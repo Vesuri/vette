@@ -76,9 +76,37 @@ table gives both so a wrong dump variant is caught rather than assumed.
 |---|---|---|---|
 | ⭐ **primary** | `97221136` — Mac II FDHD & IIx & IIcx, 256 KB | `mac2fdhd`, and the **same file** also serves `maciix` and `macse30` | `ce3b966f` |
 | ⚠ **also required** — the Mac II has **no built-in video** | Apple Macintosh Display Card 4/8, `3410801.bin`, 32 KB | romset `nb_mdc48`, selected with **`-nb9 mdc48`** | `e283da91` |
+| ⚠ **also required** — alternative to the row above, and what the **default** slot config wants | Apple Macintosh Display Card 8/24, `3410868.bin`, 32 KB | romset `nb_mdc824`, the stock `-nb9` | `57f925fa` |
+| ⛔ **also required, unavoidable** — a fixed device, not a slot card | ADB modem MCU, `342s0440-b.bin`, 1 KB | romset `adbmodem`; required by **every** Mac II-class driver (`macii`, `maciix`, `macse30`, `maciici`, …) | `cffb33eb` |
 | second choice, more period-pure | `9779D2C4` (800K v2) or `97851DB6` (800K v1) | `macii` / `maciihmu` | `4df6d054` / `8c8b9d03` |
 | QEMU fallback | `F1ACAD13` — Quadra 610/650/800 | `q800` | — |
 | deferred B&W timing ref | `4D1F8172` — MacPlus v3 | `macplus` ⚠ wants **chip-level** dumps (`342-0341-c.u6d` + `342-0342-b.u8d`, 64 KB each, byte-interleaved), so a single 128 KB file must be split into even/odd bytes. `[ASSUMED]` interleave order — verify with `-verifyroms` | `f69697e6` / `49f25913` |
+
+### Where the ROM lives, and what is still missing
+
+⭐ **The primary ROM is in place:** `ref/mame/roms/mac2fdhd/97221136.rom`, 262 144 B, CRC32
+`ce3b966f` — MAME's requirement exactly. ⚠⚠ **`/ref/` is gitignored as a whole** (not just `*.rom`):
+it is the reference loop's local-only tree — ROMs, System/game disk images, MAME `cfg`/`nvram`,
+savestates, captures. Nothing under it may ever be committed. Invoke with:
+
+```
+mame mac2fdhd -rompath ref/mame/roms -nb9 mdc48 …          # + the headless flags below
+mame mac2fdhd -rompath ref/mame/roms -verifyroms           # what is still missing
+```
+
+⛔ **The machine will NOT run yet**, and `-verifyroms` says why: the main ROM passes, but MAME wants
+two more files, both of them *device* ROMs rather than Mac ROMs, so a Mac-ROM collection does not
+contain them — they live in a MAME romset (`adbmodem.zip`, `nb_mdc48.zip` / `nb_mdc824.zip`):
+
+| file | size | CRC32 | romset | needed because |
+|---|---|---|---|---|
+| `342s0440-b.bin` | 1 024 | `cffb33eb` | `adbmodem` | fixed device in every Mac II-class driver — no way to configure it away |
+| `3410801.bin` | 32 768 | `e283da91` | `nb_mdc48` | the video card, with `-nb9 mdc48` (the 4bpp match) |
+| `3410868.bin` | 32 768 | `57f925fa` | `nb_mdc824` | the video card, if the **default** slot config is left alone instead |
+
+⚠ Only **one** of the two card ROMs is needed — whichever matches the `-nb9` in use. Until both the
+ADB ROM and one card ROM are present, MAME ends in *"Required files are missing, the machine cannot
+be run."* → `docs/open-work.md` #1.
 
 **Why `mac2fdhd` and not the others:**
 - **68020.** It is the CPU class the Color build was written for. `maciix` and `macse30` are 68030 —

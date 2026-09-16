@@ -83,3 +83,10 @@ amiga/*_probe.sh
 # mounts as an Amiga hard drive (run.sh mounts .run/dh0 + dh1), so this is a
 # global guard.
 *.uaem
+
+# --- Reference-emulator material (never commit) ------------------------------
+# ref/ holds the Macintosh reference loop's local-only inputs and state: ROM
+# images, System / game disk images, MAME cfg+nvram, savestates and captures.
+# None of it is ours to distribute.  Broad on purpose — *.rom alone would not
+# cover a .zip romset, a device ROM named *.bin, or a boot image.
+/ref/

@@ -7,8 +7,15 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — nothing else can start
 
-1. ⛔⛔ **USER INPUT NEEDED: a Mac II-class ROM image + a System install, and a game volume set up
-   past the password.** This is the *only* thing blocking the reference loop and therefore Phase 1
+1. ⛔⛔ **USER INPUT NEEDED: two small MAME device ROMs + a System install, and a game volume set up
+   past the password.** ⭐ The **main ROM is in place** — `ref/mame/roms/mac2fdhd/97221136.rom`,
+   CRC32 `ce3b966f`, accepted by `-verifyroms` (`/ref/` is gitignored whole). Still missing, and
+   `mac2fdhd` will not start without them: **`342s0440-b.bin`** (1 024 B, CRC `cffb33eb`, romset
+   `adbmodem` — a fixed device in every Mac II-class driver) and **one** video-card ROM,
+   **`3410801.bin`** (32 768 B, CRC `e283da91`, romset `nb_mdc48`, used with `-nb9 mdc48`, the 4bpp
+   match) or `3410868.bin` (CRC `57f925fa`, `nb_mdc824`, the default slot config). ⚠ These are MAME
+   *device* romsets, not Mac ROMs — a Mac-ROM collection will not have them.
+   → `docs/mac-reference-loop.md` §Where the ROM lives. This is the *only* thing blocking the reference loop and therefore Phase 1
    and Phase 2. The emulator question is **answered on tool-level evidence** — MAME 0.289 primary
    (both `macii` and `macplus`, items 1-5 verified under test, and a gdb stub that speaks m68k),
    QEMU 11.1.1 as fallback — but item **0b, "boots a real System and the game", cannot be tested
