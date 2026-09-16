@@ -371,6 +371,69 @@ result. ⭐ Inherited note that still applies: the prior ports ended up wanting 
 tools — a scriptable oracle and an interactive accurate one — and that was the right shape rather
 than indecision.
 
+## ⭐⭐ The loop DRIVES — launching the game with no window and no human
+
+```
+timeout -k 5 300 env SDL_VIDEODRIVER=dummy mame mac2fdhd -rompath ref/mame/roms -nb9 mdc48 \
+  -ramsize 8M -hard ref/mame/hd/608_2GB_drive.hd -video none -sound none -window \
+  -skip_gameinfo -nothrottle -seconds_to_run 110 -snapshot_directory ref/mame/snap \
+  -cfg_directory ref/mame/cfg -nvram_directory ref/mame/nvram \
+  -autoboot_script tools/mac_launch.lua
+```
+
+⚠ **`-cfg_directory` / `-nvram_directory` are not optional hygiene.** Without them MAME writes
+`cfg/` and `nvram/` into the current directory — that is where the **PRAM holding the 16-colour
+screen setting** lives, so it is both repo litter *and* reference state, and it was committed by
+accident once before `.gitignore` grew the entries.
+
+| script | what it is |
+|---|---|
+| `tools/mame_mac_input.lua` | the library: ADB key/mouse injection, menu pull-downs, `mac.launch()`, and state readback from low memory |
+| `tools/mac_launch.lua` | boot → Finder → launch `Color VETTE!` → snapshot every 5 s |
+| `tools/mac_probe_display.lua`, `tools/mac_probe_fb.lua` | read the display structures / dump the framebuffer + CLUT (`docs/mac-hardware.md`) |
+| `tools/mac_set_16colors.lua` | one-time Monitors setup, ending in Special ▸ Shut Down so PRAM and the volume flush |
+| `tools/fb_to_png.py` | re-render a framebuffer dump and diff it against MAME's screenshot |
+
+### ⭐ Completion is read from the Mac's own low memory, never from a screenshot
+
+`CurApName` ($910, Str31) is the frontmost application, `RawMouse` ($82C, Point v,h) is the cursor,
+`MacJmp` ($120) is non-zero when a debugger is installed. **A step that silently did nothing is
+otherwise indistinguishable from a slow one**, which is the whole reason the launch waits on
+`CurApName == "Color VETTE!"` rather than on a frame count.
+
+### Three gates the game itself imposes, each found by running it
+
+1. **32-Bit QuickDraw** — without it the game quits on launch. Installed from the game volume's own
+   `System Folder Additions`.
+2. **More than 2 MB** — "not enough memory" at MAME's 2 MB default. `-ramsize 8M`.
+3. ⭐⭐ **A 16-colour screen** — *"Please change your Monitors setting in the Control Panel to 16
+   colors."* The game stating its own 4-bitplane requirement. Set once via Monitors; it persists in
+   the volume/PRAM.
+
+### ⚠⚠ Input injection — five things that cost real time, four of them silent
+
+- ⛔ **`natkeyboard:post` types NOTHING on this driver**, with or without `in_use = true`: `macadb`
+  exposes no natural-keyboard character map, so the call returns quietly and the next step acts on
+  whatever was already selected. Type through **ioport fields** instead.
+- ⚠ **MAME names a key by BOTH its legends** — the `o` key is the field `"o  O"` (two spaces), `6`
+  is `"6  ^"`. A bare `"o"` raises "no ioport field named o", which is at least loud; the library
+  widens single characters for you.
+- ⚠⚠ **The mouse axes are 0..255 and act on the CHANGE between reads**, so *holding* a value moves
+  the cursor nowhere (measured: held 40/200/2000 for 60 frames → +0 px). Accumulate mod 256 every
+  frame. Units are not pixels — the Mac applies acceleration, measured ~0.3 px/unit and non-linear —
+  so aim **closed-loop against `RawMouse`**, never open-loop.
+- ⚠⚠ **Aim for a TOLERANCE and then SETTLE.** Demanding an exact pixel makes the cursor oscillate
+  and park in a corner; and the ADB consumes one more delta *after* the loop stops writing, so a
+  position read the instant the tolerance is met is read before the cursor has stopped. Without the
+  6-frame settle a double-click landed 17 px above the icon and the launch silently did nothing.
+- ⚠ **ADB is polled**: a 1-frame press can be missed entirely. Hold ~4 frames.
+- ⛔ **System 6's Finder has no type-select** (that is a System 7 feature), so navigation is by
+  coordinate. ⭐ Icon positions are only stable because `Special ▸ Clean Up Window` was run once —
+  `hfsutils` writes no `fdLocation`, so files copied from the host land on top of each other. After
+  a clean-up the positions live in the volume's catalog and survive reboots.
+- Mac menus are **press-drag-release**. Releasing back on the title chooses nothing, which is the
+  safe way to probe a menu's geometry (snapshot while held).
+
 ## Traps to inherit from the prior ports' reference loops
 
 All measured, all cost real time there:

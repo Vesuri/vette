@@ -164,10 +164,19 @@ and it changes **no** measurement of the kind this project takes, because they a
 
 ### Macintosh reference (MAME) — from repo root
 ```
-timeout -k 5 240 env SDL_VIDEODRIVER=dummy mame mac2fdhd -rompath ref/mame/roms -nb9 mdc48 \
-  -hard ref/mame/hd/608_2GB_drive.hd -video none -sound none -window -skip_gameinfo \
-  -nothrottle -seconds_to_run N -snapshot_directory ref/mame/snap -autoboot_script tools/mame_snap.lua
+timeout -k 5 300 env SDL_VIDEODRIVER=dummy mame mac2fdhd -rompath ref/mame/roms -nb9 mdc48 \
+  -ramsize 8M -hard ref/mame/hd/608_2GB_drive.hd -video none -sound none -window -skip_gameinfo \
+  -nothrottle -seconds_to_run N -snapshot_directory ref/mame/snap \
+  -cfg_directory ref/mame/cfg -nvram_directory ref/mame/nvram -autoboot_script tools/mac_launch.lua
 ```
+⚠ **Pass `-cfg_directory` / `-nvram_directory`** or MAME drops `cfg/` and `nvram/` — PRAM, and with
+it the 16-colour screen setting — into the repo root, where they get committed by accident.
+⭐ **`-ramsize 8M` is REQUIRED** — the game refuses to start in MAME's 2 MB default. The Lua drivers
+(`tools/mame_mac_input.lua` + a `mac_*.lua` on top) boot, launch the game and read completion from
+the Mac's own low memory; ⚠ **never sleep a guessed number of frames instead**.
+⚠⚠ **Mask handles to 24 bits (`$00FFFFFF`) when probing Mac memory** — a Mac II runs in 24-bit mode
+and a master pointer's high byte holds Memory Manager flags. An unmasked deref prints confident
+nonsense. → `docs/mac-hardware.md`.
 ⚠⚠ **`/ref/` is LOCAL ONLY, like `tmp/`** — ROMs, System/game images, MAME state, captures. Never
 commit it. ⭐ Put files on the Mac volume from the host with `hfsutils`
 (`hmount …608_2GB_drive.hd 1`, `hcopy -m` to keep BOTH forks) — not with floppy images.
