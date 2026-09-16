@@ -15,7 +15,14 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
    **`3410801.bin`** (32 768 B, CRC `e283da91`, romset `nb_mdc48`, used with `-nb9 mdc48`, the 4bpp
    match) or `3410868.bin` (CRC `57f925fa`, `nb_mdc824`, the default slot config). ⚠ These are MAME
    *device* romsets, not Mac ROMs — a Mac-ROM collection will not have them.
-   → `docs/mac-reference-loop.md` §Where the ROM lives. This is the *only* thing blocking the reference loop and therefore Phase 1
+   → `docs/mac-reference-loop.md` §Where the ROM lives.
+   ⭐ **What the System side should be:** a pre-made **bootable System 6.0.8 hard-disk image**,
+   partition-mapped, renamed `.hd`/`.hdv` (⚠ MAME rejects `.img` for `-hard`) — a persistent volume
+   is what the past-the-password requirement needs. A bootable 6.0.8 `System Tools` floppy
+   (`.dc42`) is worth having either way: it boots with no hard disk and is the cheapest first proof
+   the ROM and video card work. ⚠ Getting the game onto the volume is **ours** (a 1.4 MB `hfsutils`
+   floppy image), not something to source. → `docs/mac-reference-loop.md` §What form the System
+   install has to arrive in. This is the *only* thing blocking the reference loop and therefore Phase 1
    and Phase 2. The emulator question is **answered on tool-level evidence** — MAME 0.289 primary
    (both `macii` and `macplus`, items 1-5 verified under test, and a gdb stub that speaks m68k),
    QEMU 11.1.1 as fallback — but item **0b, "boots a real System and the game", cannot be tested

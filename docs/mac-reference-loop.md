@@ -120,6 +120,41 @@ be run."* → `docs/open-work.md` #1.
 - ⭐ **`mdc48` fits the evidence:** the 4/8 card does **4bpp**, which is exactly the 16 colours the
   eight `pltt` resources imply (`docs/source-inventory.md`).
 
+### ⭐ What form the System install has to arrive in
+
+Verified from `mame mac2fdhd -listmedia` / `-listxml`: the machine has **two 35hd Superdrives**
+(`flop1`/`flop2`, 1.4 MB), a **SCSI hard disk at id 0 by default** (`-hard`), and a CD-ROM at
+scsi:3. Accepted extensions differ per medium and that is a real trap:
+
+| medium | extensions MAME accepts | note |
+|---|---|---|
+| `flop1`/`flop2` | `.dc42`, `.img`, `.dsk`, `.ima`, `.woz`, … | ⭐ Disk Copy 4.2 (`.dc42`) is the format period images ship in |
+| `hard` | `.chd`, `.hd`, `.hdv`, `.2mg`, `.hdi` | ⚠⚠ **`.img` is NOT accepted here** — a raw hard-disk image must be renamed `.hd`/`.hdv`, or converted with `chdman` (⚠ not installed on this host) |
+
+⚠⚠ **A bootable SCSI image needs an Apple Partition Map and an HFS driver partition, not just a
+bare HFS volume.** The ROM's SCSI boot walks the partition map; a bare volume (what
+`tools/ndif2raw.py` produces — `tmp/VETTE_1_02.raw` is an 8 MB bare HFS volume) will not boot and
+will not even mount. Building one from scratch means HD SC Setup patched for a non-Apple drive,
+which is GUI work best avoided.
+
+So, in preference order:
+
+1. ⭐⭐ **A pre-made bootable System 6.0.8 hard-disk image**, partition-mapped, 40-160 MB. One file,
+   zero setup, and it is the only option that gives a *persistent* volume — which item 3 above
+   (a game install past the password) requires.
+2. ⭐ **A bootable System 6.0.8 "System Tools" floppy image** (`.dc42`, 800 KB). Useful *regardless*
+   of #1: it boots with no hard disk at all, which makes it the cheapest possible first proof that
+   the ROM and the video card work, and it doubles as a rescue disk.
+3. The full 6.0.8 **install disk set** with no pre-made HD — workable but the expensive path, because
+   it means formatting a blank SCSI volume first (see the partition-map warning above).
+
+⭐ **Getting the game onto the volume is ours to solve, not a thing to source.** `Color VETTE!`
+(~86 KB) plus `VETTE!.Data` (577 KB) fit on one 1.4 MB Superdrive image, which we can build with
+`hfsutils` from the already-extracted volume and hand to `flop1`.
+
+⚠ Useful extras, if they happen to be to hand — both are just files to drop into the System Folder,
+not installs: **MacsBug 6.2.x** (the A-trap log for capability 3) and **ResEdit 2.1.3**.
+
 **System 6.0.8** — and the reason is this project's, not nostalgia:
 
 1. ⭐⭐ **The trap inventory is only as clean as the system that patches the traps.** System 6 with
