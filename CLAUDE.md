@@ -162,6 +162,16 @@ EXTRA_ARGS="--warp_mode=1" GDBSCRIPT=x.gdb ./diag_run.sh 60   # ⭐⭐ ~4.9x fas
 and it changes **no** measurement of the kind this project takes, because they are ratios of
 *emulated* quantities.
 
+### Macintosh reference (MAME) — from repo root
+```
+timeout -k 5 240 env SDL_VIDEODRIVER=dummy mame mac2fdhd -rompath ref/mame/roms -nb9 mdc48 \
+  -hard ref/mame/hd/608_2GB_drive.hd -video none -sound none -window -skip_gameinfo \
+  -nothrottle -seconds_to_run N -snapshot_directory ref/mame/snap -autoboot_script tools/mame_snap.lua
+```
+⚠⚠ **`/ref/` is LOCAL ONLY, like `tmp/`** — ROMs, System/game images, MAME state, captures. Never
+commit it. ⭐ Put files on the Mac volume from the host with `hfsutils`
+(`hmount …608_2GB_drive.hd 1`, `hcopy -m` to keep BOTH forks) — not with floppy images.
+
 ⚠⚠ **MAME must be run with the headless recipe in `docs/mac-reference-loop.md`, never bare.**
 `-video none` alone still opens a **FULLSCREEN window** on macOS and hijacks the user's screen;
 `SDL_VIDEODRIVER=dummy` + `-window` + `-skip_gameinfo` + an external `timeout` is the verified form.
