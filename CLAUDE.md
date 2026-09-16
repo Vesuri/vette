@@ -43,10 +43,30 @@ Doing these out of order is the known-expensive failure mode, so they gate each 
 | 3 | **The seam rule is written down** before the first routine is converted | `docs/faithfulness-seam.md` |
 | 4 | **Profile an end-to-end skeleton on the real A500** before choosing what to optimise, and before setting any target | `docs/perf-method.md` |
 
-## ⛔ Blocked, and it blocks everything
+## Getting from the archive to the segments
 
-`tmp/VETTE__1.02_and_extras.sit` is **StuffIt 5** and nothing on this machine reads it (`unar`,
-`lsar`, `unstuff`, `7z` all absent). `docs/open-work.md` #1.
+Three layers, two of them needing our own code because the host reads neither. `docs/toolchain.md`
+has the detail; the commands are:
+
+```
+unar -o tmp/unpacked tmp/VETTE__1.02_and_extras.sit        # StuffIt 5  (brew install unar)
+python3 tools/ndif2raw.py "tmp/unpacked/.../VETTE!.img" tmp/VETTE_1_02.raw
+python3 tools/hfs_extract.py tmp/VETTE_1_02.raw list
+python3 tools/hfs_extract.py tmp/VETTE_1_02.raw segments "<path>/VETTE!" tmp/seg_bw
+```
+
+⚠⚠ **`VETTE!.img` is an NDIF image and its block map is in the RESOURCE FORK** (`bcem` 128). A copy
+of that file that lost its fork — moved through a non-HFS filesystem, a zip, an email — **cannot be
+converted at all**, and the loss is invisible because the data fork alone still looks like a disk
+image and its first 7 sectors even parse as a valid HFS volume header. Keep the fork.
+
+⚠ **Do not gate anything on the checksum `bcem` records.** `vers` calls it a CRC, the algorithm is
+unidentified, and the recorded value reproduces under none of the obvious candidates — so a
+mismatch is **not** a corruption signal here. Validate structurally with `hfs_extract.py` instead;
+`tools/ndif2raw.py`'s docstring says why that is the stronger proof.
+
+⭐ **There are TWO applications on the volume, B&W and Color, and they are different builds** — not
+one binary with a flag. Which one this port follows is an open decision (`PROJECT.md`).
 
 ## The source material
 
@@ -80,8 +100,13 @@ anything, and treat the inventory as a FLOOR** — Revs's looked closed after a 
 more calls were found by *running* it.
 
 ⚠ **Ghidra 12.1 has no classic-Mac resource-fork loader** (verified against this install: 68000
-processor yes, HFS+ for iOS only). Extract the `CODE` resources with our own tools and import each as
-a raw binary, `68000:BE:32:default`. `docs/toolchain.md`.
+processor yes, HFS+ for iOS only). Extract the `CODE` resources with `tools/hfs_extract.py segments`
+and import each as a raw binary, `68000:BE:32:default`. `docs/toolchain.md`.
+
+⭐ **The segments carry their original names** (`Main`, `Initialize`, `Communication`, `load`,
+`Score`, `Traffic`, `FRED`, `Intro`, `sound`, `%A5Init`) — free, authored structure of the kind
+`docs/rename.md` exists to recover by hand. Treat a name as `[INFERRED]` evidence about a segment's
+contents, not as proof.
 
 ## Build / run / debug
 
@@ -134,6 +159,7 @@ Hard-won detail lives in `docs/`, not here. **Read the relevant one BEFORE worki
 | **`docs/postmortem.md`** ⚑ | **Early, once, in full.** The retrospective this pipeline is built on, and how it maps onto a Mac 68k port |
 | `docs/phases.md` | The gating between phases, and what each phase owes |
 | **`docs/faithfulness-seam.md`** ⭐ | **Before converting, rewriting or reimplementing ANY routine.** The three-way choice this port has and the prior ports did not |
+| **`docs/source-inventory.md`** ⭐⭐ | **What is actually in the shipped game** — the 11 named `CODE` segments, the 23 data types, the 160 objects. Read it before estimating anything |
 | **`docs/mac-reference-loop.md`** ⭐ | Anything about ground truth, or before trusting a claim about what the original does |
 | **`docs/mac-hardware.md`** | Touching the trap layer, the display, input or sound. ⚠ Mostly `[ASSUMED]` — replace rows, don't build on them |
 | `docs/toolchain.md` | Running the pipeline: resource/segment tools, Ghidra headless, the builds |

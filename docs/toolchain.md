@@ -11,9 +11,10 @@ ground-truth-loop choice and PROJECT.md §Open decisions for the rest. Do not re
 
 ```
 VETTE__1.02_and_extras.sit                       (tmp/, local only, never committed)
-  └─ unpack (StuffIt 5) ──► the application's DATA + RESOURCE forks
-        └─ tools/rsrc_map.py  ──► the resource catalogue (type, id, name, size)
-        └─ tools/code_load.py ──► disasm/code/CODE_NNNN.bin + the jump table from CODE 0
+  └─ unar ─────────────────────► VETTE!.img + the extras (manual, map, key chart)
+        └─ tools/ndif2raw.py ──► VETTE_1_02.raw    NDIF -> raw; block map is in the RESOURCE FORK
+              └─ tools/hfs_extract.py list|extract|resources|segments
+                    ──► CODE_NN_<name>.bin, one file per segment, + the jump table from CODE 0
               └─ Ghidra headless (ghidra_scripts/) ──► disasm/listing.txt, xrefs, TRAP map
                     └─ disasm/symbols.csv  ◄── curated, grows over time (addr → name/type/note)
                           └─ src/mac/     the Toolbox/OS trap layer (the hardware boundary)
@@ -36,8 +37,9 @@ port.
 | FS-UAE + `m68k-amiga-elf-gdb` | `~/.local/fs-uae` (same `env.sh`) | Amiga measurement loop | ✅ |
 | Kickstart 3.1 | `$KICKSTART` (`~/Documents/RetroPie/BIOS/kick31.rom`) | FS-UAE boot | ✅ |
 | Ghidra 12.1 + JDK 21 | `tools/ghidra` → `~/.local/share/ghidra` | disassembly | ✅ |
-| **a StuffIt 5 unpacker** | — | open the source archive — ⚠ **BLOCKING: nothing on this machine reads it** | ❓ |
-| **a resource-fork reader** | — | `CODE`/`PICT`/`snd ` extraction | ❓ |
+| `unar` / `lsar` 1.10.7 | `brew install unar` | the StuffIt 5 archive — **the only tool that reads SIT5** | ✅ |
+| `tools/ndif2raw.py` | ours | NDIF disk image → raw sectors (nothing off the shelf does this) | ✅ |
+| `tools/hfs_extract.py` | ours | read the HFS volume; extract forks; `CODE`/`PICT`/`snd ` resources | ✅ |
 | **a Macintosh emulator** | — | the ground-truth reference loop (`docs/mac-reference-loop.md`) | ❓ |
 
 `tools/ghidra` is a **symlink to the shared install at `~/.local/share/ghidra`** — the same one the
@@ -59,6 +61,75 @@ export PATH="$JAVA_HOME/bin:$PATH"
 > ⚠ **Verify a fresh Ghidra extraction has `support/analyzeHeadless` before trusting it.** A pruned
 > copy silently breaks headless use while looking like a normal install at a glance.
 
+## ⭐ From the archive to the segments — three nested layers, and two need our own code
+
+Verified end to end on this machine. Each layer defeats a *different* tool, which is why this is
+written down rather than left as "just unpack it".
+
+```sh
+brew install unar                                              # once
+unar -o tmp/unpacked tmp/VETTE__1.02_and_extras.sit
+python3 tools/ndif2raw.py "tmp/unpacked/VETTE! 1.02 Folder-1/VETTE!.img" tmp/VETTE_1_02.raw
+python3 tools/hfs_extract.py tmp/VETTE_1_02.raw list
+python3 tools/hfs_extract.py tmp/VETTE_1_02.raw segments \
+        "VETTE!/VETTE! Folder/(Folder) B&W VETTE!/VETTE!" tmp/seg_bw
+```
+
+**1. StuffIt 5 → `unar`, and there is no second option.** `7z`/p7zip handles no SIT at all; the
+`macutils` `macunpack` lineage stops at StuffIt 1.5.1; Aladdin's own StuffIt Expander was 32-bit and
+cannot run on a 64-bit-only macOS. `unar` (the XADMaster engine behind The Unarchiver) is the only
+maintained SIT5 implementation, and it also **preserves the resource fork**, which layer 2 needs.
+⭐ It verifies StuffIt's per-file CRC16 and prints `OK` per entry — so its `OK` is a real check, not
+a "no exception was thrown". Trust it, and note the archive *declares* each entry's size, which is
+how a suspicious-looking size can be cleared without a second extractor.
+
+**2. `VETTE!.img` is NDIF (Disk Copy 6.x), and nothing on the host reads it.** `hdiutil imageinfo`,
+`convert` and `attach` all answer `image not recognised` — Apple dropped NDIF. `unar` does not parse
+it either (`Couldn't recognize the archive format`). `dmg2img` and `libdmg-hfsplus` are UDIF-only.
+Hence `tools/ndif2raw.py`.
+
+⚠⚠ **The block map is in the image's RESOURCE FORK, as `bcem` 128.** A copy that lost its fork
+cannot be converted, and the loss looks like nothing: the data fork's first 7 sectors are stored
+**raw**, so `file` still says `Macintosh HFS data ... volume name: VETTE!` and the MDB parses
+perfectly — while everything after it is undecodable compressed chunks. **The convincing part is
+the part that survives.** (This cost a detour here: the MDB's own geometry said 8 241 152 bytes
+against a 1 867 894-byte file, which reads exactly like a truncated extraction.)
+
+`bcem` layout, `[DERIVED]` by inspection and confirmed by the result:
+
+| off | field |
+|---|---|
+| 0 | version (`0x000B` here) |
+| 4 | volume name, `Str63` |
+| 68 | total sectors (uint32; ×512 = image size) |
+| 80 | checksum — see the warning below |
+| 124 | chunk count (uint32) |
+| 128 | chunk entries, 12 bytes each |
+
+Each entry is `uint32 (startSector << 8) | type`, `uint32 offsetInDataFork`, `uint32 length`.
+Types seen: **`0x02` stored raw**, **`0x83` ADC** (Apple Data Compression — byte-oriented LZSS,
+three opcodes; ~15 lines). Entries with `length == 0` are free-space/terminator entries and are
+skipped; sectors no chunk covers are zero filled. An **unknown type aborts loudly** rather than
+leaving a hole, per CLAUDE.md.
+
+⚠ **Do not gate anything on the `bcem` checksum.** `vers` labels it `CRC: $0580C874`; the Disk Copy
+add-then-rotate-right over big-endian words, its byte / 32-bit / little-endian variants, and CRC-32
+all disagree. The algorithm is unidentified, so **a mismatch is not a corruption signal.** Note also
+that a whole zero sector is a *no-op* for the add-then-ROR family (256 rotations is the identity on
+32 bits), so that family could not distinguish our zero fill from the original free space anyway.
+
+⭐ **Validate structurally instead** — it is the stronger proof and `hfs_extract.py` does it as a
+side effect. Here five independent structures agreed: the MDB, both B-trees (the extents header node
+decoded with `nodeSize=512, maxKeyLen=7`), the catalog's 4 directories and 12 files, every file's
+extents lying inside the image, and both applications' resource maps parsing with 68000 prologues
+(`4E56 0000` = `LINK A6,#0`) and readable segment names. Wrong decompression cannot produce that.
+Independently, the covered sector count agreed with the volume's own `drFreeBks`.
+
+**3. HFS-standard volumes cannot be mounted on macOS** (support was removed in 10.15), so
+`tools/hfs_extract.py` reads the MDB, the catalog and extents B-trees, and the extents-overflow tree
+directly. It **fails loudly on a short fork** rather than returning one, because a truncated
+resource fork still parses as a merely-odd resource map.
+
 ## ⚠⚠ Ghidra has NO classic-Mac resource-fork loader — verified, not assumed
 
 Checked against this install (12.1): the processor list has `68000`, and the file-format module has
@@ -67,7 +138,7 @@ HFS. So there is no "import the application and get its segments" path.
 
 ⇒ **Extract the `CODE` resources ourselves and import each as a raw binary** with processor
 `68000:BE:32:default`, exactly the pattern both prior ports used (`xex_load.py`, `ssd_load.py`).
-That is `tools/code_load.py`'s job. The upside is that the extraction is ours and scriptable; the
+That is `tools/hfs_extract.py segments`'s job. The upside is that the extraction is ours and scriptable; the
 cost is that **segment relocation and the jump table are our problem** — see below.
 
 ## ⭐ What makes a Mac application different from the prior two binaries

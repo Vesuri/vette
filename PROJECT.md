@@ -55,35 +55,68 @@ how much else depends on them.
 2. ⭐ **The reference emulator.** `docs/mac-reference-loop.md` §Candidates, evaluated against the
    capability list there rather than on accuracy reputation. The capability that decides it is
    scripted breakpoints + register reads, because that is what makes the trap inventory possible.
-3. ⭐ **The display architecture.** 512×342 **1-bit** at ~60 Hz, onto a PAL planar Amiga at 50 Hz.
+3. ⭐ **Which build: B&W `VETTE!` or `Color VETTE!`?** Two separate applications, same 11 named
+   segments, code within 5% either way, and — verified — **the same 231 game-data resources,
+   byte for byte**. So this picks an application, not a data set, and almost the whole ~1 MB
+   difference is 192 `PICT` in colour rather than 1-bit. It ties directly to #4: 1bpp is a genuine
+   *advantage* on the Amiga, and the B&W build is the one that already assumes it. ⚠ Settle it
+   before `disasm/symbols.csv` has a single row, because every address is `(segment, offset)` **in
+   one specific build**. → `docs/source-inventory.md`.
+4. ⭐ **The display architecture.** 512×342 **1-bit** at ~60 Hz, onto a PAL planar Amiga at 50 Hz.
    Every part of that is a decision: the width (512 is not a free Amiga mode), the height (342 vs
    256 lines), the depth (1bpp is cheap — a genuine *advantage* over both prior ports), and the
    17% timing difference. → `docs/mac-hardware.md` question 5, and it is properly answerable only
    once the sweep says what the game draws with.
-4. **Machine target.** RoF needed 1 MB and did not fit a bare 512 KB A500. Unknown here and not
+5. **Machine target.** RoF needed 1 MB and did not fit a bare 512 KB A500. Unknown here and not
    guessable: it depends on whether the original segments stay resident and on how the display is
    arranged. **Decide when the first real measurement exists, not before.**
-5. **Performance target.** Deliberately not set. → `docs/perf-method.md` §The target. ⭐ Unlike both
+6. **Performance target.** Deliberately not set. → `docs/perf-method.md` §The target. ⭐ Unlike both
    prior ports there is a real reference: the Mac Plus's 7.83 MHz 68000 is within 12% of the A500's
    7.09 MHz, so the original's own framerate under the reference loop is a meaningful yardstick.
    Set the target from that plus a Phase 4 profile.
-6. **Host build: does it exist, and what for?** RoF had an SDL backend and its approximation cost
+7. **Host build: does it exist, and what for?** RoF had an SDL backend and its approximation cost
    real time; Revs deliberately had **no renderer** and used the host only for differentials.
    ⚠ This port's differentials are different again (there is no transliteration oracle), so the
    question is open rather than answered by either precedent.
 
+⚠ `docs/mac-hardware.md` question 5 is referenced by #4 above; the numbering here shifted when the
+build choice was added, so trust the titles rather than any number quoted elsewhere.
+
 ## The source material
 
 `tmp/VETTE__1.02_and_extras.sit` — the 1.02 release plus extras, 10.3 MB, **StuffIt 5**
-(`StuffIt (c)1997-2002 Aladdin Systems`).
+(`StuffIt (c)1997-2002 Aladdin Systems`). Opened with `unar`; three nested layers, see
+`docs/toolchain.md` §From the archive to the segments.
 
-⛔⛔ **BLOCKING: nothing on this machine can open it.** `unar`, `lsar`, `unstuff` and `7z` are all
-absent. Everything downstream of "look at the binary" is blocked on this —
-`docs/open-work.md` #1.
+Inside: an **8049 KiB HFS volume** as an NDIF image, plus the extras — `scans/Manual.pdf` (5.2 MB),
+`Map.jpg`, `MapInfo_1/2.jpg`, `KeyChart.jpg`, `Package.pdf`, and `web_docs/cheats.txt`. ⭐ Worth
+reading *before* the binary; RoF's `docs/manual.md` earned its place. ⚠ `readme.txt` says the build
+asks for a copy-protection password **once, on first run**, and the answers are in the first pages of
+`Manual.pdf` — so a reference-loop image must be set up past that, and a fresh one will stop there.
 
-Unexamined, therefore unknown: which Mac the 1.02 build requires, what the "extras" are (a manual is
-likely, and worth reading *before* the binary — RoF's `docs/manual.md` earned its place), and the
-resource inventory.
+On the volume, `VETTE! Folder/` holds **two separate builds**:
+
+| | code | data | notes |
+|---|---|---|---|
+| `(Folder) B&W VETTE!/VETTE!` | `APPL`/`VETT`, 523 089 B rsrc, **11 `CODE`, 124 554 B** | `VETTE!.Data` `DATA`/`VETT`, 577 498 B | plus `Start VETTE!` (`APPL`/`SVET`, 3 393 B) |
+| `(Folder) Color VETTE!/Color VETTE!` | `APPL`/`VETT`, 1 587 389 B rsrc, **11 `CODE`, 118 892 B** | its own 577 498 B `VETTE!.Data` | adds `pltt` ×8, `wctb`, 8 `WIND` |
+
+⭐ **Same 11 named segments in both** — `Main`, `Initialize`, `Communication`, `load`, `Score`,
+`Traffic`, `FRED`, `Intro`, `sound`, `%A5Init`, over `CODE 0`'s jump table — and the *code* is
+roughly the same size. Almost all of the Color build's extra megabyte is `PICT` (192 resources in
+both, colour versus 1-bit). So the two differ mainly in artwork and the colour Toolbox calls, and
+**net of `CODE 0` (4 072 B, the jump table) and `%A5Init` (28 664 B, the MPW globals initialiser)
+the B&W game is ~91.8 KB of 68000 code.** That is the actual size of the thing being ported.
+
+⭐⭐ **Both `VETTE!.Data` forks hold the same 231 resources, all byte-for-byte identical** (checked
+pairwise; the forks' own hashes differ only in resource-map layout). The game data is
+build-independent. And the data is **self-describing** — 23 four-character types with named
+resources: `Sine Table 360`, `Bogas Driver v2.1`, 160 named 3D objects, the eight cars, the courses,
+`Protect`. ⇒ **`docs/source-inventory.md`**, which is where all of that lives and which corrects a
+documented assumption about audio.
+
+⚠ Everything in that inventory is `[INFERRED]` from types, names and sizes; nothing has been
+disassembled or run, and which Mac 1.02 requires is still unknown.
 
 ⚠ **Kept local, never committed**, and the `.gitignore` is deliberately broad about it: a Mac
 application arrives as a `.sit`, then a MacBinary/BinHex file, then a data fork plus a resource fork,
@@ -95,9 +128,10 @@ prevent.
 
 ```
 VETTE__1.02_and_extras.sit
-  └─ unpack ──► the application's data + resource forks
-        └─ tools/rsrc_map.py   ──► the resource catalogue
-        └─ tools/code_load.py  ──► disasm/code/CODE_NNNN.bin + the CODE 0 jump table
+  └─ unar ──────────────────► VETTE!.img          (NDIF, block map in its RESOURCE FORK)
+        └─ tools/ndif2raw.py  ──► VETTE_1_02.raw  (8049 KiB raw HFS; ADC-decompressed)
+              └─ tools/hfs_extract.py             (list / extract / resources / segments)
+        └─ tools/hfs_extract.py segments ──► CODE_NN_<name>.bin + the CODE 0 jump table
               └─ Ghidra headless (68000:BE:32) ──► disasm/listing.txt, the TRAP map, the A5 map
                     └─ disasm/symbols.csv  ◄── curated, grows over time
                           └─ src/mac/       the Toolbox/OS trap layer  ⭐ the centre of gravity

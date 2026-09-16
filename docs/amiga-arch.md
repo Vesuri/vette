@@ -95,12 +95,21 @@ library open/close stay outside.
 Deliberately **not** used: the framework's `Production`/`Part`/`Script`/`ProductionRunner`
 timeline, and its `ModulePlayer` / TrackerPacker replay.
 
-**Audio: undecided, and structurally different from both prior ports.** Neither of them had OS audio
-to reproduce in the same sense — RoF drove POKEY directly, Revs reached the SN76489 only through the
-MOS sound scheduler (so `src/platform/sound.c` reproduced the *scheduler*). Vette's original drives
-the **Mac Sound Manager / the Sound Driver**, which is a sampled-audio path, not a tone-generator
-one — so the Amiga side is a Paula sample player, and the faithful surface to reproduce is whatever
-the game asks the Mac for. Settle it when the trap sweep says which calls it makes.
+**Audio: undecided, but LESS unlike Revs than this doc first claimed.**
+
+⚠⚠ **CORRECTED.** This section originally said Vette's original drives the Mac Sound Manager / Sound
+Driver directly, making it structurally unlike both prior ports (RoF drove POKEY directly; Revs
+reached the SN76489 only through the MOS sound scheduler, so `src/platform/sound.c` reproduced the
+*scheduler*). The resource inventory says otherwise: `VETTE!.Data` ships **`BGAS 128
+"Bogas Driver v2.1"`** plus 16 named `INST` samples — 72% of the whole data file — and the `sound`
+code segment is **732 bytes in both builds**.
+
+So `[INFERRED]` the game talks to a **third-party sampled-instrument driver shipped in its own
+data**, which makes this **the Revs shape after all**: reproduce the *driver's* interface, with a
+Paula sample player underneath, rather than reproduce a Toolbox manager. ⭐ The upside is that the
+surface is enumerable from one 15 KB resource instead of from a trap sweep.
+⚠ Still inference from names and sizes — disassemble `sound` and identify the driver interface before
+building on it. → `docs/source-inventory.md` §Audio.
 ⚠ Inherited placement rule that will apply whatever the backend is: audio work goes **AFTER** the
 copper work in the handler, because a Paula DMA restart busy-waits on the beam and nothing that
 waits on the beam may precede the copper writes.
