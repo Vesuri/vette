@@ -120,6 +120,40 @@ be run."* → `docs/open-work.md` #1.
 - ⭐ **`mdc48` fits the evidence:** the 4/8 card does **4bpp**, which is exactly the 16 colours the
   eight `pltt` resources imply (`docs/source-inventory.md`).
 
+### ⭐⭐ The ROM side is CLOSED — `mac2fdhd` runs headlessly and asks for a boot disk
+
+`ref/mame/roms/` now holds all four files MAME wants, all four CRC32s matching:
+
+| file | romset dir | size | CRC32 |
+|---|---|---|---|
+| `97221136.rom` | `mac2fdhd/` | 262 144 | `ce3b966f` |
+| `3410801.bin` | `nb_mdc48/` | 32 768 | `e283da91` |
+| `3410868.bin` | `nb_mdc824/` | 32 768 | `57f925fa` |
+| `342s0440-b.bin` | `adbmodem/` | 1 024 | `cffb33eb` |
+
+`mame mac2fdhd -rompath ref/mame/roms -verifyroms` → **"romset mac2fdhd is good"**.
+⚠ `-verifyroms` rejects `-nb9` ("unknown option"), so the card choice can only be verified by
+running; the stock `mdc824` is what `-verifyroms` checks.
+
+**What a run proves so far** (`-nb9 mdc48`, 27 s emulated, ~1 050% of real time): the ROM starts,
+initialises the display card at **640×480**, draws the desktop grey pattern and the arrow cursor,
+and by ~25 s in shows the **blinking floppy icon** — i.e. it is hunting for a boot device and
+finding none. ⭐ Everything *below* the System is therefore working; capability **0b** is down to
+the System install alone.
+
+```
+timeout -k 5 180 env SDL_VIDEODRIVER=dummy \
+  mame mac2fdhd -rompath ref/mame/roms -nb9 mdc48 \
+    -video none -sound none -window -skip_gameinfo -nothrottle \
+    -seconds_to_run 27 -snapshot_directory ref/mame/snap \
+    -autoboot_script tools/mame_snap.lua
+```
+
+⚠ **MAME writes no screenshot when `-seconds_to_run` expires**, so a headless run that is meant to
+prove something needs `tools/mame_snap.lua` (`VETTE_SNAP_FRAMES=900,1500`, frame counts in
+*emulated* 60 Hz fields — reproducible across host speeds, same reasoning as FS-UAE's warp mode).
+Captures land in `ref/mame/snap/<machine>/` and are gitignored with the rest of `/ref/`.
+
 ### ⭐ What form the System install has to arrive in
 
 Verified from `mame mac2fdhd -listmedia` / `-listxml`: the machine has **two 35hd Superdrives**

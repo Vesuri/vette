@@ -7,33 +7,23 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — nothing else can start
 
-1. ⛔⛔ **USER INPUT NEEDED: two small MAME device ROMs + a System install, and a game volume set up
-   past the password.** ⭐ The **main ROM is in place** — `ref/mame/roms/mac2fdhd/97221136.rom`,
-   CRC32 `ce3b966f`, accepted by `-verifyroms` (`/ref/` is gitignored whole). Still missing, and
-   `mac2fdhd` will not start without them: **`342s0440-b.bin`** (1 024 B, CRC `cffb33eb`, romset
-   `adbmodem` — a fixed device in every Mac II-class driver) and **one** video-card ROM,
-   **`3410801.bin`** (32 768 B, CRC `e283da91`, romset `nb_mdc48`, used with `-nb9 mdc48`, the 4bpp
-   match) or `3410868.bin` (CRC `57f925fa`, `nb_mdc824`, the default slot config). ⚠ These are MAME
-   *device* romsets, not Mac ROMs — a Mac-ROM collection will not have them.
-   → `docs/mac-reference-loop.md` §Where the ROM lives.
-   ⭐ **What the System side should be:** a pre-made **bootable System 6.0.8 hard-disk image**,
-   partition-mapped, renamed `.hd`/`.hdv` (⚠ MAME rejects `.img` for `-hard`) — a persistent volume
-   is what the past-the-password requirement needs. A bootable 6.0.8 `System Tools` floppy
-   (`.dc42`) is worth having either way: it boots with no hard disk and is the cheapest first proof
-   the ROM and video card work. ⚠ Getting the game onto the volume is **ours** (a 1.4 MB `hfsutils`
-   floppy image), not something to source. → `docs/mac-reference-loop.md` §What form the System
-   install has to arrive in. This is the *only* thing blocking the reference loop and therefore Phase 1
-   and Phase 2. The emulator question is **answered on tool-level evidence** — MAME 0.289 primary
-   (both `macii` and `macplus`, items 1-5 verified under test, and a gdb stub that speaks m68k),
-   QEMU 11.1.1 as fallback — but item **0b, "boots a real System and the game", cannot be tested
-   without the ROM**, and it is the only item that matters for ground truth.
-   → `docs/mac-reference-loop.md` §The dependency that gates every candidate.
-   ⚠ Not ours to source or distribute, and nothing about it may land in this repo. ⚠ New constraint from the archive: the build asks for a copy-protection
-   password **once, on first run** (answers in `Manual.pdf`'s first pages), so the chosen emulator
-   must be able to keep a *post-registration* volume — a throwaway image stops at the prompt every
-   time, and that turns the reference loop into a manual chore exactly where it needs to be cheap.
-   ⚠ The port patches the protection out (#17) but **ground truth does not** — the reference loop
-   runs the original, so this constraint stands on its own and is not retired by that decision.
+1. ⛔⛔ **USER INPUT NEEDED: a System 6.0.8 install, and a game volume set up past the password.**
+   The last thing blocking the reference loop, and therefore Phase 1 and Phase 2.
+   ⭐ **The ROM side is closed:** all four required files are in `ref/mame/roms/` (gitignored whole),
+   `-verifyroms` says *"romset mac2fdhd is good"*, and a headless 27 s run initialises the `mdc48`
+   card at 640×480 and reaches the **blinking boot-disk icon** — everything below the System works.
+   **Wanted, in preference order:** (a) a pre-made **bootable System 6.0.8 hard-disk image**,
+   partition-mapped, renamed `.hd`/`.hdv` (⚠ MAME rejects `.img` for `-hard`; a bare HFS volume will
+   not boot — the ROM walks an Apple Partition Map); (b) a bootable 6.0.8 **`System Tools` floppy**
+   (`.dc42`), which boots with no hard disk at all; (c) the full install set, the slow path.
+   ⚠ Only (a) gives the *persistent* volume the past-the-password requirement needs, because the
+   shipped build asks once on first run (`readme.txt`) and a throwaway image re-asks every time —
+   exactly where ground truth has to be cheap. ⚠ The port patches the protection out (#17) but
+   **ground truth does not**, so that constraint is not retired by the patch decision.
+   ⚠ Getting the game onto the volume is **ours** (a 1.4 MB `hfsutils` floppy image: the app is
+   ~86 KB, `VETTE!.Data` 577 KB), not something to source. Nice-to-have, both plain System Folder
+   files: **MacsBug 6.2.x** (the A-trap log for capability 3) and ResEdit 2.1.3.
+   → `docs/mac-reference-loop.md` §What form the System install has to arrive in.
 
 ## Phase 0 — scaffolding (see `docs/phases.md`)
 
