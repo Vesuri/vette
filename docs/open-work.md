@@ -7,8 +7,14 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — nothing else can start
 
-1. **Pick the reference-loop emulator.** → `docs/mac-reference-loop.md` §Candidates. Gates Phase 1,
-   which gates Phase 2. ⚠ New constraint from the archive: the build asks for a copy-protection
+1. ⛔⛔ **USER INPUT NEEDED: a Mac II-class ROM image + a System install, and a game volume set up
+   past the password.** This is the *only* thing blocking the reference loop and therefore Phase 1
+   and Phase 2. The emulator question is **answered on tool-level evidence** — MAME 0.289 primary
+   (both `macii` and `macplus`, items 1-5 verified under test, and a gdb stub that speaks m68k),
+   QEMU 11.1.1 as fallback — but item **0b, "boots a real System and the game", cannot be tested
+   without the ROM**, and it is the only item that matters for ground truth.
+   → `docs/mac-reference-loop.md` §The dependency that gates every candidate.
+   ⚠ Not ours to source or distribute, and nothing about it may land in this repo. ⚠ New constraint from the archive: the build asks for a copy-protection
    password **once, on first run** (answers in `Manual.pdf`'s first pages), so the chosen emulator
    must be able to keep a *post-registration* volume — a throwaway image stops at the prompt every
    time, and that turns the reference loop into a manual chore exactly where it needs to be cheap.

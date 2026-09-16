@@ -10,12 +10,18 @@
 
 ## Why this loop matters MORE here than in either prior port
 
-- **The Mac Plus is a 7.83 MHz 68000 and the A500 is 7.09 MHz.** For the first time there is a real
-  *performance* reference, not just a behavioural one: the same instructions ran ~12% faster on the
-  original machine. That makes a large Amiga shortfall **diagnosable** — it is the port's seam, the
-  display conversion or the trap layer, not "the algorithm" — which is a lever neither prior port
-  had. ⚠ It does not make a Mac number an Amiga measurement (`docs/perf-method.md` §The target
-  machine).
+- ⚠⚠ **CORRECTED — the performance-reference argument does NOT survive the build choice.** This
+  bullet used to read: *"the Mac Plus is a 7.83 MHz 68000 and the A500 is 7.09 MHz, so the same
+  instructions ran ~12% faster on the original machine"*, making a large Amiga shortfall diagnosable
+  — a lever neither prior port had. **That reasoning applies to the B&W build only.** The port
+  follows `Color VETTE!`, which needs Color QuickDraw, which `[INFERRED]` means a **Mac II-class
+  machine: a 16 MHz 68020 on a 32-bit bus**. That is a different class of machine from an A500, so
+  **the Color build's framerate is not an A500 yardstick and must never be quoted as one.**
+  ⭐ The lever is recoverable but costs a second machine, because the two builds share
+  byte-identical data and the same 11 named segments: run **B&W on an accurate Mac Plus for timing**
+  and **Color on a Mac II for pixels and traps**. ⚠ Deferred by decision — behaviour first; revisit
+  only if an Amiga shortfall actually needs diagnosing (`docs/open-work.md`). Until then this
+  project has **no** performance reference, which is the same position both prior ports were in.
 - **The trap surface is an inventory we cannot close statically.** Revs's MOS layer was proven a
   *floor* by running it — three calls were found that way. A Mac game's surface is an order of
   magnitude larger, so "run it and watch what it asks for" is not a nice-to-have, it is how the
@@ -46,21 +52,109 @@ judged against this list, not against its accuracy reputation alone.**
 only in a GUI. Revs's postmortem chose jsbeeb over b2 largely on this: b2's HTTP API had
 peek/poke/reset/run/mount/paste but breakpoints and registers appeared GUI-only.
 
-## Candidates — NOT YET EVALUATED
+## ⛔ The dependency that gates every candidate: ROMs and system software
 
-Listed with what to check, so the evaluation is a measurement and not a preference. None is
-installed on this machine.
+⚠⚠ **No emulator here can be evaluated end to end without them, and this repo cannot contain them.**
+Every candidate needs:
+
+1. **A ROM image for the emulated machine** — a Mac II-class ROM for the Color build (`macii`,
+   `mac2fdhd`, Basilisk II) or a Quadra 800 ROM for QEMU's `q800`. ⚠ QEMU's `q800` can boot Linux
+   with `-kernel` and no ROM, so *a working `q800`* is **not** evidence it will boot Mac OS.
+2. **A System install** — System 6.0.x or 7.x, on a disk image the emulator can mount.
+3. **A volume with the game installed and PAST the password**, because the shipped build asks once on
+   first run (`readme.txt`). A throwaway image re-asks every time, which is exactly where ground
+   truth needs to be cheap.
+
+⭐ The tool-level capabilities **can** be evaluated without any of this (does the driver exist, does
+the Lua API expose watchpoints, does the gdb stub attach, does `screendump` work), and that is what
+the evaluation below does first. ⚠ Keep the two apart in the write-up: *"MAME exposes watchpoints"*
+and *"MAME boots this game"* are different claims, and only the first is cheap.
+
+## ⭐ The evaluation — a checklist, run against both, recorded as a measurement
+
+Decided: **install both MAME and QEMU and choose on evidence**, not on preference. Fill this in as it
+is run; an empty cell is an unanswered question, not a pass.
+
+Installed and evaluated: **MAME 0.289** and **QEMU 11.1.1** (both `brew install`). ⚠ Every row below
+is a *tool-level* result — see §0b for the one thing neither can do yet.
+
+| # | Capability | MAME 0.289 | QEMU 11.1.1 |
+|---|---|---|---|
+| 0a | the machine exists | ✅ **both target classes in one tool**: `macii`, `mac2fdhd`, `maciix`, `maciici`, … **and** `macplus` (plus Quadra 605-800) | ⚠ `q800` only — Quadra 800, 68040 |
+| 0b | ⛔ boots a real System **and the game** | **BLOCKED — ROMs + System, see above** | **BLOCKED — same** |
+| 1 | headless + scripted | ✅ verified end to end, exit 0, no window, 71 154% speed (`apexc`) — ⚠ recipe below, it is not just `-video none` | ✅ `-display none -qmp stdio -S` |
+| 2 | framebuffer dump at a named moment | ✅ `machine.video:snapshot()` **called successfully**; `emu.add_machine_frame_notifier` present, so "at this PC" = snapshot from a breakpoint callback | ✅ QMP `screendump` (also `human-monitor-command`) |
+| 3 | ⭐⭐ breakpoints + registers + step | ✅ `debugger:command("bpset …")` **ACCEPTED**; `cpu.state["PC"].value` **read a register**; needs `-debug`, and `-debugger none` keeps it headless | ✅ gdb stub **attached and read `pc`/`sr`/`d0`** (⚠ `a7` is spelled `sp`; gdb warns *"Architecture rejected target-supplied description"* and works anyway) |
+| 4 | scriptable memory peek/poke | ✅ `cpu.spaces["program"]:read_u8()` **returned a value** | ✅ gdb `x`, plus QMP `pmemsave`/`memsave` |
+| 5 | ⭐ watchpoint attributing a store to its PC | ✅ `debugger:command("wpset 0,1,w")` **ACCEPTED** | ⚠ gdb watchpoints expected but **not tested** |
+| 6 | deterministic scripted input | ⚠ `machine.ioport` and save states present, **injection not tested** | ⚠ would need QMP input events, **not tested** |
+| 7 | cycle counts | ⚠ available via the debugger, **not tested** | ⛔ no |
+
+⭐⭐ **Unexpected finding, and it changes the trade-off: MAME has a gdb stub that speaks m68k.**
+`-debugger gdbstub` with `-debugger_host`/`-debugger_port`, and the binary carries
+`org.gnu.gdb.m68k.core` among its target descriptions. So the "QEMU gives us the `amiga/debug.sh`
+idiom" argument is **not exclusive to QEMU** — MAME can offer the same gdb-driven workflow *and* the
+right machine class. ⚠ `[DERIVED]` from the target-description strings and the option surface, **not
+from a live 68k attach** — that needs the ROMs. Test it before depending on it.
+
+### ⚠⚠ Running MAME headlessly — four things that cost real time here
+
+**`-video none` is NOT enough. On macOS it still opens a FULLSCREEN window** (defaults are
+`window 0`, `video auto`), which hijacks the user's screen. The verified recipe:
+
+```
+timeout -k 5 60 env SDL_VIDEODRIVER=dummy \
+  mame <system> -video none -sound none -window -skip_gameinfo \
+               -seconds_to_run <n> -nothrottle -autoboot_script <script.lua>
+```
+
+- **`SDL_VIDEODRIVER=dummy` is the part that actually prevents a window.** `-window` is a belt-and-braces
+  fallback so that anything that does appear is not fullscreen.
+- **`-skip_gameinfo`, always.** The game-info screen waits for a keypress that never comes headless,
+  and the symptom is a black window and an infinite hang — indistinguishable from a wedged emulator.
+- **`-seconds_to_run` cannot fire on a machine with no CPU.** `___empty` hangs forever for exactly
+  this reason, which makes it the wrong vehicle for an API check. ⭐ **`apexc` is ROM-free, has a CPU
+  and needs no media** — use it for tool-level checks. (`a2600` demands a cartridge; `vgmplay`,
+  `alto2`, `705*prg` all need ROMs.)
+- **Wrap every run in an external `timeout`**, and ⚠⚠ **kill only the pid you started** — the
+  `pkill` prohibition in CLAUDE.md applies here for the same reason it applies to FS-UAE.
+
+⭐⭐ **Check `MacsBug` inside the guest as a separate instrument, whichever emulator wins.** Its
+`atb`/`atr` commands break on and *record* A-line traps by name — item 3, purpose-built for the one
+inventory this project most needs, and independent of the host emulator's own debugger. If it works,
+the emulator's debugger matters mainly for items 2 and 5.
+
+## Candidates — the shortlist the evaluation runs against
+
+⚠ Listed with what to check, so the evaluation is a measurement and not a preference. **The Color
+build needs Color QuickDraw, so a Mac Plus-only emulator cannot run the ported build at all** — that
+demotes Mini vMac and PCE from oracle to (potential) timing reference.
 
 | Candidate | Machine | Why it might be the oracle | What to verify first |
 |---|---|---|---|
 | **MAME** (`macplus`, `macse`, …) | the real target | Full Lua-scriptable debugger with breakpoints, registers, single-step and watchpoints, and genuinely headless (`-video none`). This is the shape of instrument the capability list above describes, and Revs kept MAME "in reserve" only because its BBC accuracy was less trusted than the dedicated emulators. **For the Mac there is no comparably-accurate dedicated emulator with a scripting surface**, which inverts that reasoning. | That the Mac drivers boot a real System + the game at all; the Lua API's watchpoint and framebuffer-dump surface |
-| **Mini vMac** | Mac Plus, very accurate | The closest thing to a "dedicated, trusted" emulator for this exact machine, and it has a debug/`dbglog` build | Whether anything resembling scripted breakpoints/registers exists outside the GUI. If not, it is a **visual** reference only — still useful, but it cannot do item 3 |
+| **Mini vMac** | Mac Plus, very accurate | The closest thing to a "dedicated, trusted" emulator for this exact machine, and it has a debug/`dbglog` build | ⛔ **Cannot run the Color build** (no Color QuickDraw on a Plus). Retained only as a possible B&W timing reference, and even there: whether scripted breakpoints/registers exist outside the GUI |
+| **PCE** (`macplus`) | Mac Plus, cycle-level | ⭐ A scriptable monitor **and** trustworthy timing — the best available answer to "what framerate did the original get?" | ⛔ Same: B&W build only. This is the candidate to reach for **if** the deferred timing reference is ever built |
 | **Basilisk II / SheepShaver** | Mac II-class (68040) | Widely available | ⚠ Wrong CPU class and wrong speed, so it is not a performance reference at all, and a 68040 can hide 68000-only behaviour |
 | **QEMU** (`q800`) | Quadra 800 | gdb stub — which would give items 3 and 4 for free, in exactly the idiom this project already uses for the Amiga | Same caveat as Basilisk: wrong machine class. But the **gdb stub** is worth a lot, and a gdb-driven loop would share tooling and habits with `amiga/debug.sh` |
 
-⭐ **The decision is the user's** (PROJECT.md §Open decisions). The note to carry into it: the prior
-ports ended up wanting **two** reference tools — a scriptable oracle and an interactive accurate
-one — and that turned out to be the right shape rather than indecision.
+## ⭐⭐ Verdict on the tool-level evidence: MAME primary, QEMU as the fallback
+
+**MAME wins, and not on reputation — on the checklist.** It is the only candidate that puts *both*
+target machines in one tool (`macii` for the Color build's Color QuickDraw, `macplus` if the deferred
+timing reference is ever built), it satisfied items 1-5 under test, and its gdb stub speaks m68k, so
+QEMU's one distinctive advantage — the `amiga/debug.sh` idiom — is available in MAME too.
+
+**QEMU stays as the fallback**, and it is a strong one: the stub attached first time and QMP gives
+`screendump`/`pmemsave`. ⚠ But `q800` is a 68040 Quadra — wrong machine class twice over (it can
+hide 68000-only behaviour and is no performance reference), and it cannot be the Mac II the Color
+build wants.
+
+⚠⚠ **Neither is proven to boot the game**, and that is item 0b, the only one that matters for ground
+truth. Until the ROM + System dependency is met, "MAME is the reference loop" is a **plan**, not a
+result. ⭐ Inherited note that still applies: the prior ports ended up wanting **two** reference
+tools — a scriptable oracle and an interactive accurate one — and that was the right shape rather
+than indecision.
 
 ## Traps to inherit from the prior ports' reference loops
 

@@ -162,6 +162,11 @@ EXTRA_ARGS="--warp_mode=1" GDBSCRIPT=x.gdb ./diag_run.sh 60   # ⭐⭐ ~4.9x fas
 and it changes **no** measurement of the kind this project takes, because they are ratios of
 *emulated* quantities.
 
+⚠⚠ **MAME must be run with the headless recipe in `docs/mac-reference-loop.md`, never bare.**
+`-video none` alone still opens a **FULLSCREEN window** on macOS and hijacks the user's screen;
+`SDL_VIDEODRIVER=dummy` + `-window` + `-skip_gameinfo` + an external `timeout` is the verified form.
+⚠ Same pid-scoped-kill rule as FS-UAE below — kill only the pid you started.
+
 ⚠⚠ **Never `pkill fs-uae` / `pkill gdb`** — several Amiga projects run their own emulator at once.
 The scripts source `~/.local/share/amiga/fsuae_common.sh` (shared, outside every repo;
 `$FSUAE_COMMON` overrides), which kills only the pid in this directory's `.run/fsuae.pid` and gives
