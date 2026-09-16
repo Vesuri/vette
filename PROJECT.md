@@ -39,6 +39,7 @@ centre of gravity**, and it is the thing to size before anything else.
 | Ground truth | **The original under a Macintosh emulator.** NEVER the dev-host backend, never the Amiga build. Which emulator is open — `docs/mac-reference-loop.md` |
 | Repo | Commit directly to `main`, one logical change per commit |
 | Source material | Kept **local only, never committed** — `tmp/` is local by policy, and `.gitignore` covers every shape a Mac application arrives in |
+| **Port strategy** | ⭐⭐ **Option A: keep the original 68000 instructions, port the seams.** The segments are near-model, so there is nothing to relocate; the cost lands entirely in the trap layer. `docs/faithfulness-seam.md` §The rule |
 | **The build** | ⭐ **`Color VETTE!`.** Not the B&W one. See below — 16 colours maps onto 4 Amiga bitplanes, so the colour build is not the expensive choice it would be at 8bpp |
 | **Copy protection** | ⭐ **Patched out, not reproduced.** The one deliberate, named departure from 1:1 — see `docs/faithfulness-seam.md` §The copy protection |
 
@@ -47,17 +48,10 @@ centre of gravity**, and it is the thing to size before anything else.
 These are genuinely open and are the right things to settle before building. They are ordered by
 how much else depends on them.
 
-1. ⭐⭐ **The port strategy: keep the original 68000 code, or reimplement?** The structural question
-   of the project, and the reason it is a good pilot. Three options, in full in
-   `docs/faithfulness-seam.md`: (A) relocate and link the original `CODE` segments and service their
-   traps — maximal faithfulness, zero validation burden, completely opaque; (B) convert routine by
-   routine to port-authored C/asm — legible and optimisable, with no byte-exact oracle to check it
-   against; (C) a default of one with the other as the exception. **Nothing should be converted
-   before this is settled.**
-2. ⭐ **The reference emulator.** `docs/mac-reference-loop.md` §Candidates, evaluated against the
+1. ⭐ **The reference emulator.** `docs/mac-reference-loop.md` §Candidates, evaluated against the
    capability list there rather than on accuracy reputation. The capability that decides it is
    scripted breakpoints + register reads, because that is what makes the trap inventory possible.
-3. ⭐ **The display architecture.** 512×342 at ~60 Hz onto a PAL planar Amiga at 50 Hz, now with
+2. ⭐ **The display architecture.** 512×342 at ~60 Hz onto a PAL planar Amiga at 50 Hz, now with
    **colour**. Every part is still a decision — the width (512 is not a free Amiga mode), the height
    (342 vs 256 lines), the depth, and the 17% timing difference.
    ⭐⭐ **The depth question got a good answer:** the Color build ships 8 `pltt` palettes of
@@ -67,14 +61,14 @@ how much else depends on them.
    ⚠ `[ASSUMED]` until confirmed from the binary: that the game's offscreen/window depth really is
    4bpp. The `pltt` count is evidence about palettes, not proof about the drawing surface — see
    `docs/open-work.md`. → `docs/mac-hardware.md` question 5.
-4. **Machine target.** RoF needed 1 MB and did not fit a bare 512 KB A500. Unknown here and not
+3. **Machine target.** RoF needed 1 MB and did not fit a bare 512 KB A500. Unknown here and not
    guessable: it depends on whether the original segments stay resident and on how the display is
    arranged. **Decide when the first real measurement exists, not before.**
-5. **Performance target.** Deliberately not set. → `docs/perf-method.md` §The target. ⭐ Unlike both
+4. **Performance target.** Deliberately not set. → `docs/perf-method.md` §The target. ⭐ Unlike both
    prior ports there is a real reference: the Mac Plus's 7.83 MHz 68000 is within 12% of the A500's
    7.09 MHz, so the original's own framerate under the reference loop is a meaningful yardstick.
    Set the target from that plus a Phase 4 profile.
-6. **Host build: does it exist, and what for?** RoF had an SDL backend and its approximation cost
+5. **Host build: does it exist, and what for?** RoF had an SDL backend and its approximation cost
    real time; Revs deliberately had **no renderer** and used the host only for differentials.
    ⚠ This port's differentials are different again (there is no transliteration oracle), so the
    question is open rather than answered by either precedent.

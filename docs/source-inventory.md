@@ -148,3 +148,24 @@ fixed-format records whose length follows the model's complexity, and `QUAD`'s
   confirming early: it tells you the renderer's LOD scheme, which is a load-bearing performance fact
   for `docs/perf-method.md` Rule 4. Note `s55BW` also hints some models are monochrome-specific.
 - `GenericC`/`GenericS` come in `Gn`, `red`, `br`, `vlb` colour variants — recoloured traffic.
+
+## The trap surface — a preliminary FLOOR, not an inventory
+
+⚠⚠ **These are screening numbers and must not be quoted as the trap inventory.** The inventory is
+Phase 2's flow-following sweep (`docs/open-work.md` #11), and ⚑ the postmortem's rule stands: treat
+any static count as a **floor** — Revs's surface looked closed after a static sweep and three more
+calls appeared only when it was *run*.
+
+| method | result |
+|---|---|
+| whole-file linear sweep of all 10 code segments, counting `$Axxx` words | 1 686 sites, **220 distinct traps** — ⚠ inflated: a linear sweep decodes data as instructions |
+| walk from each of the 508 distinct jump-table entries to its first terminator (2 734 instructions) | 141 sites, **61 distinct traps** — ⚠ deflated: 600 B per entry, no branch following |
+
+⭐ The honest reading is only this: **the surface is in the low hundreds of distinct traps, and it is
+the project.** Both numbers exist to bracket it, not to size the work.
+
+⭐⭐ **Also from `CODE 0`, and these are solid:** 509 jump-table entries, per-segment counts summing
+to exactly 509 (`Main` 130, `FRED` **242**, `Traffic` 80, `Initialize` 16, `Communication` 16,
+`sound` 12, `Score` 9, `Intro` 2, `load` 1, `%A5Init` 1), 31 272 B of A5-relative globals, 4 104 B
+above `a5`. `FRED`'s 242 entries in 6 508 bytes — ~27 bytes per externally-callable routine —
+`[INFERRED]` make it a small-leaf-routine library rather than a subsystem.

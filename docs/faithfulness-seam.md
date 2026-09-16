@@ -4,9 +4,10 @@
 > *write the seam rule down first*, because it is the decision you make hundreds of times, and both
 > prior ports paid for having settled it late.
 >
-> ⚠⚠ **THIS FILE STATES THE QUESTION, NOT THE ANSWER.** The answer depends on the port strategy
-> (PROJECT.md §Open decisions #1), which is not decided. Do not start converting routines before it
-> is — that is precisely the mistake this file exists to prevent.
+> ⭐⭐ **THE ANSWER IS NOW DECIDED: option A is the default.** Keep the original instructions; port
+> the seams. §The rule below states it and what it costs. The three-way framing is kept because it
+> is what stops the decision being re-litigated, and because #2 — *what forces a routine off A* —
+> is still answered one routine at a time.
 
 ## Why this is a genuinely different question from the prior ports'
 
@@ -33,11 +34,50 @@ That makes the seam a **three-way** choice, not a two-way one:
 works well, a Mac 68k port is dramatically cheaper than a 6502 one, and the pilot's job is to find
 out where it stops working.
 
+## ⭐⭐ The rule: A by default, B by exception, and the exception must be argued
+
+**Decision (locked): the port keeps the original 68000 instructions and services their traps.**
+Option B is available but is the *exception*, and a routine moved to B needs a stated reason from the
+list in #2 below. ⚠ A default of B would have been a rewrite with no oracle; neither prior port's
+answer transfers, because neither had option A.
+
+### Why A is cheaper here than it sounds — the segments need NO relocation at all
+
+Verified against the Color build's own `CODE` resources:
+
+| fact | consequence |
+|---|---|
+| **All 11 segments are NEAR MODEL** (header = `first-JT-entry-offset:w`, `entry-count:w`; no `0xFFFF` far header, no relocation tables) | ⭐⭐ **There is nothing to relocate.** Internal references are PC-relative, globals are A5-relative, and every inter-segment call goes through the jump table. "Linking" a segment is *place the bytes and fix the table* — strictly **less** work than an Amiga hunk `RELOC32` pass, which does have offsets to patch |
+| `CODE 0` header: below-A5 **31 272 B** of application globals, above-A5 **4 104 B** = 32 B + a **4 072 B jump table of 509 entries**, at A5+32 | the A5 world is one 35 KB allocation with two known halves. `a5` points between them |
+| All 509 JT entries are in **unloaded** form — `offset:w`, `MOVE.W #seg,-(SP)`, `_LoadSeg` ($A9F0) | the port's segment-loader stand-in can pre-patch every entry to loaded form (`offset:w`, `JMP abs.l`) once at startup and never service `_LoadSeg` at all |
+| Per-segment entry counts sum to **exactly 509** (130 `Main`, 242 `FRED`, 80 `Traffic`, 16 `Initialize`, 16 `Communication`, 12 `sound`, 9 `Score`, 2 `Intro`, 1 `load`, 1 `%A5Init`) | ⭐ the jump table is **fully accounted for** — no hidden entries, and the postmortem's dispatch sweep is a closed set of 509 |
+
+`[DERIVED]` from a 68000-vs-68020 differential over all 508 distinct entry points (2 734
+instructions walked from each entry to its first terminator): **no 68020-only encoding on any
+reachable path.** ⚠ That is a screen, not a proof — it covers 600 bytes per entry and does not follow
+branches. The linear-sweep hits (`callm`, `rtm`, `cmp2`, one `mulu.l`) are misaligned data, which is
+what a whole-file sweep of mixed code and data produces. → `docs/open-work.md`.
+
+### ⚠⚠ What A actually costs, and it is not zero
+
+**A moves the entire job into the trap layer, and it removes your freedom to reinterpret.** Under B
+you can decide what a Toolbox call *meant* and implement that; under A the original bytes make the
+call exactly as Inside Macintosh documents it, and the port must honour the documented semantics:
+
+- **Memory Manager handles MOVE.** `NewHandle`/`HLock`/`HUnlock` is not malloc; code that
+  dereferences a handle twice across an allocation is *correct* Mac code and the port must make it
+  correct here too.
+- **QuickDraw's `GrafPort`, regions and the current-port global** are a stateful surface the code
+  will assume, not a drawing call it makes once.
+- **`%A5Init` must run, or be replaced by what it produces.** 28 732 B whose job is to initialise
+  those 31 272 B of globals. Skipping it gives a game whose globals are zero instead of initialised
+  — a silent wrong-value failure, not a crash.
+- **The code is opaque by construction**: unnameable, unprofilable at source level, unoptimisable.
+  The map is `disasm/symbols.csv` plus the 509 names the jump table hands us, and nothing more.
+
 ## The questions the rule has to answer, in the order they will come up
 
-1. **What is the default?** A or B. A default of A makes the port fast and opaque; a default of B
-   makes it a rewrite with no oracle. ⚠ Neither prior port's answer transfers, because neither had
-   option A.
+1. ~~**What is the default?**~~ **Settled: A.** See above.
 2. **What forces a routine off A?** Candidates, to be confirmed against the binary: it makes a
    Toolbox call whose semantics the port changes; it touches the screen (1-bit 512×342 vs planar);
    it is hot enough to need optimising; it depends on a Mac hardware register or a low-memory global.

@@ -92,6 +92,9 @@ Read these before any disassembly work; `docs/toolchain.md` has the verified det
 1. **The code is in numbered `CODE` resources, one per segment** — not one flat image. The flat
    memory image both prior ports disassembled **does not exist**, and an address is
    `(segment, offset)`. Every address in `symbols.csv` and in the docs must say which segment.
+   ⭐ All 11 are **near model**, so there is **nothing to relocate** — internal references are
+   PC-relative, globals A5-relative, inter-segment calls go through the jump table. Never write
+   relocation code for these; if you think you need it, re-read the segment header.
 2. **`CODE 0` is the jump table**, and every inter-segment call goes through it. ⭐ This makes the
    postmortem's highest-leverage item — the exhaustive dispatch sweep — **enumerable** rather than a
    search. Take the win.
@@ -115,13 +118,33 @@ and import each as a raw binary, `68000:BE:32:default`. `docs/toolchain.md`.
 `docs/rename.md` exists to recover by hand. Treat a name as `[INFERRED]` evidence about a segment's
 contents, not as proof.
 
+## ⭐⭐ The port strategy is decided: **keep the original instructions** (option A)
+
+The original `CODE` segments are placed, linked and executed as-is; the port supplies the *seams*.
+Option B (port-authored reimplementation of a routine) is the **exception** and needs a stated
+reason from `docs/faithfulness-seam.md` #2. Consequences that are rules, not notes:
+
+- ⚠⚠ **The trap layer must honour DOCUMENTED Toolbox semantics, because A removes the freedom to
+  reinterpret.** Memory Manager handles **move**; QuickDraw has a stateful current port; the
+  Resource Manager is how the game reads all of its data. Implement what Inside Macintosh says, not
+  what the call appears to want.
+- ⚠ **`%A5Init` runs, or is replaced by exactly what it produces.** It initialises the game's
+  31 272 B of A5-relative globals. Skipping it zeroes them — a silent wrong-value failure.
+- **The A5 world is fixed and known:** 31 272 B of globals below `a5`; above it 32 B + a 4 072 B
+  jump table of **509 entries** at A5+32, all shipped in unloaded form. Pre-patch them to
+  `JMP abs.l` at startup and `_LoadSeg` never needs servicing.
+- ⭐ **The 509 entries are a CLOSED set** (per-segment counts sum to exactly 509), so the dispatch
+  sweep is an enumeration. `FRED` alone exports 242 of them.
+- **Carried-over code is opaque** — unnameable, unprofilable at source level, unoptimisable. That is
+  the accepted price; `disasm/symbols.csv` and the jump table are the whole map.
+
 ## Build / run / debug
 
 ⚠ None of this is verified in this repo yet. Phase 0 (`docs/phases.md`).
 
 ### Host — from repo root
 ```
-make                       # build/vette — scope is an OPEN DECISION (PROJECT.md #6)
+make                       # build/vette — scope is an OPEN DECISION (PROJECT.md #5)
 make todo                  # ⭐⭐ WHAT IS OPEN: docs/open-work.md's queue + a live marker sweep
 ```
 
