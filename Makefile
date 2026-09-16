@@ -23,12 +23,14 @@ help:
 # ⭐⭐ WHAT IS OPEN.  The queue plus a live sweep for markers in the tracked, non-vendored tree.
 # Expected marker output is "none" — a printed marker is either a real work item that belongs in
 # docs/open-work.md or a stale marker to delete.  (CLAUDE.md §Working conventions.)
+# ⚠ The pattern is written with character classes (TOD[O] etc) so this Makefile does not match
+# ITSELF and report a permanent phantom hit.
 todo:
 	@cat docs/open-work.md
 	@echo
 	@echo "=== live marker sweep (tracked, non-vendored) ==="
 	@if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then \
-	  hits=$$(git grep -nE '(TODO|FIXME|HACK|XXX)' -- \
+	  hits=$$(git grep -nE '(TOD[O]|FIXM[E]|HAC[K]|XX[X])' -- \
 	            ':!src/platform/amiga/framework' ':!docs' 2>/dev/null); \
 	  if [ -n "$$hits" ]; then echo "$$hits"; else echo "none"; fi; \
 	else echo "(not a git repo)"; fi
