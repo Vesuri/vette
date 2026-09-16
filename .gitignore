@@ -84,6 +84,15 @@ amiga/*_probe.sh
 # global guard.
 *.uaem
 
+# --- MAME's own state, written into the CWD ----------------------------------
+# MAME writes cfg/ and nvram/ relative to the working directory unless told
+# otherwise, so a bare run drops emulator state in the repo root -- and it WAS
+# committed once before this rule existed.  The reference invocation now passes
+# -cfg_directory / -nvram_directory into ref/mame/; these two entries are the
+# backstop for a run that forgets.
+/cfg/
+/nvram/
+
 # --- Reference-emulator material (never commit) ------------------------------
 # ref/ holds the Macintosh reference loop's local-only inputs and state: ROM
 # images, System / game disk images, MAME cfg+nvram, savestates and captures.
