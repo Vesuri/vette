@@ -1,0 +1,214 @@
+# Performance method — how to get a number you can trust
+
+> ⚑ **Method inherited from the *Rescue on Fractalus!* (Atari) and *Revs* (BBC) ports.** Every rule
+> below was learned by getting a number wrong first, on **this target with this toolchain**, so it
+> applies here unchanged.
+>
+> ⚠⚠ **What is deliberately NOT carried over is the NUMBERS.** `~/Documents/Revs/docs/perf-method.md`
+> is ~1500 lines of Revs's own measurements — a frame budget, a phase→function map, a view-pipeline
+> ledger. None of it describes Vette, and Rule 3 below says an old number is wrong even within one
+> project. Read it as a **worked example of the method** (it is the best one that exists), never as
+> a figure to quote. This file will grow its own numbers section once there is something on the
+> target to measure.
+>
+> Companions: `docs/m68k-optimisation.md` (what to do once you know where the time goes),
+> `docs/headless-fsuae.md` (how to drive the target), `docs/method-lessons.md` (how to work at all).
+
+## The target machine
+
+**A500, 7 MHz 68000, PAL.** A frame is 20 ms. Spending 10 ms on *anything* is half the budget.
+Units: 1 raster scanline = 63.56 µs; a PAL frame = 313 lines. Be conscious of absolute
+milliseconds, always — a percentage of an unknown total is not a measurement.
+
+⚠ **This project starts from a 68000 original, which is new and cuts both ways.** The Mac Plus/SE
+the game targeted is a 7.83 MHz 68000 — within 12% of an A500's 7.09 MHz — so unlike the two prior
+ports there is a *real* performance reference: whatever framerate the original gets on a Mac Plus is
+roughly what the same instructions should get here. That makes a large shortfall diagnosable
+(it is the seam, the display conversion or the trap layer, not "the algorithm") and it makes the
+target arguable rather than a pure scope call. It does **not** license quoting a Mac number as an
+Amiga measurement: the Mac's 1-bit 512×342 display and the Amiga's planar bitmap are different
+amounts of work, and that difference is the port.
+
+## The target
+
+**Undecided — see PROJECT.md.** Set it from a measurement of an end-to-end skeleton on the target,
+plus a measurement of the original under a Mac emulator, and not before. Postmortem §4.1: profile a
+slow end-to-end skeleton on real hardware *before* committing to an approach. RoF's retired
+"50 FPS is impossible without an algorithm change" was disproven by hand-asm — the ceiling was GCC,
+not the algorithm. That cuts both ways: don't declare it impossible from reasoning, and don't
+declare it reached from optimism.
+
+## Lessons — measurement
+
+- **Compare FPS row vectors, never a `total painted` line.** A total spans a partial trailing row
+  and the run length in vblanks varies between otherwise-identical runs. Under a pinned RNG + warp
+  a per-segment series is deterministic row for row — the resolution limit is one painted frame,
+  not run-to-run variance, which is what makes a small (~1-3%) change quotable at all if enough
+  rows are averaged.
+- **Never diff a phase-bracket share across builds** — only within one run (Rule 2).
+- **Calibrate a new bracket against a known cycle count before trusting what it reports.** Burn N
+  known cycles inside it and check linearity in N. An uncalibrated bracket can look several times
+  more expensive than the instruction count predicts, and the gap is usually arithmetic on the
+  reader's side, not an instrument fault.
+- **A beam-tick bracket must accumulate through a monotonic epoch, not a raw
+  `beamTick() - beamTick()` difference** — a raw difference silently discards any bracket that
+  straddles the once-per-display-frame wrap, and it discards the LONGEST phases hardest. A profile
+  that reads several rows as flat zero is this bug, not evidence those routines are trivial.
+- **Every instrument needs a cheap total-accounting check, printed every run.** One division
+  (bracketed ticks vs elapsed ticks, "MUST be ~100") would have failed loudly on the first run of a
+  profile that instead published an inverted hot-path ranking for two phases.
+- **Size a routine's call count while the game is DOING SOMETHING, not parked.** A parked call count
+  next to a driving framerate describes two different workloads.
+- **`make clean` before every differently-flagged build.** The Amiga Makefile tracks neither
+  `PROBES` nor a define change — a stale object reproduces the PREVIOUS build's number to the
+  digit, which is the tell that a rebuild didn't happen.
+- **Match the build to the control.** A `PROBES=1` build is meaningfully slower on its own merits;
+  never compare a probe-build number to a shipping one.
+- **Put no gdb stop inside a measurement window.** A conditional breakpoint that halts the machine
+  to evaluate its own condition can bias a reading by an order of magnitude in either direction,
+  and can agree with the truth on one build while being wildly wrong on another. Sample from an
+  in-program counter instead.
+- **An average over calls that do materially different jobs hides the finding.** Bracket each arm
+  separately, and add an **empty-bracket control running at the same call rate** before trusting
+  any number a new bracket reports — a bracket's own overhead can exceed what it measures.
+- **Bound a measurement window in EMULATED time, not host time.** Under warp the host's throughput
+  depends on what else the machine is doing, so two arms of one A/B can cover very different
+  amounts of game time out of the same wall-clock window. Freeze the accumulators after N display
+  fields and print the proof that the freeze fired.
+  ⚠ And a partial freeze is its own trap: anything bumped outside the frozen accumulators keeps
+  climbing, and a row mixing the two is fiction.
+- **Prove the flags reached the build.** A shell that eats all but the first `VAR=1` produces a
+  perfectly plausible table for a configuration you did not build. Print the build's own flag
+  bitmask in the probe header and read it.
+
+## Lessons — implementation
+
+These are the ones that are about the 68000 and GCC, so they transfer intact. (The prior ports'
+lessons about *transliterated 6502* — flag chains, `bus_read` hoisting, driver twins — do not apply
+here: there is no interpreter to delete. That is the single biggest difference in this project's
+performance shape, and it means **the machinery-overhead lever that dominated both prior ports does
+not exist here**. Expect the time to be in the display conversion and the trap layer instead.)
+
+- **A parameter that is a compile-time constant at every call site must be `always_inline`d, or it
+  is a memory operand in the inner loop.** A descriptor struct left out of line costs a reload of
+  its fields on every call; inlining turns them into immediates and folds each specialisation's
+  now-constant tests. ⭐ `always_inline` on the LEAF does not fold a descriptor — the *selection*
+  must be specialised too.
+- ⚠⚠ **Making a hot routine SMALLER can revoke its inlining and cost more than the edit saved.**
+  GCC's inlining threshold is part of the change in both directions. **After any size-changing edit
+  to a hot function, count `jsr <hot-leaf>` in the objdump and require 0.**
+- ⭐⭐ **A hot loop's state lives in MEMORY if anything takes its address.** Grep a hot kernel for
+  `n(a5)` / `n(sp)` / `pea` before calling its shape clean; hand small results back packed in one
+  register instead. ⚠ But **packing is not free**: the 68000 has no byte-insert, so each pack is
+  ~40 cycles ≈ 2-3 stack reloads. **Count packs against reloads in the objdump — a per-LOOP-ITERATION
+  reload is the prize, a per-CALL one is already nearly free.**
+- ⚠ **Instruction count is not the scoreboard.** A memory operand is 16-20 cycles against 4-8 for a
+  register op, so a bigger routine is routinely a faster one.
+- **On a register-poor machine a stack slot is a legitimate home for a loop invariant.** Rank
+  reloads **per iteration of the HOT PATH**, never stack-slot operands per loop, and identify that
+  path from a census before believing a static ranking.
+- **Read the objdump of a hot loop before theorising about its algorithm.** A loop-invariant
+  re-read per iteration, or pointers spilled into data registers, is worth single-digit percent of
+  a whole frame and is invisible to any amount of algorithm reasoning.
+- **A loop is not free where the original unrolled.** Rolling an unrolled chain into `for` recovers
+  legibility but pays real per-iteration cost.
+- **RAM is uniformly slow — there is no "fast RAM" on an A500.** Optimise by reducing the NUMBER of
+  accesses, never by moving data to a "cheaper" buffer, and never explain a measurement with
+  fast-vs-chip RAM.
+- **When an expensive per-tick output is a pure function of a handful of rarely-moving inputs,
+  compare inputs and reuse the previous output.** The single biggest lever found in the Revs port.
+  Sabotage the reuse against the real routine's rare *moving* inputs, not just static ones.
+- **Before building a representation change, ask which quantity the current cost is proportional
+  to.** A change that collapses *stores* when the loop's real cost is source *reads* moves nothing.
+  Settle it with a differential that strips one stage at a time, never with a plan's predicted
+  before/after count.
+- ⭐⭐ **Price a change with THREE numbers: what it deletes, what one unit of the new shape costs,
+  and what it cannot touch.** A census of deleted work bounds the saving and says nothing about the
+  replacement; a per-unit hook cannot reach per-line driver cost. Both prior ports lost a built,
+  proven, measured optimisation to a missing third number.
+- **Don't qualify a big state array `volatile` unless something on THIS platform actually races it.**
+  The qualifier blocks every optimisation over it for a hazard that has to be demonstrated.
+
+## Rule 1 — quote a framerate from an in-program series only
+
+`FPS = 50 * <painted frames> / <emulated vblanks>` — painted frames per **emulated** vblank, so
+host speed and the gdb stub's own slowness cancel out completely. Sample it with a series the
+*program* stores for itself (the VERTB handler, every N vblanks), read afterwards; never with a
+conditional-breakpoint script.
+
+⚠ Both counters must be a linker gc ROOT (`PROBE_SYMS` in `amiga/Makefile`), or `--gc-sections`
+drops the unreferenced one and gdb prints **instruction bytes** in its place — a fake measurement
+rather than an obvious zero. `make probe-audit` enforces it on every link.
+
+⚠ **Never quote a framerate from a `PROBES` build.**
+
+## ⭐⭐⭐ Rule 1a — the framerate is quantised to `50/N`, so size a change in **ms/frame**
+
+If `renderFrame()` presents and then spins until the vblank counter changes, a painted frame lasts a
+whole number of PAL fields and the framerate can only ever be `50/N`. The spin **pads** whatever the
+frame's work is up to the next field boundary, so a saving smaller than the current pad is entirely
+real and entirely invisible to FPS. So is a regression.
+
+Measured on the Revs port with a known cycle burn: **7.9 ms of real added cost read as −0.97% FPS,
+75% of it absorbed by the pad** — and the same factor appeared with the opposite sign on a real
+optimisation (−12.5 ms/frame read as +1.5%). Under-read **~4×** in both directions.
+
+⇒ **The scoreboard is a phase table in ms/frame; FPS is a derived `50/N` that follows.** Give the
+spin its own phase row so the absorption is visible, and size a change against
+`Σ(phases) − <spin phase>`, or against the one row you changed.
+⭐ The corollary is good news: the payoff is a **step function**, so every millisecond cut before a
+field boundary is banked, not lost.
+
+## Rule 2 — price a twin with an IN-PROCESS differential, never cross-run
+
+The new implementation and the old one run back-to-back on the **same inputs in one run**,
+byte-compared, with beam ticks tallied per implementation.
+
+Cross-run comparison (build A vs build B) is **not valid by default**, and the reason is structural:
+a 50 Hz interrupt asynchronous to a free-running main loop means any change in render speed shifts
+the phase between them — and that shift changes what the program actually does. A number measured
+on a different workload is not a comparison.
+
+- **Pin the RNG for every perf run.** OFF by default — it removes real variety, so never judge
+  *rendering or gameplay* from a pinned-RNG build.
+- ⚠ The differential's metric is the **ratio**, not absolute ticks/call.
+- ⚠ Run any baseline **≥2× after a rebuild** before believing a delta.
+- ⚠ A bracket **includes nested callees**, so it is not that function's own cost.
+
+## Rule 3 — every old number is wrong; re-measure
+
+Any figure in an older note or commit was measured on a different build, probe set or workload.
+**Re-measure, don't quote.** Two specific traps: probe builds are much slower than shipping ones,
+and an unattended run eventually stops doing the work being measured while the vblank counter keeps
+ticking.
+
+## Rule 4 — shape-probe the algorithm before optimising it
+
+The biggest single win in either prior port did not come from PC sampling. It came from **measuring
+the distribution of a routine's own inputs** with dedicated shape counters, finding that a small
+number of cases covered most calls, and specialising those. Then: prove the algebra over millions of
+randomised cases **on the host**, *then* write the fast path, *then* run the on-target differential.
+
+- A "check before drawing" scheme usually re-reads the very byte the check was meant to avoid.
+- After special-casing a recursion's leaves, **re-price their parents**.
+- Ask whether a "serial" accumulator really has to be serial.
+
+## Rule 5 — interrupt work is capped at one frame
+
+Over that, a displayed frame is silently dropped — and the dropped frame (a stall, a 2× animation
+jump, a copper write landing behind the beam) is what the player reports, not the cost. Bracket any
+ISR-side work with VPOSR/VHPOSR beam-line reads *before* theorising. A 50 Hz ISR is also a fixed tax
+on all wall clock regardless of framerate, which makes its per-firing cost one of the few
+legitimately comparable cross-build numbers.
+
+## Rule 6 — suspect a beam-timing race? re-run on a FASTER CPU
+
+`AMIGA_MODEL=` / `EXTRA_ARGS=` on `run.sh` and `diag_run.sh`. A slow A500 can land safely inside a
+race window that a faster CPU moves a violation into. Also: quote the **duration**, not the hit
+count — a beam-overlap counter can read differently on two runs of one binary.
+
+## Reporting
+
+Surface numbers honestly. Say which build produced them, which harness, and the window size. If a
+change measures at zero, that is a result — record it as closed *on data*, and do not re-open it on
+optimism.
