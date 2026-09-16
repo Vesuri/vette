@@ -154,6 +154,51 @@ prove something needs `tools/mame_snap.lua` (`VETTE_SNAP_FRAMES=900,1500`, frame
 *emulated* 60 Hz fields — reproducible across host speeds, same reasoning as FS-UAE's warp mode).
 Captures land in `ref/mame/snap/<machine>/` and are gitignored with the rest of `/ref/`.
 
+### ⭐⭐ The System side is CLOSED TOO — a 6.0.8 volume boots and carries the game
+
+Sourced from savagetaylor.com (all under the gitignored `/ref/`, originals kept in `ref/mame/dl/`):
+
+| what | file | where it goes | verified |
+|---|---|---|---|
+| bootable 6.0.8 **hard drive** (driver + partition map) | `608_2GB_drive.zip` → `ref/mame/hd/608_2GB_drive.hd` | `-hard` | ⭐ boots to the Finder, volume `6.0.8 2GB (D)` |
+| bootable 6.0.8 **floppy**, 1.4 MB | `OS_608_boot.dsk.zip` → `ref/mame/flop/OS_608_boot.dsk` | `-flop1` | ⭐ boots to the Finder ⚠ Finder offers *"needs minor repairs"* on mount — cosmetic, but it is a modal dialog in the way of an unattended capture |
+| ResEdit 2.1.3 | `ResEdit_2.1.3.sea.bin` | not installed yet | — |
+
+⚠⚠ **The drive image must be renamed `.dsk` → `.hd`**; MAME's `-hard` does not accept either
+extension the download ships with. Its partition map is `Apple_partition_map` (block 1),
+`Apple_Driver43` (64), `Apple_HFS` (96, 3 850 144 blocks) — which is why it boots where a bare
+volume does not. The volume also already carries **HD SC Setup 7.3.5 (Patched)** and Disk Copy 4.2.
+
+⛔ **MacsBug is NOT on that site**, so the A-trap log (capability 3) still has no debugger. That is
+the only thing left outstanding from the whole tool/ROM/System dependency.
+
+### ⭐⭐ Putting files on the volume from the HOST — `hfsutils`, no floppy shuffling
+
+`brew install hfsutils`. ⭐ **The host can write the booted volume directly, forks and all**, and the
+volume still boots afterwards (verified). This is the cheap path and it removes the transfer problem
+from the reference loop entirely:
+
+```
+hmount ref/mame/hd/608_2GB_drive.hd 1     # ⚠ hfsutils counts HFS PARTITIONS, not map entries:
+                                          #    the Apple_HFS partition is map entry 3 but "1" here
+hmkdir "Color VETTE!" ; hcd "Color VETTE!"
+hcopy -m tmp/macbin/'Color_VETTE!.bin' ":Color VETTE!"   # -m = MacBinary: keeps BOTH forks
+hcopy -m tmp/macbin/'VETTE!.Data.bin'  ":VETTE!.Data"    #      and the type/creator
+humount
+```
+
+The game volume itself mounts with plain `hmount tmp/VETTE_1_02.raw` (a bare HFS volume needs no
+partition argument), and `hcopy -m` out of it is how the MacBinary files above were made.
+⚠ **Its folder names literally begin `"(Folder) "`** — `(Folder) Color VETTE!`, `(Folder) B&W
+VETTE!` — so `hcd "Color VETTE!"` fails. Not a display artefact of `hls`.
+
+⚠⚠ **CORRECTION to a size claimed earlier in this doc and in `docs/open-work.md`:** the application
+is **1 587 389 B, ALL of it resource fork** (data fork 0), and `VETTE!.Data` is **577 498 B, also
+all resource fork**. The "~86 KB" figure is the 11 `CODE` segments alone — a small fraction of the
+resource fork, which also carries the `PICT`s, `pltt`s and everything else. App + data = **2.16 MB,
+so they do NOT fit on one 1.4 MB floppy**; the `hfsutils` path above is not merely more convenient,
+it is what makes the transfer a single step.
+
 ### ⭐ What form the System install has to arrive in
 
 Verified from `mame mac2fdhd -listmedia` / `-listxml`: the machine has **two 35hd Superdrives**

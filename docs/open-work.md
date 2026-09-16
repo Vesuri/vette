@@ -7,23 +7,22 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — nothing else can start
 
-1. ⛔⛔ **USER INPUT NEEDED: a System 6.0.8 install, and a game volume set up past the password.**
-   The last thing blocking the reference loop, and therefore Phase 1 and Phase 2.
-   ⭐ **The ROM side is closed:** all four required files are in `ref/mame/roms/` (gitignored whole),
-   `-verifyroms` says *"romset mac2fdhd is good"*, and a headless 27 s run initialises the `mdc48`
-   card at 640×480 and reaches the **blinking boot-disk icon** — everything below the System works.
-   **Wanted, in preference order:** (a) a pre-made **bootable System 6.0.8 hard-disk image**,
-   partition-mapped, renamed `.hd`/`.hdv` (⚠ MAME rejects `.img` for `-hard`; a bare HFS volume will
-   not boot — the ROM walks an Apple Partition Map); (b) a bootable 6.0.8 **`System Tools` floppy**
-   (`.dc42`), which boots with no hard disk at all; (c) the full install set, the slow path.
-   ⚠ Only (a) gives the *persistent* volume the past-the-password requirement needs, because the
-   shipped build asks once on first run (`readme.txt`) and a throwaway image re-asks every time —
-   exactly where ground truth has to be cheap. ⚠ The port patches the protection out (#17) but
-   **ground truth does not**, so that constraint is not retired by the patch decision.
-   ⚠ Getting the game onto the volume is **ours** (a 1.4 MB `hfsutils` floppy image: the app is
-   ~86 KB, `VETTE!.Data` 577 KB), not something to source. Nice-to-have, both plain System Folder
-   files: **MacsBug 6.2.x** (the A-trap log for capability 3) and ResEdit 2.1.3.
-   → `docs/mac-reference-loop.md` §What form the System install has to arrive in.
+1. ⭐⭐ **Finish the reference loop: get the game LAUNCHED and past the password, unattended.**
+   No longer blocked on the user — the ROM, the System and the transfer are all done and verified:
+   `mac2fdhd` + `-nb9 mdc48` boots `ref/mame/hd/608_2GB_drive.hd` (System 6.0.8) to the Finder, and
+   `Color VETTE!` + `VETTE!.Data` are on that volume with both forks intact, written from the host
+   with `hfsutils`. → `docs/mac-reference-loop.md`. What is left, in order:
+   - **Drive the GUI headlessly** — MAME must double-click the app (or Finder's *Set Startup* must
+     be set once) with no window open. Unsolved; Lua mouse/keyboard injection is the candidate.
+   - **Answer the copy-protection password once**, then never again — the volume is persistent, so
+     this is a one-time cost. ⭐ The answers are in `tmp/unpacked/…/scans/Manual.pdf`, which is
+     already here, so nothing external is needed. ⚠ Ground truth runs the **unpatched** original;
+     #17's patch is port-side only and does not retire this.
+   - **Set the screen to 16 colours** in the Monitors control panel (the card is a 4/8 at 640×480;
+     the captures so far are 1-bit). ⚠ It persists in MAME's `nvram`, so verify it survives a
+     restart rather than assuming.
+   - ⛔ **Find MacsBug 6.2.x** — not on savagetaylor.com, and capability 3 (the A-trap log) has no
+     debugger without it. The one remaining external dependency, and it gates the trap inventory.
 
 ## Phase 0 — scaffolding (see `docs/phases.md`)
 
