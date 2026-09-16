@@ -65,6 +65,51 @@ Every candidate needs:
    first run (`readme.txt`). A throwaway image re-asks every time, which is exactly where ground
    truth needs to be cheap.
 
+### ⭐⭐ Which ROM and which System — decided, with the MAME romset names
+
+⚠ MAME names Mac ROM files by the **Apple ROM checksum** (the longword at offset 0), which is the
+same convention the common ROM collections use — so a file called `97221136 … .ROM` is literally the
+`97221136.rom` MAME asks for. ⚠ But MAME verifies the **CRC32**, which is a *different* number; the
+table gives both so a wrong dump variant is caught rather than assumed.
+
+| role | file (Apple checksum) | MAME romset / driver | CRC32 MAME requires |
+|---|---|---|---|
+| ⭐ **primary** | `97221136` — Mac II FDHD & IIx & IIcx, 256 KB | `mac2fdhd`, and the **same file** also serves `maciix` and `macse30` | `ce3b966f` |
+| ⚠ **also required** — the Mac II has **no built-in video** | Apple Macintosh Display Card 4/8, `3410801.bin`, 32 KB | romset `nb_mdc48`, selected with **`-nb9 mdc48`** | `e283da91` |
+| second choice, more period-pure | `9779D2C4` (800K v2) or `97851DB6` (800K v1) | `macii` / `maciihmu` | `4df6d054` / `8c8b9d03` |
+| QEMU fallback | `F1ACAD13` — Quadra 610/650/800 | `q800` | — |
+| deferred B&W timing ref | `4D1F8172` — MacPlus v3 | `macplus` ⚠ wants **chip-level** dumps (`342-0341-c.u6d` + `342-0342-b.u8d`, 64 KB each, byte-interleaved), so a single 128 KB file must be split into even/odd bytes. `[ASSUMED]` interleave order — verify with `-verifyroms` | `f69697e6` / `49f25913` |
+
+**Why `mac2fdhd` and not the others:**
+- **68020.** It is the CPU class the Color build was written for. `maciix` and `macse30` are 68030 —
+  one step further from the original, and under **option A the original bytes must execute**, so CPU
+  class is not a cosmetic choice.
+- ⭐ **One file, three drivers.** Every Mac II-class driver here is flagged `imperfect` (only
+  `macplus` is `good`), so having `maciix` and `macse30` available as fallbacks *without sourcing
+  another ROM* is worth real time.
+- **FDHD = SuperDrive = 1.4 MB floppy images.** The 800K-ROM `macii` caps images at 800 KB, which is
+  awkward for an app plus a 577 KB data file.
+- ⭐ **`mdc48` fits the evidence:** the 4/8 card does **4bpp**, which is exactly the 16 colours the
+  eight `pltt` resources imply (`docs/source-inventory.md`).
+
+**System 6.0.8** — and the reason is this project's, not nostalgia:
+
+1. ⭐⭐ **The trap inventory is only as clean as the system that patches the traps.** System 6 with
+   plain Finder (MultiFinder **off**) sits close to bare ROM. System 7 always runs the Process
+   Manager, patches far more of the trap table and layers 32-Bit QuickDraw over Color QuickDraw —
+   all of it noise in an A-trap log, exactly where capability 3 needs signal.
+2. **Period-correct.** VETTE! 1.02 is 1989; System 7 is 1991.
+3. **Cheap and deterministic.** Boots fast, small RAM and disk, one application, no background
+   processes competing for events or time — a reference capture must be cheap to repeat.
+
+⚠ **Fallback: System 7.1**, if debugger tooling forces it or a 6.0.8 volume proves awkward to set up
+past the password. Accept the noisier trap surface knowingly. Avoid 7.5+ (heavier again) and 6.0.x
+below 6.0.4 (Mac II/FDHD support).
+⚠ `[ASSUMED]`, to verify rather than trust: that **MacsBug 6.2.x** is the right build for System 6
+(6.6.x expects System 7), and the `-ramsize` option's accepted values for these drivers.
+⭐ Apple released System 6.0.8 and 7.5.3 free, so the System side is legitimately sourceable; the
+ROMs are the user's own to supply.
+
 ⭐ The tool-level capabilities **can** be evaluated without any of this (does the driver exist, does
 the Lua API expose watchpoints, does the gdb stub attach, does `screendump` work), and that is what
 the evaluation below does first. ⚠ Keep the two apart in the write-up: *"MAME exposes watchpoints"*
