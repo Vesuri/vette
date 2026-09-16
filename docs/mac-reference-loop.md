@@ -169,8 +169,24 @@ extension the download ships with. Its partition map is `Apple_partition_map` (b
 `Apple_Driver43` (64), `Apple_HFS` (96, 3 850 144 blocks) — which is why it boots where a bare
 volume does not. The volume also already carries **HD SC Setup 7.3.5 (Patched)** and Disk Copy 4.2.
 
-⛔ **MacsBug is NOT on that site**, so the A-trap log (capability 3) still has no debugger. That is
-the only thing left outstanding from the whole tool/ROM/System dependency.
+⭐⭐ **MacsBug 6.2.2 is installed on that volume and VERIFIED INSTALLED, not merely present.**
+`MacsBug` + `Debugger Prefs` were copied into the `System 6.0.8` folder (`dbgr/mxbg`, 97 266 B data
++ 15 954 B rsrc). The check, because "the file is in the System Folder" proves nothing about
+whether the System hooked it:
+
+| boot volume | `MacJmp` (`$0120`) read from the emulator after boot | reading |
+|---|---|---|
+| the hard disk, with MacsBug | **`701E9A6E`** — flag bits in the high byte, code-looking bytes at `$1E9A6E` | ⭐ a debugger is installed and hooked |
+| ⭐ **the boot floppy, WITHOUT MacsBug (the control)** | **`00000000`** | no debugger |
+
+⭐ **That is a real differential, not a single reading** — `docs/method-lessons.md`'s rule is that a
+control which is not the old state measures the test rather than the change, and the MacsBug-less
+floppy is exactly that control. The probe is 6 lines of Lua reading `$0120` through
+`manager.machine.devices[":maincpu"].spaces["program"]`, which is also the pattern every later
+memory-level ground-truth probe should use.
+
+⚠ Not yet done: **entering** MacsBug (it needs an interrupt/programmer's-switch, so it is an input
+question, not an installation one) and logging A-traps from it.
 
 ### ⭐⭐ Putting files on the volume from the HOST — `hfsutils`, no floppy shuffling
 
@@ -185,6 +201,18 @@ hmkdir "Color VETTE!" ; hcd "Color VETTE!"
 hcopy -m tmp/macbin/'Color_VETTE!.bin' ":Color VETTE!"   # -m = MacBinary: keeps BOTH forks
 hcopy -m tmp/macbin/'VETTE!.Data.bin'  ":VETTE!.Data"    #      and the type/creator
 humount
+```
+
+⚠⚠ **`hcopy -m` takes MacBinary, and nothing on a modern macOS produces it.** `tools/macbin.py`
+does: it wraps a forked host file (as `unar` unpacks one — resource fork as a named fork,
+type/creator in `com.apple.FinderInfo`) into MacBinary II. It **refuses** to write a MacBinary with
+an empty resource fork for an `APPL`/`dbgr`/`DATA` file, because that silent loss produces a file
+that exists, looks right and cannot be launched. ⚠ `os.getxattr` is **Linux-only** — on macOS read
+`<path>/..namedfork/rsrc` and shell out to `xattr -px`.
+
+```
+python3 tools/macbin.py "tmp/macsbug/MacsBug 6.2.2/MacsBug" tmp/macbin/
+hcopy -m tmp/macbin/MacsBug ":MacsBug"
 ```
 
 The game volume itself mounts with plain `hmount tmp/VETTE_1_02.raw` (a bare HFS volume needs no

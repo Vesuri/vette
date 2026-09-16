@@ -21,8 +21,10 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
    - **Set the screen to 16 colours** in the Monitors control panel (the card is a 4/8 at 640×480;
      the captures so far are 1-bit). ⚠ It persists in MAME's `nvram`, so verify it survives a
      restart rather than assuming.
-   - ⛔ **Find MacsBug 6.2.x** — not on savagetaylor.com, and capability 3 (the A-trap log) has no
-     debugger without it. The one remaining external dependency, and it gates the trap inventory.
+   - **Enter MacsBug and log A-traps.** ⭐ MacsBug 6.2.2 is installed and *verified* installed
+     (`MacJmp` = `701E9A6E` on the hard disk vs `00000000` on the MacsBug-less floppy control), so
+     what is left is an **input** problem — the programmer's-switch interrupt — shared with the
+     GUI-driving item above. This is what capability 3 and the trap inventory run on.
 
 ## Phase 0 — scaffolding (see `docs/phases.md`)
 
