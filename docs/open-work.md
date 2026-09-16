@@ -88,6 +88,13 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
     a genuine three-way choice (scale, crop, or interlace) plus the 60 Hz→50 Hz question, and it
     wants the user's call. ⭐ Chunky → planar conversion is now a named cost the port must budget
     for. → `PROJECT.md`.
+    ⚠⚠ **First measure whether IN-GAME is 512 × 342, not 512 × 320.** The garage screen paints
+    512 × 320, but a **512 × 342** window — the compact-Mac screen size — already exists behind it
+    (`docs/mac-hardware.md` §The display surface), and the driving view is the likely occupant.
+    It changes the decision rather than refining it: 342 lines against ~283 of PAL lores overscan is
+    a 17 % vertical crop of a driving game's view, so a good crop may not exist and interlace stops
+    being the expensive option. ⭐ Cheap to settle — one reference-loop probe of the front
+    `WindowRecord`'s `portRect` once past the garage screen. Do it before choosing a mode.
 
 17. ⭐ **Locate the copy-protection check, then patch it out.** Decision locked — patched, not
     reproduced (`docs/faithfulness-seam.md` §The copy protection; required for a WHDLoad release).
