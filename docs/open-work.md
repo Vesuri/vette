@@ -7,24 +7,22 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — nothing else can start
 
-1. ⭐⭐ **Finish the reference loop: get the game LAUNCHED and past the password, unattended.**
-   No longer blocked on the user — the ROM, the System and the transfer are all done and verified:
-   `mac2fdhd` + `-nb9 mdc48` boots `ref/mame/hd/608_2GB_drive.hd` (System 6.0.8) to the Finder, and
-   `Color VETTE!` + `VETTE!.Data` are on that volume with both forks intact, written from the host
-   with `hfsutils`. → `docs/mac-reference-loop.md`. What is left, in order:
-   - **Drive the GUI headlessly** — MAME must double-click the app (or Finder's *Set Startup* must
-     be set once) with no window open. Unsolved; Lua mouse/keyboard injection is the candidate.
-   - **Answer the copy-protection password once**, then never again — the volume is persistent, so
-     this is a one-time cost. ⭐ The answers are in `tmp/unpacked/…/scans/Manual.pdf`, which is
-     already here, so nothing external is needed. ⚠ Ground truth runs the **unpatched** original;
-     #17's patch is port-side only and does not retire this.
-   - **Set the screen to 16 colours** in the Monitors control panel (the card is a 4/8 at 640×480;
-     the captures so far are 1-bit). ⚠ It persists in MAME's `nvram`, so verify it survives a
-     restart rather than assuming.
-   - **Enter MacsBug and log A-traps.** ⭐ MacsBug 6.2.2 is installed and *verified* installed
-     (`MacJmp` = `701E9A6E` on the hard disk vs `00000000` on the MacsBug-less floppy control), so
-     what is left is an **input** problem — the programmer's-switch interrupt — shared with the
-     GUI-driving item above. This is what capability 3 and the trap inventory run on.
+1. ⭐⭐ **Enter MacsBug and log A-traps.** This is what capability 3 and the whole trap inventory
+   run on, and it is the last piece of the reference loop.
+   ⭐ Everything under it is done and verified: the ROM, the System, the transfer, and the loop now
+   **drives** — `tools/mac_launch.lua` boots `ref/mame/hd/608_2GB_drive.hd` and launches
+   `Color VETTE!` unattended, verified from `CurApName`, and the game runs to its garage screen.
+   MacsBug 6.2.2 is installed and *verified* installed (`MacJmp` = `701E9A6E` on the hard disk vs
+   `00000000` on the MacsBug-less floppy control). What is left is an **input** problem: the
+   programmer's-switch interrupt, and then MacsBug's own command line.
+   → `docs/mac-reference-loop.md`.
+
+   ⏸ **The copy-protection password is DEFERRED** (user decision: revisit when it becomes
+   relevant). It has not blocked anything — the game reached the garage screen without ever asking,
+   so either this copy is already registered or the check fires deeper in. ⚠ Do not record "there
+   is no password" as a finding: `readme.txt` says there is one, and the two readings have not been
+   separated. The answers are in `tmp/unpacked/…/scans/Manual.pdf` when it is time. ⚠ Ground truth
+   runs the **unpatched** original; #17's patch is port-side only and does not retire this.
 
 ## Phase 0 — scaffolding (see `docs/phases.md`)
 
@@ -82,11 +80,14 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
     externally-callable routines is **~27 bytes each**, so `[INFERRED]` it is a library of small leaf
     routines (maths/trig/fixed-point being the obvious candidates, which would fit the table-driven
     trig already found in the data). Cheap to settle: disassemble a dozen of its entries.
-16. **Decide the display architecture** — 512×342 against a PAL planar display, and 60 Hz against
-    50 Hz. ⚠ **Re-read since the build choice:** the depth is no longer "1bpp, which is a free win";
-    the Color build is `[DERIVED]` a 16-colour program, so 4 bitplanes, which is workable but costs
-    real bitplane DMA and blit width. Blocked on #18 for the actual surface depth.
-    → `PROJECT.md`, `docs/mac-hardware.md` question 5.
+16. ⭐⭐ **Decide the display architecture.** ⚠ **No longer blocked, and the numbers are harder than
+    the ones this entry used to carry:** `[MEASURED]` from the running original — the game paints
+    **512 × 320** in **16 colours**, chunky 4 bpp, inside a 640 × 480 desktop
+    (`docs/mac-hardware.md` §The display surface). 4 bitplanes at 512 px wide is **OCS hires at its
+    maximum depth**, and **320 lines is more than a non-interlaced PAL field displays** — so this is
+    a genuine three-way choice (scale, crop, or interlace) plus the 60 Hz→50 Hz question, and it
+    wants the user's call. ⭐ Chunky → planar conversion is now a named cost the port must budget
+    for. → `PROJECT.md`.
 
 17. ⭐ **Locate the copy-protection check, then patch it out.** Decision locked — patched, not
     reproduced (`docs/faithfulness-seam.md` §The copy protection; required for a WHDLoad release).
@@ -96,14 +97,7 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
     that also initialises state is a classic, and a stub would give a game that runs and is subtly
     wrong. The patch is a **named** port-side seam in `disasm/symbols.csv`, not a silent edit, and
     the reference loop keeps running the *unpatched* original.
-18. ⭐ **Confirm the Color build's real offscreen depth from the binary.** `[DERIVED]` 16 colours →
-    4 bitplanes comes from 8 `pltt` resources of 16 entries each, which is evidence about palettes,
-    not about the drawing surface. The answer lives in `Initialize`'s Color QuickDraw calls
-    (`NewGWorld`/`NewPixMap`/`GDevice` setup), not in `PICT` headers — a naive `PICT` opcode scan
-    produced garbage (`49151 bpp`) and must not be re-trusted. It gates #16 and the whole blit
-    budget. → `docs/source-inventory.md`, `docs/mac-hardware.md` question 5.
-
-19. ⭐⭐ **Build the A5 world and the segment-loader stand-in.** The first port code that option A
+18. ⭐⭐ **Build the A5 world and the segment-loader stand-in.** The first port code that option A
     requires, and it is well-specified rather than exploratory: allocate the A5 world (**31 272 B**
     of globals below `a5`, **4 104 B** above = 32 B + the **4 072 B / 509-entry jump table** at
     A5+32), pre-patch all 509 entries from unloaded form (`MOVE.W #seg,-(SP)`, `_LoadSeg`) to
@@ -111,7 +105,7 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
     ⚠⚠ **`%A5Init` must run or be replaced by what it produces** — 28 732 B whose job is to
     initialise those globals. Skip it and the globals are zero instead of initialised: a silent
     wrong-value failure, not a crash. → `docs/faithfulness-seam.md`.
-20. **Close the 68020-legality question properly.** ⭐ Current status is a *screen*, not a proof:
+19. **Close the 68020-legality question properly.** ⭐ Current status is a *screen*, not a proof:
     a 68000-vs-68020 differential from all 508 distinct jump-table entries (2 734 instructions,
     600 B per entry, no branch following) found **no 68020-only encoding on any reachable path**.
     The Ghidra sweep (#11/#12) closes it for real, since it follows flow. ⚠ It matters more under

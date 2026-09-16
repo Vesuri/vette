@@ -16,6 +16,15 @@ actually requires — a Plus, an SE, a machine with a bigger screen, 1 MB or mor
 the binary and the documentation in the archive, and it matters because it fixes the reference
 machine and the performance comparison.
 
+⭐⭐ **For the COLOR build three of those are now `[MEASURED]`, because the game states them itself
+and refuses to run otherwise:** it needs **32-Bit QuickDraw** (quits without it), **more than 2 MB**
+("not enough memory" at the 2 MB default; 8 MB is what the reference loop runs), and a **16-colour
+screen** — the game's own words are *"Please change your Monitors setting in the Control Panel to
+16 colors."* ⭐ That last one is the game declaring the 4-bitplane requirement directly, and it is
+much stronger evidence than the `pltt` count it replaces. So the row below is the compact-Mac
+*B&W* build's machine; the Color build is a **Mac II-class colour machine**, and the reference loop
+runs it as one. → §The display surface.
+
 | | Mac Plus / SE `[ASSUMED]` | A500 (the target) |
 |---|---|---|
 | CPU | 68000 @ 7.8336 MHz | 68000 @ 7.09 MHz (PAL) |
@@ -32,6 +41,67 @@ decisions, and all three are in PROJECT.md.
 
 ⚠ **The one-button mouse is a genuine advantage over both prior ports** — there is no analogue axis
 to substitute for (Revs had to replace a uPD7002) and no two-button assumption to unpick.
+
+## ⭐⭐ The display surface — `[MEASURED]` from the running original
+
+**This section closes the old open-work #18 (“confirm the real offscreen depth”) and re-bases #16, and it supersedes every `pltt`/`PICT` inference.** The numbers
+come from the Mac's own structures while `Color VETTE!` is on screen, read by
+`tools/mac_probe_fb.lua`, and the pixel format is *proved* rather than read off a field — see
+§How it was proved below.
+
+| What | Value | Where it was read |
+|---|---|---|
+| Screen | **640 × 480**, **4 bpp**, `pixelType` 0 = **chunky / CLUT-indexed** | `MainDevice` ($8A4) → `GDevice` → `gdPMap` |
+| Screen `rowBytes` | **320** — i.e. **2 pixels per byte**, no padding | same PixMap |
+| Screen base | `$F9000A00`, agreeing with `ScrnBase` ($824) — the NuBus **slot 9** card's framebuffer, not RAM | PixMap `baseAddr` |
+| **The game's window** | **512 × 320** of content, at screen `(64,92)`–`(575,411)` | front `WindowRecord`'s `portRect`, **and** independently the bounding box of non-desktop pixels in the framebuffer dump |
+| Second window | 512 × 342 (the compact-Mac screen size), behind it | `WindowList` ($9D6) chain |
+| Offscreen surface | **512 × 512, 4 bpp, `rowBytes` 260** (256 bytes of pixels + 4 of padding) | `CurrentA5` → QD globals → `thePort` (a CGrafPort) |
+| Palette | **16 entries**, reloaded per scene (the intro's CLUT and the garage's differ) | PixMap `pmTable` |
+| Sound | mono, active through the ~20 s intro, **silent on the garage screen** | `-wavwrite` capture |
+
+⭐⭐ **512 × 320 in 16 colours is the number the port has to hit**, and it is an awkward one for PAL:
+4 bitplanes at 512 px wide is OCS hires at its maximum depth, and 320 lines is more than a
+non-interlaced PAL field shows. It is a real decision, not a formality — `PROJECT.md`, and #16.
+
+⭐⭐ **The game composites from an offscreen GWorld with MASKS.** The 512 × 512 scratch page caught
+mid-frame holds the spec panel, two gauge sprites, and a car image **with its black silhouette mask
+beside it** — the classic Mac masked-`CopyBits` idiom. That is the single most useful thing learned
+so far about the render architecture, because it maps directly onto the Amiga blitter's cookie-cut
+mode rather than needing to be re-invented. ⚠ `[INFERRED]` that this is how the game draws
+generally: one probe caught one scratch page. The trap sweep confirms it or kills it.
+
+### ⚠⚠ The CLUT is NOT what the player saw — there is a gamma table in the way
+
+QuickDraw's `pmTable` holds the *requested* colour; the video card's driver passes it through a
+**gamma table** before it reaches the DAC. Measured against MAME's own output across all 16 entries
+(48 channels): a pure power law with **γ = 1.435**, worst-case error **1/255**.
+
+It is not a subtlety. Index 4 is `(43,43,43)` in `pmTable` and `(74,74,74)` on the glass — Amiga
+`$222` vs `$444`, **a factor of two in the midtones**, and the mid-greys are most of the garage.
+
+⭐ **Rule: derive the Amiga palette from the DISPLAYED colour, never from `pmTable` directly.** The
+reference loop's screenshots are the authority; `pmTable` is the request, not the result.
+
+### How it was proved — and the trap it was nearly lost to
+
+`tools/mac_probe_fb.lua` dumps the live framebuffer and CLUT; `tools/fb_to_png.py` re-renders the
+dump and diffs it against MAME's screenshot of the same frame. Every one of the 16 indices maps to
+**exactly one** displayed colour across all 307 200 pixels (`distinct=1` for all 16), which settles
+the base address, the `rowBytes`, 2-pixels-per-byte, **high nibble = left pixel** and the index order
+in a single measurement. Guess any one of them wrong and the picture comes out visibly mangled.
+
+⚠⚠ **A Mac II boots in 24-BIT MODE, so a Memory Manager master pointer carries FLAG BITS IN ITS HIGH
+BYTE** (bit 7 locked, 6 purgeable, 5 resource). Dereferencing a handle without masking to
+`$00FFFFFF` does not fail — it reads a wild address and formats whatever is there. The first version
+of this probe reported the screen as **“12730 × −17543 px, 18923 bpp”** in exactly the same confident
+tone as the correct run. **Mask every pointer that came out of a handle**, and sanity-check the
+result rather than printing it.
+
+⚠ A dump taken during the intro *animation* differs from the snapshot beside it by 40% of the
+screen, which reads as a broken format guess rather than as two different moments. Probe on a static
+screen and bracket the dump with snapshots.
+
 
 ## The trap surface — `[ASSUMED]` shape, `[DERIVED]` content pending
 
@@ -74,8 +144,10 @@ it is needed: a named, loud report, never a silent absorb (`docs/faithfulness-se
 2. What is the complete trap set, at how many sites, with which selectors? (`make traps`)
 3. Does the game reach low memory or hardware (the VIA, the SCC, the sound buffer) directly?
 4. How does it time itself — `TickCount`, a VBL task, a vertical-retrace interrupt, or a spin?
-5. What does it draw with — `CopyBits` from an offscreen `BitMap`, direct writes to screen memory,
-   or both? **This single answer decides most of the render architecture.**
+5. ~~What does it draw with?~~ **Partly answered:** it keeps a 512 × 512 4 bpp offscreen GWorld of
+   sprite art *with masks*, so at least some of the drawing is masked `CopyBits` compositing
+   (§The display surface). ⚠ Still open: whether the driving view also goes through QuickDraw or
+   writes the framebuffer directly, and that is what decides the render architecture.
 6. Where is its entropy from?
 7. What is in the "and extras" half of the archive — documentation, a manual, saved games? The
    manual is worth reading before the binary (RoF's `docs/manual.md` earned its place).

@@ -34,12 +34,15 @@ either way.
 | 8 `pltt` resources (128-131, 140, 150, 160, 170), **every one exactly 272 B** = 16 B header + 16 × 16 B entries | `[DERIVED]` the game's palettes hold **16 colours** → **4 Amiga bitplanes**, an ordinary OCS configuration and one plane *cheaper* than Revs's five |
 | Color `PICT`s open with `0x0011` VersionOp at offset 10; B&W `PICT`s are v1 (byte opcode `0x11`, version `0x01`) | Color is **PICT v2 / Color QuickDraw**; the picture decoder the port needs is the v2 one |
 
-⚠⚠ **`pltt` is evidence about PALETTES, not proof about the DRAWING SURFACE.** The offscreen/window
-depth the game actually composites into must come from the Color QuickDraw calls in `Initialize`
-(`NewGWorld`/`NewPixMap` and friends), not from counting palette entries and not from parsing
-`PICT` headers — a naive opcode scan of those headers produced nonsense here (`0 bpp`, `49151 bpp`),
-which is exactly the kind of number that gets believed if it lands closer to plausible.
-→ `docs/open-work.md`.
+⚠⚠ **`pltt` was evidence about PALETTES, not proof about the DRAWING SURFACE** — and the proof has
+since been taken somewhere else entirely: **the running original says 4 bpp**, for both the screen
+and the game's offscreen GWorlds, and it also says **512 × 320** for the painted area.
+→ `docs/mac-hardware.md` §The display surface. The `pltt` reading above was right, but it was right
+by luck: it is kept here as the resource fact, not as the depth authority.
+
+⚠ Do not re-derive depth from `PICT` headers: a naive opcode scan of them produced nonsense here
+(`0 bpp`, `49151 bpp`), which is exactly the kind of number that gets believed if it lands closer to
+plausible.
 
 ## The 11 `CODE` segments — and they are NAMED
 
