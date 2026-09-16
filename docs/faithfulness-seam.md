@@ -62,6 +62,35 @@ out where it stops working.
    surfaces far from its cause. (There is already one in this tree: `BitmapAssembler.s`'s two
    non-interleaved arms, inherited as silent no-ops and retagged `[ASSUMED]`.)
 
+## ⭐ The copy protection — the one named exception to 1:1
+
+**Decision (locked): the protection is patched out, not reproduced.**
+
+`readme.txt` says the shipped 1.02 build asks for a password **once, on first run**, with the answers
+in the first pages of `Manual.pdf`. The data side of it is `VETTE!.Data`'s `COPY 1 "Protect"`
+(1 991 B); the check itself is in the code, un-located as yet (`Initialize` is the obvious first
+place to look, and `Main` the second).
+
+Three reasons it is not a faithfulness question at all:
+
+1. **A WHDLoad release cannot ask.** The port's delivery format launches the game directly, with no
+   manual in the player's hands and nowhere to put a modal password prompt. Patching it is a
+   *release requirement*, not a shortcut.
+2. **It is not player-visible behaviour.** ⚑ This doc's own rule — *faithful means faithful from the
+   PLAYER's point of view* — excludes a gate whose only correct outcome is "proceed".
+3. **Left in, it poisons the reference loop.** Every fresh reference image would stop at the prompt,
+   which is precisely where ground truth needs to be cheap. → `docs/mac-reference-loop.md`.
+
+⚠⚠ **But patch it the way this project patches things, not the way a cracker would.**
+- **Find the check before defeating it.** The `COPY` resource is 1 991 bytes, which is far more than
+  a password list needs; until the routine is read, we do not know what *else* it gates. A protection
+  check that also initialises state is a classic, and stubbing it would produce a game that runs and
+  is subtly wrong — the failure shape `docs/method-lessons.md` calls the most expensive one.
+- **The patch is a port-side seam with a name, not a silent edit**, and it is recorded here and in
+  `disasm/symbols.csv`. A reader must be able to find the one place 1:1 was deliberately broken.
+- **Keep the original path runnable under the reference loop.** Ground truth is the *unpatched*
+  original; the patch belongs to the port, so never validate the port against a patched reference.
+
 ## Rules that apply whatever the answer to #1 is
 
 - **Faithful means faithful from the PLAYER's point of view.** Validate *results*, not a three-register

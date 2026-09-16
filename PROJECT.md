@@ -39,6 +39,8 @@ centre of gravity**, and it is the thing to size before anything else.
 | Ground truth | **The original under a Macintosh emulator.** NEVER the dev-host backend, never the Amiga build. Which emulator is open — `docs/mac-reference-loop.md` |
 | Repo | Commit directly to `main`, one logical change per commit |
 | Source material | Kept **local only, never committed** — `tmp/` is local by policy, and `.gitignore` covers every shape a Mac application arrives in |
+| **The build** | ⭐ **`Color VETTE!`.** Not the B&W one. See below — 16 colours maps onto 4 Amiga bitplanes, so the colour build is not the expensive choice it would be at 8bpp |
+| **Copy protection** | ⭐ **Patched out, not reproduced.** The one deliberate, named departure from 1:1 — see `docs/faithfulness-seam.md` §The copy protection |
 
 ## Open decisions
 
@@ -55,26 +57,24 @@ how much else depends on them.
 2. ⭐ **The reference emulator.** `docs/mac-reference-loop.md` §Candidates, evaluated against the
    capability list there rather than on accuracy reputation. The capability that decides it is
    scripted breakpoints + register reads, because that is what makes the trap inventory possible.
-3. ⭐ **Which build: B&W `VETTE!` or `Color VETTE!`?** Two separate applications, same 11 named
-   segments, code within 5% either way, and — verified — **the same 231 game-data resources,
-   byte for byte**. So this picks an application, not a data set, and almost the whole ~1 MB
-   difference is 192 `PICT` in colour rather than 1-bit. It ties directly to #4: 1bpp is a genuine
-   *advantage* on the Amiga, and the B&W build is the one that already assumes it. ⚠ Settle it
-   before `disasm/symbols.csv` has a single row, because every address is `(segment, offset)` **in
-   one specific build**. → `docs/source-inventory.md`.
-4. ⭐ **The display architecture.** 512×342 **1-bit** at ~60 Hz, onto a PAL planar Amiga at 50 Hz.
-   Every part of that is a decision: the width (512 is not a free Amiga mode), the height (342 vs
-   256 lines), the depth (1bpp is cheap — a genuine *advantage* over both prior ports), and the
-   17% timing difference. → `docs/mac-hardware.md` question 5, and it is properly answerable only
-   once the sweep says what the game draws with.
-5. **Machine target.** RoF needed 1 MB and did not fit a bare 512 KB A500. Unknown here and not
+3. ⭐ **The display architecture.** 512×342 at ~60 Hz onto a PAL planar Amiga at 50 Hz, now with
+   **colour**. Every part is still a decision — the width (512 is not a free Amiga mode), the height
+   (342 vs 256 lines), the depth, and the 17% timing difference.
+   ⭐⭐ **The depth question got a good answer:** the Color build ships 8 `pltt` palettes of
+   **16 entries** each, so `[DERIVED]` the game is a **16-colour** program, not 256. 16 colours is
+   **4 Amiga bitplanes** — an ordinary OCS configuration, and cheaper per pixel than the 5 bitplanes
+   Revs needs. So choosing Color costs bitplane DMA and blit width, not a colour-reduction pass.
+   ⚠ `[ASSUMED]` until confirmed from the binary: that the game's offscreen/window depth really is
+   4bpp. The `pltt` count is evidence about palettes, not proof about the drawing surface — see
+   `docs/open-work.md`. → `docs/mac-hardware.md` question 5.
+4. **Machine target.** RoF needed 1 MB and did not fit a bare 512 KB A500. Unknown here and not
    guessable: it depends on whether the original segments stay resident and on how the display is
    arranged. **Decide when the first real measurement exists, not before.**
-6. **Performance target.** Deliberately not set. → `docs/perf-method.md` §The target. ⭐ Unlike both
+5. **Performance target.** Deliberately not set. → `docs/perf-method.md` §The target. ⭐ Unlike both
    prior ports there is a real reference: the Mac Plus's 7.83 MHz 68000 is within 12% of the A500's
    7.09 MHz, so the original's own framerate under the reference loop is a meaningful yardstick.
    Set the target from that plus a Phase 4 profile.
-7. **Host build: does it exist, and what for?** RoF had an SDL backend and its approximation cost
+6. **Host build: does it exist, and what for?** RoF had an SDL backend and its approximation cost
    real time; Revs deliberately had **no renderer** and used the host only for differentials.
    ⚠ This port's differentials are different again (there is no transliteration oracle), so the
    question is open rather than answered by either precedent.
@@ -93,20 +93,23 @@ Inside: an **8049 KiB HFS volume** as an NDIF image, plus the extras — `scans/
 reading *before* the binary; RoF's `docs/manual.md` earned its place. ⚠ `readme.txt` says the build
 asks for a copy-protection password **once, on first run**, and the answers are in the first pages of
 `Manual.pdf` — so a reference-loop image must be set up past that, and a fresh one will stop there.
+⚠ That constraint is about **ground truth**, and the protection decision does not retire it: the
+*port* patches the check out, the *reference* keeps it.
 
 On the volume, `VETTE! Folder/` holds **two separate builds**:
 
 | | code | data | notes |
 |---|---|---|---|
 | `(Folder) B&W VETTE!/VETTE!` | `APPL`/`VETT`, 523 089 B rsrc, **11 `CODE`, 124 554 B** | `VETTE!.Data` `DATA`/`VETT`, 577 498 B | plus `Start VETTE!` (`APPL`/`SVET`, 3 393 B) |
-| `(Folder) Color VETTE!/Color VETTE!` | `APPL`/`VETT`, 1 587 389 B rsrc, **11 `CODE`, 118 892 B** | its own 577 498 B `VETTE!.Data` | adds `pltt` ×8, `wctb`, 8 `WIND` |
+| ⭐ `(Folder) Color VETTE!/Color VETTE!` — **the one this port follows** | `APPL`/`VETT`, 1 587 389 B rsrc, **11 `CODE`, 118 892 B** | its own 577 498 B `VETTE!.Data` | adds `pltt` ×8, `wctb`, 8 `WIND` |
 
 ⭐ **Same 11 named segments in both** — `Main`, `Initialize`, `Communication`, `load`, `Score`,
 `Traffic`, `FRED`, `Intro`, `sound`, `%A5Init`, over `CODE 0`'s jump table — and the *code* is
 roughly the same size. Almost all of the Color build's extra megabyte is `PICT` (192 resources in
 both, colour versus 1-bit). So the two differ mainly in artwork and the colour Toolbox calls, and
 **net of `CODE 0` (4 072 B, the jump table) and `%A5Init` (28 664 B, the MPW globals initialiser)
-the B&W game is ~91.8 KB of 68000 code.** That is the actual size of the thing being ported.
+the B&W game is ~91.8 KB of 68000 code** (Color ~86.1 KB by the same subtraction). That is the
+actual size of the thing being ported.
 
 ⭐⭐ **Both `VETTE!.Data` forks hold the same 231 resources, all byte-for-byte identical** (checked
 pairwise; the forks' own hashes differ only in resource-map layout). The game data is

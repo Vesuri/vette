@@ -66,7 +66,14 @@ mismatch is **not** a corruption signal here. Validate structurally with `hfs_ex
 `tools/ndif2raw.py`'s docstring says why that is the stronger proof.
 
 ⭐ **There are TWO applications on the volume, B&W and Color, and they are different builds** — not
-one binary with a flag. Which one this port follows is an open decision (`PROJECT.md`).
+one binary with a flag. ⭐⭐ **This port follows `Color VETTE!`** (decision locked, `PROJECT.md`).
+Extract, import and name **that** build: an address is `(segment, offset)` *in one specific build*,
+and the two builds' segments differ in size, so a B&W offset is simply wrong here.
+
+⭐ **The copy protection is patched out, not reproduced** — the single deliberate, documented
+departure from 1:1. ⚠ Find the check before defeating it (`COPY 1 "Protect"` is 1 991 B, more than
+a password list needs, so it may gate more than the prompt). Rules:
+`docs/faithfulness-seam.md` §The copy protection.
 
 ## The source material
 

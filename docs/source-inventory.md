@@ -20,11 +20,26 @@ Two applications and one data file, in `VETTE!/VETTE! Folder/` on the 8049 KiB v
 
 ⭐⭐ **The two `VETTE!.Data` forks contain the SAME 231 resources, all 231 byte-for-byte identical**
 (checked pairwise). The forks' whole-file hashes differ only in resource-map layout. So **the game
-data is build-independent**: choosing B&W or Color (`docs/open-work.md` #3) picks an *application*,
-not a data set, and every table, object and sound below is common to both.
+data is build-independent**: the build choice picked an *application*, not a data set, and every
+table, object and sound below is common to both. ⭐ **The port follows `Color VETTE!`** (locked).
 
 Both applications carry 192 `PICT`; almost the entire ~1 MB difference is those pictures in colour
-rather than 1-bit. The *code* is within 5% either way.
+rather than 1-bit (380 328 B of `PICT` in B&W vs 1 447 468 B in Color). The *code* is within 5%
+either way.
+
+### ⭐⭐ What the colour build says about depth — 16 colours, not 256
+
+| evidence | reading |
+|---|---|
+| 8 `pltt` resources (128-131, 140, 150, 160, 170), **every one exactly 272 B** = 16 B header + 16 × 16 B entries | `[DERIVED]` the game's palettes hold **16 colours** → **4 Amiga bitplanes**, an ordinary OCS configuration and one plane *cheaper* than Revs's five |
+| Color `PICT`s open with `0x0011` VersionOp at offset 10; B&W `PICT`s are v1 (byte opcode `0x11`, version `0x01`) | Color is **PICT v2 / Color QuickDraw**; the picture decoder the port needs is the v2 one |
+
+⚠⚠ **`pltt` is evidence about PALETTES, not proof about the DRAWING SURFACE.** The offscreen/window
+depth the game actually composites into must come from the Color QuickDraw calls in `Initialize`
+(`NewGWorld`/`NewPixMap` and friends), not from counting palette entries and not from parsing
+`PICT` headers — a naive opcode scan of those headers produced nonsense here (`0 bpp`, `49151 bpp`),
+which is exactly the kind of number that gets believed if it lands closer to plausible.
+→ `docs/open-work.md`.
 
 ## The 11 `CODE` segments — and they are NAMED
 
