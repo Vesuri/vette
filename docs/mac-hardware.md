@@ -39,6 +39,47 @@ is 21.4 KB a frame; the Amiga has no 512-pixel-wide 1-bit mode that is free, the
 lines tall, and 60 Hz vs 50 Hz means any animation timed in frames runs 17% slow. All three are
 decisions, and all three are in PROJECT.md.
 
+## ⭐⭐ The game executes NO 68020-only instruction — `[MEASURED]`, both builds
+
+The Color build requires a Mac II, which **has** a 68020, and that was the worry: under option A the
+original bytes must *execute* on a 68000, not merely be understood. They do. `tools/m68k_sweep.py`
+found **zero** 68020-only encodings on any reachable path in **either** build.
+
+| | Color | B&W |
+|---|---|---|
+| Jump-table entries walked | 509 | 507 |
+| Code bytes reached by flow | 77 900 / 114 764 = **67.9 %** | 75 986 / 120 442 = **63.1 %** |
+| 68020-only instructions found | **0** | **0** |
+| Unfollowable computed jumps | 609 | 601 |
+
+⭐ **Why 68 % coverage is nevertheless an answer, and this is the interesting part.** The sweep also
+sweeps the bytes it did *not* reach, linearly, and asks the same question there. Those come back at
+**18.4 candidates per KB** — `pack d2,d5,#$656c` (that immediate is the ASCII `"el"`), `fmovem`
+repeating on an 0x80 stride, `callm`. Is that 68020 code the walk missed, or data? The tool
+answers it by **calibrating the method against itself**: the same linear sweep over the bytes the
+walk *proved* are code, deliberately skewed by 2 bytes so it desyncs from the real instruction
+boundaries, yields **0.07 per KB**. A **260× separation**. Misaligned real 68000 code does not
+invent 68020 instructions; the unreached bytes do, so the unreached bytes are not code.
+
+⭐ 88 % of the residue is in `%A5Init`, whose 28 728 bytes are the A5-world initialisation *data* by
+definition (1 % reached, and that is the expected number, not a gap in the sweep).
+
+⚠ **The two things that make the result trustworthy, and both were needed:**
+- **It self-tests.** `--selftest` runs 25 fixtures of known-020 and known-68000 encodings through
+  the classifier, including two capstone itself gets wrong: `callm`/`rtm` (`$06C0`) decode as `dc.w`
+  in **both** modes, so they need a raw-encoding table, and `cas2` is **wrongly accepted** by
+  capstone's 68000 decoder. A fixture-less pass runs zero comparisons and reports green.
+- ⚠⚠ **It reports coverage, and that is what caught the bug that would have faked this answer.**
+  The first run printed the same table of zeros at **17.6 %** coverage, because capstone returns a
+  branch target as an operand of type **`M68K_OP_BR_DISP`**, not `M68K_OP_IMM`, so the walker matched
+  nothing and **followed no branches at all**. It still produced a confident, entirely worthless
+  clean bill of health. The only visible symptom was the coverage number. (Target =
+  `address + 2 + disp`; PC-relative `jsr $x(pc)` arrives as `M68K_OP_MEM` with
+  `address_mode == M68K_AM_PCI_DISP` and the same arithmetic.)
+
+⛔ **Do not re-run a whole-file linear sweep as evidence.** It is the method the residue control
+exists to discredit: on mixed code and data it yields `callm`/`rtm`/`cmp2`/`pack` by the dozen.
+
 ⚠ **The one-button mouse is a genuine advantage over both prior ports** — there is no analogue axis
 to substitute for (Revs had to replace a uPD7002) and no two-button assumption to unpick.
 

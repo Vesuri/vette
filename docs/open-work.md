@@ -105,15 +105,15 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
     ⚠⚠ **`%A5Init` must run or be replaced by what it produces** — 28 732 B whose job is to
     initialise those globals. Skip it and the globals are zero instead of initialised: a silent
     wrong-value failure, not a crash. → `docs/faithfulness-seam.md`.
-19. **Close the 68020-legality question properly.** ⭐ Current status is a *screen*, not a proof:
-    a 68000-vs-68020 differential from all 508 distinct jump-table entries (2 734 instructions,
-    600 B per entry, no branch following) found **no 68020-only encoding on any reachable path**.
-    The Ghidra sweep (#11/#12) closes it for real, since it follows flow. ⚠ It matters more under
-    option A than it would under B: the original bytes must *execute* on a 68000, not merely be
-    understood. ⚠ Do not re-run the whole-file linear sweep as evidence — mixed code and data
-    yields `callm`/`rtm`/`cmp2` false positives by the dozen.
 
 ## ⛔ CLOSED — measured dead ends
 
-*(empty — read this section before proposing a lever, so a negative result is not re-derived.
-Each entry is ONE line: what was tried, what it measured, and the doc that has the detail.)*
+*Read this section before proposing a lever, so a negative result is not re-derived.
+Each entry is ONE line: what was tried, what it measured, and the doc that has the detail.*
+
+- **68020-only instructions in the game** — none. Flow-following sweep of all 509/507 jump-table
+  entries in both builds, 67.9 %/63.1 % of code bytes reached, **0** found; the unreached bytes are
+  shown to be data by a self-calibrated linear control (18.4 vs 0.07 candidates/KB).
+  `tools/m68k_sweep.py`, `docs/mac-hardware.md`.
+- **Whole-file LINEAR 68020 sweep** — unusable as evidence: it decodes data as code and yields
+  `callm`/`rtm`/`cmp2`/`pack` by the dozen. `docs/mac-hardware.md`.

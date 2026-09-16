@@ -1,7 +1,8 @@
 # Vette! — Macintosh 68000 → Amiga port
 
 Porting Spectrum HoloByte's 1989 Macintosh driving simulation *Vette!* to the Amiga from the Mac
-application. ⭐ **The code is already 68000 and can stay 68000** — this is a port of the *seams*
+application. ⭐ **The code is already 68000 and can stay 68000** (`[MEASURED]` — zero 68020-only instructions in
+either build, `docs/mac-hardware.md`) — this is a port of the *seams*
 (OS/Toolbox calls, display, input, sound), not a translation across processor families like the
 three 6502 ports before it. **Faithful 1:1 port** — parity before improvements; validate against
 the original under a Macintosh emulator, **NEVER** against the dev-host backend.
