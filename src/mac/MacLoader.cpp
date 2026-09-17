@@ -2838,6 +2838,24 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
         if (g_stageCDepth < 80) g_stageCDepth = 80;
         return 1;
     }
+    if (trap == 0xa970) {                    // GetNextEvent(mask, event) -> Boolean
+        uint8_t* event = (uint8_t*)read32(userStack);
+        if (event) {
+            // The queue is empty on the measured first main-loop poll.  Return
+            // a complete nullEvent record rather than leaving caller storage
+            // stale. Mouse coordinates and keyboard production remain gated
+            // on the input layer that supplies them.
+            write16(event + 0, 0);           // nullEvent
+            write32(event + 2, 0);           // message
+            write32(event + 6, g_macTicks);  // when
+            write16(event + 10, 0);          // where.v
+            write16(event + 12, 0);          // where.h
+            write16(event + 14, 0);          // modifiers
+            write16(userStack + 6, 0);
+            if (g_stageCDepth < 81) g_stageCDepth = 81;
+            return 7;
+        }
+    }
     if (trap == 0xa9a0) {                    // GetResource(type:4, id:2) -> Handle result:4
         int16_t id = (int16_t)read16(userStack);
         uint32_t type = read32(userStack + 2);

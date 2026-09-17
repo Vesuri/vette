@@ -194,6 +194,12 @@ The current loud stop is `GetNextEvent` at `Main+$29F2`, confirmed by the depth-
 `SystemTask` now presents dirty pixels, the post-intro screen is no longer left black while the main
 loop starts.
 
+81. `GetNextEvent` (complete `nullEvent` record for the measured empty-queue poll)
+
+After this call there is no next loud stop in a 45-second event-driven run: the game remains in its
+main loop polling the empty queue. Mouse coordinates, button transitions, and keyboard events are
+the next input-layer feature rather than fabricated data in this checkpoint.
+
 `amiga/stage_c.gdb` breaks on `VetteScreen::showLoudStop`, after the report is complete, and prints
 the depth, trap identity, selector, runtime `(segment, offset)`, absolute PC, USP and its first
 words, all data/address registers, and nearby instructions. It then exits, so `diag_run.sh` stops
