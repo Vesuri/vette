@@ -327,7 +327,8 @@ static const TrapName s_trapNames[] = {
     {0xa914,"WINDOW MANAGER","DISPOSEWINDOW"}, {0xa90d,"WINDOW MANAGER","PAINTBEHIND"},
     {0xa04d,"MEMORY MANAGER","PURGEMEM"}, {0xa04c,"MEMORY MANAGER","COMPACTMEM"},
     {0xa93a,"MENU MANAGER","DISABLEITEM"}, {0xa931,"MENU MANAGER","NEWMENU"},
-    {0xa933,"MENU MANAGER","APPENDMENU"}, {0xa9bf,"MENU MANAGER","GETRMENU"},
+    {0xa933,"MENU MANAGER","APPENDMENU"}, {0xa94d,"MENU MANAGER","ADDRESMENU"},
+    {0xa9bf,"MENU MANAGER","GETRMENU"},
     {0xa937,"MENU MANAGER","DRAWMENUBAR"}, {0xa970,"EVENT MANAGER","GETNEXTEVENT"},
     {0xa9b4,"EVENT MANAGER","SYSTEMTASK"}, {0xaa94,"PALETTE MANAGER","ACTIVATEPALETTE"},
     {0xa874,"QUICKDRAW","GETPORT"}
@@ -2406,6 +2407,23 @@ static bool appendMenu(uint8_t** handle, const uint8_t* specification)
     return true;
 }
 
+static bool addResourceMenu(uint8_t** menu, uint32_t type)
+{
+    if (!menu || !*menu || handleSize(menu) < 16) return false;
+
+    // AddResMenu appends the names of resources of the requested type.  The
+    // shipped application and data forks contain no DRVR resources, so the
+    // measured desk-accessory-menu call is an empty append.  Keep a loud stop
+    // if a different archive does contain a named match: encoding those names
+    // as menu items is observable state and must not be silently omitted.
+    for (uint32_t i = 0; i < s_resourceArchive.resourceCount(); ++i) {
+        ResourceArchive::Item item;
+        if (!s_resourceArchive.item(i, item)) return false;
+        if (item.type == type && item.nameLength) return false;
+    }
+    return true;
+}
+
 static void initTextEdit()
 {
     // TEInit creates an empty private scrap handle and resets its manager globals.
@@ -2709,6 +2727,12 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
         if (appendMenu((uint8_t**)read32(userStack + 4),
                        (const uint8_t*)read32(userStack))) {
             if (g_stageCDepth < 73) g_stageCDepth = 73;
+            return 9;
+        }
+    }
+    if (trap == 0xa94d) {                    // AddResMenu(menu, type)
+        if (addResourceMenu((uint8_t**)read32(userStack + 4), read32(userStack))) {
+            if (g_stageCDepth < 74) g_stageCDepth = 74;
             return 9;
         }
     }

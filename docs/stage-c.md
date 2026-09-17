@@ -164,7 +164,9 @@ post-intro continuation is:
 72. `NewMenu`
 73. `AppendMenu`
 
-`AddResMenu` is the next unimplemented call.
+74. `AddResMenu` (the requested `DRVR` type has no entries in either packaged resource fork)
+
+The current loud stop is `InsertMenu`, confirmed at `load+$0542` by the depth-74 run.
 
 `amiga/stage_c.gdb` breaks on `VetteScreen::showLoudStop`, after the report is complete, and prints
 the depth, trap identity, selector, runtime `(segment, offset)`, absolute PC, USP and its first

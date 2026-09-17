@@ -7,10 +7,10 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — current loud stop
 
-⭐ **HEAD OF QUEUE: `AddResMenu`, called by `load+$053A`.** The opt-in `SKIP_INTRO=1` path now
-crosses `PaintBehind`, `PurgeMem`, `CompactMem`, `DisableItem`, `NewMenu`, and `AppendMenu` and
-halts at the next measured Menu Manager operation. Implement only its state semantics and continue
-toward the garage. Do not add dialog/UI traps to conceal an upstream failure.
+⭐ **HEAD OF QUEUE: `InsertMenu`, called by `load+$0542`.** The packaged resource archive
+contains no `DRVR` entries, so the preceding `AddResMenu(menu, 'DRVR')` is a validated empty
+append. Implement only menu-list state semantics and continue toward the garage. Do not add
+dialog/UI traps to conceal an upstream failure.
 
 The MAME A-trap log remains a measured reference-run inventory → `docs/trap-log.md`,
 but Stage C has proved that it is **not an exact standalone-port first-use script**. The port has
@@ -77,8 +77,8 @@ a converted Mac screenshot is a display-path proof and nothing more — it must 
 "the intro screen works".
 
 ⛔ **Deferred until execution asks for them:** the Event Manager (`GetNextEvent`, `SystemTask`)
-and unobserved late manager operations. The current loud stop is `AddResMenu`; `PaintBehind`,
-`PurgeMem`, `CompactMem`, `DisableItem`, `NewMenu`, and `AppendMenu` are now implemented because the
+and unobserved late manager operations. `PaintBehind`, `PurgeMem`, `CompactMem`, `DisableItem`,
+`NewMenu`, `AppendMenu`, and the empty-`DRVR` `AddResMenu` case are now implemented because the
 post-intro path reached them. Do not defer a trap that the loud-stop loop actually reaches.
 
 ⚠ **Refer to an item by its TITLE, not its number.** The list is renumbered every time an entry is
