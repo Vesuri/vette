@@ -67,6 +67,29 @@ static uint8_t* s_qdThePort;
 static uint8_t* s_currentA5;
 static uint16_t s_currentResourceFork = 0;  // application resource file at process launch
 
+struct WindowSlot {
+    uint8_t record[156];
+    bool used;
+    uint8_t structureRegion[10];
+    uint8_t* structureRegionMaster;
+    uint8_t contentRegion[10];
+    uint8_t* contentRegionMaster;
+    uint8_t clipRegion[10];
+    uint8_t* clipRegionMaster;
+    uint8_t updateRegion[10];
+    uint8_t* updateRegionMaster;
+    uint8_t title[256];
+    uint8_t* titleMaster;
+    int16_t procID;
+    uint8_t** palette;
+    bool paletteUpdates;
+    bool updating;
+};
+static WindowSlot s_windows[8];
+static uint8_t* s_windowList;
+static uint32_t s_colorSeed = 1;
+static uint8_t** s_activePalette;
+
 struct FontManagerState {
     bool initialized;
     int16_t systemFont;
@@ -162,10 +185,12 @@ static const TrapName s_trapNames[] = {
     {0xa029,"MEMORY MANAGER","HLOCK"}, {0xa11e,"MEMORY MANAGER","NEWPTR"},
     {0xa998,"RESOURCE MANAGER","USERESFILE"}, {0xa994,"RESOURCE MANAGER","CURRESFILE"},
     {0xaa46,"WINDOW MANAGER","GETNEWCWINDOW"}, {0xa91b,"WINDOW MANAGER","MOVEWINDOW"},
+    {0xa915,"WINDOW MANAGER","SHOWWINDOW"},
     {0xaa92,"PALETTE MANAGER","GETNEWPALETTE"}, {0xa873,"QUICKDRAW","SETPORT"},
     {0xaa28,"COLOR MANAGER","GETCTSEED"}, {0xa91f,"WINDOW MANAGER","SELECTWINDOW"},
     {0xa922,"WINDOW MANAGER","BEGINUPDATE"}, {0xa923,"WINDOW MANAGER","ENDUPDATE"},
     {0xa889,"QUICKDRAW","TEXTMODE"}, {0xa9b9,"QUICKDRAW","GETCURSOR"},
+    {0xa851,"QUICKDRAW","SETCURSOR"},
     {0xa97c,"DIALOG MANAGER","GETNEWDIALOG"}, {0xab1d,"QUICKDRAW","QDEXTENSIONS"},
     {0xaa95,"PALETTE MANAGER","SETPALETTE"}, {0xa146,"TRAP MANAGER","GETTRAPADDRESS"},
     {0xa047,"TRAP MANAGER","SETTRAPADDRESS"}, {0xa983,"DIALOG MANAGER","DISPOSEDIALOG"},
@@ -392,18 +417,21 @@ static void initWindowManagerPort()
                -32767, -32767, 32767, 32767);
     initRegion(s_grayRgn, s_grayRgnMaster, 20, 0, 320, 512);
 
-    // CGrafPort has the same 108-byte footprint as GrafPort.  The high portVersion
-    // bits identify the color form; all pointers below are classic Mac Handles.
-    write32(s_windowManagerPort + 2, (uint32_t)&s_windowManagerPixMapMaster);
-    write16(s_windowManagerPort + 6, 0xc000);
+    // WMgrPort remains an old-style GrafPort on this system.  Vette reads its
+    // embedded BitMap directly to obtain the screen bounds before centering windows.
+    write32(s_windowManagerPort + 2, (uint32_t)s_colorScreen);
+    write16(s_windowManagerPort + 6, 512 / 2);
+    writeRect(s_windowManagerPort + 8, 0, 0, 320, 512);
     writeRect(s_windowManagerPort + 16, 0, 0, 320, 512);
     write32(s_windowManagerPort + 24, (uint32_t)&s_windowManagerVisRgnMaster);
     write32(s_windowManagerPort + 28, (uint32_t)&s_windowManagerClipRgnMaster);
-    write16(s_windowManagerPort + 42, 0xffff);
-    write16(s_windowManagerPort + 44, 0xffff);
-    write16(s_windowManagerPort + 46, 0xffff);        // rgbBkColor = white
-    write16(s_windowManagerPort + 54, 1);             // pnSize.h (v at +52 is 1 below)
+    for (uint16_t i = 0; i < 8; ++i) {
+        s_windowManagerPort[32 + i] = 0;              // bkPat = white
+        s_windowManagerPort[40 + i] = 0xff;           // fillPat = black
+        s_windowManagerPort[58 + i] = 0xff;           // pnPat = black
+    }
     write16(s_windowManagerPort + 52, 1);             // pnSize.v
+    write16(s_windowManagerPort + 54, 1);             // pnSize.h
     write16(s_windowManagerPort + 56, 8);             // patCopy
     write16(s_windowManagerPort + 68, s_fontManager.systemFont);
     write16(s_windowManagerPort + 72, 1);             // srcOr
@@ -417,6 +445,115 @@ static void initWindowManagerPort()
     write32(s_qdThePort, (uint32_t)s_windowManagerPort);
     write32(s_currentA5 + 8, (uint32_t)s_windowManagerPort);
     write32(s_currentA5 + 12, (uint32_t)&s_grayRgnMaster);
+}
+
+static void initColorPort(uint8_t* port, uint8_t** visRgn, uint8_t** clipRgn,
+                          int16_t top, int16_t left, int16_t bottom, int16_t right)
+{
+    write32(port + 2, (uint32_t)&s_windowManagerPixMapMaster);
+    write16(port + 6, 0xc000);                        // CGrafPort version
+    writeRect(port + 16, top, left, bottom, right);
+    write32(port + 24, (uint32_t)visRgn);
+    write32(port + 28, (uint32_t)clipRgn);
+    write16(port + 42, 0xffff);
+    write16(port + 44, 0xffff);
+    write16(port + 46, 0xffff);                       // rgbBkColor = white
+    write16(port + 52, 1);
+    write16(port + 54, 1);
+    write16(port + 56, 8);                            // patCopy
+    write16(port + 68, s_fontManager.systemFont);
+    write16(port + 72, 1);                            // srcOr
+    write16(port + 74, s_fontManager.systemSize);
+    write32(port + 80, 33);                           // blackColor
+    write32(port + 84, 30);                           // whiteColor
+}
+
+static uint8_t* newColorWindow(int16_t id, uint8_t* storage, uint8_t* behind)
+{
+    uint8_t** resource = getResource(0x57494e44UL, id); // 'WIND'
+    if (!resource || !*resource) return 0;
+    const uint8_t* wind = *resource;
+
+    WindowSlot* slot = 0;
+    for (uint16_t i = 0; i < sizeof(s_windows) / sizeof(s_windows[0]); ++i)
+        if (!s_windows[i].used) { slot = &s_windows[i]; break; }
+    if (!slot) return 0;
+    slot->used = true;
+    for (uint16_t i = 0; i < sizeof(slot->record); ++i) slot->record[i] = 0;
+
+    int16_t top = (int16_t)read16(wind);
+    int16_t left = (int16_t)read16(wind + 2);
+    int16_t bottom = (int16_t)read16(wind + 4);
+    int16_t right = (int16_t)read16(wind + 6);
+    uint8_t* window = storage ? storage : slot->record;
+    if (storage)
+        for (uint16_t i = 0; i < sizeof(slot->record); ++i) storage[i] = 0;
+
+    initRegion(slot->structureRegion, slot->structureRegionMaster,
+               top, left, bottom, right);
+    initRegion(slot->contentRegion, slot->contentRegionMaster,
+               top, left, bottom, right);
+    initRegion(slot->clipRegion, slot->clipRegionMaster,
+               top, left, bottom, right);
+    initRegion(slot->updateRegion, slot->updateRegionMaster, 0, 0, 0, 0);
+    initColorPort(window, &slot->contentRegionMaster, &slot->clipRegionMaster,
+                  top, left, bottom, right);
+
+    write16(window + 108, 0);                         // windowKind
+    window[110] = wind[10];                           // visible
+    window[112] = wind[11];                           // goAwayFlag
+    write32(window + 114, (uint32_t)&slot->structureRegionMaster);
+    write32(window + 118, (uint32_t)&slot->contentRegionMaster);
+    write32(window + 122, (uint32_t)&slot->updateRegionMaster);
+    slot->procID = (int16_t)read16(wind + 8);         // WDEF selection for later operations
+    uint8_t titleLength = wind[16];
+    slot->title[0] = titleLength;
+    for (uint16_t i = 0; i < titleLength; ++i) slot->title[i + 1] = wind[17 + i];
+    slot->titleMaster = slot->title;
+    write32(window + 134, (uint32_t)&slot->titleMaster);
+    write32(window + 144, (uint32_t)s_windowList);
+    write32(window + 152, read32(wind + 12));         // refCon
+    s_windowList = window;                            // front of our window chain
+    (void)behind;                                     // both shipped calls use behindWindow=-1
+    return window;
+}
+
+static void moveWindow(uint8_t* window, int16_t h, int16_t v, bool front)
+{
+    int16_t height = (int16_t)(read16(window + 20) - read16(window + 16));
+    int16_t width = (int16_t)(read16(window + 22) - read16(window + 18));
+    writeRect(window + 16, v, h, (int16_t)(v + height), (int16_t)(h + width));
+    uint8_t** structure = (uint8_t**)read32(window + 114);
+    uint8_t** content = (uint8_t**)read32(window + 118);
+    if (structure && *structure) writeRect(*structure + 2, v, h, v + height, h + width);
+    if (content && *content) writeRect(*content + 2, v, h, v + height, h + width);
+    if (front) s_windowList = window;
+}
+
+static WindowSlot* windowSlot(uint8_t* window)
+{
+    for (uint16_t i = 0; i < sizeof(s_windows) / sizeof(s_windows[0]); ++i)
+        if (s_windows[i].used && s_windows[i].record == window) return &s_windows[i];
+    return 0;
+}
+
+static void activatePalette(uint8_t* window)
+{
+    WindowSlot* slot = windowSlot(window);
+    if (!slot || !slot->palette || !*slot->palette) return;
+    s_activePalette = slot->palette;
+    const uint8_t* palette = *slot->palette;
+    uint16_t count = read16(palette);
+    if (count > 16) count = 16;
+    for (uint16_t i = 0; i < count; ++i) {
+        const uint8_t* color = palette + 16 + i * 16;
+        uint8_t* spec = s_windowManagerColors + 8 + i * 8;
+        write16(spec, i);
+        write16(spec + 2, read16(color));
+        write16(spec + 4, read16(color + 2));
+        write16(spec + 6, read16(color + 4));
+    }
+    write32(s_windowManagerColors, s_colorSeed++);
 }
 
 static void initMenus()
@@ -670,6 +807,98 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
         regs[0] = (uint32_t)(int32_t)s_memoryManager.error;
         if (g_stageCDepth < 23) g_stageCDepth = 23;
         return 1;
+    }
+    if (trap == 0xaa46) {                    // GetNewCWindow(id, storage, behind) -> WindowPtr
+        uint8_t* window = newColorWindow((int16_t)read16(userStack + 8),
+                                         (uint8_t*)read32(userStack + 4),
+                                         (uint8_t*)read32(userStack));
+        write32(userStack + 10, (uint32_t)window);
+        if (g_stageCDepth < 24) g_stageCDepth = 24;
+        return 11;
+    }
+    if (trap == 0xa91b) {                    // MoveWindow(window, h, v, front)
+        moveWindow((uint8_t*)read32(userStack + 6),
+                   (int16_t)read16(userStack + 4), (int16_t)read16(userStack + 2),
+                   userStack[0] != 0);
+        if (g_stageCDepth < 25) g_stageCDepth = 25;
+        return 11;
+    }
+    if (trap == 0xa873) {                    // SetPort(GrafPtr)
+        write32(s_qdThePort, read32(userStack));
+        if (g_stageCDepth < 26) g_stageCDepth = 26;
+        return 5;
+    }
+    if (trap == 0xaa92) {                    // GetNewPalette(id) -> PaletteHandle
+        write32(userStack + 2,
+                (uint32_t)getResource(0x706c7474UL, (int16_t)read16(userStack))); // 'pltt'
+        if (g_stageCDepth < 27) g_stageCDepth = 27;
+        return 3;
+    }
+    if (trap == 0xaa28) {                    // GetCTSeed() -> unique long seed
+        write32(userStack, s_colorSeed++);
+        if (g_stageCDepth < 28) g_stageCDepth = 28;
+        return 1;
+    }
+    if (trap == 0xaa95) {                    // SetPalette(window, palette, update)
+        WindowSlot* slot = windowSlot((uint8_t*)read32(userStack + 6));
+        if (slot) {
+            slot->palette = (uint8_t**)read32(userStack + 2);
+            slot->paletteUpdates = userStack[0] != 0;
+        }
+        if (g_stageCDepth < 29) g_stageCDepth = 29;
+        return 11;
+    }
+    if (trap == 0xaa94) {                    // ActivatePalette(window)
+        activatePalette((uint8_t*)read32(userStack));
+        if (g_stageCDepth < 30) g_stageCDepth = 30;
+        return 5;
+    }
+    if (trap == 0xa915) {                    // ShowWindow(window)
+        uint8_t* window = (uint8_t*)read32(userStack);
+        if (windowSlot(window)) window[110] = 1;
+        if (g_stageCDepth < 31) g_stageCDepth = 31;
+        return 5;
+    }
+    if (trap == 0xa91f) {                    // SelectWindow(window)
+        uint8_t* window = (uint8_t*)read32(userStack);
+        for (uint16_t i = 0; i < sizeof(s_windows) / sizeof(s_windows[0]); ++i)
+            if (s_windows[i].used) s_windows[i].record[111] = s_windows[i].record == window;
+        s_windowList = window;
+        if (g_stageCDepth < 32) g_stageCDepth = 32;
+        return 5;
+    }
+    if (trap == 0xa922) {                    // BeginUpdate(window)
+        WindowSlot* slot = windowSlot((uint8_t*)read32(userStack));
+        if (slot) slot->updating = true;
+        if (g_stageCDepth < 33) g_stageCDepth = 33;
+        return 5;
+    }
+    if (trap == 0xa923) {                    // EndUpdate(window)
+        WindowSlot* slot = windowSlot((uint8_t*)read32(userStack));
+        if (slot) {
+            slot->updating = false;
+            initRegion(slot->updateRegion, slot->updateRegionMaster, 0, 0, 0, 0);
+        }
+        if (g_stageCDepth < 34) g_stageCDepth = 34;
+        return 5;
+    }
+    if (trap == 0xa889) {                    // TextMode(mode)
+        uint8_t* port = (uint8_t*)read32(s_qdThePort);
+        if (port) write16(port + 72, read16(userStack));
+        if (g_stageCDepth < 35) g_stageCDepth = 35;
+        return 3;
+    }
+    if (trap == 0xa9b9) {                    // GetCursor(id) -> CursHandle
+        write32(userStack + 2,
+                (uint32_t)getResource(0x43555253UL, (int16_t)read16(userStack))); // 'CURS'
+        if (g_stageCDepth < 36) g_stageCDepth = 36;
+        return 3;
+    }
+    if (trap == 0xa851) {                    // SetCursor(Cursor*)
+        s_cursor.image = (const uint8_t*)read32(userStack);
+        s_cursor.visible = true;
+        if (g_stageCDepth < 37) g_stageCDepth = 37;
+        return 5;
     }
 
     g_stageBState = 3;

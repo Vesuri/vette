@@ -6,11 +6,11 @@ port's execution order, which is now known to differ from the earlier MAME first
 
 ## Current checkpoint
 
-The Amiga run executes **23 distinct implemented traps** and halts loudly at:
+The Amiga run executes **37 distinct implemented traps** and halts loudly at:
 
 ```
-$AA46  WINDOW MANAGER / GETNEWCWINDOW
-caller: load+$046A
+$A97C  DIALOG MANAGER / GETNEWDIALOG
+caller: load+$0054
 ```
 
 The successful first-use order is:
@@ -38,6 +38,20 @@ The successful first-use order is:
 21. `CurResFile`
 22. `UseResFile`
 23. `NewPtrClear`
+24. `GetNewCWindow`
+25. `MoveWindow`
+26. `SetPort`
+27. `GetNewPalette`
+28. `GetCTSeed`
+29. `SetPalette`
+30. `ActivatePalette`
+31. `ShowWindow`
+32. `SelectWindow`
+33. `BeginUpdate`
+34. `EndUpdate`
+35. `TextMode`
+36. `GetCursor`
+37. `SetCursor`
 
 `amiga/stage_c.gdb` breaks on the loud-stop renderer and prints the depth, trap identity,
 selector, and runtime `(segment, offset)`. The build's `muldiv-audit` and `probe-audit` are clean.
@@ -68,6 +82,18 @@ The target Resource Manager searches the selected fork and returns real double-i
 Archive payloads are permanently resident: `MoveHHi` validates such a handle but needs no physical
 relocation, while `HLock` records its lock state. `OpenResFile` performs classic case-insensitive
 filename matching, which matters because the shipped Pascal name is `Vette!.DATA`.
+
+## Window and palette state
+
+The Window Manager now builds `CWindowRecord`s from the shipped `WIND` resources, maintains the
+window chain, places and shows windows, switches the current port, and brackets updates. One early
+address-error run caught a pool header that made `WindowRecord` addresses odd; records now begin at
+offset zero in an even-aligned slot. `WMgrPort` is intentionally an old-style `GrafPort`: the game
+reads its embedded `BitMap` bounds directly when centering windows.
+
+`GetNewPalette` loads the shipped `pltt` resource as a Handle. `SetPalette` associates it with a
+window, and `ActivatePalette` copies its 16 `RGBColor` entries into the active color table with a
+fresh seed. Cursor resources likewise remain Handles until the game dereferences and installs one.
 
 ## Correction to the MAME log
 
