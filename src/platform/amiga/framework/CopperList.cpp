@@ -150,17 +150,25 @@ void CopperList::setColor(uint32_t listIndex, uint16_t color, uint16_t count)
 // so each region re-emits them.  The rest of the playfield setup (FMODE, BPLCON3,
 // BPLCON2, BPLCON1, DIWSTRT/STOP/HIGH, DDFSTRT/STOP) is CONSTANT for the whole frame;
 // set it ONCE up front via AmigaHardware::setPlayfield() instead of re-running those
-// nine MOVEs in the copper every frame.  (Width/height/centerY are accepted for a
-// signature compatible with AmigaHardware::setPlayfield but only the bitplane geometry
-// is used here.)
+// nine MOVEs in the copper every frame.  That is why `height` and `centerY` are unused
+// here: they only feed the display window, which this function deliberately does not
+// emit.  ⚠ They stay in the signature so a caller can pass the same argument list to
+// both functions and have the two agree by construction.
+// ⚠⚠ `interlace` IS used, and used to be ignored: it sets LACE (BPLCON0 bit 2) and it
+// doubles the row stride the modulo skips, because each field displays every other row
+// (Amiga Hardware Reference Manual §Modulo in Interlaced Mode).  Dropping it produced a
+// half-height picture that looked plausible.  AmigaHardware::setPlayfield() carries the
+// full derivation; keep the two in step.
 uint32_t CopperList::setPlayfield(uint32_t listIndex, uint16_t width, uint16_t height, uint8_t bitplaneCount, bool interleaved, bool hires, bool interlace, bool dualPlayfield, bool holdAndModify, uint16_t centerY)
 {
-    (void)height; (void)interlace; (void)centerY;
+    (void)height; (void)centerY;
     uint16_t bitplaneWidth = width >> 3;
     uint16_t alignedWidth = AmigaHardware::hasAGAChipSet ? (bitplaneWidth & 0xfffc) : bitplaneWidth;
-    data_[listIndex++] = copperMove(bplcon0, (uint16_t)((bitplaneCount << PLNCNTSHFT) | (hires ? MODE_640 : 0) | (dualPlayfield ? DBLPF : 0) | (holdAndModify ? HOLDNMODIFY : 0) | USE_BPLCON3));
-    data_[listIndex++] = copperMove(bpl1mod, (uint16_t)(interleaved ? (bitplaneCount * bitplaneWidth - alignedWidth) : 0));
-    data_[listIndex++] = copperMove(bpl2mod, (uint16_t)(interleaved ? (bitplaneCount * bitplaneWidth - alignedWidth) : 0));
+    uint16_t rowBytes = (uint16_t)(interleaved ? (bitplaneCount * bitplaneWidth) : bitplaneWidth);
+    uint16_t modulo = (uint16_t)((interlace ? (rowBytes << 1) : rowBytes) - alignedWidth);
+    data_[listIndex++] = copperMove(bplcon0, (uint16_t)((bitplaneCount << PLNCNTSHFT) | (hires ? MODE_640 : 0) | (interlace ? INTERLACE : 0) | (dualPlayfield ? DBLPF : 0) | (holdAndModify ? HOLDNMODIFY : 0) | USE_BPLCON3));
+    data_[listIndex++] = copperMove(bpl1mod, modulo);
+    data_[listIndex++] = copperMove(bpl2mod, modulo);
 
     return listIndex;
 }

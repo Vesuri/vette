@@ -279,12 +279,13 @@ Hard-won detail lives in `docs/`, not here. **Read the relevant one BEFORE worki
   NUMBER of accesses, never by moving data to a "cheaper" buffer, and never explain a measurement
   with fast-vs-chip RAM. It is a 68020-era distinction. (`docs/m68k-optimisation.md`)
 - ⭐⭐ **`src/platform/amiga/VetteScreen.cpp` is the SINGLE OWNER of the display mode registers**
-  (BPLCON0-3, FMODE, DIWSTRT/DIWSTOP, DDFSTRT/DDFSTOP, BPLxMOD) and derives every one of them from
-  the measured 512×320 surface. ⛔ **Do not call the framework's `setPlayfield()`** from either
-  class — both accept an `interlace` argument and `(void)` it, so neither ever sets LACE, and this
-  port's mode is hires **interlaced**. It is a silent no-op of exactly the forbidden kind.
-  ⚠ `AmigaHardware::isLongFrame()` does not link either; read VPOSR bit 15.
-  (`docs/amiga-arch.md` §THE VENDORED `setPlayfield()`)
+  (BPLCON0-3, FMODE, DIWSTRT/DIWSTOP/DIWHIGH, DDFSTRT/DDFSTOP, BPLxMOD) and derives every one of
+  them from the measured 512×320 surface. Nothing else may write one. ⚠ The framework's
+  `setPlayfield()` silently discarded `interlace` (no LACE bit, no interlaced modulo), hardcoded a
+  320-lores window and used the lores DDF formulas for hires; **all three are fixed**, and
+  `VetteScreen.cpp` `static_assert`s its constants against the framework's formulas so the two
+  cannot drift. Keep that cross-check alive when either side changes.
+  (`docs/amiga-arch.md` §`setPlayfield()` COULD NOT PRODUCE THIS PORT'S MODE)
 - **Copper bitplane POINTER swaps happen in the VBI ISR, never mid-frame** — a torn pointer garbages
   the whole viewport for a frame. Colour-only pokes mid-frame are tolerable; `SPRxPT` operands are
   stricter still (the copper reads them at scanline 16).

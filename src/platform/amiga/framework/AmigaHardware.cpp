@@ -51,22 +51,86 @@ void AmigaHardware::setColor(uint16_t colorIndex, uint16_t color)
     *colorRegister = color;
 }
 
+// ⭐ Which field is about to be displayed: LOF (VPOSR bit 15) is set for the LONG field,
+// which shows rows 0, 2, 4, ...  An interlaced display re-points its bitplane pointers
+// from this every field (Amiga Hardware Reference Manual §Modulo in Interlaced Mode).
+// ⚠ UNCONDITIONAL -- see the header for why this one is not asm-bridged.
+bool AmigaHardware::isLongFrame()
+{
+    return (bool)((*vposrPointer & 0x8000) ? true : false);
+}
+
+// ⭐ EVERY register below is DERIVED from the arguments, following the Amiga Hardware
+// Reference Manual ch. 3, "Forming a Basic Playfield" (ADCD 2.1,
+// REFERENCE/HTML/HARDWARE_MANUAL_GUIDE).  Three of its relationships do NOT scale with
+// the mode the way the arguments do, and all three used to be wrong here:
+//
+//  1. ⚠⚠ DIWSTRT/DIWSTOP ARE ALWAYS IN LORES, NON-INTERLACED UNITS.  "If you select
+//     high resolution mode or interlaced mode, the starting position does not change"
+//     (HRM §Setting Display Window Starting Position).  So a hires width halves, and an
+//     interlaced height halves, BEFORE it reaches the display window.  This function used
+//     to write the fixed full-screen window ($81..$1C1) whatever the width, and to take
+//     `height` as field lines whatever the mode.
+//  2. ⚠ DDFSTRT trails HSTART by 4.5 colour clocks in hires and 8.5 in lores, and the
+//     fetch steps 4 colour clocks per word in hires, 8 in lores:
+//         DDFSTRT = DDFSTOP - 8 * (words - 1)   lores   (the normal pair is $38/$D0)
+//         DDFSTRT = DDFSTOP - 4 * (words - 2)   hires   (the normal pair is $3C/$D4)
+//     The old OCS "hires" branch produced the LORES $38, so eight hires pixels of every
+//     line were fetched before the window opened: a picture shifted left, last word cut.
+//  3. ⚠⚠ INTERLACED MODE NEEDS LACE *AND* A ROW OF EXTRA MODULO.  Each field displays
+//     every OTHER row -- "you use a modulo of 40 to skip the lines in the other field"
+//     (HRM §Modulo in Interlaced Mode) -- and LACE is BPLCON0 bit 2.  This function took
+//     an `interlace` argument and ignored it entirely, so an interlaced request came out
+//     as a plausible half-height picture with nothing reporting a problem.
+//
+// ⚠ The CALLER still owns the per-field bitplane pointers, because they change every
+// field and this runs once: long field at row 0, short field one row further in.
+// AmigaHardware::isLongFrame() says which field is next.
 void AmigaHardware::setPlayfield(uint16_t width, uint16_t height, uint8_t bitplaneCount, bool interleaved, bool hires, bool interlace, bool dualPlayfield, bool holdAndModify, uint16_t centerY)
 {
-    uint16_t halfHeight = height >> 1;
     uint16_t bitplaneWidth = width >> 3;
     uint16_t alignedWidth = hasAGAChipSet ? (bitplaneWidth & 0xfffc) : bitplaneWidth;
+    uint16_t words = (uint16_t)(alignedWidth >> 1);
+    // (1) the display window, in lores non-interlaced units, centred horizontally in the
+    // standard 320-lores window [$81, $1C1) and vertically on centerY.
+    uint16_t loresWidth = (uint16_t)(hires ? (width >> 1) : width);
+    uint16_t fieldLines = (uint16_t)(interlace ? (height >> 1) : height);
+    uint16_t hstart = (uint16_t)(0x81 + ((320 - loresWidth) >> 1));
+    uint16_t hstop = (uint16_t)(hstart + loresWidth);
+    uint16_t vstart = (uint16_t)(centerY - (fieldLines >> 1));
+    uint16_t vstop = (uint16_t)(centerY + (fieldLines >> 1));
+    // (2) the fetch window: 4.5 colour clocks behind HSTART in hires, 8.5 in lores.
+    // ⚠ NOT named ddfstrt/ddfstop: AmigaHardware.h #defines those as bare register offsets.
+    uint16_t fetchStart = (uint16_t)((hstart - (hires ? 9 : 17)) >> 1);
+    uint16_t fetchStop = (uint16_t)(hires ? (fetchStart + ((words - 2) << 2))
+                                          : (fetchStart + ((words - 1) << 3)));
+    // (3) the modulo: bytes from the end of one displayed line to the start of the next
+    // line OF THIS FIELD.  Interleaved bitmaps put the other bitplanes in between;
+    // interlace puts the other field's row in between as well.
+    uint16_t rowBytes = (uint16_t)(interleaved ? (bitplaneCount * bitplaneWidth) : bitplaneWidth);
+    uint16_t modulo = (uint16_t)((interlace ? (rowBytes << 1) : rowBytes) - alignedWidth);
     *fmodePointer = (uint16_t)(hasAGAChipSet ? 3 : 0);
     *bplcon3Pointer = 0x0c00 | BPLCON3_BRDNBLNK | BPLCON3_BRDNTRAN;
     *bplcon2Pointer = 0x0024;
     *bplcon1Pointer = 0;
-    *bplcon0Pointer = (uint16_t)((bitplaneCount << PLNCNTSHFT) | (hires ? MODE_640 : 0) | (dualPlayfield ? DBLPF : 0) | (holdAndModify ? HOLDNMODIFY : 0) | USE_BPLCON3);
-    // DIW bounds the 320px lores fetch (DDFSTRT=0x38/DDFSTOP=0xD0 → hpos
-    // 0x81..0x1C1); matched so BPLCON3 BRDNBLNK can blank both borders.
-    *diwstrtPointer = (uint16_t)(((centerY - halfHeight) << 8) | 0x81);
-    *diwstopPointer = (uint16_t)(((centerY + halfHeight) << 8) | 0xc1);
-    *diwhighPointer = 0x2100;
+    *bplcon0Pointer = (uint16_t)((bitplaneCount << PLNCNTSHFT) | (hires ? MODE_640 : 0) | (interlace ? INTERLACE : 0) | (dualPlayfield ? DBLPF : 0) | (holdAndModify ? HOLDNMODIFY : 0) | USE_BPLCON3);
+    *diwstrtPointer = (uint16_t)((vstart << 8) | (hstart & 0xff));
+    *diwstopPointer = (uint16_t)((vstop << 8) | (hstop & 0xff));
+    // ⚠⚠ DIWHIGH MUST BE COMPUTED, NOT HARDCODED, AND MUST BE WRITTEN.  It carries the
+    // ninth horizontal and the upper vertical bits of BOTH corners (bit 13 = HSTOP H8,
+    // bits 10-8 = VSTOP high, bit 5 = HSTART H8, bits 2-0 = VSTART high).  On ECS/AGA it
+    // OVERRIDES the old rules that DIWSTOP's H8 is forced to 1 and its V8 to the
+    // complement of V7 -- and once anything has written it, it stays written, so leaving
+    // graphics.library's value in place after a takeover can hold the display window open
+    // to the bottom of the frame.  On plain OCS the register does not exist and the write
+    // is a no-op; the two schemes agree for any window centred as above.
+    *diwhighPointer = (uint16_t)(((hstop & 0x100) ? 0x2000 : 0) | ((vstop >> 8) & 7) << 8
+                                | ((hstart & 0x100) ? 0x0020 : 0) | ((vstart >> 8) & 7));
     if (hasAGAChipSet) {
+        // ⚠ [ASSUMED] The AGA fetch window is the donor project's empirical pair, kept
+        // unchanged and unmeasured: FMODE=3 fetches four words per access, so DDFSTOP has
+        // to be pulled in and the documented OCS formulas above do not apply.  This port
+        // targets OCS/ECS (fmode 0), so nothing here exercises it.
         if (hires) {
             *ddfstrtPointer = (uint16_t)(0x88 - alignedWidth);
             *ddfstopPointer = (uint16_t)(0x94 + (alignedWidth >> 1));
@@ -75,16 +139,11 @@ void AmigaHardware::setPlayfield(uint16_t width, uint16_t height, uint8_t bitpla
             *ddfstopPointer = (uint16_t)(0x90 + alignedWidth);
         }
     } else {
-        if (hires) {
-            *ddfstrtPointer = (uint16_t)(0x88 - bitplaneWidth);
-            *ddfstopPointer = (uint16_t)(0x80 + bitplaneWidth);
-        } else {
-            *ddfstrtPointer = (uint16_t)(0x88 - (bitplaneWidth << 1));
-            *ddfstopPointer = (uint16_t)(0x80 + (bitplaneWidth << 1));
-        }
+        *ddfstrtPointer = fetchStart;
+        *ddfstopPointer = fetchStop;
     }
-    *bpl1modPointer = (uint16_t)(interleaved ? (bitplaneCount * bitplaneWidth - alignedWidth) : 0);
-    *bpl2modPointer = (uint16_t)(interleaved ? (bitplaneCount * bitplaneWidth - alignedWidth) : 0);
+    *bpl1modPointer = modulo;
+    *bpl2modPointer = modulo;
 }
 
 void AmigaHardware::setSpritesEnabled(bool enabled)
@@ -539,11 +598,6 @@ void* AmigaHardware::getVBR()
     return (void*)Supervisor((ULONG (*)())getVBRSupervisor);
 }
 
-bool AmigaHardware::isLongFrame()
-{
-    return (bool)((*vposrPointer & 0x8000) ? true : false);   // VPOSR bit 15 = LOF
-}
-
 bool AmigaHardware::isBlitterBusy()
 {
     (void)*(volatile uint16_t*)dmaconrPointer;             // A1000 compatibility read
@@ -568,14 +622,6 @@ void* AmigaHardware::getVBR()
     register void* ret __asm("d0");
     __asm volatile("jsr _getVBR__13AmigaHardwareFv"
                    : "=r"(ret) : : "cc", "memory", "d1", "a0", "a1");
-    return ret;
-}
-
-bool AmigaHardware::isLongFrame()
-{
-    register bool ret __asm("d0");
-    __asm volatile("jsr _isLongFrame__13AmigaHardwareFv"
-                   : "=r"(ret) : : "cc", "memory");
     return ret;
 }
 

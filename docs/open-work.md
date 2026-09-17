@@ -139,22 +139,8 @@ date in a pilot project's docs propagates to every port after it.
     `__mulsi3`, so it fails the mandatory `muldiv-audit` — with a message that names `__mulsi3`
     rather than the caller. Fix it when something needs it, not speculatively. →
     `src/platform/amiga/framework/UPSTREAM.md` §Two latent link traps.
-    ✅ The other one is no longer dormant: `AmigaHardware::isLongFrame()`'s ASSEMBLER bridge `jsr`s
-    `_isLongFrame__13AmigaHardwareFv`, which no `.s` defines, and the interlaced display was its
-    first caller. **Not fixed — routed around**, because the whole function is one VPOSR read
-    (`VetteScreen::vbiUpdate()`). Left here because a future caller will hit it again.
 
-14. ⚠⚠ **⛔ Do not call the framework's `setPlayfield()` — it discards `interlace` silently.**
-    Both `AmigaHardware::setPlayfield()` and `CopperList::setPlayfield()` accept the flag and
-    `(void)` it, so neither ever writes BPLCON0's LACE bit; `CopperList`'s also drops `height` and
-    `centerY`. It additionally hardcodes a 320-lores DIW window and uses the *lores* DDFSTRT
-    formula for hires. Since `PROJECT.md` locks this port to **hires interlaced**, calling it would
-    have produced a plausible half-resolution picture with nothing reporting a problem.
-    `VetteScreen` owns those registers instead. **Decide once, for the series:** fix the vendored
-    framework (and feed it upstream) or mark the two functions unusable so the next Mac 68k port
-    does not rediscover this. → `docs/amiga-arch.md` §THE VENDORED `setPlayfield()`.
-
-15. ⚠ **The quit chord is the BARE left mouse button, not `CTRL`+LMB.** `amiga/run.sh` documents
+14. ⚠ **The quit chord is the BARE left mouse button, not `CTRL`+LMB.** `amiga/run.sh` documents
     the CTRL qualifier and explains why it exists: the Macintosh is a one-button machine, so the
     game **will** bind the bare button. Reading CTRL needs the keyboard layer, which Stage A does
     not have. ⚠⚠ **This must be fixed BEFORE the first trap that reads the mouse button**
@@ -163,35 +149,35 @@ date in a pilot project's docs propagates to every port after it.
 
 ## Phase 1+ — carried forward, not yet actionable
 
-16. **Write `ghidra_scripts/DumpTraps.java`.** The trap map is the abstraction boundary and there is
+15. **Write `ghidra_scripts/DumpTraps.java`.** The trap map is the abstraction boundary and there is
     no inherited script for it (Revs's `DumpHwAccesses.java` hardcodes BBC I/O ranges and was not
     carried over). → `docs/toolchain.md`.
-17. **Fill `ghidra_scripts/entrypoints.csv` from `CODE 0`.** The jump table makes the postmortem's
+16. **Fill `ghidra_scripts/entrypoints.csv` from `CODE 0`.** The jump table makes the postmortem's
     §1.1 sweep *enumerable* rather than a search — take the win.
-18. **Read the manual / the extras before the binary.** RoF's `docs/manual.md` earned its place.
+17. **Read the manual / the extras before the binary.** RoF's `docs/manual.md` earned its place.
     Present and unread: `scans/Manual.pdf` (5.2 MB), `Map.jpg`, `MapInfo_1/2.jpg`, `KeyChart.jpg`,
     `Package.pdf`, `web_docs/cheats.txt`. ⭐ `KeyChart.jpg` is the input map and `cheats.txt` may
     name states worth reaching in the reference loop.
-19. **Decode the `VETTE!.Data` record formats.** The *inventory* is done
+18. **Decode the `VETTE!.Data` record formats.** The *inventory* is done
     (`docs/source-inventory.md`); the formats are not. ⭐ Start with **`PERF`** — eight records of
     exactly 110 bytes with meaningful names (`Stock`, `ZR1`, `F40`, …), which is the cheapest
     possible place to calibrate a decode. Then `OBJS` (160 models, recurring exact sizes, and
     `QUAD`'s `Quad Discripter Data` says the renderer is quad-based) and `MAPS`. ⚠ Do this against
     the `load` segment's disassembly, not by pattern-guessing — RoF's postmortem §1.2 is about
     exactly this.
-20. **Confirm or kill the `OBJS` two-level-of-detail reading.** The `C`/`S` name pairs
+19. **Confirm or kill the `OBJS` two-level-of-detail reading.** The `C`/`S` name pairs
     (`F40C`/`F40S1`, `GenericC`/`GenericS`, `Taxi`/`TaxiS`, …) `[INFERRED]` a near/far pair per
     object. It is load-bearing for the Amiga frame budget, so it should be confirmed early rather
     than discovered during optimisation. → `docs/source-inventory.md` §OBJS.
-21. **Explain the `Communication` segment and `COMM` 0.** 9.1 KB of code in *both* builds plus a
+20. **Explain the `Communication` segment and `COMM` 0.** 9.1 KB of code in *both* builds plus a
     2 490 B resource, in a 1989 single-player driving game. Modem head-to-head is a guess. It matters
     because 9 KB of code that the port may not need at all is 10% of the whole job.
-22. **Explain `FRED`** — 6.5 KB in both builds, name says nothing. ⭐ New evidence, and it is a
+21. **Explain `FRED`** — 6.5 KB in both builds, name says nothing. ⭐ New evidence, and it is a
     strong hint: `FRED` exports **242 of the 509 jump-table entries** — 6 508 bytes across 242
     externally-callable routines is **~27 bytes each**, so `[INFERRED]` it is a library of small leaf
     routines (maths/trig/fixed-point being the obvious candidates, which would fit the table-driven
     trig already found in the data). Cheap to settle: disassemble a dozen of its entries.
-23. ⭐ **The two display questions that are still open** — the mode itself is now locked
+22. ⭐ **The two display questions that are still open** — the mode itself is now locked
     (4 bitplanes, hires interlaced; `PROJECT.md` §Decisions), so what remains is:
     **(a)** is the **in-game** surface 512 × 320 or **512 × 342**? One reference-loop probe of the
     front `WindowRecord`'s `portRect` past the garage screen. ⭐ Cheap, and do it on the next
@@ -204,7 +190,7 @@ date in a pilot project's docs propagates to every port after it.
     ⛔ **Do not settle that from inference** — #1's trap log plus a write tap over the live GWorld's
     pixel range answers it by measurement. → `docs/mac-hardware.md` question 5.
 
-24. ⭐ **Locate the copy-protection check, then patch it out.** Decision locked — patched, not
+23. ⭐ **Locate the copy-protection check, then patch it out.** Decision locked — patched, not
     reproduced (`docs/faithfulness-seam.md` §The copy protection; required for a WHDLoad release).
     Targets: `VETTE!.Data`'s `COPY 1 "Protect"` (1 991 B) for the data side, and the check itself in
     the code — `Initialize` first, `Main` second. ⚠⚠ **Read the routine before defeating it.** 1 991

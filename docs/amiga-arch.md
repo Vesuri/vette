@@ -26,31 +26,51 @@ DMA before the scene's one-time register setup and the OS copper will run throug
 intermittently reset those registers — a bug that only shows up when an OS-copper frame happens
 to land after your write.
 
-## ⚠⚠ THE VENDORED `setPlayfield()` CANNOT PRODUCE THIS PORT'S MODE — and it fails SILENTLY
+## ⭐ `setPlayfield()` COULD NOT PRODUCE THIS PORT'S MODE — the three defects, and the fix
 
-`[MEASURED]` by reading both implementations, then by building the mode by hand.  ⛔ **Do not
-call `AmigaHardware::setPlayfield()` or `CopperList::setPlayfield()` in this port, and do not
-"simplify" `VetteScreen` back onto them.**  Three defects, and the first is the dangerous kind:
+`[MEASURED]` by reading both implementations, building the mode by hand, and then re-deriving the
+framework's formulas from the **Amiga Hardware Reference Manual ch. 3** ("Forming a Basic
+Playfield", ADCD 2.1 `REFERENCE/HTML/HARDWARE_MANUAL_GUIDE`).  Three defects, the first of the
+dangerous kind — all three are now **fixed in the vendored framework** rather than routed around
+(`src/platform/amiga/framework/UPSTREAM.md` carries them for upstream):
 
-1. ⭐⭐ **Both take an `interlace` argument and both `(void)`-discard it.**  Neither ever writes
-   BPLCON0's LACE bit (`CopperList.cpp:158` also drops `height` and `centerY`).  `PROJECT.md`
-   locks this port's display to **4 bitplanes, hires interlaced**, so the call would have
-   produced a plausible half-resolution picture out of 320 rows of data with nothing reporting a
-   problem.  That is exactly `CLAUDE.md`'s "a silent no-op is the most expensive translation
-   choice", inside the framework rather than in our own code.
-2. **The DIW window is hardcoded to 320 lores / 640 hires** (`0x81`…`0x1c1`, DIWHIGH `0x2100`).
-   This port's window is 512 hires px, which is 256 lores wide and has to be centred inside the
-   standard one.
-3. **The hires DDFSTRT uses the LORES formula.**  `DDFSTRT = (HSTART-9)/2` is common to both, but
-   the fetch step is 4 colour clocks per word in hires against 8 in lores, so
-   `DDFSTOP = DDFSTRT + 4*(words-2)`.  The framework's "hires" branch yields the standard *lores*
-   value.
+1. ⭐⭐ **Both took an `interlace` argument and both `(void)`-discarded it.**  Neither ever wrote
+   BPLCON0's LACE bit (bit 2), and neither added the extra row of modulo an interlaced field needs
+   — each field displays every *other* row, so the modulo has to skip one ("you use a modulo of 40
+   to skip the lines in the other field", HRM §Modulo in Interlaced Mode).  `PROJECT.md` locks this
+   port's display to **4 bitplanes, hires interlaced**, so the call would have produced a plausible
+   half-resolution picture out of 320 rows of data with nothing reporting a problem — exactly
+   `CLAUDE.md`'s "a silent no-op is the most expensive translation choice", inside the framework
+   rather than in our own code.
+2. **The DIW window was hardcoded to 320 lores / 640 hires** (`0x81`…`0x1c1`, DIWHIGH `0x2100`),
+   and `height` was taken as field lines whatever the mode.  ⚠⚠ **DIWSTRT/DIWSTOP are ALWAYS in
+   lores, non-interlaced units** — "if you select high resolution mode or interlaced mode, the
+   starting position does not change" (HRM §Setting Display Window Starting Position) — so a hires
+   width halves and an interlaced height halves *before* reaching the display window.  It now
+   derives both corners from `width`/`height`/`centerY` and centres them in the standard window.
+3. **The hires DDF pair used the LORES formulas.**  DDFSTRT trails HSTART by 4.5 colour clocks in
+   hires against 8.5 in lores, and the fetch steps 4 clocks per word against 8:
+   `DDFSTRT = DDFSTOP - 8*(words-1)` lores, `= DDFSTOP - 4*(words-2)` hires (normal pairs
+   `$38/$D0` and `$3C/$D4`).  The old "hires" branch produced the *lores* `$38`, i.e. eight hires
+   pixels of every line fetched before the window opened: a picture shifted left with its last word
+   cut off.
 
-**What this port does instead:** `src/platform/amiga/VetteScreen.cpp` is the **single owner** of
-BPLCON0-3, FMODE, DIWSTRT/DIWSTOP, DDFSTRT/DDFSTOP and BPL1MOD/BPL2MOD, derives every one of them
-from the two measured facts (a 512×320 Macintosh surface; 4 planes hires interlaced) and
-`static_assert`s the derivation.  Two owners for one write-only register is how a value ends up
-fixed in the wrong file.
+⚠ A fourth, found while fixing the third: **DIWHIGH must be computed and written, never inherited.**
+On ECS/AGA it carries the ninth horizontal and upper vertical bits of *both* corners and overrides
+the old rules (DIWSTOP H8 forced to 1, V8 the complement of V7) — and once anything has written it,
+it stays written.  Kickstart's own copper list writes `$2100`, whose VSTOP high bit belongs to a
+different window, so a takeover that writes only DIWSTRT/DIWSTOP can leave the display window open
+to the bottom of the frame.  `VetteScreen` now writes `$2000`, derived from its own corners.
+⚠ The **AGA** DDF branch is left exactly as inherited and is `[ASSUMED]`: FMODE 3 fetches four
+words per access, the documented OCS formulas do not apply, and nothing here exercises it.
+
+**Who owns the registers:** still `src/platform/amiga/VetteScreen.cpp`, the **single owner** of
+BPLCON0-3, FMODE, DIWSTRT/DIWSTOP/DIWHIGH, DDFSTRT/DDFSTOP and BPL1MOD/BPL2MOD.  Two reasons
+survive the fix — its values come from the [MEASURED] 512×320 Macintosh window rather than from a
+`centerY` magic number, and this port pins FMODE to 0 so an AGA machine fetches like an A500, which
+the framework's AGA branch deliberately does not.  ⭐ But the two derivations are no longer
+independent: `VetteScreen.cpp` `static_assert`s its constants **against the framework's formulas**,
+so a future change to either one fails the build instead of moving the picture sideways on the glass.
 
 ### ⭐ The interlaced-field arithmetic, since it is not obvious
 
@@ -60,10 +80,11 @@ short field's at `base + 256 + k*64`.  A bitplane pointer advances 64 B as it fe
 must reach the same plane **two** rows down, so `BPL1MOD = BPL2MOD = 2*256 - 64 = 448`.
 The pointers are re-pointed **first** in the VERTB handler, every field.
 
-⚠⚠ **`AmigaHardware::isLongFrame()` DOES NOT LINK in this configuration** — its GCC+ASSEMBLER
-bridge `jsr`s `_isLongFrame__13AmigaHardwareFv`, which no `.s` defines (`docs/open-work.md` had it
-logged as a dormant trap; the interlaced display is the first caller, so it is dormant no longer).
-Read `VPOSR` bit 15 directly; it is one instruction.
+⚠ **`AmigaHardware::isLongFrame()` did not LINK** — in the ASSEMBLER configurations it was declared
+`__asm`/bridged and `jsr`ed `_isLongFrame__13AmigaHardwareFv`, a symbol no `.s` ever defined, so the
+*first* caller was an undefined-symbol link error and only an interlaced display needs the field
+parity.  **Fixed** by taking it out of the bridged set altogether: the body is one register read and
+a bit test (`VPOSR` bit 15), and it is now unconditional on both compilers.
 
 ### ⚠ How the field parity is verified, and the wrong answer it gave twice
 

@@ -30,15 +30,27 @@
  *
  * ⚠ DDF IS NOT THE SAME FORMULA IN HIRES.  DDFSTRT = (HSTART - 9) / 2 holds for both, but
  * the fetch step is 4 colour clocks per word in hires and 8 in lores, so
- * DDFSTOP = DDFSTRT + 4*(words - 2).  The vendored AmigaHardware::setPlayfield() uses the
- * LORES step for hires (its "hires" branch yields the standard LORES DDFSTRT), which is the
- * second reason this file does not call it.
+ * DDFSTOP = DDFSTRT + 4*(words - 2).  (Amiga Hardware Reference Manual ch. 3, §Telling the
+ * System How to Fetch and Display Data: the normal pairs are $38/$D0 lores, $3C/$D4 hires.)
+ * AmigaHardware::setPlayfield() used the LORES step for hires; that is fixed, and the
+ * VS_* constants below are static_asserted against its formulas so the two cannot drift.
  */
 #define VS_DIWSTRT  0x5CA1
 #define VS_DIWSTOP  0xFCA1
 #define VS_DDFSTRT  0x004C          /* (161 - 9) / 2                            */
 #define VS_DDFSTOP  0x00C4          /* 0x4C + 4 * (32 - 2)                      */
 #define VS_WORDS    (VetteScreen::kWidth / 16)                    /* 32         */
+
+/* ⚠⚠ DIWHIGH IS WRITTEN, NOT LEFT ALONE.  On ECS/AGA it carries the ninth horizontal and
+ * the upper vertical bits of both display-window corners, and it OVERRIDES the old rules
+ * that DIWSTOP's H8 is forced to 1 and its V8 to the complement of V7 -- and once anything
+ * has written it, it stays written.  Kickstart's own copper list writes it ($2100, a
+ * 200-line NTSC-style window whose VSTOP is above 255), so a takeover that only writes
+ * DIWSTRT/DIWSTOP inherits a stale VSTOP high bit and the window stays open to the bottom
+ * of the frame.  Ours: HSTOP 417 has H8 set (0x2000); VSTOP 252, HSTART 161 and VSTART 92
+ * all fit in their low bits.  On plain OCS the register does not exist and this is a no-op,
+ * where the hardware's own V8 = ~V7 rule gives the same window. */
+#define VS_DIWHIGH  0x2000
 
 /* BPLCON0: HIRES | 4 planes | COLOR | LACE | ECSENA.
  * ⚠⚠ THE LACE BIT (0x0004) IS THE ONE THE FRAMEWORK DROPS.  Without it the display shows
@@ -51,9 +63,31 @@
 static_assert(VS_BPLCON0 == 0xC205, "BPLCON0 no longer derives to HIRES|4 planes|COLOR|LACE|ECSENA");
 static_assert(VS_DDFSTOP == VS_DDFSTRT + 4 * (VS_WORDS - 2), "hires DDF window inconsistent");
 
+/* ⭐⭐ THE CROSS-CHECK AGAINST THE FRAMEWORK.  AmigaHardware::setPlayfield() can express
+ * this mode now, and this file keeps the writes (VetteScreen.h says why) -- so the one
+ * thing that must not happen is the two derivations disagreeing.  Below are the framework's
+ * own formulas, evaluated at compile time for THIS mode with centerY = 172, asserted
+ * against the measured constants above.  ⚠ If a future framework change moves a formula,
+ * this is what fails, at build time, instead of the picture drifting sideways on the glass.
+ */
+#define VS_CENTER_Y     172                                      /* (92 + 252) / 2        */
+#define VS_LORES_WIDTH  (VetteScreen::kWidth / 2)                /* DIW is lores units    */
+#define VS_FIELD_LINES  (VetteScreen::kHeight / 2)               /* ...and non-interlaced */
+#define VS_HSTART       (0x81 + ((320 - VS_LORES_WIDTH) / 2))
+#define VS_HSTOP        (VS_HSTART + VS_LORES_WIDTH)
+#define VS_VSTART       (VS_CENTER_Y - VS_FIELD_LINES / 2)
+#define VS_VSTOP        (VS_CENTER_Y + VS_FIELD_LINES / 2)
+static_assert(VS_DIWSTRT == ((VS_VSTART << 8) | (VS_HSTART & 0xff)), "DIWSTRT != the framework's");
+static_assert(VS_DIWSTOP == ((VS_VSTOP  << 8) | (VS_HSTOP  & 0xff)), "DIWSTOP != the framework's");
+static_assert(VS_DDFSTRT == ((VS_HSTART - 9) / 2), "DDFSTRT != the framework's hires formula");
+static_assert(VS_DIWHIGH == ((((VS_HSTOP & 0x100) ? 0x2000 : 0) | (((VS_VSTOP >> 8) & 7) << 8)
+                              | ((VS_HSTART & 0x100) ? 0x20 : 0) | ((VS_VSTART >> 8) & 7))),
+              "DIWHIGH != the framework's");
+
 /* ⭐ The interlaced row modulo.  A bitplane pointer advances by kBytesPerRow (64) as it
  * fetches one line; to reach the SAME plane of the row two rows down (the next row of THIS
- * field) it must land at +2*kRowStride.  modulo = 2*256 - 64 = 448. */
+ * field) it must land at +2*kRowStride.  modulo = 2*256 - 64 = 448.  Same expression the
+ * framework now uses: (interlace ? 2 : 1) * rowBytes - bytesPerRow. */
 #define VS_BPLMOD   (2 * VetteScreen::kRowStride - VetteScreen::kBytesPerRow)
 
 // Copper-list layout.  Small and fixed: the pointers first (the copper must have loaded
@@ -127,6 +161,7 @@ void VetteScreen::writeModeRegisters()
     *bplcon3Pointer = 0x0c00;      // AGA: bank 0, normal; harmless on OCS
     *diwstrtPointer = VS_DIWSTRT;
     *diwstopPointer = VS_DIWSTOP;
+    *diwhighPointer = VS_DIWHIGH;  // ⚠ must be written, not inherited -- see above
     *ddfstrtPointer = VS_DDFSTRT;
     *ddfstopPointer = VS_DDFSTOP;
     *bpl1modPointer = VS_BPLMOD;
@@ -144,15 +179,11 @@ void VetteScreen::vbiUpdate()
     // the picture with its two half-resolution fields swapped, i.e. every row displaced
     // by one scanline.  It reads as a slightly soft image, not as a fault, so it is on
     // the Stage A eyeball checklist (docs/open-work.md), not left to look right.
-    // ⚠⚠ NOT AmigaHardware::isLongFrame().  In the GCC+ASSEMBLER configuration this build
-    // uses, that function is a register-marshalling bridge that `jsr`s to
-    // `_isLongFrame__13AmigaHardwareFv` -- a symbol AmigaHardwareAssembler.s never defines
-    // (it xdefs 9 routines and that is not one of them).  Calling it is an undefined
-    // reference at LINK time, so the defect is latent until someone needs the field parity,
-    // i.e. until the first interlaced display.  One register read is the whole function
-    // anyway.  → docs/open-work.md.
+    // ⚠ AmigaHardware::isLongFrame() used to be an undefined symbol at LINK time in this
+    // build's GCC+ASSEMBLER configuration (its bridge `jsr`ed a routine no .s defined);
+    // it is fixed and unconditional now, and it is exactly this test.
     uint32_t base = (uint32_t)m_chip;
-    if (!(*vposrPointer & 0x8000)) base += kRowStride;   // LOF clear = short field
+    if (!AmigaHardware::isLongFrame()) base += kRowStride;   // LOF clear = short field
 
     for (uint16_t k = 0; k < kPlanes; k++) {
         uint32_t p = base + (uint32_t)k * kBytesPerRow;

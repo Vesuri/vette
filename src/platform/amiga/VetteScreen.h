@@ -7,15 +7,18 @@
  * from the constants below and written in one place.  (Revs learned this the hard
  * way; docs/amiga-lessons.md.)
  *
- * ⚠⚠ THE VENDORED FRAMEWORK CANNOT DO THIS MODE, and the way it cannot is the
- * dangerous way: AmigaHardware::setPlayfield() and CopperList::setPlayfield() both
- * take an `interlace` argument and BOTH `(void)` it -- no LACE bit is ever written.
- * `PROJECT.md` locks the port's mode to 4 bitplanes hires INTERLACED, so calling
- * the framework would have produced a plausible 160-line display from 320 lines of
- * data with nothing reporting a problem.  The framework's DIW/DDF arithmetic is
- * also hardcoded for a 320-lores/640-hires window (`0x81..0x1c1`) and its hires
- * DDFSTRT formula yields the LORES standard value, so neither is usable at 512 px.
- * → docs/open-work.md.  ⛔ Do not "simplify" this file back onto setPlayfield().
+ * ⚠ THE FRAMEWORK CAN NOW EXPRESS THIS MODE -- IT COULD NOT BEFORE, AND SILENTLY.
+ * AmigaHardware::setPlayfield() and CopperList::setPlayfield() both took an `interlace`
+ * argument and both `(void)`d it, so LACE was never written and an interlaced request
+ * came out as a plausible half-height picture; the display window was hardcoded to the
+ * full 320-lores screen whatever the width; and the hires DDFSTRT branch produced the
+ * LORES value.  All three are FIXED (framework/UPSTREAM.md, docs/amiga-arch.md).
+ * ⭐ This file still owns the WRITES, for two reasons that survive the fix: the values
+ * below are derived from the [MEASURED] Macintosh window rather than from a centerY
+ * magic number, and this port pins FMODE to 0 so an AGA machine fetches like an A500,
+ * which the framework's AGA branch deliberately does not.  The two derivations are
+ * cross-checked against each other by static_assert in VetteScreen.cpp, so they cannot
+ * drift apart in silence.
  */
 #ifndef VETTE_SCREEN_H
 #define VETTE_SCREEN_H

@@ -54,12 +54,17 @@ public:
     // matching Amiga construct for the Atari's VCOUNT polls (wait_vcount_eq /
     // wait_vcount_ge_7a, $D40B): a genuine hardware raster sync, not a frame wait.
     static void waitBeamLine(uint16_t line);
+    // ⚠⚠ isLongFrame() IS NOT IN THE ASSEMBLER-BRIDGED SET, on purpose.  It used to be
+    // declared __asm/bridged in the ASSEMBLER builds, but AmigaHardwareAssembler.s never
+    // defined `_isLongFrame__13AmigaHardwareFv` -- so the FIRST caller of it was an
+    // undefined-symbol link error, and since only an interlaced display needs the field
+    // parity, the defect stayed latent for years.  The body is one register read and a
+    // bit test; there is nothing for asm to win.  Always the C++ body now.
+    static bool isLongFrame();
 #if defined(ASSEMBLER) && defined(__SASC)
-    __asm static bool isLongFrame();
     __asm static bool isBlitterBusy();
     __asm static void blitterWait();
 #else
-    static bool isLongFrame();
     static bool isBlitterBusy();
     static void blitterWait();
 #endif
