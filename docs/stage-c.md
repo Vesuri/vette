@@ -177,6 +177,12 @@ do not contain the Macintosh System file's Chicago bitmap font; it does not clai
 identity. The current loud stop is `ReleaseResource`, confirmed in `Score+$0A74` by the depth-77
 run.
 
+78. `ReleaseResource` (invalidate the archive-backed master pointer; permit a later reload)
+
+The next loud stop is `FlushEvents` at `Main+$1F36`. Its report incorrectly says depth 2 because a
+later `UnLoadSeg` assigns rather than monotonically advances the diagnostic counter; that reporting
+bug is fixed before continuing the event path.
+
 `amiga/stage_c.gdb` breaks on `VetteScreen::showLoudStop`, after the report is complete, and prints
 the depth, trap identity, selector, runtime `(segment, offset)`, absolute PC, USP and its first
 words, all data/address registers, and nearby instructions. It then exits, so `diag_run.sh` stops

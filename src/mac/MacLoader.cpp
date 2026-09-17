@@ -290,7 +290,7 @@ static const TrapName s_trapNames[] = {
     {0xa930,"MENU MANAGER","INITMENUS"}, {0xa9cc,"TEXTEDIT","TEINIT"},
     {0xa97b,"DIALOG MANAGER","INITDIALOGS"},
     {0xa997,"RESOURCE MANAGER","OPENRESFILE"},
-    {0xa9a1,"RESOURCE MANAGER","GETNAMEDRESOURCE"},
+    {0xa9a1,"RESOURCE MANAGER","GETNAMEDRESOURCE"}, {0xa9a3,"RESOURCE MANAGER","RELEASERESOURCE"},
     {0xa063,"MEMORY MANAGER","MAXAPPLZONE"}, {0xa01c,"MEMORY MANAGER","FREEMEM"},
     {0xa090,"TOOLBOX UTILITIES","SYSENVIRONS"},
     {0xa746,"TRAP MANAGER","GETTOOLTRAPADDRESS"},
@@ -2764,6 +2764,16 @@ static int32_t resourceHandleIndex(uint8_t** handle)
     return (int32_t)((address - base) / sizeof(s_resourceMasters[0]));
 }
 
+static bool releaseResource(uint8_t** handle)
+{
+    int32_t index = resourceHandleIndex(handle);
+    if (index < 0 || !*handle) return false;
+    *handle = 0;
+    s_resourceLocked[index] = false;
+    s_resourcePurgeable[index] = false;
+    return true;
+}
+
 static bool isPermanentHandle(uint8_t** handle)
 {
     // The screen device and its PixMap are permanent system-style handles.  They
@@ -2810,6 +2820,12 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
         write32(userStack + 8, (uint32_t)handle);
         if (g_stageCDepth < 51) g_stageCDepth = 51;
         return 9;
+    }
+    if (trap == 0xa9a3) {                    // ReleaseResource(resource)
+        if (releaseResource((uint8_t**)read32(userStack))) {
+            if (g_stageCDepth < 78) g_stageCDepth = 78;
+            return 5;
+        }
     }
     if (trap == 0xa86e) {                    // InitGraf(&qd.thePort)
         initGraf((uint8_t*)read32(userStack));
