@@ -12,8 +12,10 @@
 | (.gitignore).  Regenerate them from a local MAME capture with:
 |   python3 tools/mac_fb_to_amiga.py ref/mame/snap/intro/fb_screen.raw \
 |       ref/mame/snap/intro/fb_screen.clut 320 480 amiga/assets/intro \
-|       --crop 64,92,512,320 --reference ref/mame/snap/intro/mac2fdhd/0000.png
-| docs/toolchain.md has the capture recipe that produces the .raw/.clut.
+|       --crop 64,92,512,320 --reference ref/mame/snap/intro/mac2fdhd/<newest>.png
+| docs/toolchain.md has the capture recipe that produces the .raw/.clut -- and the two
+| traps it documents: MAME keeps NUMBERING snapshots, so <newest> is not 0000.png, and
+| the Macintosh cursor is composited INTO the framebuffer (the probe parks it first).
 
 	.section .rodata
 	.align 4

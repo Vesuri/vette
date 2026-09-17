@@ -72,7 +72,7 @@ the Event Manager (`GetNextEvent`, `SystemTask`), the Menu Manager (`NewMenu`, `
    The display path is built and measured headlessly: `out/Vette.exe` takes the machine over, brings
    up 512×320 in 4 bitplanes hires interlaced and shows Target 1's captured Macintosh frame from
    chip RAM. `EXTRA_ARGS="--warp_mode=1" GDBSCRIPT=stage_a.gdb ./diag_run.sh 30` reads
-   `screenReady=1`, `planeChecksum=0x597A969D` (identical to `python3 tools/planes_checksum.py
+   `screenReady=1`, `planeChecksum=0xD57A969E` (identical to `python3 tools/planes_checksum.py
    amiga/assets/intro.planes`, so the whole asset path is proven byte for byte) and
    `long/lace=0.500` with VPOSR alternating.
    ⚠⚠ **What no probe here can cover:** whether the picture is centred and undistorted **on the
@@ -81,6 +81,9 @@ the Event Manager (`GetNextEvent`, `SystemTask`), the Menu Manager (`NewMenu`, `
    scanline, which reads as a slightly soft image rather than as a fault. Run `cd amiga && ./run.sh`
    and compare against `amiga/assets/intro_amiga.png` (what it should look like) and
    `intro_mac.png` (what the Macintosh showed). **Then delete this item.**
+   ✅ **Already found this way, and fixed:** the first capture had the *Macintosh* mouse cursor
+   baked into the asset at `(32,8)` — the Mac II composites the cursor into the framebuffer, so a
+   framebuffer dump contains it (`docs/toolchain.md` §Regenerating Stage A's assets).
    ⚠ **And it proves nothing about the game** — it displays a converted Macintosh screenshot. See
    the honesty rule above.
 7. ⭐⭐ **Stage B — the loader: the game's own code executes on the Amiga.** Place all 11 `CODE`

@@ -55,6 +55,18 @@ end
 
 mac.run(function()
 	mac.launch()
+	-- ⚠⚠ PARK THE POINTER OUTSIDE THE CROP FIRST.  On a Mac II the cursor is
+	-- SOFTWARE-COMPOSITED into the framebuffer by the Cursor Manager's VBL task, so
+	-- it is part of the pixels this probe dumps -- not an overlay the emulator draws
+	-- on top.  The first intro capture had the Finder's arrow baked into the Amiga
+	-- asset at (32,8) of the 512x320 window, which then looked like an Amiga sprite
+	-- bug on the port.  The screen is 640x480 and the game window is
+	-- 64,92..576,412, so the bottom-right corner is outside it.
+	-- ⚠ Mouse MOTION changes nothing the game times off (the intro polls Button), and
+	-- $VETTE_FB_AT is an absolute frame, so this only has to finish before that frame
+	-- -- which is why the parked position and the frame are printed.
+	mac.mouse_to(620, 460, 8)
+	mac.step("pointer parked")
 	-- ⚠ Wait past the INTRO ANIMATION, not just "a while": a dump taken during the
 	-- wipe differs from the snapshot beside it by 40% of the screen, and that reads
 	-- as a broken pixel-format guess rather than as two different moments in time.

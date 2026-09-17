@@ -50,8 +50,20 @@ port.
 VETTE_FB_AT=1770 <the MAME headless recipe with -autoboot_script tools/mac_probe_fb.lua>
 python3 tools/mac_fb_to_amiga.py ref/mame/snap/intro/fb_screen.raw \
     ref/mame/snap/intro/fb_screen.clut 320 480 amiga/assets/intro \
-    --crop 64,92,512,320 --reference ref/mame/snap/intro/mac2fdhd/0000.png
+    --crop 64,92,512,320 --reference ref/mame/snap/intro/mac2fdhd/<LAST>.png
 ```
+
+⚠⚠ **`<LAST>` IS NOT `0000.png`.** MAME numbers snapshots from the highest file already in the
+directory, so the run's own brackets are the *newest* pair, and passing `0000.png` silently diffs
+the fresh dump against **a previous run's screenshot**. That failure reads as
+`GAMMA NOT CONFIRMED: worst channel error 255/255` — i.e. as a broken palette derivation, not as
+the wrong file. `ls -t ref/mame/snap/intro/mac2fdhd/ | head -3` and take the first bracket of the
+newest three.
+⚠⚠ **The Macintosh mouse cursor is IN THE PIXELS.** On a Mac II the Cursor Manager's VBL task
+composites it into the framebuffer, so a dump contains the arrow wherever the pointer happens to be
+— the first intro asset had it baked in at `(32,8)` of the window and it looked like an Amiga
+sprite bug on the port. `tools/mac_probe_fb.lua` parks the pointer at `(620,460)`, outside the
+crop, before the capture frame, and prints where and when it parked.
 
 `VETTE_FB_AT` is an **absolute frame number**, not a delay: ⭐ **1770** is the intro art complete
 and before the first overlay `DrawPicture` at 1782 (Target 1's reference), **4218** is the garage
