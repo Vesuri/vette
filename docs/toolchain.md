@@ -40,6 +40,7 @@ port.
 | `unar` / `lsar` 1.10.7 | `brew install unar` | the StuffIt 5 archive — **the only tool that reads SIT5** | ✅ |
 | `tools/ndif2raw.py` | ours | NDIF disk image → raw sectors (nothing off the shelf does this) | ✅ |
 | `tools/hfs_extract.py` | ours | read the HFS volume; extract forks; `CODE`/`PICT`/`snd ` resources | ✅ |
+| `tools/mac_fb_to_amiga.py` | ours | ⭐ a framebuffer dump → **Amiga interleaved bitplanes + a 16-entry `COLORxx` palette**, with every lossy step priced. **This is the Stage A pixel differential.** Pass `--reference <MAME.png>` and it re-measures the CLUT→DAC gamma against the emulator's own output on every run | ✅ |
 | **a Macintosh emulator** | — | the ground-truth reference loop (`docs/mac-reference-loop.md`) | ❓ |
 
 `tools/ghidra` is a **symlink to the shared install at `~/.local/share/ghidra`** — the same one the

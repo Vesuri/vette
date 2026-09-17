@@ -126,6 +126,36 @@ It is not a subtlety. Index 4 is `(43,43,43)` in `pmTable` and `(74,74,74)` on t
 ⭐ **Rule: derive the Amiga palette from the DISPLAYED colour, never from `pmTable` directly.** The
 reference loop's screenshots are the authority; `pmTable` is the request, not the result.
 
+⭐⭐ **The garage screen's palette, derived and cross-checked** — `tools/mac_fb_to_amiga.py` does
+this derivation, and with `--reference` it **re-measures the gamma on every run**: reconstructing
+the Macintosh image from `pmTable^(1/1.435)` and diffing it against MAME's own screenshot of the
+same frame leaves a worst channel error of **1/255** over the game's 512 × 320 (19 498 of 163 840
+pixels off by exactly one level — pure rounding). A wrong gamma shows up there in the *tens*.
+
+| idx | `pmTable` | displayed | OCS | idx | `pmTable` | displayed | OCS |
+|---|---|---|---|---|---|---|---|
+| 0 | 255,255,255 | 255,255,255 | `$FFF` | 8 | 158,158,158 | 183,183,183 | `$BBB` |
+| 1 | 250,243,5 | 252,247,16 | `$FF1` | 9 | 0,99,0 | 0,132,0 | `$080` |
+| 2 | 255,71,71 | 255,105,105 | `$F66` | 10 | 87,43,5 | 121,74,16 | `$741` |
+| 3 | 255,5,5 | 255,16,16 | `$F11` | 11 | 209,209,209 | 222,222,222 | `$DDD` |
+| 4 | 43,43,43 | 74,74,74 | `$444` | 12 | 255,174,174 | 255,195,195 | `$FBB` |
+| 5 | 94,94,94 | 127,127,127 | `$777` | 13 | 145,220,255 | 172,230,255 | `$AEF` |
+| 6 | 0,0,212 | 0,0,224 | `$00D` | 14 | 156,0,0 | 181,0,0 | `$B00` |
+| 7 | 0,171,235 | 0,193,241 | `$0BE` | 15 | 0,0,0 | 0,0,0 | `$000` |
+
+⚠ **This is the GARAGE screen's CLUT and the intro's differs** — the palette is reloaded per scene,
+so Target 1 needs the intro's own dump, not this one. The table is here as the worked example.
+
+⭐⭐ **OCS 4-bit quantisation is the ACCEPTANCE FLOOR, and it is not zero:** worst channel error
+**8/255 (3.1%)**, mean **2.70/255** over the 512 × 320. A correct Amiga frame differs from the
+Macintosh by exactly that much. ⚠ A *smaller* difference means the palette that ran is not the one
+derived here, which is a bug that looks like success. ⚠ `[ASSUMED]` that the Amiga DAC is linear in
+the register value — untested, and the FS-UAE screenshot diff is what will test it.
+
+⭐ **Chunky → 4 interleaved bitplanes is LOSSLESS**, and asserted rather than assumed: the tool
+unpacks its own output and compares index-for-index (163 840 pixels identical). ⚠ That round trip is
+the only check that catches a plane-order or bit-order flip — both produce a plausible image.
+
 ### How it was proved — and the trap it was nearly lost to
 
 `tools/mac_probe_fb.lua` dumps the live framebuffer and CLUT; `tools/fb_to_png.py` re-renders the
