@@ -210,11 +210,13 @@ amiga/                  Amiga build infrastructure: Makefile, env.sh, run.sh, de
 - [x] **Phase 1 — The Macintosh reference loop.** ⭐ It **drives**: MAME boots the reference volume
       and launches `Color VETTE!` unattended, completion read from the Mac's own low memory, and the
       game runs to its garage screen. Framebuffer + CLUT capture and host-side re-render are proven
-      against MAME's own screenshots. ⭐⭐ **The A-trap log is done** → `docs/trap-log.md`: **38
+      against MAME's own screenshots. ⭐⭐ **The A-trap log is done** → `docs/trap-log.md`: **51
       traps** called by the game's own `CODE` segments, first-use ordered, every caller resolved to
-      `(segment, offset)`, segment bases pinned by matching each extracted resource's own bytes in
-      memory. ⚠ It is a **FLOOR**: the window ends at the menu, so `FRED` and `Communication`
-      never ran.
+      `(segment, offset)` live at the moment of the call, segment bases pinned by matching each
+      extracted resource's own bytes in memory *and* by requiring its resident jump-table exports to
+      fall inside the pinned span. Arguments are read at the call site, so `SetTrapAddress`'s target,
+      `%A5Init`'s trap set and the `QDExtensions` selectors are measured too. ⚠ It is a **FLOOR**:
+      the window ends at the menu, so `FRED` and `Communication` never ran.
 - [ ] Phase 2 — Complete static map (segments, the jump table, the trap map, the A5 world)
 - [ ] Phase 3 — The trap layer
 - [ ] Phase 4 — End-to-end skeleton on the target, then profile, then set a target
@@ -226,26 +228,35 @@ See `docs/phases.md` for exit criteria and the gating between phases.
 
 ## Immediate next step
 
-### ⭐⭐ Target 1 — the intro screen, and it is scoped by measurement: **18 traps**
+### ⭐⭐ Target 1 — the intro screen, and it is scoped by measurement: **36 traps**
 
 The first target is **the intro screen painted by the game's own code**: the Golden Gate /
 San Francisco title art, matched against the MAME reference capture of frame 1758 under a pixel
-differential. Staged in `docs/open-work.md` #3–#6: Stage A (display path) → B (loader) →
-C (the 18 traps) → D (`DrawPicture`).
+differential. Staged in `docs/open-work.md` #6–#9: Stage A (display path) → B (loader) →
+C (the 36 traps) → D (`DrawPicture`).
 
-⭐ The gate that stood in front of it is gone — the trap log is measured (`docs/trap-log.md`) — and
-the measurement **shrank the target** rather than confirming the estimate:
+⭐ Every gate that stood in front of it is gone — the trap log is measured, arguments included
+(`docs/trap-log.md`):
 
-- **18 traps, not 38**, stand between launch and a painted intro screen. The art is up at frame
-  1758; the last new trap before it is `CopyBits` at 1698.
-- **Rows 19–21 are the wait-for-click loop and rows 22–38 are the garage screen** — both explicitly
-  out of scope, listed as deferred in the queue so they are not implemented "while we are here".
+- **36 of the 51 traps** stand between launch and a painted intro screen. The art is up at frame
+  1758; the last new traps before it are `CopyBits` and `EraseRect` at 1698–1699.
+  ⚠⚠ **This is double the "18" previously recorded here**, and the 18 were blind rather than wrong:
+  the earlier tracer cleared its accumulators when the app became frontmost, discarding the game's
+  own first 230 frames — `%A5Init`, QuickDraw/Font/Window/Menu init, the `QUAD` + 160 `OBJS` loads,
+  the GWorld creation. Nothing left the list; 18 more joined the front of it.
+- **Rows 37–38 are the animation + wait-for-click loop and rows 39–51 are the garage screen** — both
+  explicitly out of scope, listed as deferred in the queue so they are not implemented "while we are
+  here".
 - **`GetNextEvent` is not on the intro path at all.** The intro polls `Button` from `Intro+0224`, so
   Target 1 needs **no Event Manager** — nor Menu Manager, nor the `GDevice`/`Palette` calls.
 - **`DrawPicture` is 16 calls and `GetPicture` 47**, so Stage D's PICT interpreter is sized and small.
-- ⚠⚠ **The game patches a trap inside Target 1** (`SetTrapAddress` at `load+00B8`, frame 1617) and
-  which trap is unmeasured. Option A means it installs that patch on the Amiga too. This gates
-  Stage C (`docs/open-work.md` #2).
+  The first call draws 512×323 at (0,0); the other 15 are two small overlay rects.
+- ⭐ **The trap the game patches is `_ExitToShell`, and it is the only one.** `SetTrapAddress` at
+  `load+00B8`, frame 1617, handler `$786A96`. Option A means the port installs that patch too — but
+  ⛔ no general trap-patching machinery is needed.
+- ⭐ **`%A5Init` costs one trap:** `_BlockMove`, ×46. Stage B's prerequisite is that alone.
+- ⭐ **`QDExtensions` dispatches on `D0`, not on a stack selector**, and Target 1 needs two:
+  `NewGWorld` (0) and `LockPixels` (1), with `flags=$40000000` and `pixelDepth=0`.
 - **`Traffic` calls `GetPicture`** (`Traffic+663C`) and is resident during the intro, so that
   segment is not purely the driving rasteriser.
 

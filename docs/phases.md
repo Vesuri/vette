@@ -49,15 +49,18 @@ harder questions were being settled.
       `space:install_read_tap()` on the ROM's Line-A dispatcher plus `cpu.state["SP"]`, which is
       what the trap inventory actually runs on. ⚠ Debugger **breakpoints** are still unexercised
       and turned out not to be needed — ⛔ do not re-derive that route.
-      ⚠⚠ Three tap gotchas each fake a clean "no traps" result: `docs/trap-log.md` §The four ways.
+      ⚠⚠ Three tap gotchas each fake a clean "no traps" result: `docs/trap-log.md` §The six ways.
 - [x] A scripted input sequence that reaches the game, deterministically — boot → launch → garage
       screen, unattended. ⚠ Not yet *gameplay*: the driving view has never been reached.
 - [x] ⭐ A **positive control** in every capture — completion is read from `CurApName` in the Mac's
       own low memory, so a run that did nothing reports "Finder" instead of passing quietly.
 
-- [x] ⭐⭐ **The A-trap log** → `docs/trap-log.md`: 38 traps called by the game's own segments,
-      first-use ordered, callers resolved to `(segment, offset)`, segment bases pinned by matching
-      each extracted resource's own bytes in memory. ⚠ It is a **FLOOR** — the window ends at the
+- [x] ⭐⭐ **The A-trap log** → `docs/trap-log.md`: **51 traps** called by the game's own segments,
+      first-use ordered, callers resolved to `(segment, offset)` **live at the moment of the call**,
+      segment bases pinned by matching each extracted resource's own bytes in memory **and** by
+      requiring every resident jump-table export to fall inside the pinned span. ⭐ Arguments are
+      read at the call site too, so `SetTrapAddress`'s target, `%A5Init`'s trap set and the
+      `QDExtensions` selectors are measured, not open. ⚠ It is a **FLOOR** — the window ends at the
       menu, so `FRED` and `Communication` never ran.
 
 ⭐ **Phase 1 is CLOSED.** Phase 2's trap map is no longer a static guess; it is a cross-check of a

@@ -111,13 +111,19 @@ project.** RoF replaced the Atari OS wholesale; Revs serviced a closed MOS surfa
 the Segment Loader and the Sound Manager. **Inventory it from the binary before estimating
 anything, and treat the inventory as a FLOOR** — Revs's looked closed after a static sweep and three
 more calls were found by *running* it.
-⭐⭐ **The RUN-TIME inventory exists and is the work list: `docs/trap-log.md`, 38 traps, first-use
-ordered — and only the first 18 paint the intro screen, which is Target 1.** Implement in that
-order, and ⛔ **do not implement rows 19-38 early**: the Event Manager, the Menu Manager and the
-`GDevice`/`Palette` calls are all outside Target 1 (`docs/open-work.md`). ⚠⚠ **"Called from RAM" is NOT "called by the game"** — the
-System's ROM-patch block at `$7Cxxxx` and the low system heap call traps *on the game's behalf*, and
-counting those put three traps on the work list that the port never has to service. A caller counts
-only if a mapped `CODE` segment claims it.
+⭐⭐ **The RUN-TIME inventory exists and is the work list: `docs/trap-log.md`, 51 traps, first-use
+ordered — and the first 36 paint the intro screen, which is Target 1.** Implement in that order, and
+⛔ **do not implement rows 37-51 early**: the Event Manager, the Menu Manager and the
+`GDevice`/`Palette` calls are all outside Target 1 (`docs/open-work.md`).
+Two rules come out of how the log was measured, and each produced a *quiet* wrong answer first:
+⚠⚠ **"Called from RAM" is NOT "called by the game"** — the System's ROM-patch block at `$7Cxxxx` and
+the low system heap call traps *on the game's behalf*, and counting those put three traps on the
+work list that the port never has to service. A caller counts only if a mapped `CODE` segment
+claims it.
+⚠⚠ **Attribute a caller to a segment LIVE, at the moment of the call — never against a final map.**
+The Finder is an application too: its `CODE` segments occupy the same heap addresses and its trap
+profile looks exactly like a game's. Resolving recorded PCs afterwards put **~30 of the Finder's
+traps** on the work list.
 
 ⚠ **Ghidra 12.1 has no classic-Mac resource-fork loader** (verified against this install: 68000
 processor yes, HFS+ for iOS only). Extract the `CODE` resources with `tools/hfs_extract.py segments`
@@ -140,6 +146,8 @@ reason from `docs/faithfulness-seam.md` #2. Consequences that are rules, not not
   what the call appears to want.
 - ⚠ **`%A5Init` runs, or is replaced by exactly what it produces.** It initialises the game's
   31 272 B of A5-relative globals. Skipping it zeroes them — a silent wrong-value failure.
+  ⭐ It needs **one** trap to do it: `_BlockMove`, 46 calls, and it is the game's very first trap
+  (`docs/trap-log.md`).
 - **The A5 world is fixed and known:** 31 272 B of globals below `a5`; above it 32 B + a 4 072 B
   jump table of **509 entries** at A5+32, all shipped in unloaded form. Pre-patch them to
   `JMP abs.l` at startup and `_LoadSeg` never needs servicing.
@@ -187,6 +195,11 @@ the Mac's own low memory; ⚠ **never sleep a guessed number of frames instead**
 ⚠⚠ **Mask handles to 24 bits (`$00FFFFFF`) when probing Mac memory** — a Mac II runs in 24-bit mode
 and a master pointer's high byte holds Memory Manager flags. An unmasked deref prints confident
 nonsense. → `docs/mac-hardware.md`.
+⚠⚠ **A trap's parameters are on the SUPERVISOR stack at `SP+8`, not on `USP` and not at `SP+6`.**
+`[MEASURED]`: Mac OS runs the application in supervisor mode (`SR=$2700`, `USP=0`), and a Mac II is
+a 68020, so the Line-A frame is the **four-word** one — `SR:w`, `PC:l`, format/vector-offset word
+(`$0028`). Both mistakes decode as plausible garbage; the `SP+6` one shows as a constant `$0028` at
+the head of every parameter list. ⚠ Our own Amiga Line-A handler gets a **six**-byte 68000 frame.
 ⚠⚠ **`/ref/` is LOCAL ONLY, like `tmp/`** — ROMs, System/game images, MAME state, captures. Never
 commit it. ⭐ Put files on the Mac volume from the host with `hfsutils`
 (`hmount …608_2GB_drive.hd 1`, `hcopy -m` to keep BOTH forks) — not with floppy images.
@@ -224,7 +237,7 @@ Hard-won detail lives in `docs/`, not here. **Read the relevant one BEFORE worki
 | `docs/phases.md` | The gating between phases, and what each phase owes |
 | **`docs/faithfulness-seam.md`** ⭐ | **Before converting, rewriting or reimplementing ANY routine.** The three-way choice this port has and the prior ports did not |
 | **`docs/source-inventory.md`** ⭐⭐ | **What is actually in the shipped game** — the 11 named `CODE` segments, the 23 data types, the 160 objects. Read it before estimating anything |
-| **`docs/trap-log.md`** ⭐⭐ | **The port's WORK LIST, measured** — the 38 traps the game's own segments call, in first-use order, with callers as `(segment, offset)`, and which 18 of them Target 1 needs. Read it before implementing any trap, and read its §The four ways before re-running the tracer |
+| **`docs/trap-log.md`** ⭐⭐ | **The port's WORK LIST, measured** — the 51 traps the game's own segments call, in first-use order, with callers as `(segment, offset)`, which **36** of them Target 1 needs, and the arguments at the call site. Read it before implementing any trap, and read its §The six ways before re-running or extending the tracer |
 | **`docs/mac-reference-loop.md`** ⭐ | Anything about ground truth, or before trusting a claim about what the original does |
 | **`docs/mac-hardware.md`** | Touching the trap layer, the display, input or sound. ⭐ The **display surface** and the **68020 question** are `[MEASURED]`; the trap/low-memory rows are still `[ASSUMED]` — replace those, don't build on them |
 | `docs/toolchain.md` | Running the pipeline: resource/segment tools, Ghidra headless, the builds |

@@ -8,172 +8,292 @@ Produced by `tools/mac_traps.lua` (+ `tools/gen_trap_names.py`) against the unpa
 MAME, launch → title → intro → menu. Re-run it with the headless recipe in `CLAUDE.md`; it writes
 `ref/mame/traps.txt`.
 
-## ⭐⭐ THE TARGET: 18 traps paint the intro screen
+⚠⚠ **Read §The six ways this measurement lies before re-running or extending the tracer.** Five of
+the six produced a plausible, quiet wrong answer that was believed for a while, and one of them put
+**thirty extra traps** on this list.
+
+## ⭐⭐ THE TARGET: 36 traps paint the intro screen
 
 `[MEASURED]`, by shooting the framebuffer every 240 frames alongside the log:
 
 | frame | what is on screen |
 |---|---|
-| 1518 | the app is frontmost |
-| 1698 | `CopyBits` — **row 18**, the last new trap before the picture exists |
+| 1288 | the jump table goes resident — ⭐ **the game's own code starts running here**, 230 frames before the Finder hands over the front window |
+| 1518 | the app is frontmost (`CurApName`) |
+| 1638 | `DrawPicture` #1 — 512×323, the title art, into the offscreen GWorld |
+| 1698–1699 | `CopyBits`, `EraseRect` — **rows 35–36**, the last new traps before the art is on screen |
 | **1758** | ⭐ **the intro screen is fully painted** — the Golden Gate / San Francisco title art |
-| 1781, 1813, 2479 | rows 19–21 (`ClipRect`, `Button`, `UseResFile`) — the **wait-for-click loop**, after the art is already up |
+| 1781–1813 | rows 37–38 (`ClipRect`, `Button`) — the **animation + wait-for-click loop**, after the art is already up |
 | 3438 | a blank white window: the intro is gone, the garage is being built |
 | 3678 | the garage / car-selection screen with the menu bar |
 
-So the boundary is sharp and it is not where I first guessed (I had assumed the `DisposeWindow` from
-`Intro+0ADA` at frame 3558 marked the end; that is the intro *window* being disposed long after the
-art came down).
+- ⭐⭐ **Rows 1–36 = paint the intro screen.** That is Target 1.
+- **Rows 37–38 = run it** — the animated overlay and `Button` polling (10 887 calls).
+- **Rows 39–51 = teardown + the garage screen and its menu bar.** Not Target 1.
 
-- ⭐⭐ **Rows 1–18 = paint the intro screen.** That is Target 1.
-- **Rows 19–21 = run it** until the user clicks (`Button` polling, 10 885 calls).
-- **Rows 22–38 = teardown + the garage screen and its menu bar.** Not Target 1.
+⚠⚠ **This supersedes an earlier "18 traps" figure, which was wrong and wrong in the dangerous
+direction.** That measurement cleared its accumulators when `CurApName` flipped at frame 1518, to
+drop the Finder's boot noise — and in doing so it discarded **the game's own first 230 frames**:
+`%A5Init`, QuickDraw/Font/Menu/Window init, the `QUAD` and 160 `OBJS` resource loads, the GWorld
+creation. Target 1 is twice the size it appeared to be. Nothing is *removed* from the old 18; 18
+more sit in front of them.
 
 ⚠ The intro art carries **"© 1991 SPHERE, INC"**, while `PROJECT.md` and `CLAUDE.md` describe the
 game as 1989. The two have not been reconciled — do not quote either date as settled.
 
-## 38 traps in the window, and how the callers split
+## 51 traps in the window, and how the callers split
 
-**187 297 trap dispatches** in the measured window. **183 853** decoded. Of those, **96 188 came
-from RAM** — but ⚠⚠ *"from RAM" is not "from the game"*, and conflating the two is the trap this
-tool fell into first (see §The four ways this measurement lies). Attributed by caller PC:
+**243 056 dispatches** through the Line-A vector; **234 682** decoded to an `$Axxx` word;
+**103 674 from ROM** and **131 008 from RAM**. ⚠⚠ *"From RAM" is not "from the game"*:
 
-| Caller region | What it is | Dispatches |
+| Caller | What it is | Dispatches |
 |---|---|---|
-| The 10 mapped `CODE` segments | ⭐ **the game** | — **38 distinct traps** |
-| `$7Cxxxx` (just under the top of the 8 MB) | the System's ROM **patch block** — Memory/Resource/Palette Manager patches | the bulk of the "RAM" count |
-| `$00xxxx–$01xxxx` (low system heap) | System file code: Window/Dialog/Script Managers, drivers | incl. `EraseRect` ×8 961 |
-| `$408xxxxx` | ROM | 87 665 |
+| ⭐ the mapped `CODE` segments, attributed **live** | **the game** — **51 distinct traps** | **84 876** |
+| `$7Bxxxx` / `$7Cxxxx` / `$00xxxx`–`$03xxxx` / `$0Cxxxx` | the System's ROM patch block and the low system heap, calling traps *on the game's behalf* | 46 132 |
+| `$77xxxx` | ⚠ **the Finder**, not the game — see lie #5 | (11 980, excluded) |
+| `$408xxxxx` | ROM | 103 674 |
 
-The last three are **the Toolbox calling itself on the game's behalf**. The port implements
-`DrawPicture` itself, so it never sees the `SetHandleSize` that Apple's `DrawPicture` makes.
+The port implements `DrawPicture` itself, so it never sees the `SetHandleSize` that Apple's
+`DrawPicture` makes. That is why the split matters.
+
+### Dispatches per segment, attributed live
+
+| seg | name | dispatches | distinct trap sites |
+|---|---|---|---|
+| 8 | `Intro` | 66 744 | 103 |
+| 1 | `Main` | 17 040 | 31 |
+| 2 | `Initialize` | 914 | 34 |
+| 4 | `load` | 51 | 46 |
+| 6 | `Traffic` | 49 | 3 |
+| 10 | `%A5Init` | 46 | **1** |
+| 9 | `sound` | 32 | 1 |
+
+⭐ `Intro` is 3 442 bytes and accounts for 79% of the game's trap traffic. `load` is the opposite
+shape: 51 calls from 46 distinct sites — straight-line startup code.
 
 ## The work list, in measured first-use order
 
-`base+off` is the caller, resolved to `(segment, offset)` in **`Color VETTE!`**. `from-RAM` /
-`from-ROM` are call counts over the whole window, by where the *caller* was.
+`caller` is resolved to `(segment, offset)` in **`Color VETTE!`**, **at the moment of the call**.
+`from-RAM` / `from-ROM` are call counts over the whole window, by where the *caller* was.
 
 | # | word | name | flags | from-RAM | from-ROM | frame | caller |
 |---|---|---|---|---|---|---|---|
-| 1 | `A91F` | SelectWindow | | 1 | 0 | 1535 | `load+04D2` |
-| 2 | `A922` | BeginUpDate | | 2 | 0 | 1535 | `load+04D8` |
-| 3 | `A923` | EndUpDate | | 1 | 0 | 1535 | `load+04DE` |
-| 4 | `A889` | TextMode | | 1 | 0 | 1535 | `load+04E2` |
-| 5 | `A9B9` | GetCursor | | 1 | 0 | 1535 | `load+003E` |
-| 6 | `A97C` | GetNewDialog | | 1 | 0 | 1536 | `load+0054` |
-| 7 | `AB1D` | **QDExtensions** | | 11 | 0 | 1544 | `Initialize+0134` |
-| 8 | `AA95` | SetPalette | | 12 | 0 | 1549 | `Initialize+0032` |
-| 9 | `A9A0` | GetResource | | 34 | 28 | 1549 | `sound+0020` |
-| 10 | `A047` | SetTrapAddress | | 1 | 0 | 1617 | `load+00B8` |
-| 11 | `A983` | DisposeDialog | | 1 | 0 | 1635 | `load+00C6` |
-| 12 | `A850` | InitCursor | | 1 | 0 | 1636 | `load+00C8` |
-| 13 | `A873` | **SetPort** | | **16 006** | 184 | 1636 | `load+00CE` |
-| 14 | `A994` | CurResFile | | 6 911 | 0 | 1637 | `Intro+000E` |
-| 15 | `A9BC` | GetPicture | | 47 | 0 | 1637 | `Traffic+663C` |
-| 16 | `A8F6` | ⭐ **DrawPicture** | | **16** | 0 | 1638 | `Intro+003E` |
-| 17 | `A89B` | PenSize | | 2 | 0 | 1698 | `Intro+0048` |
-| 18 | `A8EC` | ⭐ **CopyBits** | | 2 600 | 0 | 1698 | `Intro+0070` |
-| 19 | `A87B` | ClipRect | | 14 428 | 7 | 1781 | `Intro+00FE` |
-| 20 | `A974` | Button | | 10 885 | 0 | 1813 | `Intro+0224` |
-| 21 | `A998` | UseResFile | | 6 936 | 0 | 2479 | `Intro+096C` |
-| 22 | `A914` | DisposeWindow | | 1 | 0 | 3558 | `Intro+0ADA` |
-| 23 | `AA32` | GetGDevice | | 1 | 0 | 3559 | `Intro+0ADE` |
-| 24 | `A90D` | PaintBehind | | 1 | 4 | 3582 | `Intro+0B10` |
-| 25 | `A91B` | MoveWindow | | 1 | 0 | 3583 | `Main+0954` |
-| 26 | `AA28` | GetCTSeed | | 2 | 0 | 3590 | `Intro+0B28` |
-| 27 | `A04D` | PurgeMem | | 2 | 0 | 3659 | `Intro+0B82` |
-| 28 | `A04C` | CompactMem | | 2 | 0 | 3662 | `Intro+0B8A` |
-| 29 | `A93A` | DisableItem | | 2 | 0 | 3808 | `Intro+0D3A` |
-| 30 | `A931` | NewMenu | | 1 | 0 | 3808 | `load+050C` |
-| 31 | `A933` | AppendMenu | | 1 | 0 | 3808 | `load+0524` |
-| 32 | `A9BF` | GetRMenu | | 3 | 0 | 3818 | `load+05A4` |
-| 33 | `A937` | DrawMenuBar | | 1 | 0 | 3820 | `load+0676` |
-| 34 | `A31E` | NewPtrClear | sys+clear | 1 | 0 | 3827 | `Main+4968` |
-| 35 | `A9F1` | UnLoadSeg | | 1 | 0 | 3832 | `Main+1F2E` |
-| 36 | `A970` | ⭐ **GetNextEvent** | | 16 958 | 0 | 3832 | `Main+29F2` |
-| 37 | `A9B4` | SystemTask | | 51 | 0 | 3832 | `Main+29E6` |
-| 38 | `A874` | GetPort | | 1 | 16 946 | 3838 | `Main+05C6` |
+| 1 | `A02E` | ⭐ **BlockMove** | | 166 | 638 | 1291 | `%A5Init+00B4` |
+| 2 | `A9F1` | UnLoadSeg | | 2 395 | 0 | 1294 | `Main+1EE6` |
+| 3 | `A8FE` | InitFonts | | 2 | 0 | 1295 | `Main+055E` |
+| 4 | `A912` | InitWindows | | 2 | 0 | 1295 | `Main+0560` |
+| 5 | `A930` | InitMenus | | 2 | 0 | 1304 | `Main+0562` |
+| 6 | `A746` | GetToolTrapAddress | trashA0+sys+clear | 30 | 0 | 1304 | `Main+0580` |
+| 7 | `A31E` | NewPtrClear | sys+clear | 3 | 0 | 1306 | `Traffic+2616` |
+| 8 | `AA32` | GetGDevice | | 2 | 0 | 1309 | `Initialize+0984` |
+| 9 | `A9A0` | ⭐ **GetResource** | | 4 312 | 982 | 1309 | `Main+2C88` |
+| 10 | `A064` | MoveHHi | | 12 | 0 | 1309 | `Main+2C9C` |
+| 11 | `A029` | HLock | | 528 | 72 | 1309 | `Main+2CA0` |
+| 12 | `A11E` | NewPtr | clear | 639 | 5 | 1316 | `Initialize+06D6` |
+| 13 | `A998` | UseResFile | | 6 940 | 0 | 1464 | `Initialize+072E` |
+| 14 | `A994` | CurResFile | | 6 912 | 0 | 1464 | `load+0450` |
+| 15 | `AA46` | GetNewCWindow | | 1 | 0 | 1464 | `load+046A` |
+| 16 | `A91B` | MoveWindow | | 5 | 0 | 1470 | `Main+0954` |
+| 17 | `AA92` | GetNewPalette | | 5 | 0 | 1472 | `load+04A0` |
+| 18 | `A873` | ⭐ **SetPort** | | **19 283** | 237 | 1472 | `load+04AA` |
+| 19 | `AA28` | GetCTSeed | | 3 | 0 | 1472 | `load+04AE` |
+| 20 | `A91F` | SelectWindow | | 1 | 0 | 1535 | `load+04D2` |
+| 21 | `A922` | BeginUpDate | | 5 | 0 | 1535 | `load+04D8` |
+| 22 | `A923` | EndUpDate | | 4 | 0 | 1535 | `load+04DE` |
+| 23 | `A889` | TextMode | | 1 | 0 | 1535 | `load+04E2` |
+| 24 | `A9B9` | GetCursor | | 9 | 0 | 1535 | `load+003E` |
+| 25 | `A97C` | GetNewDialog | | 1 | 0 | 1536 | `load+0054` |
+| 26 | `AB1D` | ⭐ **QDExtensions** | | 14 | 0 | 1544 | `Initialize+0134` |
+| 27 | `AA95` | SetPalette | | 12 | 0 | 1549 | `Initialize+0032` |
+| 28 | `A146` | GetTrapAddress | clear | 35 | 13 | 1617 | `load+00AA` |
+| 29 | `A047` | ⚠ **SetTrapAddress** | | 16 | 0 | 1617 | `load+00B8` |
+| 30 | `A983` | DisposeDialog | | 1 | 0 | 1635 | `load+00C6` |
+| 31 | `A850` | InitCursor | | 1 | 0 | 1636 | `load+00C8` |
+| 32 | `A9BC` | GetPicture | | 47 | 0 | 1637 | `Traffic+663C` |
+| 33 | `A8F6` | ⭐ **DrawPicture** | | **16** | 0 | 1638 | `Intro+003E` |
+| 34 | `A89B` | PenSize | | 2 | 0 | 1698 | `Intro+0048` |
+| 35 | `A8EC` | ⭐ **CopyBits** | | 2 622 | 0 | 1698 | `Intro+0070` |
+| 36 | `A8A3` | EraseRect | | 8 979 | 1 | 1699 | `Intro+007C` |
+| 37 | `A87B` | ClipRect | | 14 438 | 14 | 1781 | `Intro+00FE` |
+| 38 | `A974` | Button | | 10 887 | 0 | 1813 | `Intro+0224` |
+| 39 | `A914` | DisposeWindow | | 1 | 0 | 3558 | `Intro+0ADA` |
+| 40 | `A90D` | PaintBehind | | 1 | 11 | 3582 | `Intro+0B10` |
+| 41 | `A04D` | PurgeMem | | 2 | 0 | 3659 | `Intro+0B82` |
+| 42 | `A04C` | CompactMem | | 2 | 15 | 3662 | `Intro+0B8A` |
+| 43 | `A93A` | DisableItem | | 2 | 0 | 3808 | `Intro+0D3A` |
+| 44 | `A931` | NewMenu | | 1 | 0 | 3808 | `load+050C` |
+| 45 | `A933` | AppendMenu | | 1 | 0 | 3808 | `load+0524` |
+| 46 | `A9BF` | GetRMenu | | 6 | 0 | 3818 | `load+05A4` |
+| 47 | `A937` | DrawMenuBar | | 4 | 3 | 3820 | `load+0676` |
+| 48 | `A970` | ⭐ **GetNextEvent** | | 17 764 | 0 | 3832 | `Main+29F2` |
+| 49 | `A9B4` | SystemTask | | 851 | 0 | 3832 | `Main+29E6` |
+| 50 | `AA94` | ActivatePalette | | 21 | 0 | 3837 | `Initialize+0B30` |
+| 51 | `A874` | GetPort | | 1 656 | 17 759 | 3838 | `Main+05C6` |
 
-### ⭐ Target 1's 18 traps, grouped by what they actually cost
+### ⭐ What Target 1 actually costs
 
-Most are one-shot housekeeping. The load-bearing ones:
+- ⭐⭐ **`%A5Init` calls exactly ONE trap: `_BlockMove`, 46 times, from `%A5Init+00B4`** — and it is
+  the game's very first trap, at frame 1291. It copies the initialised globals into the A5 world,
+  which is precisely what `CLAUDE.md` says `%A5Init` is for. **Stage B's prerequisite is one trap.**
+- **`DrawPicture` (16) + `GetPicture` (47) + `CopyBits` (2 622)** — the presentation path, and the
+  PICT interpreter is sized: the intro draws **16 pictures**, not hundreds.
+- **`GetResource` (5 294)** — how all game data arrives. See §Arguments.
+- **`SetPort` (19 520) / `ClipRect` (14 452) / `PenSize` / `TextMode`** — QuickDraw port state.
+  Cheap per call, but stateful: see the option-A rule in `CLAUDE.md` about documented semantics.
+- **`GetNextEvent` (17 764) is NOT on the intro path at all** — it arrives only at the menu (frame
+  3832). ⭐ The intro runs on `Button` polling from `Intro+0224`, so **Target 1 needs no Event
+  Manager**.
+- ⭐ `Traffic+663C` calls `GetPicture` and `Traffic+2616` calls `NewPtrClear` — so `Traffic` is *not*
+  purely the driving rasteriser; it is resident and working during startup and the intro.
 
-- **`DrawPicture` (16 calls) + `GetPicture` (47) + `CopyBits` (2 600)** — the presentation path.
-  This is the PICT interpreter, and it is now sized: the intro draws **16 pictures**, not hundreds.
-- **`SetPort` / `ClipRect` / `PenSize` / `TextMode`** — QuickDraw port state. Cheap, but stateful:
-  see the option-A rule in `CLAUDE.md` about documented Toolbox semantics.
-- **`QDExtensions` ($AB1D, 11 calls from `Initialize+0134`)** — the selector-based call that carries
-  `NewGWorld` / `LockPixels`. ⚠ The **selector is not recorded yet**; it is pushed on the stack and
-  this tool only reads the trap word. That is the next thing to measure, because it decides whether
-  the offscreen surface is created before the intro or only for driving.
-- **`GetResource` from `sound+0020`** — the sound segment is touched *before* the intro paints.
-- **`GetNextEvent` (16 958) is NOT on the intro path at all** — it arrives only at the menu
-  (frame 3832). ⭐ The intro runs on `Button` polling from `Intro+0224`, so **Target 1 needs no
-  Event Manager**.
+## ⭐⭐ Arguments at the call site
 
-⚠⚠ **`SetTrapAddress` at `load+00B8` — the game patches a trap, and we do not know which one.**
-One call, at frame 1617, i.e. *inside* Target 1. Under option A the game's own code runs, so
-whatever it installs it will install on the Amiga too, and our trap layer has to route the patched
-trap to the game's handler instead of to ours. ⭐ The trap number is in `d0` at the call site.
-**Resolve it before writing any of Stage C** — a layer that silently ignores the patch is the
-silent-wrong-value failure this project's hard rules exist to prevent. (The `GetTrapAddress` calls
-in the window are all from the System's patch block, not the game, so the game does not appear to
-chain the old handler — but that is an *absence* in one run, not a finding.)
+`tools/mac_traps.lua` reads the parameters for a watch-list of traps. ⚠⚠ Two facts about *how* are
+load-bearing and both are `[MEASURED]`:
 
-⚠ Eight of the 18 are Window/Dialog Manager one-shots from `load` (`SelectWindow`, `BeginUpDate`,
-`EndUpDate`, `GetNewDialog`, `DisposeDialog`, `GetCursor`, `InitCursor`, `TextMode`) — presumably a
-splash or loading dialog. The port owns the whole screen and has no overlapping windows, so
-`BeginUpDate`/`EndUpDate` can be minimal — ⚠ but that is a **seam decision** and belongs in
-`docs/faithfulness-seam.md` with its reason, not an implementation shortcut taken quietly.
+- **There is only ONE stack.** Classic Mac OS runs the application itself in **supervisor mode** —
+  every trap arrives with `SR = $2700` and `USP = 0`. Toolbox parameters are on the same stack as
+  the exception frame. ⛔ Do not read parameters via `USP`: it is 0, and a read at 0 returns
+  low-memory globals that decode as plausible garbage.
+- **The frame is EIGHT bytes, not six.** A Mac II is a 68020 and pushes the "normal four word"
+  frame: `SR:w`, `PC:l`, and a **format/vector-offset word**, which for the Line-A vector reads
+  `$0028` (vector 10 × 4). Parameters start at `SP+8`. ⭐ The giveaway when this is wrong is a
+  constant `$0028` at the head of every parameter list. ⚠ The Amiga's 68000 pushes six; nothing in
+  the *game* reads the frame, but our own Line-A handler is the one place the difference is real.
 
-⭐ `Traffic+663C` calls `GetPicture` — so the `Traffic` segment is *not* purely the driving
-rasteriser, and it is resident and drawing during the intro.
+### ⚠⚠ Which trap does the game patch? `_ExitToShell`, and only that
 
-### Segments, and their measured placements
+**`SetTrapAddress` from `load+00B8`, frame 1617, `D0 = $A9F4` (`_ExitToShell`), handler `$786A96`.**
+One call, and it is the game's only trap patch. ⭐ This closes the gate on Stage C: the port does
+**not** need general trap patching. It needs `SetTrapAddress($A9F4)` honoured — or, equivalently,
+the game's own quit handler installed where our `ExitToShell` would go.
 
-⭐ Each base was pinned by finding the unique address where the **extracted resource's own first 8
-bytes** appear in memory, which also proves the near-model claim: the resident image is the resource
-verbatim, nothing relocated.
+⚠ The other 15 `SetTrapAddress` calls in the window are all from `$7B1EF2` at frame 908, **before
+the game is loaded** — some extension patching `SystemTask`, `InitGraf`, `StdLine`, `Line`,
+`InverRect`, `PaintRect`, `InverRgn`, `CopyBits`, `HiliteWindow`, `SetPort`, `SetPBits`,
+`GetOSEvent`, `OSEventAvail`, `GetKeys`, `Button`. ⛔ None of that is the game's, and the port
+inherits none of it.
 
-| seg | name | base | len |
+### ⭐ The `QDExtensions` selectors — and the selector is in `D0`
+
+⚠⚠ **Not on the stack.** `[MEASURED]` from the call sites and confirmed by the push sequences:
+
+| `D0` | routine | calls | where |
 |---|---|---|---|
-| 1 | `Main` | `$049F2C` | 24 994 |
-| 2 | `Initialize` | `$05F698` | 7 032 |
-| 4 | `load` | `$061218` | 1 668 |
-| 6 | `Traffic` | `$0618A4` | 27 958 |
-| 5 | `Score` | `$670D10` | 4 628 |
-| 8 | `Intro` | `$71838C` | 3 442 |
-| 9 | `sound` | `$719108` | 732 |
+| 0 | **`NewGWorld`** | 3 | `Initialize+0134` (Target 1), `+02E8`, `+033A` |
+| 1 | **`LockPixels`** | 6 | `Initialize+0154`, `+01A4` (Target 1), `+0304`, `+0356`, `+03A6`, `+0408` |
+| 12 | `[UNIDENTIFIED]` | 2 | `Initialize+031E`, `+0422` — **not** in Target 1 |
 
-`CurrentA5 = $7869C4`. Of the 509 jump-table entries, **239 were resident at launch, 250 by the
-menu**.
+Selector 0 is `NewGWorld` beyond doubt: the push sequence at `Initialize+011C` is exactly its
+signature —
 
-⚠ **`Communication` (3), `FRED` (7) and `%A5Init` (10) were never observed resident**, so any trap
-they call is missing from the list above. `%A5Init` in particular *must* have run — it initialises
-the A5 world — and was already gone when the app was first detected as frontmost, even with the
-jump table polled **every frame** for 400 frames from launch. ⚠⚠ **So the traps `%A5Init` makes are
-unmeasured, and Stage B runs `%A5Init`.** `FRED` exports 242 of the 509 entries and is presumably
-the driving code, which this window never reaches.
+```
+clr.w   -(sp)                 ; QDErr result space
+pea     -31254(a5)            ; VAR offscreenGWorld: GWorldPtr
+clr.w   -(sp)                 ; pixelDepth = 0  (inherit the device's)
+pea     -31226(a5)            ; boundsRect
+clr.l   -(sp)                 ; cTable   = NIL
+clr.l   -(sp)                 ; aGDevice = NIL
+move.l  #$40000000,-(sp)      ; flags
+moveq   #0,d0                 ; <== the selector
+_QDExtensions
+tst.w   (sp)+                 ; QDErr
+```
 
-⭐ **Every unattributed caller region was checked, and none of them is a game segment.** The regions
-that called a trap from RAM were scanned for all ten segments' own first-8-byte signatures:
+Selector 1 takes one `PixMapHandle` and returns a `Boolean` (`clr.b -(sp)` … `tst.b (sp)+`) —
+`LockPixels`. Selector 12 takes a `PixMapHandle` and returns nothing.
 
-| region | calls | verdict |
+⛔ **Selector 12 is deliberately left unnamed.** Pasting in the `QDOffscreen` selector order from
+memory is exactly how a guess becomes a documented fact; it is a void procedure taking the GWorld's
+`PixMapHandle`, and it is outside Target 1, so it costs nothing to leave open.
+⚠ Selector 20, three calls from `$00DAB8` before launch, is the System's, not the game's.
+
+⭐ **Target 1 needs two selectors: `NewGWorld` ×1 and `LockPixels` ×2.** `flags = $40000000` and
+`pixelDepth = 0` are the measured arguments — the GWorld inherits the screen's 4 bpp.
+
+### ⭐ What the game loads, and what it draws
+
+`GetResource` at `Main+2C88` and `Initialize+066C`:
+
+| type | ids | what |
 |---|---|---|
-| `$71xxxx` | 66 779 | `sound` + `Intro` (mapped) |
-| `$04xxxx` | 17 029 | `Main` (mapped) |
-| `$7Bxxxx` | 10 837 | no segment signature — System code |
-| `$00xxxx` / `$01xxxx` / `$0Cxxxx` / `$7Cxxxx` | 1 441 | no segment signature — System code |
-| `$78xxxx` | 3 | ⭐ **inside the jump table itself** — an *unloaded* JT stub executing its own `MOVE.W #seg,-(SP); _LoadSeg`. Exactly the mechanism `CLAUDE.md` says to pre-patch away |
+| `QUAD` | 1000 | one, first, from `Main+2C88` at frame 1309 |
+| `OBJS` | 100, 200, … 2500 (and 8700 out of order) | ⭐ the 3-D object database — matches the **160 `OBJS`** in `VETTE!.Data` (`docs/source-inventory.md`), named `Porche`, `Testa`, `Lambo`, `F40`, `Bus`, `lamppost` … |
 
-⚠ The scan runs at the **end** of the window, so a segment that was resident earlier and purged
-would not be found. It is evidence that the 38 are complete for callers still resident, not proof
-that nothing was missed.
+`DrawPicture`, all 16 calls, with the destination rects — ⚠ the rect pointers are into the A5 world
+(`CurrentA5 = $7869C4`), i.e. the rects are the game's own globals:
 
-## ⚠⚠ The four ways this measurement lies, all of them found by it failing
+| frame | caller | dstRect | size |
+|---|---|---|---|
+| 1638 | `Intro+003E` | (0,0)–(323,512) | ⭐ **512×323** — the title art |
+| 1782 | `Intro+0132` | (150,0)–(217,80) | 80×67 |
+| 2726–2865 | `Intro+0926` ×14 | (150,80)–(228,114) | 34×78 — the animated overlay, 3 alternating PicHandles |
 
-Each of these produced a *plausible, quiet* wrong answer. They are recorded because the same tool
-will be re-run, and three of the four look identical from the outside: **"the game takes no traps"**.
+⚠ **512×323, not 512×320.** `docs/mac-hardware.md` records the game painting 512×320 at (64,92);
+the picture the intro draws is 323 rows. Three rows are unaccounted for — clipped, or the recorded
+320 is short. ⛔ Do not build the Amiga viewport geometry on either number until this is settled.
+
+`GetPicture` — 47 calls, all from the one stub at `Traffic+663C`, and ⭐ **every ID it passes is a
+real `PICT` in `Color VETTE!`** (24592, 21981, 25025, 29223, 6482, 16709, 30796, 198, 25396, 3499,
+439, …), cross-checked against the app's 192-entry `PICT` list. That is an independent confirmation
+that the parameter reads are correct — the IDs look like garbage because the game's PICT IDs are
+scattered over 68…31884, not because the read is wrong. The stub retries on failure:
+
+```
+move.l  (sp)+,-11930(a5)      ; pop the return address into a global
+move.w  (sp),-11926(a5)       ; the picID, which is also left as the parameter
+_GetPicture
+tst.l   (sp)                  ; NIL?
+bne.s   ...
+move.l  #1000000,d0
+_PurgeMem                     ; free a megabyte and try again
+```
+
+## Segments, and their measured placements
+
+⭐ Each base was pinned by finding the address where the **extracted resource's own first 8 bytes**
+appear in memory **and** every one of that segment's resident jump-table exports falls inside
+`[base, base+len)`. The first test alone is not enough (lie #6).
+
+| seg | name | base | len | first mapped |
+|---|---|---|---|---|
+| 1 | `Main` | `$049F2C` | 24 994 | frame 1288 |
+| 10 | `%A5Init` | `$0531A0` | 28 732 | frame 1290 |
+| 6 | `Traffic` | `$0618A4` | 27 958 | frame 1305 |
+| 4 | `load` | `$061218` | 1 668 | frame 1306 |
+| 2 | `Initialize` | `$05F698` | 7 032 | frame 1308 |
+| 9 | `sound` | `$719108` | 732 | frame 1549 |
+| 8 | `Intro` | `$71838C` | 3 442 | frame 1637 |
+| 5 | `Score` | `$670D10` | 4 628 | frame 3822 |
+
+`CurrentA5 = $7869C4`. Of the 509 jump-table entries, **338 were resident at frame 1288, 250 by the
+menu** (segments are unloaded as well as loaded). The mapped ranges were checked for overlap: none.
+
+⚠ **`%A5Init` and `Initialize` each had 2 candidate bases** matching the 8-byte signature; the
+lowest was taken. For `%A5Init` the choice is not independently confirmed, so its `+00B4` offset is
+`[DERIVED]`, not `[MEASURED]`.
+
+⚠ **`Communication` (3) and `FRED` (7) were never observed resident**, so any trap they call is
+missing from the list above. `FRED` exports 242 of the 509 entries and is presumably the driving
+code, which this window never reaches.
+
+⭐ **Every unattributed caller region was checked.** The regions that called a trap from RAM, with
+the frame range of their calls — ⭐ the frame range is what identifies an owner, because the game's
+code did not exist before frame 1288:
+
+| region | calls | frames | verdict |
+|---|---|---|---|
+| `$71xxxx` | 66 779 | 1549–3808 | `Intro` + `sound` (mapped) |
+| `$04xxxx` | 32 586 | 1013–4397 | `Main` (mapped) from 1288; ⚠ the 15 546 before that are **the Finder's**, in the same region |
+| `$77xxxx` | 11 980 | **1015–1286** | ⚠ **the Finder** — every call precedes the game's first instruction |
+| `$7Bxxxx` | 11 052 | 851–3822 | no segment — System code (the extension that patches 15 traps lives here) |
+| `$00xxxx`–`$03xxxx`, `$0Cxxxx`, `$7Cxxxx`, `$7Exxxx`, `$7Fxxxx` | 7 500 | 82–3838 | no segment — System code |
+| `$78xxxx` | 8 | 1014–3832 | ⭐ **inside the jump table itself** — an *unloaded* JT stub executing its own `MOVE.W #seg,-(SP); _LoadSeg`. Exactly the mechanism `CLAUDE.md` says to pre-patch away |
+
+## ⚠⚠ The six ways this measurement lies, all of them found by it failing
+
+Each produced a *plausible, quiet* wrong answer. They are recorded because the same tool will be
+re-run, and several look identical from the outside: **"the game takes no traps"**.
 
 1. **A tap on the Line-A vector `$28` never fires.** MAME's m68k core does not route CPU
    exception-vector fetches through a tapped accessor. Neither RAM data reads nor Lua's own
@@ -187,10 +307,23 @@ will be re-run, and three of the four look identical from the outside: **"the ga
    counted 2 306 hits over 12 frames and then **exactly 0 for the next 1 900** — through the
    game's entire launch. Keeping the handle counted 58 419 and rising.
 4. **"In RAM" ≠ "the game".** A first pass classified every non-ROM caller as game code and put
-   `SetHandleSize` (9 088 calls, from the Memory Manager patch at `$7C8080`), `EraseRect` (8 961,
-   system heap) and `SCSIDispatch` on the port's work list. The fix is the segment map above:
-   ⭐ **a caller is the game only if a mapped segment claims it**, and an unmapped PC is printed as a
-   bare address, never attributed to the nearest segment.
+   `SetHandleSize` (9 659 calls, from the Memory Manager patch block), `EraseRect` (from the system
+   heap) and `SCSIDispatch` on the port's work list. ⭐ A caller is the game only if a mapped
+   segment claims it, and an unmapped PC prints as a bare address, never as the nearest segment.
+5. ⚠⚠ **Attribute LIVE, never retroactively — or the FINDER's traps become the game's.** Resolving
+   recorded PCs against the *final* segment map at report time put **~30 extra traps** on this list,
+   attributed to `Main` at frames 1013–1286. They were the Finder's: the Finder is an application
+   too, its `CODE` segments occupy the same heap addresses (`$04xxxx`, `$77xxxx`), and its trap
+   profile — menus, windows, `GetNextEvent`, dialogs, resource files, `SetCursor` — is exactly what
+   a game's looks like. ⭐ The giveaway was **`_Launch` from "Main+4200"**: only the Finder calls
+   `_Launch`, and it called it to start this very game. A segment now enters the map only once its
+   own bytes are found resident, and attribution happens at hit time.
+6. ⚠ **The 8-byte `CODE` header chance-matches, so a signature hit is not an identification.** The
+   header is a small offset and a small count — low entropy. A scan "found" `Initialize` at
+   `$77D2FE`, inside the Finder. ⭐ The second test is the one that decides: every resident
+   jump-table export for that segment number must fall inside `[base, base+len)`. Before the app is
+   loaded `CurrentA5` is *another application's*, so its jump table is what gets scanned — with its
+   own segment numbers 1…7, which collide with ours. The span test rejects all of it.
 
 ⚠ **No hand-written trap-name table.** A first pass had one and it was confidently wrong: `$A8B5`
 was labelled a QuickDraw call and is `ScriptUtil`; `$A893` is `MoveTo`; `$A885` is `DrawText`. The
@@ -202,10 +335,11 @@ so the lookup indexes by trap *number* as well, or `NewPtr`/`NewHandle`/`GetTrap
 ## ⛔ What this log is NOT
 
 - **Not the driving surface.** The window ends at the menu. `FRED` and `Communication` never ran.
-  ⚠ Treat the 38 as a **FLOOR**, per `CLAUDE.md` — Revs's inventory looked closed after a static
+  ⚠ Treat the 51 as a **FLOOR**, per `CLAUDE.md` — Revs's inventory looked closed after a static
   sweep and running it found three more.
-- **Not selector-resolved.** `QDExtensions` ($AB1D), `ScriptUtil`, `SCSIDispatch` and the `Pack`
-  traps are selector-dispatched; the selector is on the stack and is not read yet.
+- **Not fully selector-resolved.** `QDExtensions` now is (`D0`), but `ScriptUtil` (194 calls),
+  `SCSIDispatch` and the `Pack` traps are selector-dispatched and unread. All three are
+  System-called in this window, so none is on the work list — that could change.
 - **Not a static cross-check.** Every call site in the binary is still unenumerated (Phase 2). A
   trap on a path this run did not take is invisible here. ⭐ The two methods are complements: the
   static sweep finds unexecuted paths, this finds what the System does on the game's behalf.
