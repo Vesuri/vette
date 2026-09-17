@@ -194,6 +194,7 @@ VASMFLAGS = -m68010 -Felf -quiet -x -no-opt -nowarn=62 $(EXTRA_VASMDEFS)
 PROBE_SYMS = g_vbiCount g_planeChecksum g_screenReady g_laceFields g_longFields g_lofSamples \
              g_stageBState g_trapWord g_trapSelector g_trapSegment g_trapOffset \
              g_resourceCount g_jumpEntryCount g_blockMoveCount g_trapManager g_trapRoutine
+PROBE_SYMS += g_stageCDepth
 ifdef PROBES
 PROBE_SYMS +=
 endif

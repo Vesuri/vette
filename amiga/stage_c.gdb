@@ -1,0 +1,16 @@
+# STAGE C PROGRESS — break on the next loud stop and print the implemented depth.
+# Run with: EXTRA_ARGS="--warp_mode=1" GDBSCRIPT=stage_c.gdb ./diag_run.sh 20
+set pagination off
+set confirm off
+
+tbreak VetteScreen::showLoudStop
+continue
+
+printf "\n===== STAGE C =====\n"
+printf "implemented depth = %u trap(s) in measured first-use order\n", g_stageCDepth
+printf "next trap         = $%04X %s / %s\n", g_trapWord, g_trapManager, g_trapRoutine
+printf "selector          = %d (-1 = N/A)\n", g_trapSelector
+printf "caller            = segment %u + $%04X\n", g_trapSegment, g_trapOffset
+printf "===================\n\n"
+detach
+quit

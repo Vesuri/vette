@@ -8,11 +8,18 @@ Produced by `tools/mac_traps.lua` (+ `tools/gen_trap_names.py`) against the unpa
 MAME, launch → title → intro → menu. Re-run it with the headless recipe in `CLAUDE.md`; it writes
 `ref/mame/traps.txt`.
 
+⚠⚠ **Stage C correction:** this table accurately describes the captured MAME run, but it is not a
+complete first-use script for the standalone port. The live Amiga loud-stop loop executes several
+setup traps absent from, or later in, this ordering (`InitGraf`, `TEInit`, `InitDialogs`,
+`OpenResFile`, `SysEnvirons`, and others). Its 51 total and 36-before-intro counts are therefore
+**floors for implementation**, not exact totals. See `docs/stage-c.md`; the tracer omission still
+needs explanation.
+
 ⚠⚠ **Read §The six ways this measurement lies before re-running or extending the tracer.** Five of
 the six produced a plausible, quiet wrong answer that was believed for a while, and one of them put
 **thirty extra traps** on this list.
 
-## ⭐⭐ THE TARGET: 36 traps paint the intro screen
+## ⭐⭐ THE REFERENCE CAPTURE: its first 36 logged traps paint the intro screen
 
 `[MEASURED]`, by shooting the framebuffer every 240 frames alongside the log:
 

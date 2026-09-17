@@ -7,10 +7,11 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — nothing else can start
 
-*Nothing.* ⭐⭐ The A-trap log is **DONE and measured** → `docs/trap-log.md`: **51 traps** called by
-the game's own segments, in first-use order, each caller resolved to `(segment, offset)` **live at
-the moment of the call**, with the intro screen's share isolated to the first **36**. Stage C's
-order is no longer an estimate, and the three measurements that used to gate it are answered:
+*Nothing.* The MAME A-trap log remains a measured reference-run inventory → `docs/trap-log.md`,
+but Stage C has proved that it is **not an exact standalone-port first-use script**. The port has
+already executed initialization calls absent from, or much later in, that 51-row ordering. Treat
+51 and the intro's 36 as floors until the tracer omission is explained. Three earlier questions
+are nevertheless answered:
 the game patches exactly one trap (`_ExitToShell`), `%A5Init` calls exactly one (`_BlockMove`), and
 `QDExtensions` is dispatched by `D0` with Target 1 needing selectors 0 (`NewGWorld`) and
 1 (`LockPixels`).
@@ -41,14 +42,10 @@ the game patches exactly one trap (`_ExitToShell`), `%A5Init` calls exactly one 
 
 ## ⭐⭐ TARGET 1 — the intro screen, painted by the game's own code — the CURRENT GOAL
 
-⭐⭐ **Scoped by measurement, not by ambition: 36 traps.** `docs/trap-log.md` shows the intro art is
-fully painted at frame 1758 and that rows 1–36 of the trap table are every trap first called before
-it exists. Rows 37–38 are the animation + wait-for-click loop and rows 39–51 are the garage screen —
-**both out of scope for Target 1.** ⚠ `GetNextEvent` is *not* needed: the intro polls `Button`.
-⚠⚠ **This is DOUBLE the 18 previously documented**, and the 18 were not wrong so much as blind: the
-earlier tracer cleared its accumulators when the app became frontmost and so discarded the game's
-own first 230 frames — `%A5Init`, QuickDraw/Font/Window/Menu init, the `QUAD` + `OBJS` loads, the
-GWorld creation. Nothing was removed; 18 more sit in front.
+The MAME capture proves that its first 36 logged traps suffice to paint the reference intro at
+frame 1758. Stage C's own loud-stop loop is now the implementation order and has already found
+additional setup calls. The visual acceptance boundary is unchanged; the exact trap count is not.
+⚠ `GetNextEvent` is still outside the intro path: the intro polls `Button`.
 
 **Acceptance criterion, and it is a pixel diff, not a look:** the Amiga paints the Golden Gate /
 San Francisco title art with "© 1991 SPHERE, INC", produced by the game's own `CODE` segments
@@ -60,15 +57,15 @@ stage that shows the right picture for the wrong reason is a failure, not a mile
 a converted Mac screenshot is a display-path proof and nothing more — it must never be reported as
 "the intro screen works".
 
-⛔ **Deferred out of Target 1 by this scoping** — do not implement them early "while we are here":
-the Event Manager (`GetNextEvent`, `SystemTask`), the Menu Manager (`NewMenu`, `AppendMenu`,
-`GetRMenu`, `DrawMenuBar`, `DisableItem`), `MoveWindow`/`DisposeWindow`/`PaintBehind`,
-`GetGDevice`/`GetMainDevice`/`GetCTSeed`, `PurgeMem`/`CompactMem`, `UnLoadSeg`.
+⛔ **Deferred until execution asks for them:** the Event Manager (`GetNextEvent`, `SystemTask`),
+late Menu Manager operations, `MoveWindow`/`DisposeWindow`/`PaintBehind`, and
+`PurgeMem`/`CompactMem`. Do not defer a trap that the loud-stop loop actually reaches:
+`UnLoadSeg` and `GetGDevice` were both required during startup.
 
-5. **Stage C — the trap layer: the 36 traps of Target 1, in the MEASURED order**
-   (`docs/trap-log.md`). ⭐ **Nothing gates this stage any more.**
+5. **Stage C — the trap layer, driven by the port's loud-stop order.**
+   ⭐ **23 distinct traps currently execute; the next stop is `GetNewCWindow` at `load+$046A`.**
    Implement first-use-first, re-running after each one; progress is countable ("N traps deep,
-   halted at *M*"). ⭐ Rows 1–36 are the whole cost of a painted intro screen, and the load-bearing
+   halted at *M*"). The MAME rows remain a useful floor and semantic cross-check, and the load-bearing
    ones are `SetPort`/`ClipRect`/`PenSize`/`TextMode` (stateful QuickDraw port), `GetResource` +
    `CurResFile`/`UseResFile`, `GetPicture`/`DrawPicture`/`CopyBits`, and `QDExtensions`
    (`NewGWorld` + `LockPixels`, selector in **`D0`**).

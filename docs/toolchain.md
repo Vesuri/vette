@@ -42,6 +42,7 @@ port.
 | `tools/hfs_extract.py` | ours | read the HFS volume; extract forks; `CODE`/`PICT`/`snd ` resources | ✅ |
 | `tools/mac_fb_to_amiga.py` | ours | ⭐ a framebuffer dump → **Amiga interleaved bitplanes + a 16-entry `COLORxx` palette**, with every lossy step priced. **This is the Stage A pixel differential.** Pass `--reference <MAME.png>` and it re-measures the CLUT→DAC gamma against the emulator's own output on every run. Writes `.planes`, `.pal` (text, for reading) and `.palbin` (binary, for `.incbin`) | ✅ |
 | `tools/planes_checksum.py` | ours | the **host half of the Stage A acceptance test**: the checksum of a `.planes` blob, to compare against the one the Amiga computes over its own chip RAM (`amiga/stage_a.gdb`). ⚠ Rotate-then-xor, not a sum — a sum is blind to byte order, which is how every plausible failure of this path goes wrong | ✅ |
+| `tools/m68k_lowmem.py` | ours | flow-follow all `CODE 0` roots and inventory reachable absolute references to Mac Page 0; self-tests both absolute-short and absolute-long decoding | ✅ |
 | **a Macintosh emulator** | — | the ground-truth reference loop (`docs/mac-reference-loop.md`) | ❓ |
 
 ### ⭐ Regenerating Stage A's assets (they are NOT committed — derived from the game)

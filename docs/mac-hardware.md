@@ -201,15 +201,17 @@ Managers a game of this kind is likely to reach — **a checklist for the sweep,
 more calls were found by running it. Expect the same and build the "unknown trap" reporter *before*
 it is needed: a named, loud report, never a silent absorb (`docs/faithfulness-seam.md` §5).
 
-## Low memory and the A5 world — `[ASSUMED]`
+## Low memory and the A5 world — `[MEASURED]`
 
 - `$0000-$0BFF` is the system's low-memory globals (`Ticks`, `MouseLocation`, `ScrnBase`, `KeyMap`,
-  …). A game reaching these directly bypasses the trap layer entirely, so **the sweep must look for
-  absolute references into low memory as well as for traps** — otherwise a whole class of hardware
-  access is invisible.
+  …). `tools/m68k_lowmem.py` follows all 509 jump-table roots and measures **108 reachable
+  references to 17 distinct locations** (plus the same 609 indirect/unresolved transfers reported
+  by the instruction sweep). `$016A`/`Ticks` accounts for 80 of them.
 - `A5` points into the application's own globals (negative offsets) and its jump table (positive).
-  ⚠ **A global here is an A5 offset, not an address** — unlike both prior ports, where a named cell
-  had a fixed address. Naming the A5 world is its own pass.
+  ⚠ **A global here is an A5 offset, not an address.** The Amiga cannot host Mac Page 0 because
+  those addresses are its vector table and OS state. Stage C validates and rewrites each executed
+  absolute-short access to a same-width A5-relative semantic shadow. `RndSeed`, `WMgrPort`, and
+  `GrayRgn` are live so far; see `docs/stage-c.md` for the exact patches.
 
 ## Open questions this file exists to have answers written into
 
