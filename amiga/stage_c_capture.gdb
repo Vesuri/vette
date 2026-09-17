@@ -13,7 +13,14 @@ end
 continue
 
 dump binary memory ../tmp/amiga_intro.raw s_colorScreen s_colorScreen+81920
-dump binary memory ../tmp/amiga_intro.planes s_loudStopScreen->m_back s_loudStopScreen->m_back+98304
+if s_loudStopScreen->m_framePending
+  dump binary memory ../tmp/amiga_intro.planes s_loudStopScreen->m_back s_loudStopScreen->m_back+98304
+else
+  # A VBI may run between the stage-depth watchpoint and this command.  Once it
+  # has swapped, the freshly converted frame is in the front buffer and m_back
+  # is the previous (initially blank) frame.
+  dump binary memory ../tmp/amiga_intro.planes s_loudStopScreen->m_chip s_loudStopScreen->m_chip+98304
+end
 dump binary memory ../tmp/amiga_intro.palette s_loudStopScreen->m_nextPalette s_loudStopScreen->m_nextPalette+16
 tbreak VetteScreen::vbiUpdate
 continue

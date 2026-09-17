@@ -38,10 +38,16 @@ does not by itself explain the original 323-row destination rectangle; that geom
 remains separately queued.
 
 Animation presentation uses a bounds-only dirty rectangle. `DrawPicture`, `CopyBits`, `EraseRect`,
-and `FrameRect` union their destination bounds; C2P expands the horizontal bounds to 16 pixels and
-converts only that area. Double-buffer coherence is maintained by copying the previous frame's
-dirty planar rectangle from front to back before applying the next one. The hot path no longer
-computes a whole-frame diagnostic checksum.
+and `FrameRect` union their destination bounds only when their resolved destination pixels are the
+visible screen; GWorld composition must not dirty the display. C2P expands the horizontal bounds to
+16 pixels and converts only that area. Double-buffer coherence is maintained by copying the
+previous frame's dirty planar rectangle from front to back before applying the next one. The hot
+path no longer computes a whole-frame diagnostic checksum.
+
+The intro's aligned `srcCopy`, `srcOr`, and `srcBic` operations stay in packed 4-bpp form. The
+clipped vertical `srcCopy` path adjusts the corresponding source row and retains memmove ordering
+for overlapping GWorld rectangles; non-overlapping boolean transfers combine packed bytes
+directly. The general scaling/odd-alignment path remains the correctness fallback.
 
 The successful first-use order is:
 

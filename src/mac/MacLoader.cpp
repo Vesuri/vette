@@ -1553,6 +1553,24 @@ static bool bitmapPixels(const uint8_t* bitmap, uint8_t*& pixels, uint16_t& rowB
     return pixels && rowBytes;
 }
 
+static bool bitmapIsScreen(const uint8_t* bitmap)
+{
+    uint8_t* pixels;
+    uint16_t rowBytes;
+    int16_t top, left, bottom, right;
+    return bitmapPixels(bitmap, pixels, rowBytes, top, left, bottom, right)
+        && pixels == s_colorScreen;
+}
+
+static bool currentPortIsScreen()
+{
+    uint8_t* pixels;
+    uint16_t rowBytes;
+    int16_t top, left, bottom, right;
+    return currentPortPixels(pixels, rowBytes, top, left, bottom, right)
+        && pixels == s_colorScreen;
+}
+
 static bool copyBits(const uint8_t* sourceBitmap, const uint8_t* destinationBitmap,
                      const uint8_t* sourceRect, const uint8_t* destinationRect,
                      uint16_t mode, const uint8_t* maskRegion)
@@ -1593,33 +1611,79 @@ static bool copyBits(const uint8_t* sourceBitmap, const uint8_t* destinationBitm
     }
     bool unscaled = fromRight - fromLeft == toRight - toLeft
                  && fromBottom - fromTop == toBottom - toTop;
-
-    // The intro scrolls large, aligned rectangles inside a GWorld.  For srcCopy
-    // that is a memmove, not a scale operation: retain overlap correctness while
-    // moving packed 4-bpp rows directly.  This is the normal fast QuickDraw path
-    // and keeps the original animation from losing time inside the compatibility
-    // layer.
-    if (unscaled && mode == 0 && ((fromLeft - sourceLeft) & 1) == 0
+    bool packedFastPath = unscaled && mode == 0 && ((fromLeft - sourceLeft) & 1) == 0
         && ((toLeft - destinationLeft) & 1) == 0 && (width & 1) == 0
         && fromTop >= sourceTop && fromBottom <= sourceBottom
         && fromLeft >= sourceLeft && fromRight <= sourceRight
         && toTop >= destinationTop && toBottom <= destinationBottom
         && toLeft >= destinationLeft && toRight <= destinationRight
         && toTop >= clipTop && toBottom <= clipBottom
-        && toLeft >= clipLeft && toRight <= clipRight) {
+        && toLeft >= clipLeft && toRight <= clipRight;
+    bool packedVerticalClipPath = unscaled && mode == 0
+        && ((fromLeft - sourceLeft) & 1) == 0
+        && ((toLeft - destinationLeft) & 1) == 0 && (width & 1) == 0
+        && fromTop >= sourceTop && fromBottom <= sourceBottom
+        && fromLeft >= sourceLeft && fromRight <= sourceRight
+        && toTop >= destinationTop && toBottom <= destinationBottom
+        && toLeft >= destinationLeft && toRight <= destinationRight
+        && toLeft >= clipLeft && toRight <= clipRight
+        && toTop < clipBottom && toBottom > clipTop;
+    bool rectanglesOverlap = sourcePixels == destinationPixels
+        && fromLeft < toRight && fromRight > toLeft
+        && fromTop < toBottom && fromBottom > toTop;
+    bool packedBooleanPath = unscaled && (mode == 1 || mode == 3)
+        && ((fromLeft - sourceLeft) & 1) == 0
+        && ((toLeft - destinationLeft) & 1) == 0 && (width & 1) == 0
+        && fromTop >= sourceTop && fromBottom <= sourceBottom
+        && fromLeft >= sourceLeft && fromRight <= sourceRight
+        && toTop >= destinationTop && toBottom <= destinationBottom
+        && toLeft >= destinationLeft && toRight <= destinationRight
+        && toTop >= clipTop && toBottom <= clipBottom
+        && toLeft >= clipLeft && toRight <= clipRight
+        && !rectanglesOverlap;
+
+    // The intro scrolls large, aligned rectangles inside a GWorld.  For srcCopy
+    // that is a memmove, not a scale operation: retain overlap correctness while
+    // moving packed 4-bpp rows directly.  This is the normal fast QuickDraw path
+    // and keeps the original animation from losing time inside the compatibility
+    // layer.
+    if (packedFastPath || packedVerticalClipPath) {
         uint16_t copyBytes = width >> 1;
-        int16_t first = 0, last = (int16_t)height, step = 1;
-        if (sourcePixels == destinationPixels && toTop > fromTop) {
-            first = (int16_t)(height - 1); last = -1; step = -1;
+        int16_t copyTop = toTop < clipTop ? clipTop : toTop;
+        int16_t copyBottom = toBottom > clipBottom ? clipBottom : toBottom;
+        uint16_t copyHeight = (uint16_t)(copyBottom - copyTop);
+        int16_t sourceCopyTop = (int16_t)(fromTop + copyTop - toTop);
+        int16_t first = 0, last = (int16_t)copyHeight, step = 1;
+        if (sourcePixels == destinationPixels && copyTop > sourceCopyTop) {
+            first = (int16_t)(copyHeight - 1); last = -1; step = -1;
         }
         for (int16_t y = first; y != last; y = (int16_t)(y + step)) {
             uint8_t* source = sourcePixels
+                + multiplyUnsigned16((uint16_t)(sourceCopyTop + y - sourceTop), sourceRowBytes)
+                + (uint16_t)(fromLeft - sourceLeft) / 2;
+            uint8_t* destination = destinationPixels
+                + multiplyUnsigned16((uint16_t)(copyTop + y - destinationTop), destinationRowBytes)
+                + (uint16_t)(toLeft - destinationLeft) / 2;
+            blockMove(source, destination, copyBytes);
+        }
+        return true;
+    }
+    if (packedBooleanPath) {
+        uint16_t copyBytes = width >> 1;
+        for (uint16_t y = 0; y < height; ++y) {
+            const uint8_t* source = sourcePixels
                 + multiplyUnsigned16((uint16_t)(fromTop + y - sourceTop), sourceRowBytes)
                 + (uint16_t)(fromLeft - sourceLeft) / 2;
             uint8_t* destination = destinationPixels
                 + multiplyUnsigned16((uint16_t)(toTop + y - destinationTop), destinationRowBytes)
                 + (uint16_t)(toLeft - destinationLeft) / 2;
-            blockMove(source, destination, copyBytes);
+            if (mode == 1) {
+                for (uint16_t x = 0; x < copyBytes; ++x)
+                    destination[x] = (uint8_t)(destination[x] | source[x]);
+            } else {
+                for (uint16_t x = 0; x < copyBytes; ++x)
+                    destination[x] = (uint8_t)(destination[x] & (uint8_t)~source[x]);
+            }
         }
         return true;
     }
@@ -2408,7 +2472,7 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
     if (trap == 0xa8a1) {                    // FrameRect(rectangle)
         const uint8_t* rectangle = (const uint8_t*)read32(userStack);
         if (frameRect(rectangle)) {
-            markDirty(rectangle);
+            if (currentPortIsScreen()) markDirty(rectangle);
             if (g_stageCDepth < 60) g_stageCDepth = 60;
             return 5;
         }
@@ -2416,7 +2480,7 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
     if (trap == 0xa8a3) {                    // EraseRect(rectangle)
         const uint8_t* rectangle = (const uint8_t*)read32(userStack);
         if (eraseRect(rectangle)) {
-            markDirty(rectangle);
+            if (currentPortIsScreen()) markDirty(rectangle);
             if (g_stageCDepth < 62) g_stageCDepth = 62;
             return 5;
         }
@@ -2437,7 +2501,7 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
         const uint8_t* rectangle = (const uint8_t*)read32(userStack);
         if (drawPicture((uint8_t**)read32(userStack + 4),
                         rectangle)) {
-            markDirty(rectangle);
+            if (currentPortIsScreen()) markDirty(rectangle);
             if (g_stageCDepth < 57) g_stageCDepth = 57;
             return 9;
         }
@@ -2449,7 +2513,8 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
                      (const uint8_t*)read32(userStack + 10),
                      destinationRect, read16(userStack + 4),
                      (const uint8_t*)read32(userStack))) {
-            markDirty(destinationRect);
+            if (bitmapIsScreen((const uint8_t*)read32(userStack + 14)))
+                markDirty(destinationRect);
             if (g_stageCDepth < 61) g_stageCDepth = 61;
             return 23;
         }
