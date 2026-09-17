@@ -226,16 +226,26 @@ See `docs/phases.md` for exit criteria and the gating between phases.
 
 ## Immediate next step
 
-**Get the Amiga executable to the game's intro screen** (user goal), in the staged order
-`docs/open-work.md` #3-#6 sets out — Stage A (display path) → B (loader) → C (trap layer) →
-D (`DrawPicture`). ⭐ The gate that was in front of it is **gone**: the trap log is measured
-(`docs/trap-log.md`), so Stage C has an order and Stage D has a size.
+### ⭐⭐ Target 1 — the intro screen, and it is scoped by measurement: **18 traps**
 
-⭐ What the measurement changed about the plan, concretely:
-- **18 traps, not 38, stand between launch and a painted intro screen.** Rows 1–18 of the table.
-- **`DrawPicture` is 16 calls and `GetPicture` 47** — the PICT interpreter is sized, and it is small.
-- **`GetNextEvent` is not on the intro path at all**; it first appears at the menu. The intro polls
-  `Button` from `Intro+0224`, so Stage C needs no Event Manager to reach the goal.
+The first target is **the intro screen painted by the game's own code**: the Golden Gate /
+San Francisco title art, matched against the MAME reference capture of frame 1758 under a pixel
+differential. Staged in `docs/open-work.md` #3–#6: Stage A (display path) → B (loader) →
+C (the 18 traps) → D (`DrawPicture`).
+
+⭐ The gate that stood in front of it is gone — the trap log is measured (`docs/trap-log.md`) — and
+the measurement **shrank the target** rather than confirming the estimate:
+
+- **18 traps, not 38**, stand between launch and a painted intro screen. The art is up at frame
+  1758; the last new trap before it is `CopyBits` at 1698.
+- **Rows 19–21 are the wait-for-click loop and rows 22–38 are the garage screen** — both explicitly
+  out of scope, listed as deferred in the queue so they are not implemented "while we are here".
+- **`GetNextEvent` is not on the intro path at all.** The intro polls `Button` from `Intro+0224`, so
+  Target 1 needs **no Event Manager** — nor Menu Manager, nor the `GDevice`/`Palette` calls.
+- **`DrawPicture` is 16 calls and `GetPicture` 47**, so Stage D's PICT interpreter is sized and small.
+- ⚠⚠ **The game patches a trap inside Target 1** (`SetTrapAddress` at `load+00B8`, frame 1617) and
+  which trap is unmeasured. Option A means it installs that patch on the Amiga too. This gates
+  Stage C (`docs/open-work.md` #2).
 - **`Traffic` calls `GetPicture`** (`Traffic+663C`) and is resident during the intro, so that
   segment is not purely the driving rasteriser.
 

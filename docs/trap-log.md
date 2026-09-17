@@ -8,7 +8,31 @@ Produced by `tools/mac_traps.lua` (+ `tools/gen_trap_names.py`) against the unpa
 MAME, launch → title → intro → menu. Re-run it with the headless recipe in `CLAUDE.md`; it writes
 `ref/mame/traps.txt`.
 
-## ⭐⭐ The headline: 38 traps, and only 6 of them matter for the intro screen
+## ⭐⭐ THE TARGET: 18 traps paint the intro screen
+
+`[MEASURED]`, by shooting the framebuffer every 240 frames alongside the log:
+
+| frame | what is on screen |
+|---|---|
+| 1518 | the app is frontmost |
+| 1698 | `CopyBits` — **row 18**, the last new trap before the picture exists |
+| **1758** | ⭐ **the intro screen is fully painted** — the Golden Gate / San Francisco title art |
+| 1781, 1813, 2479 | rows 19–21 (`ClipRect`, `Button`, `UseResFile`) — the **wait-for-click loop**, after the art is already up |
+| 3438 | a blank white window: the intro is gone, the garage is being built |
+| 3678 | the garage / car-selection screen with the menu bar |
+
+So the boundary is sharp and it is not where I first guessed (I had assumed the `DisposeWindow` from
+`Intro+0ADA` at frame 3558 marked the end; that is the intro *window* being disposed long after the
+art came down).
+
+- ⭐⭐ **Rows 1–18 = paint the intro screen.** That is Target 1.
+- **Rows 19–21 = run it** until the user clicks (`Button` polling, 10 885 calls).
+- **Rows 22–38 = teardown + the garage screen and its menu bar.** Not Target 1.
+
+⚠ The intro art carries **"© 1991 SPHERE, INC"**, while `PROJECT.md` and `CLAUDE.md` describe the
+game as 1989. The two have not been reconciled — do not quote either date as settled.
+
+## 38 traps in the window, and how the callers split
 
 **187 297 trap dispatches** in the measured window. **183 853** decoded. Of those, **96 188 came
 from RAM** — but ⚠⚠ *"from RAM" is not "from the game"*, and conflating the two is the trap this
@@ -70,10 +94,9 @@ The last three are **the Toolbox calling itself on the game's behalf**. The port
 | 37 | `A9B4` | SystemTask | | 51 | 0 | 3832 | `Main+29E6` |
 | 38 | `A874` | GetPort | | 1 | 16 946 | 3838 | `Main+05C6` |
 
-### ⭐ What this says about the goal — the intro screen
+### ⭐ Target 1's 18 traps, grouped by what they actually cost
 
-**Rows 1–18 are the whole cost of a painted intro screen**, and most of them are one-shot
-housekeeping. The load-bearing ones are:
+Most are one-shot housekeeping. The load-bearing ones:
 
 - **`DrawPicture` (16 calls) + `GetPicture` (47) + `CopyBits` (2 600)** — the presentation path.
   This is the PICT interpreter, and it is now sized: the intro draws **16 pictures**, not hundreds.
@@ -84,8 +107,24 @@ housekeeping. The load-bearing ones are:
   this tool only reads the trap word. That is the next thing to measure, because it decides whether
   the offscreen surface is created before the intro or only for driving.
 - **`GetResource` from `sound+0020`** — the sound segment is touched *before* the intro paints.
-- **`GetNextEvent` (16 958)** is the main loop and arrives only at the **menu** (frame 3832), i.e.
-  ⭐ the intro runs on `Button` polling (`Intro+0224`), not on the Event Manager.
+- **`GetNextEvent` (16 958) is NOT on the intro path at all** — it arrives only at the menu
+  (frame 3832). ⭐ The intro runs on `Button` polling from `Intro+0224`, so **Target 1 needs no
+  Event Manager**.
+
+⚠⚠ **`SetTrapAddress` at `load+00B8` — the game patches a trap, and we do not know which one.**
+One call, at frame 1617, i.e. *inside* Target 1. Under option A the game's own code runs, so
+whatever it installs it will install on the Amiga too, and our trap layer has to route the patched
+trap to the game's handler instead of to ours. ⭐ The trap number is in `d0` at the call site.
+**Resolve it before writing any of Stage C** — a layer that silently ignores the patch is the
+silent-wrong-value failure this project's hard rules exist to prevent. (The `GetTrapAddress` calls
+in the window are all from the System's patch block, not the game, so the game does not appear to
+chain the old handler — but that is an *absence* in one run, not a finding.)
+
+⚠ Eight of the 18 are Window/Dialog Manager one-shots from `load` (`SelectWindow`, `BeginUpDate`,
+`EndUpDate`, `GetNewDialog`, `DisposeDialog`, `GetCursor`, `InitCursor`, `TextMode`) — presumably a
+splash or loading dialog. The port owns the whole screen and has no overlapping windows, so
+`BeginUpDate`/`EndUpDate` can be minimal — ⚠ but that is a **seam decision** and belongs in
+`docs/faithfulness-seam.md` with its reason, not an implementation shortcut taken quietly.
 
 ⭐ `Traffic+663C` calls `GetPicture` — so the `Traffic` segment is *not* purely the driving
 rasteriser, and it is resident and drawing during the intro.
@@ -111,8 +150,25 @@ menu**.
 
 ⚠ **`Communication` (3), `FRED` (7) and `%A5Init` (10) were never observed resident**, so any trap
 they call is missing from the list above. `%A5Init` in particular *must* have run — it initialises
-the A5 world — and was purged before the first map. `FRED` exports 242 of the 509 entries and is
-presumably the driving code, which this window never reaches.
+the A5 world — and was already gone when the app was first detected as frontmost, even with the
+jump table polled **every frame** for 400 frames from launch. ⚠⚠ **So the traps `%A5Init` makes are
+unmeasured, and Stage B runs `%A5Init`.** `FRED` exports 242 of the 509 entries and is presumably
+the driving code, which this window never reaches.
+
+⭐ **Every unattributed caller region was checked, and none of them is a game segment.** The regions
+that called a trap from RAM were scanned for all ten segments' own first-8-byte signatures:
+
+| region | calls | verdict |
+|---|---|---|
+| `$71xxxx` | 66 779 | `sound` + `Intro` (mapped) |
+| `$04xxxx` | 17 029 | `Main` (mapped) |
+| `$7Bxxxx` | 10 837 | no segment signature — System code |
+| `$00xxxx` / `$01xxxx` / `$0Cxxxx` / `$7Cxxxx` | 1 441 | no segment signature — System code |
+| `$78xxxx` | 3 | ⭐ **inside the jump table itself** — an *unloaded* JT stub executing its own `MOVE.W #seg,-(SP); _LoadSeg`. Exactly the mechanism `CLAUDE.md` says to pre-patch away |
+
+⚠ The scan runs at the **end** of the window, so a segment that was resident earlier and purged
+would not be found. It is evidence that the 38 are complete for callers still resident, not proof
+that nothing was missed.
 
 ## ⚠⚠ The four ways this measurement lies, all of them found by it failing
 

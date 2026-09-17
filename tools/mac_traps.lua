@@ -46,6 +46,7 @@ local count, order, seen = {}, {}, {}
 local n_rom, n_ram, n_hits = 0, 0, 0
 local phase = "boot"
 local cur, taps = 0, 0
+local launch_frame = nil
 local keep = {}   -- ⚠⚠ see note 4: this is not bookkeeping, it is the tap's owner
 
 local function on_trap()
@@ -63,7 +64,8 @@ local function on_trap()
 		count[key] = c
 		order[#order + 1] = key
 	end
-	if rom then c.rom = c.rom + 1 else c.ram = c.ram + 1 end
+	if rom then c.rom = c.rom + 1 else c.ram = c.ram + 1
+		c.pcs = c.pcs or {}; c.pcs[pc] = (c.pcs[pc] or 0) + 1 end
 	-- ⭐ First time this trap is called FROM THE GAME (not from ROM) is the
 	-- number that orders the work list, so it is recorded separately.
 	if not rom and not c.ram_first then
@@ -85,7 +87,13 @@ local map_hook
 emu.register_frame_done(function()
 	local h = prog:read_u32(0x28)
 	if h ~= cur and h > 0x1000 then arm(h) end
-	if map_hook and mac.frames() % 60 == 0 then map_hook() end
+	-- ⚠ %A5Init runs once at startup and is purged, so a 60-frame cadence can
+	-- miss it entirely and then every trap it called is misfiled as "the
+	-- System".  Poll every frame until it is seen or the window closes.
+	if map_hook then
+		local n = mac.frames() - (launch_frame or 0)
+		if n <= 400 or mac.frames() % 60 == 0 then map_hook() end
+	end
 end)
 
 -- ---------------------------------------------------- names + segments -----
@@ -245,6 +253,16 @@ local function where(pc)
 end
 
 local function report()
+	-- ⚠ An unattributed caller is either the System or a segment we never
+	-- mapped.  Print the regions so the difference is visible instead of assumed.
+	local region = {}
+	for k, c in pairs(count) do
+		for pc, n in pairs(c.pcs or {}) do
+			local r = pc >> 16
+			region[r] = (region[r] or 0) + n
+		end
+	end
+
 	local out = io.open("ref/mame/traps.txt", "w")
 	local function p(s) print(s); if out then out:write(s .. "\n") end end
 	-- ⚠⚠ "in RAM" is NOT "the game".  [MEASURED] the callers split into three
@@ -289,6 +307,49 @@ local function report()
 	local line = {}
 	for _, k in ipairs(rest) do line[#line + 1] = string.format("%s(%s)=%d", k, (name(tonumber(k, 16))), count[k].rom + count[k].ram) end
 	p("VP " .. table.concat(line, " "))
+	p("")
+	p("VP ---- all RAM caller PCs by 64 KB region (is anything here an unmapped segment?) ----")
+	local rs = {}
+	for r in pairs(region) do rs[#rs+1] = r end
+	table.sort(rs, function(a, b) return region[a] > region[b] end)
+	local rl = {}
+	for _, r in ipairs(rs) do
+		local tag = ""
+		for _, e in ipairs(bases) do
+			if (e.base >> 16) == r then tag = "=" .. e.name end
+		end
+		rl[#rl+1] = string.format("%02Xxxxx%s:%d", r, tag, region[r])
+	end
+	p("VP " .. table.concat(rl, "  "))
+	-- ⭐ Decisive check on the unattributed regions: is any of them an unmapped
+	-- GAME segment?  Scan only the 64 KB regions that actually called a trap,
+	-- for every segment's own first 8 bytes.  A hit names a segment we missed;
+	-- no hit means the region is System code and the 38-row list is complete
+	-- for this window.
+	p("")
+	p("VP ---- scanning the unattributed regions for ANY segment's signature ----")
+	local want = {}
+	for seg, info in pairs(SEGS) do
+		local h0, h1, len = seg_head(info[2])
+		if h0 then want[#want+1] = {seg = seg, name = info[1], h0 = h0, h1 = h1, len = len} end
+	end
+	for _, r in ipairs(rs) do
+		local mapped = false
+		for _, e in ipairs(bases) do if (e.base >> 16) == r then mapped = true end end
+		if not mapped then
+			local found = {}
+			for a = r << 16, (r << 16) + 0xFFFE, 2 do
+				local v = prog:read_u32(a)
+				for _, w in ipairs(want) do
+					if v == w.h0 and prog:read_u32(a + 4) == w.h1 then
+						found[#found+1] = string.format("seg %d %s @%06X", w.seg, w.name, a)
+					end
+				end
+			end
+			p(string.format("VP   %02Xxxxx (%d calls): %s", r, region[r],
+				#found > 0 and ("⚠⚠ " .. table.concat(found, ", ")) or "no segment signature -- System code"))
+		end
+	end
 	if out then out:close(); print("VP wrote ref/mame/traps.txt") end
 end
 
@@ -302,12 +363,16 @@ mac.run(function()
 	count, order, seen = {}, {}, {}
 	n_rom, n_ram, n_hits = 0, 0, 0
 	phase = "launched"
-	map_hook = map_segments   -- ⭐ from here the map refreshes every 60 frames
+	launch_frame = mac.frames()
+	map_hook = map_segments
 	for i = 1, 12 do
 		mac.wait(240)
 		phase = "t+" .. (i * 4) .. "s"
 		print(string.format("VP %-8s frame=%-6d hits=%-8d ram=%-7d distinct=%d",
 			phase, mac.frames(), n_hits, n_ram, #seen))
+		-- ⚠ Is the intro really over at the DisposeWindow from Intro+0ADA
+		-- (frame ~3558)?  Shoot either side of it and look, rather than assume.
+		mac.shot(); print("VP SHOT " .. i .. " at frame " .. mac.frames())
 	end
 	mac.shot()
 	map_hook = nil

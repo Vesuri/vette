@@ -18,24 +18,47 @@ intro screen's share isolated to **18** of them. Stage C's order is no longer an
    separated. The answers are in `tmp/unpacked/…/scans/Manual.pdf` when it is time. ⚠ Ground truth
    runs the **unpatched** original; the patch item below is port-side only and does not retire this.
 
-2. ⭐ **Record the SELECTOR for the selector-dispatched traps, and re-run the log for DRIVING.**
-   Two named gaps in `docs/trap-log.md`, both cheap now that the tracer exists:
-   * `QDExtensions` (`$AB1D`, 11 calls from `Initialize+0134`) carries `NewGWorld` / `LockPixels`
-     and the selector is on the stack, unread. It decides whether the offscreen surface exists
-     before the intro or only for driving — which is the question `docs/amiga-arch.md`'s c2p section
-     is waiting on. `ScriptUtil`, `SCSIDispatch` and the `Pack` traps are selector-dispatched too.
+2. ⭐⭐ **Three measurements that GATE Stage C**, all cheap now that `tools/mac_traps.lua` exists —
+   extend it to read the stack/registers at the call site instead of just the trap word:
+   * ⚠⚠ **Which trap does the game patch?** `SetTrapAddress` at `load+00B8`, one call at frame 1617,
+     *inside* Target 1. The trap number is in `d0`. Under option A the game installs that patch on
+     the Amiga too, so our dispatcher has to route the patched trap to the game's handler. A layer
+     that ignores it is wrong silently.
+   * ⚠ **What does `%A5Init` call?** It was already purged when the app first became frontmost, even
+     with the jump table polled every frame for 400 frames. Stage B *runs* `%A5Init`, so its trap
+     set is a hole in the work list. Catch it by arming the tracer before `CurApName` flips.
+   * ⭐ **The `QDExtensions` selectors** ($AB1D, 11 calls from `Initialize+0134`) — they carry
+     `NewGWorld` / `LockPixels`, and they decide whether the offscreen surface exists before the
+     intro or only for driving, which is the question `docs/amiga-arch.md`'s c2p section waits on.
+     `ScriptUtil`, `SCSIDispatch` and the `Pack` traps are selector-dispatched too.
+
+   And one that does not gate it:
    * The window ends at the **menu**: `FRED` (242 of the 509 jump-table entries) and
      `Communication` never ran, and `%A5Init` was purged before the first segment map. ⚠ The 38 are
      a **FLOOR**. Extend `tools/mame_mac_input.lua` past the garage screen and re-run.
-   ⚠ Not blocking Stage A or B. Do it before Stage C commits to an implementation order for
-   anything past the intro.
+   ⚠ The re-run for driving does not block Stage A or B; the three bullets above block **Stage C**.
 
-## ⭐⭐ The road to the intro screen on the Amiga — the CURRENT GOAL
+## ⭐⭐ TARGET 1 — the intro screen, painted by the game's own code — the CURRENT GOAL
+
+⭐⭐ **Scoped by measurement, not by ambition: 18 traps.** `docs/trap-log.md` shows the intro art is
+fully painted at frame 1758 and that rows 1–18 of the trap table are the last new trap before it
+exists. Rows 19–21 are the wait-for-click loop and rows 22–38 are the garage screen — **both out of
+scope for Target 1.** ⚠ `GetNextEvent` is *not* needed: the intro polls `Button`.
+
+**Acceptance criterion, and it is a pixel diff, not a look:** the Amiga paints the Golden Gate /
+San Francisco title art with "© 1991 SPHERE, INC", produced by the game's own `CODE` segments
+calling our trap layer, and it matches the MAME reference capture of frame 1758 under the Stage A
+differential.
 
 ⚠⚠ **Read the honesty rule before starting any of these: each stage states what it PROVES, and a
 stage that shows the right picture for the wrong reason is a failure, not a milestone.** Displaying
 a converted Mac screenshot is a display-path proof and nothing more — it must never be reported as
 "the intro screen works".
+
+⛔ **Deferred out of Target 1 by this scoping** — do not implement them early "while we are here":
+the Event Manager (`GetNextEvent`, `SystemTask`), the Menu Manager (`NewMenu`, `AppendMenu`,
+`GetRMenu`, `DrawMenuBar`, `DisableItem`), `MoveWindow`/`DisposeWindow`/`PaintBehind`,
+`GetGDevice`/`GetMainDevice`/`GetCTSeed`, `PurgeMem`/`CompactMem`, `UnLoadSeg`.
 
 3. ⭐ **Stage A — the display path, with a captured frame.** Amiga skeleton in the locked mode
    (4 bitplanes, hires **interlaced**), a copper list, VERTB, the frame pump, and a host-side
@@ -54,13 +77,18 @@ a converted Mac screenshot is a display-path proof and nothing more — it must 
    hard rules exist to prevent.
    ⚠ The resources have to reach the Amiga too — the Resource Manager is how the game reads all of
    its data, so a host-side resource-fork → Amiga-readable converter is part of this stage.
-5. **Stage C — the trap layer, in the MEASURED order** (`docs/trap-log.md`, the 38-row table).
+5. **Stage C — the trap layer: the 18 traps of Target 1, in the MEASURED order**
+   (`docs/trap-log.md`).
    Implement first-use-first, re-running after each one; progress is countable ("N traps deep,
    halted at *M*"). ⭐ Rows 1–18 are the whole cost of a painted intro screen, and the load-bearing
    ones are `SetPort`/`ClipRect`/`PenSize`/`TextMode` (stateful QuickDraw port), `GetResource` +
    `CurResFile`/`UseResFile`, `GetPicture`/`DrawPicture`/`CopyBits`, and `QDExtensions`.
    ⭐ **`GetNextEvent` is NOT needed for the intro** — it first appears at the menu; the intro runs
    on `Button` polling from `Intro+0224`.
+   ⚠⚠ **Two measurements gate this stage, both cheap and both listed in #2 below — take them first:**
+   (a) which trap `SetTrapAddress` patches at `load+00B8`, and (b) the `QDExtensions` selectors.
+   Neither is optional: (a) decides whether our dispatcher must route a trap to the game's own
+   handler, and a layer that ignores the patch fails silently.
    ⚠ **Honour documented Inside Macintosh semantics, not what the call appears to want** — handles
    move, QuickDraw has a stateful current port (`CLAUDE.md`).
 6. ⚠ **Stage D — `DrawPicture`, and it is a PICT opcode interpreter, not a call to wire up.**
@@ -69,6 +97,13 @@ a converted Mac screenshot is a display-path proof and nothing more — it must 
    QuickDraw picture parser is far more than this port needs.
    **Then:** the intro screen is rendered by the game's own code, and the Stage A differential says
    whether it is right.
+
+## Small, cheap, and wrong if left
+
+⚠ **The game's year is not settled.** The intro art reads **"© 1991 SPHERE, INC"**; `PROJECT.md`,
+`CLAUDE.md` and `docs/source-inventory.md` all say 1989, and the archive is `VETTE! 1.02`. Read the
+`vers` resource and fix whichever is wrong, in one pass, everywhere. It costs minutes and a wrong
+date in a pilot project's docs propagates to every port after it.
 
 ## Phase 0 — scaffolding (see `docs/phases.md`)
 
