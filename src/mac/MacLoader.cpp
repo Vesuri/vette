@@ -305,6 +305,7 @@ static const TrapName s_trapNames[] = {
     {0xa9ef,"MEMORY MANAGER","PTRANDHAND"},
     {0xa02a,"MEMORY MANAGER","HUNLOCK"}, {0xa049,"MEMORY MANAGER","HPURGE"},
     {0xa04a,"MEMORY MANAGER","HNOPURGE"},
+    {0xa032,"EVENT MANAGER","FLUSHEVENTS"},
     {0xa03b,"TIME MANAGER","DELAY"},
     {0xa03c,"TEXT UTILITIES","CMPSTRING"}, {0xa23c,"TEXT UTILITIES","CMPSTRING"},
     {0xa43c,"TEXT UTILITIES","CMPSTRING"}, {0xa63c,"TEXT UTILITIES","CMPSTRING"},
@@ -2806,6 +2807,13 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
     if (trap == 0xa9f1) {                    // _UnLoadSeg(Ptr), deliberately kept resident
         if (g_stageCDepth < 2) g_stageCDepth = 2;
         return 5;                             // handled + four parameter bytes consumed
+    }
+    if (trap == 0xa032) {                    // FlushEvents(whichMask, stopMask) in D0
+        // No Macintosh events have been enqueued before the main loop.  The
+        // combined masks in D0 are still accepted exactly as a register trap;
+        // live mouse/key state is not an event-queue entry and is untouched.
+        if (g_stageCDepth < 79) g_stageCDepth = 79;
+        return 1;
     }
     if (trap == 0xa9a0) {                    // GetResource(type:4, id:2) -> Handle result:4
         int16_t id = (int16_t)read16(userStack);

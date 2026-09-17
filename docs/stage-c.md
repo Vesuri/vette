@@ -183,6 +183,11 @@ The next loud stop is `FlushEvents` at `Main+$1F36`. A later `UnLoadSeg` origina
 depth 2 by assigning its historical row; the handler now advances monotonically like every other
 implemented trap.
 
+79. `FlushEvents` (empty Macintosh event queue; live hardware input remains separate)
+
+The current loud stop is `SystemTask` at `Main+$29E6`, immediately before `GetNextEvent`, confirmed
+by the depth-79 run.
+
 `amiga/stage_c.gdb` breaks on `VetteScreen::showLoudStop`, after the report is complete, and prints
 the depth, trap identity, selector, runtime `(segment, offset)`, absolute PC, USP and its first
 words, all data/address registers, and nearby instructions. It then exits, so `diag_run.sh` stops
