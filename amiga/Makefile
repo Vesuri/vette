@@ -193,7 +193,8 @@ VASMFLAGS = -m68010 -Felf -quiet -x -no-opt -nowarn=62 $(EXTRA_VASMDEFS)
 # they are unconditional rather than under `ifdef PROBES`.
 PROBE_SYMS = g_vbiCount g_planeChecksum g_screenReady g_laceFields g_longFields g_lofSamples \
              g_stageBState g_trapWord g_trapSelector g_trapSegment g_trapOffset \
-             g_resourceCount g_jumpEntryCount g_blockMoveCount g_trapManager g_trapRoutine
+             g_trapPC g_trapRegisters g_trapUserStack g_resourceCount g_jumpEntryCount \
+             g_blockMoveCount g_trapManager g_trapRoutine
 PROBE_SYMS += g_stageCDepth
 ifdef PROBES
 PROBE_SYMS +=

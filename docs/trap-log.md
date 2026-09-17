@@ -193,7 +193,7 @@ inherits none of it.
 |---|---|---|---|
 | 0 | **`NewGWorld`** | 3 | `Initialize+0134` (Target 1), `+02E8`, `+033A` |
 | 1 | **`LockPixels`** | 6 | `Initialize+0154`, `+01A4` (Target 1), `+0304`, `+0356`, `+03A6`, `+0408` |
-| 12 | `[UNIDENTIFIED]` | 2 | `Initialize+031E`, `+0422` — **not** in Target 1 |
+| 12 | **`NoPurgePixels`** | 2 | `Initialize+031E`, `+0422` — **not** in the MAME Target 1 path |
 
 Selector 0 is `NewGWorld` beyond doubt: the push sequence at `Initialize+011C` is exactly its
 signature —
@@ -212,11 +212,9 @@ tst.w   (sp)+                 ; QDErr
 ```
 
 Selector 1 takes one `PixMapHandle` and returns a `Boolean` (`clr.b -(sp)` … `tst.b (sp)+`) —
-`LockPixels`. Selector 12 takes a `PixMapHandle` and returns nothing.
-
-⛔ **Selector 12 is deliberately left unnamed.** Pasting in the `QDOffscreen` selector order from
-memory is exactly how a guess becomes a documented fact; it is a void procedure taking the GWorld's
-`PixMapHandle`, and it is outside Target 1, so it costs nothing to leave open.
+`LockPixels`. Selector 12 takes a `PixMapHandle` and returns nothing. The classic Macintosh glue
+mapping explicitly assigns selector 12 to `NoPurgePixels`; the standalone run has now exercised
+that selector as part of its copied support-code path.
 ⚠ Selector 20, three calls from `$00DAB8` before launch, is the System's, not the game's.
 
 ⭐ **Target 1 needs two selectors: `NewGWorld` ×1 and `LockPixels` ×2.** `flags = $40000000` and

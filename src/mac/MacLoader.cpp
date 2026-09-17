@@ -27,6 +27,9 @@ volatile uint16_t g_trapWord = 0;
 volatile int32_t  g_trapSelector = -1;
 volatile uint16_t g_trapSegment = 0xffff;
 volatile uint32_t g_trapOffset = 0xffffffffUL;
+volatile uint32_t g_trapPC = 0;
+volatile uint32_t g_trapRegisters[15] = {0};
+volatile uint32_t g_trapUserStack = 0;
 volatile uint32_t g_resourceCount = 0;
 volatile uint16_t g_jumpEntryCount = 0;
 volatile uint16_t g_blockMoveCount = 0;
@@ -45,6 +48,7 @@ static VetteScreen* s_loudStopScreen;
 static ResourceArchive s_resourceArchive;
 static uint8_t* s_resourceMasters[572];
 static bool s_resourceLocked[572];
+static bool s_resourcePurgeable[572];
 static uint8_t s_quickDrawScreen[(512 / 8) * 320];
 static uint8_t s_colorScreen[(512 / 2) * 320];
 static uint8_t s_windowManagerPort[108];
@@ -62,13 +66,14 @@ static uint8_t s_grayRgn[10];
 static uint8_t* s_grayRgnMaster;
 static uint8_t s_textEditScrap[1];
 static uint8_t* s_textEditScrapMaster;
-static uint8_t s_toolTrapTokens[1024];
+static uint8_t s_trapTokens[4096];
+static uint8_t* s_trapAddresses[4096];
 static uint8_t* s_qdThePort;
 static uint8_t* s_currentA5;
 static uint16_t s_currentResourceFork = 0;  // application resource file at process launch
 
 struct WindowSlot {
-    uint8_t record[156];
+    uint8_t record[170];                    // WindowRecord plus DialogRecord tail
     bool used;
     uint8_t structureRegion[10];
     uint8_t* structureRegionMaster;
@@ -84,11 +89,38 @@ struct WindowSlot {
     uint8_t** palette;
     bool paletteUpdates;
     bool updating;
+    bool dialog;
+    uint16_t dialogItemCount;
+    bool dialogDrawn;
 };
 static WindowSlot s_windows[8];
 static uint8_t* s_windowList;
 static uint32_t s_colorSeed = 1;
 static uint8_t** s_activePalette;
+static uint32_t s_ticks;
+
+// VBLTask is a 14-byte 68k record: qLink, qType, vblAddr, vblCount,
+// vblPhase.  Keep the caller-owned records linked exactly as the classic
+// Vertical Retrace Manager does.  Execution is deliberately a separate
+// concern: calling application code from Amiga's supervisor-mode VERTB ISR
+// would give Line-A traps the wrong exception/USP context.
+static uint8_t* s_vblTasks[8];
+static uint16_t s_vblTaskCount;
+
+struct GWorldSlot {
+    uint8_t port[108];
+    uint8_t pixMap[50];
+    uint8_t* pixMapMaster;
+    uint8_t visRegion[10];
+    uint8_t* visRegionMaster;
+    uint8_t clipRegion[10];
+    uint8_t* clipRegionMaster;
+    uint8_t* pixels;
+    bool used;
+    bool locked;
+    bool purgeable;
+};
+static GWorldSlot s_gworlds[4];
 
 struct FontManagerState {
     bool initialized;
@@ -136,6 +168,22 @@ struct MemoryManagerState {
 };
 static MemoryManagerState s_memoryManager;
 
+struct PointerAllocation {
+    uint8_t* pointer;
+    uint8_t* master;
+    uint32_t size;
+};
+static PointerAllocation s_pointerAllocations[128];
+
+struct HandleAllocation {
+    uint8_t* master;
+    uint32_t size;
+    bool locked;
+    bool purgeable;
+};
+static HandleAllocation s_handleAllocations[128];
+static uint16_t s_handleAllocationCount;
+
 struct Segment { uint8_t* begin; uint8_t* end; const char* name; };
 static const Segment s_segments[11] = {
     {vette_code_0, vette_code_0_end, "CODE0"},
@@ -177,12 +225,21 @@ static const TrapName s_trapNames[] = {
     {0xa930,"MENU MANAGER","INITMENUS"}, {0xa9cc,"TEXTEDIT","TEINIT"},
     {0xa97b,"DIALOG MANAGER","INITDIALOGS"},
     {0xa997,"RESOURCE MANAGER","OPENRESFILE"},
+    {0xa9a1,"RESOURCE MANAGER","GETNAMEDRESOURCE"},
     {0xa063,"MEMORY MANAGER","MAXAPPLZONE"}, {0xa01c,"MEMORY MANAGER","FREEMEM"},
     {0xa090,"TOOLBOX UTILITIES","SYSENVIRONS"},
     {0xa746,"TRAP MANAGER","GETTOOLTRAPADDRESS"},
     {0xa31e,"MEMORY MANAGER","NEWPTRCLEAR"}, {0xaa32,"QUICKDRAW","GETGDEVICE"},
     {0xa9a0,"RESOURCE MANAGER","GETRESOURCE"}, {0xa064,"MEMORY MANAGER","MOVEHHI"},
     {0xa029,"MEMORY MANAGER","HLOCK"}, {0xa11e,"MEMORY MANAGER","NEWPTR"},
+    {0xa51e,"MEMORY MANAGER","NEWPTRSYS"},
+    {0xa122,"MEMORY MANAGER","NEWHANDLE"},
+    {0xa128,"MEMORY MANAGER","RECOVERHANDLE"},
+    {0xa025,"MEMORY MANAGER","GETHANDLESIZE"},
+    {0xa9ef,"MEMORY MANAGER","PTRANDHAND"},
+    {0xa02a,"MEMORY MANAGER","HUNLOCK"}, {0xa049,"MEMORY MANAGER","HPURGE"},
+    {0xa03b,"TIME MANAGER","DELAY"},
+    {0xa033,"VERTICAL RETRACE","VINSTALL"},
     {0xa998,"RESOURCE MANAGER","USERESFILE"}, {0xa994,"RESOURCE MANAGER","CURRESFILE"},
     {0xaa46,"WINDOW MANAGER","GETNEWCWINDOW"}, {0xa91b,"WINDOW MANAGER","MOVEWINDOW"},
     {0xa915,"WINDOW MANAGER","SHOWWINDOW"},
@@ -191,7 +248,8 @@ static const TrapName s_trapNames[] = {
     {0xa922,"WINDOW MANAGER","BEGINUPDATE"}, {0xa923,"WINDOW MANAGER","ENDUPDATE"},
     {0xa889,"QUICKDRAW","TEXTMODE"}, {0xa9b9,"QUICKDRAW","GETCURSOR"},
     {0xa851,"QUICKDRAW","SETCURSOR"},
-    {0xa97c,"DIALOG MANAGER","GETNEWDIALOG"}, {0xab1d,"QUICKDRAW","QDEXTENSIONS"},
+    {0xa97c,"DIALOG MANAGER","GETNEWDIALOG"}, {0xa981,"DIALOG MANAGER","DRAWDIALOG"},
+    {0xab1d,"QUICKDRAW","QDEXTENSIONS"},
     {0xaa95,"PALETTE MANAGER","SETPALETTE"}, {0xa146,"TRAP MANAGER","GETTRAPADDRESS"},
     {0xa047,"TRAP MANAGER","SETTRAPADDRESS"}, {0xa983,"DIALOG MANAGER","DISPOSEDIALOG"},
     {0xa850,"QUICKDRAW","INITCURSOR"}, {0xa9bc,"QUICKDRAW","GETPICTURE"},
@@ -487,7 +545,7 @@ static uint8_t* newColorWindow(int16_t id, uint8_t* storage, uint8_t* behind)
     int16_t right = (int16_t)read16(wind + 6);
     uint8_t* window = storage ? storage : slot->record;
     if (storage)
-        for (uint16_t i = 0; i < sizeof(slot->record); ++i) storage[i] = 0;
+        for (uint16_t i = 0; i < 156; ++i) storage[i] = 0;
 
     initRegion(slot->structureRegion, slot->structureRegionMaster,
                top, left, bottom, right);
@@ -518,6 +576,53 @@ static uint8_t* newColorWindow(int16_t id, uint8_t* storage, uint8_t* behind)
     return window;
 }
 
+static uint8_t* newDialog(int16_t id, uint8_t* storage, uint8_t* behind)
+{
+    uint8_t** resource = getResource(0x444c4f47UL, id); // 'DLOG'
+    if (!resource || !*resource) return 0;
+    const uint8_t* dlog = *resource;
+    WindowSlot* slot = 0;
+    for (uint16_t i = 0; i < sizeof(s_windows) / sizeof(s_windows[0]); ++i)
+        if (!s_windows[i].used) { slot = &s_windows[i]; break; }
+    if (!slot) return 0;
+    slot->used = true;
+    slot->dialog = true;
+    uint8_t* dialog = storage ? storage : slot->record;
+    for (uint16_t i = 0; i < sizeof(slot->record); ++i) dialog[i] = 0;
+
+    int16_t top = (int16_t)read16(dlog);
+    int16_t left = (int16_t)read16(dlog + 2);
+    int16_t bottom = (int16_t)read16(dlog + 4);
+    int16_t right = (int16_t)read16(dlog + 6);
+    initRegion(slot->structureRegion, slot->structureRegionMaster, top, left, bottom, right);
+    initRegion(slot->contentRegion, slot->contentRegionMaster, top, left, bottom, right);
+    initRegion(slot->clipRegion, slot->clipRegionMaster, top, left, bottom, right);
+    initRegion(slot->updateRegion, slot->updateRegionMaster, 0, 0, 0, 0);
+    initColorPort(dialog, &slot->contentRegionMaster, &slot->clipRegionMaster,
+                  top, left, bottom, right);
+
+    dialog[110] = dlog[10];
+    dialog[112] = dlog[12];
+    write32(dialog + 114, (uint32_t)&slot->structureRegionMaster);
+    write32(dialog + 118, (uint32_t)&slot->contentRegionMaster);
+    write32(dialog + 122, (uint32_t)&slot->updateRegionMaster);
+    slot->procID = (int16_t)read16(dlog + 8);
+    uint8_t titleLength = dlog[20];
+    slot->title[0] = titleLength;
+    for (uint16_t i = 0; i < titleLength; ++i) slot->title[i + 1] = dlog[21 + i];
+    slot->titleMaster = slot->title;
+    write32(dialog + 134, (uint32_t)&slot->titleMaster);
+    write32(dialog + 144, (uint32_t)s_windowList);
+    write32(dialog + 152, read32(dlog + 14));
+    write32(dialog + 156,
+            (uint32_t)getResource(0x4449544cUL, (int16_t)read16(dlog + 18))); // 'DITL'
+    write16(dialog + 164, 0xffff);           // no editable-text item selected
+    write16(dialog + 168, 1);                // default item
+    s_windowList = dialog;
+    (void)behind;
+    return dialog;
+}
+
 static void moveWindow(uint8_t* window, int16_t h, int16_t v, bool front)
 {
     int16_t height = (int16_t)(read16(window + 20) - read16(window + 16));
@@ -537,6 +642,56 @@ static WindowSlot* windowSlot(uint8_t* window)
     return 0;
 }
 
+static int32_t resourceHandleIndex(uint8_t** handle);
+
+static uint32_t resourceHandleSize(uint8_t** handle)
+{
+    int32_t index = resourceHandleIndex(handle);
+    ResourceArchive::Item item;
+    return index >= 0 && s_resourceArchive.item((uint32_t)index, item) ? item.size : 0;
+}
+
+static void fillColorRect(int16_t top, int16_t left, int16_t bottom, int16_t right,
+                          uint8_t color)
+{
+    if (top < 0) top = 0;
+    if (left < 0) left = 0;
+    if (bottom > 320) bottom = 320;
+    if (right > 512) right = 512;
+    for (int16_t y = top; y < bottom; ++y)
+        for (int16_t x = left; x < right; ++x) {
+            uint8_t* pixel = s_colorScreen + (uint32_t)y * (512 / 2) + (x >> 1);
+            if (x & 1) *pixel = (uint8_t)((*pixel & 0xf0) | (color & 0x0f));
+            else *pixel = (uint8_t)((*pixel & 0x0f) | ((color & 0x0f) << 4));
+        }
+}
+
+static bool drawDialog(uint8_t* dialog)
+{
+    WindowSlot* slot = windowSlot(dialog);
+    if (!slot || !slot->dialog) return false;
+    uint8_t** itemsHandle = (uint8_t**)read32(dialog + 156);
+    uint32_t size = resourceHandleSize(itemsHandle);
+    if (!itemsHandle || !*itemsHandle || size < 2) return false;
+    const uint8_t* items = *itemsHandle;
+    uint16_t count = (uint16_t)(read16(items) + 1);
+    uint32_t offset = 2;
+    for (uint16_t i = 0; i < count; ++i) {
+        if (offset + 14 > size) return false;
+        uint8_t dataLength = items[offset + 13];
+        offset += 14 + dataLength;
+        if (offset & 1) ++offset;
+        if (offset > size) return false;
+    }
+    slot->dialogItemCount = count;
+    slot->dialogDrawn = true;
+    dialog[110] = 1;
+    write32(s_qdThePort, (uint32_t)dialog);
+    fillColorRect((int16_t)read16(dialog + 16), (int16_t)read16(dialog + 18),
+                  (int16_t)read16(dialog + 20), (int16_t)read16(dialog + 22), 0);
+    return true;
+}
+
 static void activatePalette(uint8_t* window)
 {
     WindowSlot* slot = windowSlot(window);
@@ -554,6 +709,53 @@ static void activatePalette(uint8_t* window)
         write16(spec + 6, read16(color + 4));
     }
     write32(s_windowManagerColors, s_colorSeed++);
+}
+
+static uint8_t* newGWorld(const uint8_t* bounds, uint16_t depth)
+{
+    GWorldSlot* slot = 0;
+    for (uint16_t i = 0; i < sizeof(s_gworlds) / sizeof(s_gworlds[0]); ++i)
+        if (!s_gworlds[i].used) { slot = &s_gworlds[i]; break; }
+    if (!slot || !bounds) return 0;
+    for (uint16_t i = 0; i < sizeof(slot->port); ++i) slot->port[i] = 0;
+    for (uint16_t i = 0; i < sizeof(slot->pixMap); ++i) slot->pixMap[i] = 0;
+    int16_t top = (int16_t)read16(bounds);
+    int16_t left = (int16_t)read16(bounds + 2);
+    int16_t bottom = (int16_t)read16(bounds + 4);
+    int16_t right = (int16_t)read16(bounds + 6);
+    uint16_t pixelDepth = depth ? depth : 4;
+    uint16_t width = (uint16_t)(right - left);
+    uint16_t height = (uint16_t)(bottom - top);
+    uint16_t rowBytes = (uint16_t)(((uint32_t)width * pixelDepth + 31) >> 5 << 2);
+    slot->pixels = (uint8_t*)AllocMem((uint32_t)rowBytes * height, MEMF_CLEAR);
+    if (!slot->pixels) return 0;
+    slot->used = true;
+    slot->locked = false;
+    slot->purgeable = true;
+    slot->pixMapMaster = slot->pixMap;
+    write32(slot->pixMap, (uint32_t)slot->pixels);
+    write16(slot->pixMap + 4, (uint16_t)(0x8000 | rowBytes));
+    writeRect(slot->pixMap + 6, top, left, bottom, right);
+    write32(slot->pixMap + 22, 72UL << 16);
+    write32(slot->pixMap + 26, 72UL << 16);
+    write16(slot->pixMap + 30, 0);
+    write16(slot->pixMap + 32, pixelDepth);
+    write16(slot->pixMap + 34, 1);
+    write16(slot->pixMap + 36, pixelDepth);
+    write32(slot->pixMap + 42, (uint32_t)&s_windowManagerColorsMaster);
+    initRegion(slot->visRegion, slot->visRegionMaster, top, left, bottom, right);
+    initRegion(slot->clipRegion, slot->clipRegionMaster, top, left, bottom, right);
+    initColorPort(slot->port, &slot->visRegionMaster, &slot->clipRegionMaster,
+                  top, left, bottom, right);
+    write32(slot->port + 2, (uint32_t)&slot->pixMapMaster);
+    return slot->port;
+}
+
+static GWorldSlot* gWorldForPixMap(uint8_t** pixMap)
+{
+    for (uint16_t i = 0; i < sizeof(s_gworlds) / sizeof(s_gworlds[0]); ++i)
+        if (s_gworlds[i].used && &s_gworlds[i].pixMapMaster == pixMap) return &s_gworlds[i];
+    return 0;
 }
 
 static void initMenus()
@@ -610,7 +812,18 @@ static uint8_t* getToolTrapAddress(uint16_t trap)
 {
     uint16_t index = trap & 0x03ff;
     if (!isImplementedToolTrap(trap)) index = 0x009f; // _Unimplemented's shared address
-    return &s_toolTrapTokens[index];
+    return &s_trapTokens[index];
+}
+
+static uint8_t* getTrapAddress(uint16_t trap)
+{
+    uint16_t index = trap & 0x0fff;
+    return s_trapAddresses[index] ? s_trapAddresses[index] : &s_trapTokens[index];
+}
+
+static void setTrapAddress(uint16_t trap, uint8_t* address)
+{
+    s_trapAddresses[trap & 0x0fff] = address;
 }
 
 static uint8_t* newPointer(uint32_t size, bool clear)
@@ -621,8 +834,111 @@ static uint8_t* newPointer(uint32_t size, bool clear)
         return 0;
     }
     s_memoryManager.error = 0;
+    if (s_memoryManager.allocationCount < sizeof(s_pointerAllocations) / sizeof(s_pointerAllocations[0])) {
+        PointerAllocation& allocation = s_pointerAllocations[s_memoryManager.allocationCount];
+        allocation.pointer = pointer;
+        allocation.master = pointer;
+        allocation.size = size ? size : 1;
+    }
     ++s_memoryManager.allocationCount;
     return pointer;
+}
+
+static uint8_t** recoverHandle(uint8_t* pointer)
+{
+    uint32_t address = (uint32_t)pointer;
+    uint32_t recorded = s_memoryManager.allocationCount;
+    if (recorded > sizeof(s_pointerAllocations) / sizeof(s_pointerAllocations[0]))
+        recorded = sizeof(s_pointerAllocations) / sizeof(s_pointerAllocations[0]);
+    for (uint32_t i = 0; i < recorded; ++i) {
+        PointerAllocation& allocation = s_pointerAllocations[i];
+        uint32_t base = (uint32_t)allocation.pointer;
+        if (address >= base && address < base + allocation.size)
+            return &allocation.master;
+    }
+    for (uint32_t i = 0; i < s_resourceArchive.resourceCount(); ++i) {
+        ResourceArchive::Item item;
+        if (!s_resourceArchive.item(i, item)) break;
+        uint32_t base = (uint32_t)item.data;
+        if (address >= base && address < base + item.size) {
+            s_resourceMasters[i] = (uint8_t*)item.data;
+            return &s_resourceMasters[i];
+        }
+    }
+    return 0;
+}
+
+static uint8_t** newHandle(uint32_t size, bool clear)
+{
+    if (s_handleAllocationCount == sizeof(s_handleAllocations) / sizeof(s_handleAllocations[0])) {
+        s_memoryManager.error = -108;
+        return 0;
+    }
+    uint8_t* data = (uint8_t*)AllocMem(size ? size : 1, clear ? MEMF_CLEAR : 0);
+    if (!data) {
+        s_memoryManager.error = -108;
+        return 0;
+    }
+    HandleAllocation& allocation = s_handleAllocations[s_handleAllocationCount++];
+    allocation.master = data;
+    allocation.size = size;
+    allocation.locked = false;
+    allocation.purgeable = false;
+    s_memoryManager.error = 0;
+    return &allocation.master;
+}
+
+static HandleAllocation* handleAllocation(uint8_t** handle)
+{
+    for (uint16_t i = 0; i < s_handleAllocationCount; ++i)
+        if (&s_handleAllocations[i].master == handle) return &s_handleAllocations[i];
+    return 0;
+}
+
+static uint32_t handleSize(uint8_t** handle)
+{
+    if (HandleAllocation* allocation = handleAllocation(handle)) {
+        s_memoryManager.error = 0;
+        return allocation->size;
+    }
+    int32_t index = resourceHandleIndex(handle);
+    ResourceArchive::Item item;
+    if (index >= 0 && s_resourceArchive.item((uint32_t)index, item)) {
+        s_memoryManager.error = 0;
+        return item.size;
+    }
+    s_memoryManager.error = -109;
+    return 0;
+}
+
+static int16_t pointerAndHandle(const uint8_t* source, uint8_t** handle, uint32_t size)
+{
+    HandleAllocation* allocation = handleAllocation(handle);
+    if (!allocation || (!source && size)) return -109;
+    uint32_t newSize = allocation->size + size;
+    uint8_t* data = (uint8_t*)AllocMem(newSize ? newSize : 1, 0);
+    if (!data) return -108;
+    for (uint32_t i = 0; i < allocation->size; ++i) data[i] = allocation->master[i];
+    for (uint32_t i = 0; i < size; ++i) data[allocation->size + i] = source[i];
+    FreeMem(allocation->master, allocation->size ? allocation->size : 1);
+    allocation->master = data;
+    allocation->size = newSize;
+    return 0;
+}
+
+static int16_t installVBLTask(uint8_t* task)
+{
+    if (!task) return -50;                   // paramErr
+    for (uint16_t i = 0; i < s_vblTaskCount; ++i)
+        if (s_vblTasks[i] == task) return -94; // vTypErr: already installed
+    if (s_vblTaskCount == sizeof(s_vblTasks) / sizeof(s_vblTasks[0]))
+        return -94;
+
+    write16(task + 4, 1);                    // vType
+    write32(task, 0);
+    if (s_vblTaskCount) write32(s_vblTasks[s_vblTaskCount - 1], (uint32_t)task);
+    s_vblTasks[s_vblTaskCount++] = task;
+    return 0;
 }
 
 static int32_t resourceHandleIndex(uint8_t** handle)
@@ -640,7 +956,7 @@ static bool isPermanentHandle(uint8_t** handle)
 {
     // The screen device and its PixMap are permanent system-style handles.  They
     // cannot move, but HLock on either is still a successful operation.
-    return resourceHandleIndex(handle) >= 0
+    return resourceHandleIndex(handle) >= 0 || handleAllocation(handle) || gWorldForPixMap(handle)
         || handle == &s_mainDeviceMaster || handle == &s_windowManagerPixMapMaster;
 }
 
@@ -718,6 +1034,16 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
         if (g_stageCDepth < 11) g_stageCDepth = 11;
         return 1;
     }
+    if (trap == 0xa146) {                    // GetTrapAddress(D0) -> A0
+        regs[8] = (uint32_t)getTrapAddress((uint16_t)regs[0]);
+        if (g_stageCDepth < 47) g_stageCDepth = 47;
+        return 1;
+    }
+    if (trap == 0xa047) {                    // SetTrapAddress(A0, D0)
+        setTrapAddress((uint16_t)regs[0], (uint8_t*)regs[8]);
+        if (g_stageCDepth < 48) g_stageCDepth = 48;
+        return 1;
+    }
     if (trap == 0xa31e) {                    // NewPtrSysClear: D0 size -> A0 pointer
         regs[8] = (uint32_t)newPointer(regs[0], true);
         regs[0] = (uint32_t)(int32_t)s_memoryManager.error;
@@ -782,8 +1108,30 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
         uint8_t** handle = (uint8_t**)regs[8];
         int32_t index = resourceHandleIndex(handle);
         if (index >= 0) { s_resourceLocked[index] = true; s_memoryManager.error = 0; }
-        else validatePermanentHandle(handle);
+        else if (HandleAllocation* allocation = handleAllocation(handle)) {
+            allocation->locked = true; s_memoryManager.error = 0;
+        } else validatePermanentHandle(handle);
         if (g_stageCDepth < 20) g_stageCDepth = 20;
+        return 1;
+    }
+    if (trap == 0xa02a) {                    // HUnlock(Handle in A0)
+        uint8_t** handle = (uint8_t**)regs[8];
+        int32_t index = resourceHandleIndex(handle);
+        if (index >= 0) { s_resourceLocked[index] = false; s_memoryManager.error = 0; }
+        else if (HandleAllocation* allocation = handleAllocation(handle)) {
+            allocation->locked = false; s_memoryManager.error = 0;
+        } else validatePermanentHandle(handle);
+        if (g_stageCDepth < 46) g_stageCDepth = 46;
+        return 1;
+    }
+    if (trap == 0xa049) {                    // HPurge(Handle in A0)
+        uint8_t** handle = (uint8_t**)regs[8];
+        int32_t index = resourceHandleIndex(handle);
+        if (index >= 0) { s_resourcePurgeable[index] = true; s_memoryManager.error = 0; }
+        else if (HandleAllocation* allocation = handleAllocation(handle)) {
+            allocation->purgeable = true; s_memoryManager.error = 0;
+        } else validatePermanentHandle(handle);
+        if (g_stageCDepth < 51) g_stageCDepth = 51;
         return 1;
     }
     if (trap == 0xa994) {                    // CurResFile() -> refNum
@@ -806,6 +1154,48 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
         regs[8] = (uint32_t)newPointer(regs[0], true);
         regs[0] = (uint32_t)(int32_t)s_memoryManager.error;
         if (g_stageCDepth < 23) g_stageCDepth = 23;
+        return 1;
+    }
+    if (trap == 0xa51e) {                    // NewPtrSys: D0 size -> A0 pointer
+        regs[8] = (uint32_t)newPointer(regs[0], false);
+        regs[0] = (uint32_t)(int32_t)s_memoryManager.error;
+        if (g_stageCDepth < 43) g_stageCDepth = 43;
+        return 1;
+    }
+    if (trap == 0xa122) {                    // NewHandle: D0 size -> A0 handle
+        regs[8] = (uint32_t)newHandle(regs[0], false);
+        regs[0] = (uint32_t)(int32_t)s_memoryManager.error;
+        if (g_stageCDepth < 45) g_stageCDepth = 45;
+        return 1;
+    }
+    if (trap == 0xa025) {                    // GetHandleSize(Handle in A0) -> D0 size
+        regs[0] = handleSize((uint8_t**)regs[8]);
+        if (g_stageCDepth < 49) g_stageCDepth = 49;
+        return 1;
+    }
+    if (trap == 0xa9ef) {                    // PtrAndHand(A0 source, A1 handle, D0 size)
+        int16_t error = pointerAndHandle((const uint8_t*)regs[8],
+                                         (uint8_t**)regs[9], regs[0]);
+        s_memoryManager.error = error;
+        regs[0] = (uint32_t)(int32_t)error;
+        if (g_stageCDepth < 50) g_stageCDepth = 50;
+        return 1;
+    }
+    if (trap == 0xa128) {                    // RecoverHandle(pointer in A0) -> handle in A0
+        regs[8] = (uint32_t)recoverHandle((uint8_t*)regs[8]);
+        s_memoryManager.error = regs[8] ? 0 : -109;
+        if (g_stageCDepth < 41) g_stageCDepth = 41;
+        return 1;
+    }
+    if (trap == 0xa03b) {                    // Delay(ticks in A0) -> final ticks in D0
+        s_ticks += regs[8];
+        regs[0] = s_ticks;
+        if (g_stageCDepth < 42) g_stageCDepth = 42;
+        return 1;
+    }
+    if (trap == 0xa033) {                    // VInstall(VBLTaskPtr in A0) -> OSErr in D0
+        regs[0] = (uint32_t)(int32_t)installVBLTask((uint8_t*)regs[8]);
+        if (g_stageCDepth < 44) g_stageCDepth = 44;
         return 1;
     }
     if (trap == 0xaa46) {                    // GetNewCWindow(id, storage, behind) -> WindowPtr
@@ -900,9 +1290,45 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
         if (g_stageCDepth < 37) g_stageCDepth = 37;
         return 5;
     }
+    if (trap == 0xa97c) {                    // GetNewDialog(id, storage, behind) -> DialogPtr
+        uint8_t* dialog = newDialog((int16_t)read16(userStack + 8),
+                                    (uint8_t*)read32(userStack + 4),
+                                    (uint8_t*)read32(userStack));
+        write32(userStack + 10, (uint32_t)dialog);
+        if (g_stageCDepth < 38) g_stageCDepth = 38;
+        return 11;
+    }
+    if (trap == 0xa981) {                    // DrawDialog(dialog)
+        drawDialog((uint8_t*)read32(userStack));
+        if (g_stageCDepth < 39) g_stageCDepth = 39;
+        return 5;
+    }
+    if (trap == 0xab1d && regs[0] == 0) {    // QDExtensions: NewGWorld
+        uint8_t* world = newGWorld((const uint8_t*)read32(userStack + 12),
+                                   read16(userStack + 16));
+        write32((uint8_t*)read32(userStack + 18), (uint32_t)world);
+        write16(userStack + 22, world ? 0 : (uint16_t)-108);
+        if (g_stageCDepth < 40) g_stageCDepth = 40;
+        return 23;
+    }
+    if (trap == 0xab1d && regs[0] == 1) {    // QDExtensions: LockPixels
+        GWorldSlot* world = gWorldForPixMap((uint8_t**)read32(userStack));
+        if (world) world->locked = true;
+        userStack[4] = world ? 1 : 0;
+        if (g_stageCDepth < 40) g_stageCDepth = 40;
+        return 5;
+    }
+    if (trap == 0xab1d && regs[0] == 12) {   // QDExtensions: NoPurgePixels
+        GWorldSlot* world = gWorldForPixMap((uint8_t**)read32(userStack));
+        if (world) world->purgeable = false;
+        return 5;
+    }
 
     g_stageBState = 3;
     g_trapWord = trap;
+    g_trapPC = pc;
+    for (uint16_t i = 0; i < 15; ++i) g_trapRegisters[i] = regs[i];
+    g_trapUserStack = (uint32_t)userStack;
     g_trapSelector = -1;
     g_trapSegment = 0xffff;
     g_trapOffset = 0xffffffffUL;

@@ -6,11 +6,11 @@ port's execution order, which is now known to differ from the earlier MAME first
 
 ## Current checkpoint
 
-The Amiga run executes **37 distinct implemented traps** and halts loudly at:
+The Amiga run executes **50 distinct implemented traps** and halts loudly at:
 
 ```
-$A97C  DIALOG MANAGER / GETNEWDIALOG
-caller: load+$0054
+$A9A1  RESOURCE MANAGER / GETNAMEDRESOURCE
+caller: dynamically allocated code at absolute PC $003D5386
 ```
 
 The successful first-use order is:
@@ -52,9 +52,25 @@ The successful first-use order is:
 35. `TextMode`
 36. `GetCursor`
 37. `SetCursor`
+38. `GetNewDialog`
+39. `DrawDialog`
+40. `QDExtensions` (`NewGWorld`, `LockPixels`, and `NoPurgePixels` selectors now exercised)
+41. `RecoverHandle`
+42. `Delay`
+43. `NewPtrSys`
+44. `VInstall`
+45. `NewHandle`
+46. `HUnlock`
+47. `GetTrapAddress`
+48. `SetTrapAddress`
+49. `GetHandleSize`
+50. `PtrAndHand`
 
 `amiga/stage_c.gdb` breaks on the loud-stop renderer and prints the depth, trap identity,
-selector, and runtime `(segment, offset)`. The build's `muldiv-audit` and `probe-audit` are clean.
+selector, runtime `(segment, offset)`, absolute PC, USP, all data/address registers, and nearby
+instructions. The expanded report matters now that Macintosh support code copied into movable
+memory is calling traps outside the 11 resident `CODE` ranges. The build's `muldiv-audit` and
+`probe-audit` are clean.
 
 ## Page 0 is not mapped
 
@@ -80,8 +96,17 @@ mouse/key state, and repeated `GrayRgn` reads.
 The host converter packs both resource forks into the pointer-free, big-endian `VRS1` archive.
 The target Resource Manager searches the selected fork and returns real double-indirect Handles.
 Archive payloads are permanently resident: `MoveHHi` validates such a handle but needs no physical
-relocation, while `HLock` records its lock state. `OpenResFile` performs classic case-insensitive
+relocation, while `HLock`/`HUnlock` record lock state. The emulated heap now also owns real movable
+Handles: `NewHandle` creates a stable master pointer, `GetHandleSize` reports the logical payload,
+and `PtrAndHand` grows and appends while updating that master pointer. `RecoverHandle` covers both
+heap allocations and resident resource payloads. `OpenResFile` performs classic case-insensitive
 filename matching, which matters because the shipped Pascal name is `Vette!.DATA`.
+
+The copied support code also installs a `VBLTask`. `VInstall` maintains the classic linked task
+records. The callback cannot be invoked directly from Amiga's supervisor-mode VERTB ISR: a Line-A
+trap made there has a different exception/USP context from the user-mode frame expected by the
+bridge. Delivery therefore belongs at a later user-mode scheduling point, not inside the hardware
+interrupt.
 
 ## Window and palette state
 
@@ -94,6 +119,15 @@ reads its embedded `BitMap` bounds directly when centering windows.
 `GetNewPalette` loads the shipped `pltt` resource as a Handle. `SetPalette` associates it with a
 window, and `ActivatePalette` copies its 16 `RGBColor` entries into the active color table with a
 fresh seed. Cursor resources likewise remain Handles until the game dereferences and installs one.
+
+`GetNewDialog` now builds the `DialogRecord` from the shipped `DLOG`/`DITL` pair and `DrawDialog`
+validates the item stream, selects the dialog port, and paints its background. Offscreen QuickDraw
+allocates a real 4-bit `GWorld`/`PixMap` and pixel store; selectors 0, 1, and 12 are respectively
+`NewGWorld`, `LockPixels`, and `NoPurgePixels`.
+
+The trap-address table is stateful. The observed `GetTrapAddress`/`SetTrapAddress` pair now records
+the game's replacement for `$A9F4 ExitToShell`; routing a later invocation through that replacement
+remains part of completing the trap bridge.
 
 ## Correction to the MAME log
 
