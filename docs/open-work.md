@@ -36,7 +36,7 @@ the game patches exactly one trap (`_ExitToShell`), `%A5Init` calls exactly one 
    that are still open**, part (a) (`PROJECT.md` #2),
    which asks the same question about the **driving** surface — take both probes at once.
 
-## ⭐⭐ TARGET 1 — the intro screen, painted by the game's own code — the CURRENT GOAL
+## ⭐⭐ TARGET 1 — the intro screen, painted by the game's own code — COMPLETE
 
 The MAME capture proves that its first 36 logged traps suffice to paint the reference intro at
 frame 1758. Stage C's own loud-stop loop is now the implementation order and has already found
@@ -48,6 +48,13 @@ San Francisco title art with "© 1991 SPHERE, INC", produced by the game's own `
 calling our trap layer, and it matches the MAME reference capture of frame 1758 under the Stage A
 differential.
 
+⭐ **Passed:** at the first `Button` poll, all 163,840 displayed colors match the Macintosh
+frame, the game-produced chunky surface converts to the expected 81,920 planar bytes, and the next
+VBI installs those exact bytes and all 16 game-derived colors into the copper display. Reproduce
+with `amiga/stage_c_capture.gdb` followed by `tools/verify_stage_c_intro.py`. The matching source
+crop is `(64,91,512,320)`; the one-row correction is recorded in `docs/stage-c.md` while the
+separate 323-row destination-rectangle question remains queued.
+
 ⚠⚠ **Read the honesty rule before starting any of these: each stage states what it PROVES, and a
 stage that shows the right picture for the wrong reason is a failure, not a milestone.** Displaying
 a converted Mac screenshot is a display-path proof and nothing more — it must never be reported as
@@ -58,32 +65,6 @@ late Menu Manager operations, `MoveWindow`/`DisposeWindow`/`PaintBehind`, and
 `PurgeMem`/`CompactMem`. Do not defer a trap that the loud-stop loop actually reaches:
 `UnLoadSeg` and `GetGDevice` were both required during startup.
 
-4. **Stage C — the trap layer, driven by the port's loud-stop order.**
-   ⭐ **65 distinct successful-path traps execute after one diagnostic intro click; a three-minute
-   warp run continues without another loud stop.** A four-slot host `GWorld` table had falsely
-   reported `memFullErr` on the fifth of six live offscreen worlds, sending the game into error
-   dialog 700. The capacity is now eight. `GetDItem`, `SetIText`, `InsetRect`, and `FrameRoundRect`
-   remain deliberately unimplemented because they were observed only on that diagnostic error path;
-   if it regresses, the first one will stop loudly and point back to the real failure.
-   Implement first-use-first, re-running after each one; progress is countable ("N traps deep,
-   halted at *M*"). The MAME rows remain a useful floor and semantic cross-check, and the load-bearing
-   ones are `SetPort`/`ClipRect`/`PenSize`/`TextMode` (stateful QuickDraw port), `GetResource` +
-   `CurResFile`/`UseResFile`, `GetPicture`/`DrawPicture`/`CopyBits`, and `QDExtensions`
-   (`NewGWorld` + `LockPixels`, selector in **`D0`**).
-   ⭐ **`GetNextEvent` is NOT needed for the intro** — it first appears at the menu; the intro runs
-   on `Button` polling from `Intro+0224`.
-   ⚠⚠ **`SetTrapAddress` must be honoured, and it is exactly one trap:** the game patches `$A9F4
-   ExitToShell` to its own handler from `load+00B8` at frame 1617, *inside* Target 1. Route it, or
-   quitting fails in a way that looks like a crash. ⛔ No general trap-patching machinery is needed.
-   ⚠ **Honour documented Inside Macintosh semantics, not what the call appears to want** — handles
-   move, QuickDraw has a stateful current port (`CLAUDE.md`).
-5. ⚠ **Stage D — `DrawPicture`, and it is a PICT opcode interpreter, not a call to wire up.**
-   ⭐ Now sized from measurement: the intro issues **16 `DrawPicture` calls and 47 `GetPicture`s**,
-   not hundreds. Read which opcodes those specific `PICT`s use before writing any of it; a general
-   QuickDraw picture parser is far more than this port needs.
-   **Then:** the intro screen is rendered by the game's own code, and the Stage A differential says
-   whether it is right.
-
 ⚠ **Refer to an item by its TITLE, not its number.** The list is renumbered every time an entry is
 closed and deleted, so a `#N` written in another doc goes quietly wrong — three of them already had.
 
@@ -91,21 +72,21 @@ closed and deleted, so a `#N` written in another doc goes quietly wrong — thre
 
 ## Phase 0 — scaffolding (see `docs/phases.md`)
 
-6. **`src/platform/platform.h` + `Platform.cpp`** — the abstraction. ⚠ Deliberately NOT copied from
+4. **`src/platform/platform.h` + `Platform.cpp`** — the abstraction. ⚠ Deliberately NOT copied from
    either prior port: both interfaces are shaped around a 6502 memory bus and an OS-call marshalling
    ABI this port does not have. Write it from this port's own boundary, which the trap map defines.
-7. **Port the standing checks.** `docs/amiga-lessons.md` prescribes counters that "must read 0"
+5. **Port the standing checks.** `docs/amiga-lessons.md` prescribes counters that "must read 0"
    (`g_beamPresentsLate`) and probe scripts (`beam_watch.gdb`, `fill_catch.gdb`) that **do not exist
    in this repo**. A rule that names a counter is an instruction to build it.
-8. **Close the inherited silent no-op.** `BitmapAssembler.s`'s two non-interleaved arms are
+6. **Close the inherited silent no-op.** `BitmapAssembler.s`'s two non-interleaved arms are
    unimplemented and retagged `[ASSUMED]`; either assert at `Bitmap` construction that nothing builds
    a non-interleaved one, or implement them. → `src/platform/amiga/framework/UPSTREAM.md`.
-9. **One dormant link trap left in the vendored framework.** `Bitmap::patternWithMask()` pulls in
+7. **One dormant link trap left in the vendored framework.** `Bitmap::patternWithMask()` pulls in
     `__mulsi3`, so it fails the mandatory `muldiv-audit` — with a message that names `__mulsi3`
     rather than the caller. Fix it when something needs it, not speculatively. →
     `src/platform/amiga/framework/UPSTREAM.md` §Two latent link traps.
 
-10. ⚠ **The quit chord is the BARE left mouse button, not `CTRL`+LMB.** `amiga/run.sh` documents
+8. ⚠ **The quit chord is the BARE left mouse button, not `CTRL`+LMB.** `amiga/run.sh` documents
     the CTRL qualifier and explains why it exists: the Macintosh is a one-button machine, so the
     game **will** bind the bare button. Reading CTRL needs the keyboard layer, which Stage A does
     not have. ⚠⚠ **This must be fixed BEFORE the first trap that reads the mouse button**
@@ -114,35 +95,35 @@ closed and deleted, so a `#N` written in another doc goes quietly wrong — thre
 
 ## Phase 1+ — carried forward, not yet actionable
 
-11. **Write `ghidra_scripts/DumpTraps.java`.** The trap map is the abstraction boundary and there is
+9. **Write `ghidra_scripts/DumpTraps.java`.** The trap map is the abstraction boundary and there is
     no inherited script for it (Revs's `DumpHwAccesses.java` hardcodes BBC I/O ranges and was not
     carried over). → `docs/toolchain.md`.
-12. **Fill `ghidra_scripts/entrypoints.csv` from `CODE 0`.** The jump table makes the postmortem's
+10. **Fill `ghidra_scripts/entrypoints.csv` from `CODE 0`.** The jump table makes the postmortem's
     §1.1 sweep *enumerable* rather than a search — take the win.
-13. **Read the manual / the extras before the binary.** RoF's `docs/manual.md` earned its place.
+11. **Read the manual / the extras before the binary.** RoF's `docs/manual.md` earned its place.
     Present and unread: `scans/Manual.pdf` (5.2 MB), `Map.jpg`, `MapInfo_1/2.jpg`, `KeyChart.jpg`,
     `Package.pdf`, `web_docs/cheats.txt`. ⭐ `KeyChart.jpg` is the input map and `cheats.txt` may
     name states worth reaching in the reference loop.
-14. **Decode the `VETTE!.Data` record formats.** The *inventory* is done
+12. **Decode the `VETTE!.Data` record formats.** The *inventory* is done
     (`docs/source-inventory.md`); the formats are not. ⭐ Start with **`PERF`** — eight records of
     exactly 110 bytes with meaningful names (`Stock`, `ZR1`, `F40`, …), which is the cheapest
     possible place to calibrate a decode. Then `OBJS` (160 models, recurring exact sizes, and
     `QUAD`'s `Quad Discripter Data` says the renderer is quad-based) and `MAPS`. ⚠ Do this against
     the `load` segment's disassembly, not by pattern-guessing — RoF's postmortem §1.2 is about
     exactly this.
-15. **Confirm or kill the `OBJS` two-level-of-detail reading.** The `C`/`S` name pairs
+13. **Confirm or kill the `OBJS` two-level-of-detail reading.** The `C`/`S` name pairs
     (`F40C`/`F40S1`, `GenericC`/`GenericS`, `Taxi`/`TaxiS`, …) `[INFERRED]` a near/far pair per
     object. It is load-bearing for the Amiga frame budget, so it should be confirmed early rather
     than discovered during optimisation. → `docs/source-inventory.md` §OBJS.
-16. **Explain the `Communication` segment and `COMM` 0.** 9.1 KB of code in *both* builds plus a
+14. **Explain the `Communication` segment and `COMM` 0.** 9.1 KB of code in *both* builds plus a
     2 490 B resource, in a single-player driving game. Modem head-to-head is a guess. It matters
     because 9 KB of code that the port may not need at all is 10% of the whole job.
-17. **Explain `FRED`** — 6.5 KB in both builds, name says nothing. ⭐ New evidence, and it is a
+15. **Explain `FRED`** — 6.5 KB in both builds, name says nothing. ⭐ New evidence, and it is a
     strong hint: `FRED` exports **242 of the 509 jump-table entries** — 6 508 bytes across 242
     externally-callable routines is **~27 bytes each**, so `[INFERRED]` it is a library of small leaf
     routines (maths/trig/fixed-point being the obvious candidates, which would fit the table-driven
     trig already found in the data). Cheap to settle: disassemble a dozen of its entries.
-18. ⭐ **The two display questions that are still open** — the mode itself is now locked
+16. ⭐ **The two display questions that are still open** — the mode itself is now locked
     (4 bitplanes, hires interlaced; `PROJECT.md` §Decisions), so what remains is:
     **(a)** is the **in-game** surface 512 × 320 or **512 × 342**? One reference-loop probe of the
     front `WindowRecord`'s `portRect` past the garage screen. ⭐ Cheap, and do it on the next
@@ -155,7 +136,7 @@ closed and deleted, so a `#N` written in another doc goes quietly wrong — thre
     ⛔ **Do not settle that from inference** — **The trap log stops at the MENU** rerun plus a write tap over the live GWorld's
     pixel range answers it by measurement. → `docs/mac-hardware.md` question 5.
 
-19. ⭐ **Locate the copy-protection check, then patch it out.** Decision locked — patched, not
+17. ⭐ **Locate the copy-protection check, then patch it out.** Decision locked — patched, not
     reproduced (`docs/faithfulness-seam.md` §The copy protection; required for a WHDLoad release).
     Targets: `VETTE!.Data`'s `COPY 1 "Protect"` (1 991 B) for the data side, and the check itself in
     the code — `Initialize` first, `Main` second. ⚠⚠ **Read the routine before defeating it.** 1 991

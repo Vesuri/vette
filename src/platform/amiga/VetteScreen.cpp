@@ -119,11 +119,17 @@ bool VetteScreen::initialize(const uint8_t* picture, const uint16_t* palette16)
     // lands on -- so allocate explicitly and copy.
     m_chip = (uint8_t*)AllocMem(kPictureBytes, MEMF_CHIP);
     if (!m_chip) return false;
+    m_back = (uint8_t*)AllocMem(kPictureBytes, MEMF_CHIP);
+    if (!m_back) { FreeMem(m_chip, kPictureBytes); m_chip = 0; return false; }
 
     m_copper = (uint32_t*)AllocMem(VS_CL_LONGS * sizeof(uint32_t), MEMF_CHIP | MEMF_CLEAR);
-    if (!m_copper) { FreeMem(m_chip, kPictureBytes); m_chip = 0; return false; }
+    if (!m_copper) {
+        FreeMem(m_back, kPictureBytes); m_back = 0;
+        FreeMem(m_chip, kPictureBytes); m_chip = 0;
+        return false;
+    }
 
-    for (uint32_t i = 0; i < kPictureBytes; i++) m_chip[i] = picture[i];
+    for (uint32_t i = 0; i < kPictureBytes; i++) m_chip[i] = m_back[i] = picture[i];
 
     // Checksum what is IN CHIP RAM, after the copy -- that is what the display reads, and it
     // is the only form of the data that proves the whole asset path end to end.
@@ -173,6 +179,15 @@ void VetteScreen::vbiUpdate()
 {
     if (!m_copper || !m_chip) return;   // the ISR must never see a half-built screen
 
+    if (m_framePending) {
+        uint8_t* oldFront = m_chip;
+        m_chip = m_back;
+        m_back = oldFront;
+        for (uint16_t i = 0; i < 16; ++i)
+            m_copper[VS_CL_COLORS + i] = copperMove(color00 + i * 2, m_nextPalette[i]);
+        m_framePending = false;
+    }
+
     // ⭐ Which field the copper is ABOUT TO DISPLAY decides which of the two row sets the
     // bitplane pointers name: the long field shows rows 0, 2, 4, ..., the short field
     // rows 1, 3, 5, ..., so the pointers move by one kRowStride between them.
@@ -199,9 +214,61 @@ void VetteScreen::vbiUpdate()
     }
 }
 
+static uint8_t gammaToOcs(uint16_t component)
+{
+    static const uint8_t thresholds[15] = {
+        2, 10, 20, 32, 46, 61, 77, 95, 113, 133, 153, 175, 197, 220, 243
+    };
+    uint8_t value = (uint8_t)(component >> 8), result = 0;
+    while (result < 15 && value >= thresholds[result]) ++result;
+    return result;
+}
+
+bool VetteScreen::presentMacFrame(const uint8_t* chunky, const uint8_t* colorTable)
+{
+    if (!chunky || !colorTable || !m_back || m_framePending) return false;
+
+    for (uint16_t y = 0; y < kHeight; ++y) {
+        const uint8_t* source = chunky + (uint32_t)y * (kWidth / 2);
+        uint8_t* destination = m_back + (uint32_t)y * kRowStride;
+        for (uint16_t word = 0; word < kWidth / 16; ++word) {
+            uint16_t planeWords[4] = {0, 0, 0, 0};
+            for (uint16_t pixel = 0; pixel < 16; ++pixel) {
+                uint8_t packed = source[word * 8 + (pixel >> 1)];
+                uint8_t index = pixel & 1 ? (uint8_t)(packed & 15) : (uint8_t)(packed >> 4);
+                uint16_t mask = (uint16_t)(0x8000U >> pixel);
+                for (uint16_t plane = 0; plane < 4; ++plane)
+                    if (index & (1U << plane)) planeWords[plane] |= mask;
+            }
+            for (uint16_t plane = 0; plane < 4; ++plane) {
+                uint8_t* output = destination + plane * kBytesPerRow + word * 2;
+                output[0] = (uint8_t)(planeWords[plane] >> 8);
+                output[1] = (uint8_t)planeWords[plane];
+            }
+        }
+    }
+
+    uint16_t finalIndex = (uint16_t)(colorTable[6] << 8 | colorTable[7]);
+    if (finalIndex > 15) finalIndex = 15;
+    for (uint16_t i = 0; i < 16; ++i) m_nextPalette[i] = 0;
+    for (uint16_t i = 0; i <= finalIndex; ++i) {
+        const uint8_t* spec = colorTable + 8 + i * 8;
+        uint16_t index = (uint16_t)(spec[0] << 8 | spec[1]);
+        if (index >= 16) continue;
+        uint8_t red = gammaToOcs((uint16_t)(spec[2] << 8 | spec[3]));
+        uint8_t green = gammaToOcs((uint16_t)(spec[4] << 8 | spec[5]));
+        uint8_t blue = gammaToOcs((uint16_t)(spec[6] << 8 | spec[7]));
+        m_nextPalette[index] = (uint16_t)(red << 8 | green << 4 | blue);
+    }
+    m_checksum = rotXorChecksum(m_back, kPictureBytes);
+    m_framePending = true;
+    return true;
+}
+
 void VetteScreen::shutdown()
 {
     if (m_copper) { FreeMem(m_copper, VS_CL_LONGS * sizeof(uint32_t)); m_copper = 0; }
+    if (m_back)   { FreeMem(m_back, kPictureBytes); m_back = 0; }
     if (m_chip)   { FreeMem(m_chip, kPictureBytes); m_chip = 0; }
 }
 

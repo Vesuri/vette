@@ -48,6 +48,11 @@ public:
     // (CLAUDE.md).  Cheap by construction: four 32-bit stores into the copper list.
     void vbiUpdate();
 
+    // Convert a Macintosh 4-bpp chunky surface and ColorTable into the Amiga's
+    // interleaved planes.  The completed frame is swapped in by vbiUpdate(), so
+    // the copper never scans a half-converted picture.
+    bool presentMacFrame(const uint8_t* chunky, const uint8_t* colorTable);
+
     // Stage B's fail-loud surface.  It replaces the captured frame with a diagnostic
     // generated on the Amiga, so an unknown Mac trap cannot masquerade as a freeze.
     void showLoudStop(const char* manager, const char* routine, int32_t selector,
@@ -66,8 +71,11 @@ private:
 
     uint32_t* m_copper = 0;
     uint8_t*  m_chip = 0;
+    uint8_t*  m_back = 0;
     uint32_t  m_checksum = 0;
     uint16_t  m_ptrIndex = 0;      // copper-list index of the first BPLxPT move
+    uint16_t  m_nextPalette[16] = {0};
+    volatile bool m_framePending = false;
 };
 
 #endif

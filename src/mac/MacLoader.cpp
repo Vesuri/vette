@@ -100,6 +100,7 @@ static uint8_t* s_windowList;
 static uint32_t s_colorSeed = 1;
 static uint8_t** s_activePalette;
 static uint32_t s_ticks;
+static bool s_presentedGameFrame;
 
 // VBLTask is a 14-byte 68k record: qLink, qType, vblAddr, vblCount,
 // vblPhase.  Keep the caller-owned records linked exactly as the classic
@@ -1578,8 +1579,13 @@ static void activatePalette(uint8_t* window)
     if (count > 16) count = 16;
     for (uint16_t i = 0; i < count; ++i) {
         const uint8_t* color = palette + 16 + i * 16;
-        uint8_t* spec = s_windowManagerColors + 8 + i * 8;
-        write16(spec, i);
+        // All shipped palettes are 16-entry pmTolerant palettes.  The Palette
+        // Manager keeps white and black in the device's reserved end slots and
+        // allocates the remaining entries through slots 1..14.  The game's 4-bpp
+        // pixels use those physical CLUT indices, not the resource entry number.
+        uint16_t physical = count == 16 ? (i == 0 ? 0 : (i == 1 ? 15 : i - 1)) : i;
+        uint8_t* spec = s_windowManagerColors + 8 + physical * 8;
+        write16(spec, physical);
         write16(spec + 2, read16(color));
         write16(spec + 4, read16(color + 2));
         write16(spec + 6, read16(color + 4));
@@ -2223,6 +2229,9 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
         }
     }
     if (trap == 0xa974) {                    // Button() -> Boolean
+        if (!s_presentedGameFrame && s_loudStopScreen
+            && s_loudStopScreen->presentMacFrame(s_colorScreen, s_windowManagerColors))
+            s_presentedGameFrame = true;
         write16(userStack, AmigaHardware::isLeftMouseButtonPressed() ? 1 : 0);
         if (g_stageCDepth < 64) g_stageCDepth = 64;
         return 1;

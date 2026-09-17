@@ -19,6 +19,21 @@ table now has capacity for all six simultaneously live offscreen worlds. Those f
 only traps are deliberately unimplemented again, so a regression stops at `GetDItem` and exposes
 the upstream failure instead of teaching the port to render it.
 
+Target 1 now passes its pixel boundary. At the first `Button` poll, `amiga/stage_c_capture.gdb`
+captures the game-produced chunky surface, the converted chip-RAM back buffer, and the copper
+colors before and after the next VBI swap. `tools/verify_stage_c_intro.py` proves:
+
+- all **163,840 displayed pixels** match the Macintosh frame (the game's physical CLUT slot
+  numbers differ, so the comparison is by the OCS color each index selects);
+- all **81,920 planar bytes** match an independent host conversion;
+- the post-VBI front buffer is exactly that planar image; and
+- the copper contains those 16 colors in `COLOR00` through `COLOR15` order.
+
+The exact framebuffer match uses Macintosh screen crop `(64,91,512,320)`, one row above the old
+Stage A asset recipe's `(64,92,512,320)`. That settles which source rows contain the game image but
+does not by itself explain the original 323-row destination rectangle; that geometry question
+remains separately queued.
+
 The successful first-use order is:
 
 1. `BlockMove`
