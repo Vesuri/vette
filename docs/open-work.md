@@ -49,8 +49,10 @@ calling our trap layer, and it matches the MAME reference capture of frame 1758 
 differential.
 
 ⭐ **Passed:** at the first `Button` poll, all 163,840 displayed colors match the Macintosh
-frame, the game-produced chunky surface converts to the expected 81,920 planar bytes, and the next
-VBI installs those exact bytes and all 16 game-derived colors into the copper display. Reproduce
+frame, the game-produced chunky surface converts into the centred 512×384 display (32 black rows,
+81,920 bytes of image, 32 black rows), and the next VBI installs those exact bytes and all 16
+game-derived colors into the copper display. No captured framebuffer is linked into the runtime.
+Reproduce
 with `amiga/stage_c_capture.gdb` followed by `tools/verify_stage_c_intro.py`. The matching source
 crop is `(64,91,512,320)`; the one-row correction is recorded in `docs/stage-c.md` while the
 separate 323-row destination-rectangle question remains queued.

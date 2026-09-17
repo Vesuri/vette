@@ -25,14 +25,23 @@ colors before and after the next VBI swap. `tools/verify_stage_c_intro.py` prove
 
 - all **163,840 displayed pixels** match the Macintosh frame (the game's physical CLUT slot
   numbers differ, so the comparison is by the OCS color each index selects);
-- all **81,920 planar bytes** match an independent host conversion;
+- all **98,304 display bytes** match an independent host conversion: 32 black rows,
+  81,920 bytes of centred game image, then 32 black rows;
 - the post-VBI front buffer is exactly that planar image; and
 - the copper contains those 16 colors in `COLOR00` through `COLOR15` order.
 
-The exact framebuffer match uses Macintosh screen crop `(64,91,512,320)`, one row above the old
-Stage A asset recipe's `(64,92,512,320)`. That settles which source rows contain the game image but
+The exact framebuffer match uses Macintosh screen crop `(64,91,512,320)`. The production binary
+no longer embeds the old Stage A framebuffer capture: it starts with a black 512×384 display, and
+the first visible artwork is the game-produced QuickDraw surface centred vertically. That settles
+which source rows contain the game image but
 does not by itself explain the original 323-row destination rectangle; that geometry question
 remains separately queued.
+
+Animation presentation uses a bounds-only dirty rectangle. `DrawPicture`, `CopyBits`, `EraseRect`,
+and `FrameRect` union their destination bounds; C2P expands the horizontal bounds to 16 pixels and
+converts only that area. Double-buffer coherence is maintained by copying the previous frame's
+dirty planar rectangle from front to back before applying the next one. The hot path no longer
+computes a whole-frame diagnostic checksum.
 
 The successful first-use order is:
 

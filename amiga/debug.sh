@@ -9,6 +9,7 @@ cd "$(dirname "$0")"
 
 FSUAE="${FSUAE:-fs-uae}"
 GDB="${GDB:-m68k-amiga-elf-gdb}"
+MODEL="${AMIGA_MODEL:-A1200}"
 ROM="${1:-${KICKSTART:-$HOME/Documents/RetroPie/BIOS/kick31.rom}}"
 [ -f "$ROM" ] || { echo "Kickstart ROM not found: $ROM  (pass as \$1 or set \$KICKSTART)"; exit 1; }
 [ -f out/Vette.elf ] || { echo "build first: make"; exit 1; }
@@ -20,7 +21,7 @@ cp -f out/Vette.exe "$DH1/Vette"
 
 fsuae_claim_port
 "$FSUAE" \
-  --amiga_model=A500+ --chip_memory=1024 --fast_memory=8192 \
+  --amiga_model="$MODEL" --chip_memory=2048 --fast_memory=8192 \
   --kickstart_file="$ROM" \
   --hard_drive_0="$DH0" --hard_drive_1="$DH1" \
   --automatic_input_grab=0 --fullscreen=0 --window_width=720 --window_height=568 \

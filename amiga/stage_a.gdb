@@ -3,15 +3,12 @@
 #
 # ⚠⚠ FS-UAE HAS NO HEADLESS SCREENSHOT, so the port cannot be verified here the way the
 # Macintosh reference is (MAME dumps its framebuffer).  What replaces the picture is this:
-# the program records what it DID, and the numbers are checked against host-computed ones.
-# Nothing below is a self-report of intent -- the checksum is taken from chip RAM after the
-# copy, and BPLCON0 is read back off the chip.  The eyeball check through ./run.sh is still
-# required; it is what these numbers cannot cover (geometry on the glass, field parity).
+# the program records what it DID.  Production startup is deliberately black: captured
+# emulator framebuffers are not linked into the executable.  The game-rendered pixel path
+# is verified separately by stage_c_capture.gdb and verify_stage_c_intro.py.
 #
 # Run:
 #   EXTRA_ARGS="--warp_mode=1" GDBSCRIPT=stage_a.gdb ./diag_run.sh 20
-# and compare g_planeChecksum against:
-#   python3 ../tools/planes_checksum.py assets/intro.planes
 #
 # ⚠ A gdb script ABORTS THE WHOLE FILE at the first unknown symbol.  If this prints only
 # its header, suspect a renamed global (and PROBE_SYMS), not a dead probe.
@@ -33,7 +30,7 @@ continue
 printf "\n===== STAGE A =====\n"
 
 printf "screenReady   = %u        (1 = both chip allocations succeeded and the list is installed)\n", g_screenReady
-printf "planeChecksum = 0x%08X   (rotate-xor over the 81920 plane bytes IN CHIP RAM)\n", g_planeChecksum
+printf "planeChecksum = 0x%08X   (want 00000000: 98304-byte startup display is black)\n", g_planeChecksum
 printf "vbiCount      = %u        (all fields, including the OS display before the takeover)\n", g_vbiCount
 printf "laceFields    = %u        (fields since the mode registers were written)\n", g_laceFields
 printf "longFields    = %u        (...of which long)\n", g_longFields

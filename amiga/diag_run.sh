@@ -8,10 +8,8 @@ FSUAE="${FSUAE:-fs-uae}"
 GDB="${GDB:-m68k-amiga-elf-gdb}"
 ROM="${KICKSTART:-$HOME/Documents/RetroPie/BIOS/kick31.rom}"
 DELAY="${1:-14}"
-# Emulated machine.  Default A500+ (the target, + ECS Denise for BPLCON3 border-blanking).
-# $AMIGA_MODEL=A1200 re-runs the same probe on a 68020 to expose beam-timing races that a
-# faster CPU moves into the danger window.
-MODEL="${AMIGA_MODEL:-A500+}"
+# Production target: A1200, 2 MiB chip RAM and 8 MiB fast RAM.
+MODEL="${AMIGA_MODEL:-A1200}"
 # Optional extra fs-uae args, e.g. EXTRA_ARGS="--cpu=68040 --jit_compiler=1".
 EXTRA_ARGS="${EXTRA_ARGS:-}"
 
@@ -22,7 +20,7 @@ cp -f out/Vette.exe "$DH1/Vette"
 
 fsuae_claim_port
 "$FSUAE" \
-  --amiga_model="$MODEL" --chip_memory=1024 --fast_memory=8192 \
+  --amiga_model="$MODEL" --chip_memory=2048 --fast_memory=8192 \
   --kickstart_file="$ROM" \
   --hard_drive_0="$DH0" --hard_drive_1="$DH1" \
   --automatic_input_grab=0 --fullscreen=0 --window_width=720 --window_height=568 \

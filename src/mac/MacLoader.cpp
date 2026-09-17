@@ -35,6 +35,8 @@ volatile uint32_t g_resourceCount = 0;
 volatile uint16_t g_jumpEntryCount = 0;
 volatile uint16_t g_blockMoveCount = 0;
 volatile uint16_t g_stageCDepth = 1;       // _BlockMove is row 1
+volatile uint32_t g_macTicks = 0;
+volatile uint32_t* g_macTicksAddress = 0;
 char g_trapManager[24] = "";
 char g_trapRoutine[24] = "";
 }
@@ -99,8 +101,31 @@ static WindowSlot s_windows[8];
 static uint8_t* s_windowList;
 static uint32_t s_colorSeed = 1;
 static uint8_t** s_activePalette;
-static uint32_t s_ticks;
-static bool s_presentedGameFrame;
+static bool s_screenDirty = true;
+static bool s_pixelsDirty = false;
+static int16_t s_dirtyTop, s_dirtyLeft, s_dirtyBottom, s_dirtyRight;
+static uint16_t read16(const uint8_t* p);
+
+static void markDirty(const uint8_t* rectangle)
+{
+    if (!rectangle) return;
+    int16_t top = (int16_t)read16(rectangle);
+    int16_t left = (int16_t)read16(rectangle + 2);
+    int16_t bottom = (int16_t)read16(rectangle + 4);
+    int16_t right = (int16_t)read16(rectangle + 6);
+    if (top >= bottom || left >= right) return;
+    if (!s_pixelsDirty) {
+        s_dirtyTop = top; s_dirtyLeft = left;
+        s_dirtyBottom = bottom; s_dirtyRight = right;
+        s_pixelsDirty = true;
+    } else {
+        if (top < s_dirtyTop) s_dirtyTop = top;
+        if (left < s_dirtyLeft) s_dirtyLeft = left;
+        if (bottom > s_dirtyBottom) s_dirtyBottom = bottom;
+        if (right > s_dirtyRight) s_dirtyRight = right;
+    }
+    s_screenDirty = true;
+}
 
 // VBLTask is a 14-byte 68k record: qLink, qType, vblAddr, vblCount,
 // vblPhase.  Keep the caller-owned records linked exactly as the classic
@@ -318,9 +343,29 @@ static bool redirectLowMemoryGlobals(uint8_t* a5)
     write16(vette_code_1 + 0x8a8, 8);
     write16(vette_code_2 + 0x8c4, 0x206d);  // MOVEA.L 12(A5),A0: GrayRgn
     write16(vette_code_2 + 0x8c6, 12);
+
+    // Ticks ($016A) is read directly at 87 instruction sites.  Every measured
+    // encoding uses absolute-word source EA $38; d16(A5) is the same width, so
+    // redirect all of them to the next reserved application-parameter slot.
+    uint16_t tickReferences = 0;
+    for (uint16_t segment = 1; segment <= 10; ++segment) {
+        uint8_t* code = s_segments[segment].begin;
+        uint32_t size = (uint32_t)(s_segments[segment].end - code);
+        for (uint32_t offset = 2; offset + 1 < size; offset += 2) {
+            uint16_t opcode = read16(code + offset - 2);
+            if (read16(code + offset) == 0x016a && (opcode & 0x003f) == 0x0038) {
+                write16(code + offset - 2, (uint16_t)((opcode & 0xffc0) | 0x002d));
+                write16(code + offset, 16);
+                ++tickReferences;
+            }
+        }
+    }
+    if (tickReferences != 87) return false;
     write32(a5 + 4, 1);
     write32(a5 + 8, 0);
     write32(a5 + 12, 0);
+    write32(a5 + 16, g_macTicks);
+    g_macTicksAddress = (volatile uint32_t*)(a5 + 16);
     return true;
 }
 
@@ -1475,7 +1520,8 @@ static bool copyBits(const uint8_t* sourceBitmap, const uint8_t* destinationBitm
                      const uint8_t* sourceRect, const uint8_t* destinationRect,
                      uint16_t mode, const uint8_t* maskRegion)
 {
-    if (!sourceRect || !destinationRect || (mode != 0 && mode != 3) || maskRegion) return false;
+    if (!sourceRect || !destinationRect || (mode != 0 && mode != 1 && mode != 3)
+        || maskRegion) return false;
     uint8_t *sourcePixels, *destinationPixels;
     uint16_t sourceRowBytes, destinationRowBytes;
     int16_t sourceTop, sourceLeft, sourceBottom, sourceRight;
@@ -1508,26 +1554,72 @@ static bool copyBits(const uint8_t* sourceBitmap, const uint8_t* destinationBitm
             clipBottom = (int16_t)read16(clip + 6); clipRight = (int16_t)read16(clip + 8);
         }
     }
+    bool unscaled = fromRight - fromLeft == toRight - toLeft
+                 && fromBottom - fromTop == toBottom - toTop;
+
+    // The intro scrolls large, aligned rectangles inside a GWorld.  For srcCopy
+    // that is a memmove, not a scale operation: retain overlap correctness while
+    // moving packed 4-bpp rows directly.  This is the normal fast QuickDraw path
+    // and keeps the original animation from losing time inside the compatibility
+    // layer.
+    if (unscaled && mode == 0 && ((fromLeft - sourceLeft) & 1) == 0
+        && ((toLeft - destinationLeft) & 1) == 0 && (width & 1) == 0
+        && fromTop >= sourceTop && fromBottom <= sourceBottom
+        && fromLeft >= sourceLeft && fromRight <= sourceRight
+        && toTop >= destinationTop && toBottom <= destinationBottom
+        && toLeft >= destinationLeft && toRight <= destinationRight
+        && toTop >= clipTop && toBottom <= clipBottom
+        && toLeft >= clipLeft && toRight <= clipRight) {
+        uint16_t copyBytes = width >> 1;
+        int16_t first = 0, last = (int16_t)height, step = 1;
+        if (sourcePixels == destinationPixels && toTop > fromTop) {
+            first = (int16_t)(height - 1); last = -1; step = -1;
+        }
+        for (int16_t y = first; y != last; y = (int16_t)(y + step)) {
+            uint8_t* source = sourcePixels
+                + multiplyUnsigned16((uint16_t)(fromTop + y - sourceTop), sourceRowBytes)
+                + (uint16_t)(fromLeft - sourceLeft) / 2;
+            uint8_t* destination = destinationPixels
+                + multiplyUnsigned16((uint16_t)(toTop + y - destinationTop), destinationRowBytes)
+                + (uint16_t)(toLeft - destinationLeft) / 2;
+            blockMove(source, destination, copyBytes);
+        }
+        return true;
+    }
     uint32_t temporaryBytes = multiplyUnsigned16(width, height);
     uint8_t* temporary = (uint8_t*)AllocMem(temporaryBytes, 0);
     if (!temporary) return false;
     for (uint16_t y = 0; y < height; ++y) {
         uint8_t* temporaryRow = temporary + multiplyUnsigned16(y, width);
-        int16_t sourceY = (int16_t)(fromTop + multiplyDivide(
-            y, (uint16_t)(fromBottom - fromTop), height));
-        for (uint16_t x = 0; x < width; ++x) {
-            int16_t sourceX = (int16_t)(fromLeft + multiplyDivide(
-                x, (uint16_t)(fromRight - fromLeft), width));
-            uint8_t value = 0;
-            if (sourceY >= sourceTop && sourceY < sourceBottom
-                && sourceX >= sourceLeft && sourceX < sourceRight) {
-                const uint8_t* row = sourcePixels
-                    + multiplyUnsigned16((uint16_t)(sourceY - sourceTop), sourceRowBytes);
-                uint16_t column = (uint16_t)(sourceX - sourceLeft);
-                uint8_t byte = row[column >> 1];
-                value = column & 1 ? (uint8_t)(byte & 0x0f) : (uint8_t)(byte >> 4);
+        int16_t sourceY = unscaled ? (int16_t)(fromTop + y)
+            : (int16_t)(fromTop + multiplyDivide(
+                y, (uint16_t)(fromBottom - fromTop), height));
+        const uint8_t* row = sourceY >= sourceTop && sourceY < sourceBottom
+            ? sourcePixels + multiplyUnsigned16((uint16_t)(sourceY - sourceTop), sourceRowBytes)
+            : 0;
+        if (unscaled) {
+            for (uint16_t x = 0; x < width; ++x) {
+                int16_t sourceX = (int16_t)(fromLeft + x);
+                uint8_t value = 0;
+                if (row && sourceX >= sourceLeft && sourceX < sourceRight) {
+                    uint16_t column = (uint16_t)(sourceX - sourceLeft);
+                    uint8_t byte = row[column >> 1];
+                    value = column & 1 ? (uint8_t)(byte & 0x0f) : (uint8_t)(byte >> 4);
+                }
+                temporaryRow[x] = value;
             }
-            temporaryRow[x] = value;
+        } else {
+            for (uint16_t x = 0; x < width; ++x) {
+                int16_t sourceX = (int16_t)(fromLeft + multiplyDivide(
+                    x, (uint16_t)(fromRight - fromLeft), width));
+                uint8_t value = 0;
+                if (row && sourceX >= sourceLeft && sourceX < sourceRight) {
+                    uint16_t column = (uint16_t)(sourceX - sourceLeft);
+                    uint8_t byte = row[column >> 1];
+                    value = column & 1 ? (uint8_t)(byte & 0x0f) : (uint8_t)(byte >> 4);
+                }
+                temporaryRow[x] = value;
+            }
         }
     }
     for (uint16_t y = 0; y < height; ++y) {
@@ -1544,10 +1636,13 @@ static bool copyBits(const uint8_t* sourceBitmap, const uint8_t* destinationBitm
             uint8_t value = temporaryRow[x];
             uint16_t column = (uint16_t)(destinationX - destinationLeft);
             uint8_t& byte = row[column >> 1];
-            if (mode == 3) {                 // srcBic: destination AND NOT source
+            if (mode != 0) {
                 uint8_t destinationValue = column & 1 ? (uint8_t)(byte & 0x0f)
                                                        : (uint8_t)(byte >> 4);
-                value = (uint8_t)(destinationValue & (uint8_t)(~value & 0x0f));
+                if (mode == 1)               // srcOr: destination OR source
+                    value = (uint8_t)(destinationValue | value);
+                else                         // srcBic: destination AND NOT source
+                    value = (uint8_t)(destinationValue & (uint8_t)(~value & 0x0f));
             }
             if (column & 1) byte = (uint8_t)((byte & 0xf0) | value);
             else byte = (uint8_t)((byte & 0x0f) | (value << 4));
@@ -2107,8 +2202,9 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
         return 1;
     }
     if (trap == 0xa03b) {                    // Delay(ticks in A0) -> final ticks in D0
-        s_ticks += regs[8];
-        regs[0] = s_ticks;
+        uint32_t target = g_macTicks + regs[8];
+        while ((int32_t)(g_macTicks - target) < 0) { }
+        regs[0] = g_macTicks;
         if (g_stageCDepth < 42) g_stageCDepth = 42;
         return 1;
     }
@@ -2169,6 +2265,7 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
     }
     if (trap == 0xaa94) {                    // ActivatePalette(window)
         activatePalette((uint8_t*)read32(userStack));
+        s_screenDirty = true;
         if (g_stageCDepth < 30) g_stageCDepth = 30;
         return 5;
     }
@@ -2229,21 +2326,30 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
         }
     }
     if (trap == 0xa974) {                    // Button() -> Boolean
-        if (!s_presentedGameFrame && s_loudStopScreen
-            && s_loudStopScreen->presentMacFrame(s_colorScreen, s_windowManagerColors))
-            s_presentedGameFrame = true;
+        if (s_screenDirty && s_loudStopScreen
+            && s_loudStopScreen->presentMacFrame(
+                s_colorScreen, s_windowManagerColors,
+                s_pixelsDirty ? s_dirtyTop : 0, s_pixelsDirty ? s_dirtyLeft : 0,
+                s_pixelsDirty ? s_dirtyBottom : 0, s_pixelsDirty ? s_dirtyRight : 0)) {
+            s_screenDirty = false;
+            s_pixelsDirty = false;
+        }
         write16(userStack, AmigaHardware::isLeftMouseButtonPressed() ? 1 : 0);
         if (g_stageCDepth < 64) g_stageCDepth = 64;
         return 1;
     }
     if (trap == 0xa8a1) {                    // FrameRect(rectangle)
-        if (frameRect((const uint8_t*)read32(userStack))) {
+        const uint8_t* rectangle = (const uint8_t*)read32(userStack);
+        if (frameRect(rectangle)) {
+            markDirty(rectangle);
             if (g_stageCDepth < 60) g_stageCDepth = 60;
             return 5;
         }
     }
     if (trap == 0xa8a3) {                    // EraseRect(rectangle)
-        if (eraseRect((const uint8_t*)read32(userStack))) {
+        const uint8_t* rectangle = (const uint8_t*)read32(userStack);
+        if (eraseRect(rectangle)) {
+            markDirty(rectangle);
             if (g_stageCDepth < 62) g_stageCDepth = 62;
             return 5;
         }
@@ -2261,18 +2367,22 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
         return 3;
     }
     if (trap == 0xa8f6) {                    // DrawPicture(PicHandle, destination Rect)
+        const uint8_t* rectangle = (const uint8_t*)read32(userStack);
         if (drawPicture((uint8_t**)read32(userStack + 4),
-                        (const uint8_t*)read32(userStack))) {
+                        rectangle)) {
+            markDirty(rectangle);
             if (g_stageCDepth < 57) g_stageCDepth = 57;
             return 9;
         }
     }
     if (trap == 0xa8ec) {                    // CopyBits(src, dst, srcRect, dstRect, mode, mask)
+        const uint8_t* destinationRect = (const uint8_t*)read32(userStack + 6);
         if (copyBits((const uint8_t*)read32(userStack + 18),
                      (const uint8_t*)read32(userStack + 14),
                      (const uint8_t*)read32(userStack + 10),
-                     (const uint8_t*)read32(userStack + 6), read16(userStack + 4),
+                     destinationRect, read16(userStack + 4),
                      (const uint8_t*)read32(userStack))) {
+            markDirty(destinationRect);
             if (g_stageCDepth < 61) g_stageCDepth = 61;
             return 23;
         }

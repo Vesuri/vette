@@ -26,11 +26,6 @@
 
 extern struct GfxBase* GfxBase;         // opened below; the global lives in GCCRuntime.cpp
 
-// The embedded Target 1 frame (incbin.s).
-extern "C" uint8_t vette_intro_planes[];
-extern "C" uint8_t vette_intro_planes_end[];
-extern "C" uint8_t vette_intro_palette[];
-
 // ---------------------------------------------------------------------------
 // ⚠⚠ EVERY GLOBAL A COMMITTED .gdb SCRIPT READS MUST BE IN amiga/Makefile's PROBE_SYMS.
 // -Wl,--gc-sections drops an unreferenced counter, and gdb then resolves the name into
@@ -46,6 +41,8 @@ volatile uint16_t g_screenReady   = 0;   // 0 = allocation failed, 1 = displayin
 volatile uint16_t g_laceFields    = 0;   // fields SINCE the display came up (the denominator)
 volatile uint16_t g_longFields    = 0;   // ...of which long; ~half if LACE took
 volatile uint16_t g_lofSamples[8];       // those fields' raw VPOSR, for the parity check
+extern volatile uint32_t g_macTicks;
+extern volatile uint32_t* g_macTicksAddress;
 }
 
 /* ⚠⚠ THE FIELD-PARITY RATIO HAS TO BE MEASURED FROM WHEN THE MODE IS SET, NOT FROM BOOT,
@@ -74,6 +71,7 @@ static struct Interrupt s_vbiServer;
 static struct IntVector s_savedVertb;
 static bool     s_vertbTaken  = false;
 static uint16_t s_savedIntena = 0;
+static uint16_t s_macTickRemainder = 0;
 
 // exec puts IntVects[] at ExecBase+84, so VERTB (bit 5) is ExecBase+144 -- exactly the
 // offset Kickstart's level-3 autovector stub dispatches through.  If this stops compiling,
@@ -99,6 +97,13 @@ static uint32_t vbiHandler()
     // LOF set, a working interlaced one alternates it, and a bad ADDRESS reads 0xFFFF.
     uint16_t vp = *vposrPointer;
     g_vbiCount++;
+
+    // Macintosh Ticks advances at ~60 Hz; PAL VERTB is 50 Hz.  Four fields add
+    // one tick and every fifth adds two, preserving real-time animation speed.
+    uint16_t tickDelta = 1;
+    if (++s_macTickRemainder == 5) { s_macTickRemainder = 0; tickDelta = 2; }
+    g_macTicks += tickDelta;
+    if (g_macTicksAddress) *g_macTicksAddress = g_macTicks;
 
     if (s_screen) {                    // non-null only once the mode registers are set
         if (g_laceFields < 8) g_lofSamples[g_laceFields] = vp;
@@ -159,7 +164,10 @@ bool PlatformAmiga::run()
     }
 
     // --- bring the screen up -------------------------------------------------
-    bool ok = screen.initialize(vette_intro_planes, (const uint16_t*)vette_intro_palette);
+    // Start black.  No captured Macintosh framebuffer is embedded or displayed:
+    // every non-black pixel seen from here on comes from the original Mac code
+    // drawing into its emulated QuickDraw surface and our planar conversion of it.
+    bool ok = screen.initialize(0, 0);
     g_screenReady   = ok ? 1 : 0;
     g_planeChecksum = ok ? screen.pictureChecksum() : 0;
 

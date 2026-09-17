@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# Run the Amiga Vette build in FS-UAE as an ECS A500+ (ECS Denise needed for
-# BPLCON3 border-blanking; OCS A500 ignores it).
+# Run the Amiga Vette build in FS-UAE as the target A1200 configuration.
 #   ./run.sh [path-to-kickstart-rom]
 # Use KS 3.1 (auto-boots directory HDs). CTRL + left mouse button quits.
 # ⚠ CTRL-qualified on purpose: whatever this port binds the bare mouse button to (the Mac
@@ -19,10 +18,9 @@ FSUAE="${FSUAE:-fs-uae}"
 ROM="${1:-${KICKSTART:-$HOME/Documents/RetroPie/BIOS/kick31.rom}}"
 [ -f "$ROM" ] || { echo "Kickstart ROM not found: $ROM  (pass as \$1 or set \$KICKSTART)"; exit 1; }
 EXE="${VETTE_EXE:-out/Vette.exe}"
-# Emulated machine: A500+ by default (the target; ECS Denise for BPLCON3 border-blanking).
-# `AMIGA_MODEL=A1200 ./run.sh` checks the port on a faster CPU — beam-timing races that the
-# slow A500 happens to land safely show up there.
-MODEL="${AMIGA_MODEL:-A500+}"
+# Production target: A1200, 2 MiB chip RAM and 8 MiB fast RAM.  AMIGA_MODEL
+# remains overridable for compatibility checks on slower machines.
+MODEL="${AMIGA_MODEL:-A1200}"
 [ -f "$EXE" ] || { echo "not found: $EXE  (build first: make, or set \$VETTE_EXE)"; exit 1; }
 
 RUN=.run; DH0="$RUN/dh0"; DH1="$RUN/dh1"
@@ -49,7 +47,7 @@ fsuae_stop_previous
 fsuae_track_self
 exec "$FSUAE" \
   --amiga_model="$MODEL" \
-  --chip_memory=1024 --fast_memory=8192 \
+  --chip_memory=2048 --fast_memory=8192 \
   --kickstart_file="$ROM" \
   --hard_drive_0="$DH0" --hard_drive_1="$DH1" \
   --joystick_port_0=none --joystick_port_1=none \

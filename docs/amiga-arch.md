@@ -58,16 +58,16 @@ dangerous kind — all three are now **fixed in the vendored framework** rather 
 ⚠ A fourth, found while fixing the third: **DIWHIGH must be computed and written, never inherited.**
 On ECS/AGA it carries the ninth horizontal and upper vertical bits of *both* corners and overrides
 the old rules (DIWSTOP H8 forced to 1, V8 the complement of V7) — and once anything has written it,
-it stays written.  Kickstart's own copper list writes `$2100`, whose VSTOP high bit belongs to a
-different window, so a takeover that writes only DIWSTRT/DIWSTOP can leave the display window open
-to the bottom of the frame.  `VetteScreen` now writes `$2000`, derived from its own corners.
+it stays written.  Kickstart's own copper list writes `$2100`, but a takeover must still derive
+that value rather than inherit it. `VetteScreen` now also writes `$2100`, derived from its 512×384
+corners.
 ⚠ The **AGA** DDF branch is left exactly as inherited and is `[ASSUMED]`: FMODE 3 fetches four
 words per access, the documented OCS formulas do not apply, and nothing here exercises it.
 
 **Who owns the registers:** still `src/platform/amiga/VetteScreen.cpp`, the **single owner** of
 BPLCON0-3, FMODE, DIWSTRT/DIWSTOP/DIWHIGH, DDFSTRT/DDFSTOP and BPL1MOD/BPL2MOD.  Two reasons
-survive the fix — its values come from the [MEASURED] 512×320 Macintosh window rather than from a
-`centerY` magic number, and this port pins FMODE to 0 so an AGA machine fetches like an A500, which
+survive the fix — it centres the [MEASURED] 512×320 Macintosh surface inside the chosen 512×384
+Amiga display, and this port pins FMODE to 0 so an AGA machine fetches like an A500, which
 the framework's AGA branch deliberately does not.  ⭐ But the two derivations are no longer
 independent: `VetteScreen.cpp` `static_assert`s its constants **against the framework's formulas**,
 so a future change to either one fails the build instead of moving the picture sideways on the glass.

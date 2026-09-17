@@ -13,20 +13,50 @@
 #include "framework/CopperList.h"   /* copperMove() -- the list entries, nothing else */
 #include "VetteScreen.h"
 
+extern "C" {
+volatile uint16_t g_macFramesQueued = 0;
+volatile uint16_t g_macFramesPresented = 0;
+}
+
+// Four Macintosh chunky bytes describe eight pixels.  Each table entry places
+// one such pixel pair into the correct two bit positions of four packed Amiga
+// plane bytes, so four lookups and ORs perform the complete 8-pixel transpose.
+// Building this once costs 4 KiB of fast RAM and removes the per-pixel/per-plane
+// inner loop that was too slow to keep up with the intro on a 68000.
+static uint32_t s_pairToPlanes[4][256];
+static bool s_pairToPlanesReady = false;
+
+static void initializePairToPlanes()
+{
+    if (s_pairToPlanesReady) return;
+    for (uint16_t position = 0; position < 4; ++position) {
+        uint16_t shift = (uint16_t)(6 - position * 2);
+        for (uint16_t value = 0; value < 256; ++value) {
+            uint16_t highPixel = value >> 4;
+            uint16_t lowPixel = value & 15;
+            uint32_t packed = 0;
+            for (uint16_t plane = 0; plane < 4; ++plane) {
+                uint32_t pair = ((highPixel >> plane) & 1) << 1;
+                pair |= (lowPixel >> plane) & 1;
+                packed |= pair << (24 - plane * 8 + shift);
+            }
+            s_pairToPlanes[position][value] = packed;
+        }
+    }
+    s_pairToPlanesReady = true;
+}
+
 /* ---------------------------------------------------------------------------
  * The mode, DERIVED — every value below comes from the two facts above it.
  *
- * [MEASURED] the Macintosh shows the game in a 512x320 window (docs/mac-hardware.md).
- * ⭐⭐ [DECISION, PROJECT.md] the Amiga reproduces it as 4 bitplanes, hires INTERLACED:
- * hires because 512 px does not fit a 320-px lores line, interlaced because 320 rows do
- * not fit a 256-line PAL field.  So one PAL field carries HALF the picture -- 160 lines --
- * and the two fields differ only in which rows they point at.
+ * [MEASURED] the Macintosh game surface is 512x320 (docs/mac-hardware.md).  The Amiga
+ * display is 512x384 with that surface centred between 32-line black bars.  It is four
+ * bitplanes, hires INTERLACED, so each PAL field carries 192 of the 384 display rows.
  *
  * Horizontal.  The standard 320-lores window is [129, 449); ours is 512 hires = 256 lores
  * wide, centred in it: HSTART = 129 + (320-256)/2 = 161 = 0xA1, HSTOP = 161 + 256 = 417,
  * and DIWSTOP's H field drops bit 8 (the hardware forces it), so 417 -> 0xA1 as well.
- * Vertical.  160 field lines centred on the standard 256-line window [44, 300): VSTART =
- * 92 = 0x5C, VSTOP = 252 = 0xFC.  (VSTOP >= 0x80 so the hardware does NOT add 256.)
+ * Vertical.  192 field lines centred at line 172: VSTART=76=$4C, VSTOP=268=$10C.
  *
  * ⚠ DDF IS NOT THE SAME FORMULA IN HIRES.  DDFSTRT = (HSTART - 9) / 2 holds for both, but
  * the fetch step is 4 colour clocks per word in hires and 8 in lores, so
@@ -35,8 +65,8 @@
  * AmigaHardware::setPlayfield() used the LORES step for hires; that is fixed, and the
  * VS_* constants below are static_asserted against its formulas so the two cannot drift.
  */
-#define VS_DIWSTRT  0x5CA1
-#define VS_DIWSTOP  0xFCA1
+#define VS_DIWSTRT  0x4CA1
+#define VS_DIWSTOP  0x0CA1
 #define VS_DDFSTRT  0x004C          /* (161 - 9) / 2                            */
 #define VS_DDFSTOP  0x00C4          /* 0x4C + 4 * (32 - 2)                      */
 #define VS_WORDS    (VetteScreen::kWidth / 16)                    /* 32         */
@@ -49,8 +79,8 @@
  * DIWSTRT/DIWSTOP inherits a stale VSTOP high bit and the window stays open to the bottom
  * of the frame.  Ours: HSTOP 417 has H8 set (0x2000); VSTOP 252, HSTART 161 and VSTART 92
  * all fit in their low bits.  On plain OCS the register does not exist and this is a no-op,
- * where the hardware's own V8 = ~V7 rule gives the same window. */
-#define VS_DIWHIGH  0x2000
+ * where this 384-line window requires ECS/AGA. */
+#define VS_DIWHIGH  0x2100
 
 /* BPLCON0: HIRES | 4 planes | COLOR | LACE | ECSENA.
  * ⚠⚠ THE LACE BIT (0x0004) IS THE ONE THE FRAMEWORK DROPS.  Without it the display shows
@@ -78,7 +108,8 @@ static_assert(VS_DDFSTOP == VS_DDFSTRT + 4 * (VS_WORDS - 2), "hires DDF window i
 #define VS_VSTART       (VS_CENTER_Y - VS_FIELD_LINES / 2)
 #define VS_VSTOP        (VS_CENTER_Y + VS_FIELD_LINES / 2)
 static_assert(VS_DIWSTRT == ((VS_VSTART << 8) | (VS_HSTART & 0xff)), "DIWSTRT != the framework's");
-static_assert(VS_DIWSTOP == ((VS_VSTOP  << 8) | (VS_HSTOP  & 0xff)), "DIWSTOP != the framework's");
+static_assert(VS_DIWSTOP == (((VS_VSTOP & 0xff) << 8) | (VS_HSTOP & 0xff)),
+              "DIWSTOP != the framework's");
 static_assert(VS_DDFSTRT == ((VS_HSTART - 9) / 2), "DDFSTRT != the framework's hires formula");
 static_assert(VS_DIWHIGH == ((((VS_HSTOP & 0x100) ? 0x2000 : 0) | (((VS_VSTOP >> 8) & 7) << 8)
                               | ((VS_HSTART & 0x100) ? 0x20 : 0) | ((VS_VSTART >> 8) & 7))),
@@ -113,6 +144,7 @@ static uint32_t rotXorChecksum(const uint8_t* p, uint32_t n)
 
 bool VetteScreen::initialize(const uint8_t* picture, const uint16_t* palette16)
 {
+    initializePairToPlanes();
     // ⚠ The picture MUST live in chip RAM: FS-UAE runs this port with --fast_memory=8192, so
     // a linked-in blob lands in fast RAM, which the display DMA cannot reach.  The failure is
     // not a crash -- the copper happily fetches whatever chip address the truncated pointer
@@ -129,7 +161,8 @@ bool VetteScreen::initialize(const uint8_t* picture, const uint16_t* palette16)
         return false;
     }
 
-    for (uint32_t i = 0; i < kPictureBytes; i++) m_chip[i] = m_back[i] = picture[i];
+    for (uint32_t i = 0; i < kPictureBytes; i++)
+        m_chip[i] = m_back[i] = picture ? picture[i] : 0;
 
     // Checksum what is IN CHIP RAM, after the copy -- that is what the display reads, and it
     // is the only form of the data that proves the whole asset path end to end.
@@ -141,7 +174,8 @@ bool VetteScreen::initialize(const uint8_t* picture, const uint16_t* palette16)
         m_copper[VS_CL_PTRS + k * 2 + 1] = copperMove(bpl1ptl + k * 4, 0);
     }
     for (uint16_t i = 0; i < 16; i++)
-        m_copper[VS_CL_COLORS + i] = copperMove(color00 + i * 2, palette16[i]);
+        m_copper[VS_CL_COLORS + i] = copperMove(color00 + i * 2,
+                                                palette16 ? palette16[i] : 0);
     m_copper[VS_CL_END] = 0xfffffffe;
 
     // Fill in a valid set of bitplane pointers for whichever field is next, before anything
@@ -186,6 +220,7 @@ void VetteScreen::vbiUpdate()
         for (uint16_t i = 0; i < 16; ++i)
             m_copper[VS_CL_COLORS + i] = copperMove(color00 + i * 2, m_nextPalette[i]);
         m_framePending = false;
+        ++g_macFramesPresented;
     }
 
     // ⭐ Which field the copper is ABOUT TO DISPLAY decides which of the two row sets the
@@ -224,28 +259,63 @@ static uint8_t gammaToOcs(uint16_t component)
     return result;
 }
 
-bool VetteScreen::presentMacFrame(const uint8_t* chunky, const uint8_t* colorTable)
+bool VetteScreen::presentMacFrame(const uint8_t* chunky, const uint8_t* colorTable,
+                                  int16_t dirtyTop, int16_t dirtyLeft,
+                                  int16_t dirtyBottom, int16_t dirtyRight)
 {
     if (!chunky || !colorTable || !m_back || m_framePending) return false;
 
-    for (uint16_t y = 0; y < kHeight; ++y) {
-        const uint8_t* source = chunky + (uint32_t)y * (kWidth / 2);
-        uint8_t* destination = m_back + (uint32_t)y * kRowStride;
-        for (uint16_t word = 0; word < kWidth / 16; ++word) {
-            uint16_t planeWords[4] = {0, 0, 0, 0};
-            for (uint16_t pixel = 0; pixel < 16; ++pixel) {
-                uint8_t packed = source[word * 8 + (pixel >> 1)];
-                uint8_t index = pixel & 1 ? (uint8_t)(packed & 15) : (uint8_t)(packed >> 4);
-                uint16_t mask = (uint16_t)(0x8000U >> pixel);
-                for (uint16_t plane = 0; plane < 4; ++plane)
-                    if (index & (1U << plane)) planeWords[plane] |= mask;
-            }
-            for (uint16_t plane = 0; plane < 4; ++plane) {
-                uint8_t* output = destination + plane * kBytesPerRow + word * 2;
-                output[0] = (uint8_t)(planeWords[plane] >> 8);
-                output[1] = (uint8_t)planeWords[plane];
+    // After the previous swap m_back is the frame from two updates ago.  Bring
+    // forward only the rectangle that changed in the last frame, then apply the
+    // new dirty rectangle.  Both buffers therefore remain coherent without a
+    // full-screen chip-RAM copy.
+    if (m_syncPending) {
+        uint16_t byteLeft = (uint16_t)m_syncLeft / 8;
+        uint16_t byteRight = (uint16_t)m_syncRight / 8;
+        for (int16_t y = m_syncTop; y < m_syncBottom; ++y) {
+            uint32_t row = (uint32_t)(y + kMacTop) * kRowStride;
+            for (uint16_t plane = 0; plane < kPlanes; ++plane) {
+                uint32_t offset = row + (uint32_t)plane * kBytesPerRow + byteLeft;
+                for (uint16_t x = byteLeft; x < byteRight; ++x, ++offset)
+                    m_back[offset] = m_chip[offset];
             }
         }
+        m_syncPending = false;
+    }
+
+    if (dirtyTop < 0) dirtyTop = 0;
+    if (dirtyLeft < 0) dirtyLeft = 0;
+    if (dirtyBottom > (int16_t)kMacHeight) dirtyBottom = kMacHeight;
+    if (dirtyRight > (int16_t)kWidth) dirtyRight = kWidth;
+    dirtyLeft &= (int16_t)~15;
+    dirtyRight = (int16_t)((dirtyRight + 15) & ~15);
+    bool pixelsDirty = dirtyTop < dirtyBottom && dirtyLeft < dirtyRight;
+    if (pixelsDirty) {
+        uint16_t firstWord = (uint16_t)dirtyLeft / 16;
+        uint16_t finalWord = (uint16_t)dirtyRight / 16;
+        for (int16_t y = dirtyTop; y < dirtyBottom; ++y) {
+            const uint8_t* source = chunky + (uint32_t)y * (kWidth / 2)
+                                  + (uint16_t)dirtyLeft / 2;
+            uint8_t* destination = m_back + (uint32_t)(y + kMacTop) * kRowStride;
+            for (uint16_t word = firstWord; word < finalWord; ++word, source += 8) {
+            uint32_t first = s_pairToPlanes[0][source[0]] | s_pairToPlanes[1][source[1]]
+                           | s_pairToPlanes[2][source[2]] | s_pairToPlanes[3][source[3]];
+            uint32_t second = s_pairToPlanes[0][source[4]] | s_pairToPlanes[1][source[5]]
+                            | s_pairToPlanes[2][source[6]] | s_pairToPlanes[3][source[7]];
+            uint16_t column = word * 2;
+            destination[column] = (uint8_t)(first >> 24);
+            destination[column + 1] = (uint8_t)(second >> 24);
+            destination[kBytesPerRow + column] = (uint8_t)(first >> 16);
+            destination[kBytesPerRow + column + 1] = (uint8_t)(second >> 16);
+            destination[kBytesPerRow * 2 + column] = (uint8_t)(first >> 8);
+            destination[kBytesPerRow * 2 + column + 1] = (uint8_t)(second >> 8);
+            destination[kBytesPerRow * 3 + column] = (uint8_t)first;
+            destination[kBytesPerRow * 3 + column + 1] = (uint8_t)second;
+            }
+        }
+        m_syncTop = dirtyTop; m_syncLeft = dirtyLeft;
+        m_syncBottom = dirtyBottom; m_syncRight = dirtyRight;
+        m_syncPending = true;
     }
 
     uint16_t finalIndex = (uint16_t)(colorTable[6] << 8 | colorTable[7]);
@@ -260,7 +330,7 @@ bool VetteScreen::presentMacFrame(const uint8_t* chunky, const uint8_t* colorTab
         uint8_t blue = gammaToOcs((uint16_t)(spec[6] << 8 | spec[7]));
         m_nextPalette[index] = (uint16_t)(red << 8 | green << 4 | blue);
     }
-    m_checksum = rotXorChecksum(m_back, kPictureBytes);
+    ++g_macFramesQueued;
     m_framePending = true;
     return true;
 }

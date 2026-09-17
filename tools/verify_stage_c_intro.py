@@ -21,7 +21,8 @@ palette_bytes = (TMP / "amiga_intro.palette").read_bytes()
 reference_palette_bytes = (ROOT / "amiga/assets/intro.palbin").read_bytes()
 copper = (TMP / "amiga_intro.copper_colors").read_bytes()
 
-assert len(live) == len(reference) == len(planes) == len(front) == 81920
+assert len(live) == len(reference) == 81920
+assert len(planes) == len(front) == 98304
 assert len(palette_bytes) == len(reference_palette_bytes) == 32
 assert len(copper) == 64
 
@@ -33,6 +34,8 @@ color_differences = sum(live_palette[a] != reference_palette[b]
                         for a, b in zip(live_pixels, reference_pixels))
 
 expected_planes = bytearray()
+blank_row = bytes(256)
+expected_planes += blank_row * 32
 for y in range(320):
     row = live_pixels[y * 512:(y + 1) * 512]
     for plane in range(4):
@@ -41,6 +44,7 @@ for y in range(320):
             for x in range(16):
                 value |= ((row[word * 16 + x] >> plane) & 1) << (15 - x)
             expected_planes += value.to_bytes(2, "big")
+expected_planes += blank_row * 32
 
 copper_words = [int.from_bytes(copper[i:i + 4], "big") for i in range(0, 64, 4)]
 copper_palette = b"".join((word & 0xffff).to_bytes(2, "big") for word in copper_words)

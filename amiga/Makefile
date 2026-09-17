@@ -196,6 +196,8 @@ PROBE_SYMS = g_vbiCount g_planeChecksum g_screenReady g_laceFields g_longFields 
              g_trapPC g_trapRegisters g_trapUserStack g_resourceCount g_jumpEntryCount \
              g_blockMoveCount g_trapManager g_trapRoutine
 PROBE_SYMS += g_stageCDepth
+PROBE_SYMS += g_macTicks
+PROBE_SYMS += g_macFramesQueued g_macFramesPresented
 ifdef PROBES
 PROBE_SYMS +=
 endif
@@ -276,8 +278,6 @@ obj/%.o : $(AMIGA_SRC)/%.s
 # ⚠ .incbin dependencies are INVISIBLE to `gcc -MMD`, so list them explicitly here as they
 # appear.  Without it, regenerating an embedded blob leaves a stale copy in the binary while the
 # on-disk file looks correct.  Paths are relative to this amiga/ directory.
-# Stage A: Target 1's captured Macintosh frame.  ⚠ NOT COMMITTED (derived from the game);
-# incbin.s carries the regeneration command.
 CODE_DEPS := \
     ../tmp/seg_color/CODE_00.bin \
     ../tmp/seg_color/CODE_01_Main.bin \
@@ -293,7 +293,7 @@ CODE_DEPS := \
 APP_RSRC := ../tmp/rsrc_VETTE!_VETTE!_Folder_Folder_Color_VETTE!_Color_VETTE!.rsrc
 DATA_RSRC := ../tmp/rsrc_VETTE!_VETTE!_Folder_Folder_Color_VETTE!_VETTE!.Data.rsrc
 RESOURCE_ARCHIVE := assets/vette.resources
-INCBIN_DEPS := assets/intro.planes assets/intro.palbin $(CODE_DEPS) $(RESOURCE_ARCHIVE)
+INCBIN_DEPS := $(CODE_DEPS) $(RESOURCE_ARCHIVE)
 
 $(RESOURCE_ARCHIVE): ../tools/rsrc_pack.py $(APP_RSRC) $(DATA_RSRC)
 	$(info PACK $@)

@@ -52,9 +52,9 @@ make clean && make -j4 PROBES=1
   **Verify anything you would have poked with a build flag instead** — put the stimulus in the
   binary, where it demonstrably runs.  (Both prior ports grew a "boot straight to the interesting
   screen" flag for exactly this; this port will want one too.)
-- **A faster CPU exposes beam-timing races**: `AMIGA_MODEL=A1200`,
-  `EXTRA_ARGS=--cpu=68040`.  See `docs/amiga-lessons.md` §SPRxPT — A1200 alone was not enough
-  there; the 68040 is what made the violation fire.
+- The default emulated production target is an A1200 with 2 MiB chip RAM and 8 MiB fast RAM.
+  `AMIGA_MODEL=A500+` remains useful as a slower compatibility stress test; an explicit
+  `EXTRA_ARGS=--cpu=68040` is useful for exposing beam-timing races.
 
 ## ⚠ The stale-build trap
 

@@ -30,14 +30,17 @@ class VetteScreen {
 public:
     // The Macintosh surface the port has to reproduce, [MEASURED] (docs/mac-hardware.md).
     static const uint16_t kWidth  = 512;
-    static const uint16_t kHeight = 320;
+    static const uint16_t kHeight = 384;
+    static const uint16_t kMacHeight = 320;
+    static const uint16_t kMacTop = (kHeight - kMacHeight) / 2;
     static const uint16_t kPlanes = 4;
     static const uint16_t kBytesPerRow = kWidth / 8;                 // 64
     static const uint16_t kRowStride   = kBytesPerRow * kPlanes;     // 256, interleaved
     static const uint32_t kPictureBytes = (uint32_t)kRowStride * kHeight;
 
-    // Copies `picture` (kPictureBytes of INTERLEAVED bitplanes, as produced by
-    // tools/mac_fb_to_amiga.py) into chip RAM and builds the copper list.
+    // Copies `picture` (kPictureBytes of interleaved bitplanes) into chip RAM and
+    // builds the copper list.  A null picture and palette produce a black screen;
+    // production startup uses that so no captured emulator frame is displayed.
     // ⚠ Returns false if chip RAM could not be had -- the caller must not display.
     bool initialize(const uint8_t* picture, const uint16_t* palette16);
     void shutdown();
@@ -51,7 +54,9 @@ public:
     // Convert a Macintosh 4-bpp chunky surface and ColorTable into the Amiga's
     // interleaved planes.  The completed frame is swapped in by vbiUpdate(), so
     // the copper never scans a half-converted picture.
-    bool presentMacFrame(const uint8_t* chunky, const uint8_t* colorTable);
+    bool presentMacFrame(const uint8_t* chunky, const uint8_t* colorTable,
+                         int16_t dirtyTop, int16_t dirtyLeft,
+                         int16_t dirtyBottom, int16_t dirtyRight);
 
     // Stage B's fail-loud surface.  It replaces the captured frame with a diagnostic
     // generated on the Amiga, so an unknown Mac trap cannot masquerade as a freeze.
@@ -76,6 +81,8 @@ private:
     uint16_t  m_ptrIndex = 0;      // copper-list index of the first BPLxPT move
     uint16_t  m_nextPalette[16] = {0};
     volatile bool m_framePending = false;
+    bool m_syncPending = false;
+    int16_t m_syncTop = 0, m_syncLeft = 0, m_syncBottom = 0, m_syncRight = 0;
 };
 
 #endif
