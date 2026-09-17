@@ -204,3 +204,89 @@ void VetteScreen::shutdown()
     if (m_copper) { FreeMem(m_copper, VS_CL_LONGS * sizeof(uint32_t)); m_copper = 0; }
     if (m_chip)   { FreeMem(m_chip, kPictureBytes); m_chip = 0; }
 }
+
+// Compact 5x7 capitals.  Rows are five low bits, left to right.  The Stage B stop uses
+// only capitals deliberately: this is exception-path code, not a general text renderer.
+static const uint8_t s_font[37][7] = {
+    {14,17,19,21,25,17,14},{4,12,4,4,4,4,14},{14,17,1,2,4,8,31},
+    {30,1,1,14,1,1,30},{2,6,10,18,31,2,2},{31,16,16,30,1,1,30},
+    {14,16,16,30,17,17,14},{31,1,2,4,8,8,8},{14,17,17,14,17,17,14},
+    {14,17,17,15,1,1,14},
+    {14,17,17,31,17,17,17},{30,17,17,30,17,17,30},{14,17,16,16,16,17,14},
+    {30,17,17,17,17,17,30},{31,16,16,30,16,16,31},{31,16,16,30,16,16,16},
+    {14,17,16,23,17,17,14},{17,17,17,31,17,17,17},{14,4,4,4,4,4,14},
+    {7,2,2,2,2,18,12},{17,18,20,24,20,18,17},{16,16,16,16,16,16,31},
+    {17,27,21,21,17,17,17},{17,25,21,19,17,17,17},{14,17,17,17,17,17,14},
+    {30,17,17,30,16,16,16},{14,17,17,17,21,18,13},{30,17,17,30,20,18,17},
+    {15,16,16,14,1,1,30},{31,4,4,4,4,4,4},{17,17,17,17,17,17,14},
+    {17,17,17,17,17,10,4},{17,17,17,21,21,21,10},{17,17,10,4,10,17,17},
+    {17,17,10,4,4,4,4},{31,1,2,4,8,16,31},
+    {0,0,0,0,0,0,0}
+};
+
+static uint8_t glyphRow(char c, uint16_t row)
+{
+    if (c >= '0' && c <= '9') return s_font[c - '0'][row];
+    if (c >= 'A' && c <= 'Z') return s_font[10 + c - 'A'][row];
+    if (c == ':') return (row == 2 || row == 5) ? 4 : 0;
+    if (c == '+') return row == 3 ? 31 : ((row >= 1 && row <= 5) ? 4 : 0);
+    if (c == '/') return (uint8_t)(1u << (row < 5 ? 4 - row : 0));
+    if (c == '-') return row == 3 ? 31 : 0;
+    if (c == '$') return s_font[28][row]; // readable S-shaped dollar substitute
+    return s_font[36][row];
+}
+
+static void setWhitePixel(uint8_t* chip, uint16_t x, uint16_t y)
+{
+    if (x >= VetteScreen::kWidth || y >= VetteScreen::kHeight) return;
+    uint8_t mask = (uint8_t)(0x80u >> (x & 7));
+    uint32_t row = (uint32_t)y * VetteScreen::kRowStride;
+    uint16_t byte = x >> 3;
+    for (uint16_t p = 0; p < VetteScreen::kPlanes; ++p)
+        chip[row + (uint32_t)p * VetteScreen::kBytesPerRow + byte] |= mask;
+}
+
+static void drawLine(uint8_t* chip, uint16_t x, uint16_t y, const char* text)
+{
+    for (; *text; ++text, x += 12) {
+        for (uint16_t row = 0; row < 7; ++row) {
+            uint8_t bits = glyphRow(*text, row);
+            for (uint16_t col = 0; col < 5; ++col) if (bits & (16u >> col)) {
+                setWhitePixel(chip, x + col * 2,     y + row * 2);
+                setWhitePixel(chip, x + col * 2 + 1, y + row * 2);
+                setWhitePixel(chip, x + col * 2,     y + row * 2 + 1);
+                setWhitePixel(chip, x + col * 2 + 1, y + row * 2 + 1);
+            }
+        }
+    }
+}
+
+static char hexDigit(uint8_t v) { return (char)(v < 10 ? '0' + v : 'A' + v - 10); }
+
+static void append(char*& p, const char* s) { while (*s) *p++ = *s++; }
+static void appendHex(char*& p, uint32_t value, uint16_t digits)
+{
+    while (digits--) *p++ = hexDigit((uint8_t)(value >> (digits * 4)) & 15);
+}
+
+void VetteScreen::showLoudStop(const char* manager, const char* routine, int32_t selector,
+                               const char* segment, uint32_t offset, uint16_t trapWord)
+{
+    if (!m_chip) return;
+    for (uint32_t i = 0; i < kPictureBytes; ++i) m_chip[i] = 0;
+
+    char line[48]; char* p;
+    drawLine(m_chip, 24, 24, "STAGE B LOUD STOP");
+    p = line; append(p, "TRAP: $"); appendHex(p, trapWord, 4); *p = 0;
+    drawLine(m_chip, 24, 58, line);
+    p = line; append(p, "MANAGER: "); append(p, manager); *p = 0;
+    drawLine(m_chip, 24, 82, line);
+    p = line; append(p, "ROUTINE: "); append(p, routine); *p = 0;
+    drawLine(m_chip, 24, 106, line);
+    p = line; append(p, "SELECTOR: ");
+    if (selector < 0) append(p, "N/A"); else appendHex(p, (uint32_t)selector, 8);
+    *p = 0; drawLine(m_chip, 24, 130, line);
+    p = line; append(p, "CALLER: "); append(p, segment); *p++ = '+';
+    appendHex(p, offset, 4); *p = 0;
+    drawLine(m_chip, 24, 154, line);
+}

@@ -14,11 +14,12 @@ of every session, so nothing dated, no measurement history, no "X now works" ach
 `docs/` file and, if it changes how to work, add or amend one line here. The same discipline governs
 `docs/rename.md` and `docs/open-work.md` (queues, never logs).
 
-⚠⚠ **ON THE AMIGA SIDE, EXACTLY ONE THING IS BUILT AND RUN: THE DISPLAY.** `out/Vette.exe` takes
-the machine over and shows a *captured Macintosh frame* in the locked mode; `./run.sh`,
-`./diag_run.sh` and the gdb stub are verified end to end. **No Macintosh code executes** — no
-loader, no A5 world, no trap layer, no input, no sound. ⛔ **Never report the display path as "the
-intro screen works"**: it displays a screenshot (`docs/open-work.md` §TARGET 1).
+⚠⚠ **ON THE AMIGA SIDE, THE DISPLAY AND STAGE B LOADER RUN.** `out/Vette.exe` takes the machine
+over, makes all 11 Color-build `CODE` resources resident, builds and patches the A5 world, runs the
+game's `%A5Init`, and stops visibly at the first unimplemented trap: Segment Manager `_UnLoadSeg`,
+`Main+$1EE6` (`docs/stage-b.md`).  The Resource Manager and the other Stage C traps do not exist yet.
+⛔ **Never report the captured Stage A frame as "the intro screen works"**: the game's code has not
+painted it (`docs/open-work.md` §TARGET 1).
 **Do not read an inherited doc's confident present tense as a description of this repo** — every ⚑
 doc describes the prior ports.
 ⭐ What else runs: the **Macintosh reference loop** (MAME boots and launches the game unattended,
@@ -151,8 +152,9 @@ reason from `docs/faithfulness-seam.md` #2. Consequences that are rules, not not
   what the call appears to want.
 - ⚠ **`%A5Init` runs, or is replaced by exactly what it produces.** It initialises the game's
   31 272 B of A5-relative globals. Skipping it zeroes them — a silent wrong-value failure.
-  ⭐ It needs **one** trap to do it: `_BlockMove`, 46 calls, and it is the game's very first trap
-  (`docs/trap-log.md`).
+  ⭐ It needs **one** trap to do it: `_BlockMove`, **49 calls**, and it is the game's very first trap.
+  The earlier MAME attribution said 46; the shipped initializer stream and Stage B both say 49
+  (`docs/stage-b.md`).
 - **The A5 world is fixed and known:** 31 272 B of globals below `a5`; above it 32 B + a 4 072 B
   jump table of **509 entries** at A5+32, all shipped in unloaded form. Pre-patch them to
   `JMP abs.l` at startup and `_LoadSeg` never needs servicing.

@@ -9,9 +9,8 @@
 #   ./debug.sh           source-level debug via the FS-UAE GDB stub
 #   ./diag_run.sh [secs] headless probe run (needs PROBES=1)
 #
-# Scope: this builds STAGE A only — the display takeover and one captured Macintosh frame
-# (docs/open-work.md).  No Macintosh 68000 code is linked in yet, so the source lists stay
-# WILDCARDED: src/mac/ and the rest of src/platform/ are picked up as soon as they exist.
+# Scope: Stage A display takeover plus the completed Stage B resident-code loader and loud
+# Line-A stop (docs/stage-b.md).  The source lists remain wildcarded for the Stage C trap layer.
 #
 # ⚠⚠ `make clean` BEFORE any PROBES=1 build and AFTER editing a widely-included header.
 # This Makefile tracks neither the flag nor header deps, so a partial rebuild links stale
@@ -67,7 +66,7 @@ CORE_C_SRCS := \
 
 # Support runtime (freestanding CRT: program entry, memset…) + any incbin'd assets.
 SUPPORT_C_SRCS := $(SUPPORT)/gcc8_c_support.c
-ASM_SRCS       := $(SUPPORT)/gcc8_a_support.s $(wildcard $(AMIGA_SRC)/incbin.s)
+ASM_SRCS       := $(SUPPORT)/gcc8_a_support.s $(wildcard $(AMIGA_SRC)/*.s)
 
 # Framework hand-written m68k asm (Motorola syntax, assembled by vasm -> ELF).  The matching
 # GCC register-marshalling bridges live under `#if defined(ASSEMBLER) && !defined(__SASC)` in
@@ -192,7 +191,9 @@ VASMFLAGS = -m68010 -Felf -quiet -x -no-opt -nowarn=62 $(EXTRA_VASMDEFS)
 # Stage A's acceptance globals (src/platform/amiga/PlatformAmiga.cpp).  These are read by
 # amiga/stage_a.gdb in a PLAIN build -- the display path is not probe instrumentation, so
 # they are unconditional rather than under `ifdef PROBES`.
-PROBE_SYMS = g_vbiCount g_planeChecksum g_screenReady g_laceFields g_longFields g_lofSamples
+PROBE_SYMS = g_vbiCount g_planeChecksum g_screenReady g_laceFields g_longFields g_lofSamples \
+             g_stageBState g_trapWord g_trapSelector g_trapSegment g_trapOffset \
+             g_resourceCount g_jumpEntryCount g_blockMoveCount g_trapManager g_trapRoutine
 ifdef PROBES
 PROBE_SYMS +=
 endif
@@ -265,12 +266,37 @@ obj/gcc8_a_support.o : $(SUPPORT)/gcc8_a_support.s
 	$(info ASM  $<)
 	@$(AS) $(ASFLAGS) -o $@ "$<"
 
+# Port-authored GAS assembly (68000 exception/trampoline code).
+obj/%.o : $(AMIGA_SRC)/%.s
+	$(info ASM  $<)
+	@$(AS) $(ASFLAGS) -o $@ "$(abspath $<)"
+
 # ⚠ .incbin dependencies are INVISIBLE to `gcc -MMD`, so list them explicitly here as they
 # appear.  Without it, regenerating an embedded blob leaves a stale copy in the binary while the
 # on-disk file looks correct.  Paths are relative to this amiga/ directory.
 # Stage A: Target 1's captured Macintosh frame.  ⚠ NOT COMMITTED (derived from the game);
 # incbin.s carries the regeneration command.
-INCBIN_DEPS := assets/intro.planes assets/intro.palbin
+CODE_DEPS := \
+    ../tmp/seg_color/CODE_00.bin \
+    ../tmp/seg_color/CODE_01_Main.bin \
+    ../tmp/seg_color/CODE_02_Initialize.bin \
+    ../tmp/seg_color/CODE_03_Communication.bin \
+    ../tmp/seg_color/CODE_04_load.bin \
+    ../tmp/seg_color/CODE_05_Score.bin \
+    ../tmp/seg_color/CODE_06_Traffic.bin \
+    ../tmp/seg_color/CODE_07_FRED.bin \
+    ../tmp/seg_color/CODE_08_Intro.bin \
+    ../tmp/seg_color/CODE_09_sound.bin \
+    ../tmp/seg_color/CODE_10__A5Init.bin
+APP_RSRC := ../tmp/rsrc_VETTE!_VETTE!_Folder_Folder_Color_VETTE!_Color_VETTE!.rsrc
+DATA_RSRC := ../tmp/rsrc_VETTE!_VETTE!_Folder_Folder_Color_VETTE!_VETTE!.Data.rsrc
+RESOURCE_ARCHIVE := assets/vette.resources
+INCBIN_DEPS := assets/intro.planes assets/intro.palbin $(CODE_DEPS) $(RESOURCE_ARCHIVE)
+
+$(RESOURCE_ARCHIVE): ../tools/rsrc_pack.py $(APP_RSRC) $(DATA_RSRC)
+	$(info PACK $@)
+	@python3 ../tools/rsrc_pack.py "$@" "application=$(APP_RSRC)" "data=$(DATA_RSRC)"
+
 obj/incbin.o : $(AMIGA_SRC)/incbin.s $(INCBIN_DEPS)
 	$(info ASM  $<)
 	@$(AS) $(ASFLAGS) -o $@ "$(abspath $(AMIGA_SRC)/incbin.s)"

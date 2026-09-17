@@ -48,6 +48,11 @@ public:
     // (CLAUDE.md).  Cheap by construction: four 32-bit stores into the copper list.
     void vbiUpdate();
 
+    // Stage B's fail-loud surface.  It replaces the captured frame with a diagnostic
+    // generated on the Amiga, so an unknown Mac trap cannot masquerade as a freeze.
+    void showLoudStop(const char* manager, const char* routine, int32_t selector,
+                      const char* segment, uint32_t offset, uint16_t trapWord);
+
     uint32_t* copperList() const { return m_copper; }
     uint8_t*  picture() const    { return m_chip; }
 

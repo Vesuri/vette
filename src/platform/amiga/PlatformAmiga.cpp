@@ -22,6 +22,7 @@
 #include "framework/AmigaHardware.h"
 #include "PlatformAmiga.h"
 #include "VetteScreen.h"
+#include "mac/MacLoader.h"
 
 extern struct GfxBase* GfxBase;         // opened below; the global lives in GCCRuntime.cpp
 
@@ -179,8 +180,13 @@ bool PlatformAmiga::run()
     // Nothing here Wait()s, so multitasking can stay off for the duration.
     Forbid();
 
-    // The Stage A frame pump.  There is no game body yet: the picture is static and the
-    // only per-field work is the interlace pointer swap, which is the ISR's.
+    // Stage B hands control to the original Macintosh instructions.  Its Line-A handler
+    // services the one prerequisite (_BlockMove), then deliberately stops on the first
+    // unimplemented trap and paints the full diagnostic into this screen.
+    static MacLoader loader;
+    if (ok) ok = loader.run(&screen);
+
+    // Reached only if loader setup failed or a future completed game returns.
     // ⚠ QUIT IS THE BARE LEFT MOUSE BUTTON FOR NOW, not the CTRL+LMB chord amiga/run.sh
     // documents.  Reading CTRL needs the keyboard layer, which Stage A does not have; the
     // chord must arrive BEFORE anything binds the bare button (the Mac original is a

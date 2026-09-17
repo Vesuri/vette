@@ -133,9 +133,12 @@ shape: 51 calls from 46 distinct sites — straight-line startup code.
 
 ### ⭐ What Target 1 actually costs
 
-- ⭐⭐ **`%A5Init` calls exactly ONE trap: `_BlockMove`, 46 times, from `%A5Init+00B4`** — and it is
+- ⭐⭐ **`%A5Init` calls exactly ONE trap: `_BlockMove`, from `%A5Init+00B4`** — and it is
   the game's very first trap, at frame 1291. It copies the initialised globals into the A5 world,
   which is precisely what `CLAUDE.md` says `%A5Init` is for. **Stage B's prerequisite is one trap.**
+  ⚠ The MAME run attributed 46 calls; Stage B executed **49**, and the shipped initializer stream
+  independently contains exactly 49 records selecting that `$A02E` path.  The 46 was therefore an
+  attribution undercount.  See `docs/stage-b.md`; the trap identity and first-use order are unchanged.
 - **`DrawPicture` (16) + `GetPicture` (47) + `CopyBits` (2 622)** — the presentation path, and the
   PICT interpreter is sized: the intro draws **16 pictures**, not hundreds.
 - **`GetResource` (5 294)** — how all game data arrives. See §Arguments.

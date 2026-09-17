@@ -1,9 +1,8 @@
-/* PlatformAmiga — the Amiga backend's machine takeover for Stage A.
+/* PlatformAmiga — the Amiga backend's machine takeover and Stage B launch.
  *
  * What it is: LoadView(NULL), display DMA down, the VERTB vector taken over wholesale,
- * VetteScreen brought up, the frame pump run, everything restored.  What it is NOT, yet:
- * the Mac trap layer, the loader, the A5 world, input, sound.  Those are Stages B-D
- * (docs/open-work.md); this file is the seam the 68000 code will eventually be run behind.
+ * VetteScreen brought up, the A5 loader entered behind the Line-A vector, everything restored
+ * if execution returns.  Input, sound, and the Stage C Toolbox implementations do not exist yet.
  */
 #ifndef VETTE_PLATFORM_AMIGA_H
 #define VETTE_PLATFORM_AMIGA_H

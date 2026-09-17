@@ -1,7 +1,7 @@
 /* Vette! — entry point.
  *
- * Stage A: bring the Amiga display up in the locked mode and show Target 1's captured
- * Macintosh frame from chip RAM.  No Macintosh code runs yet (docs/open-work.md).
+ * Stage B: bring up the locked display, run the resident Macintosh code behind our
+ * Line-A vector, and stop visibly at its first unimplemented trap (docs/stage-b.md).
  */
 #ifdef VETTE_PLATFORM_AMIGA
 #include "platform/amiga/PlatformAmiga.h"
