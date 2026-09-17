@@ -2488,6 +2488,67 @@ static uint8_t** getMenu(int16_t id)
     return menu;
 }
 
+// Compact capitals used only for the four menu-bar titles.  The game requests
+// the Macintosh system font, but that font lives in the absent System file;
+// keeping this renderer local makes the compatibility substitution explicit.
+static const uint8_t kMenuFont[26][7] = {
+    {14,17,17,31,17,17,17},{30,17,17,30,17,17,30},{14,17,16,16,16,17,14},
+    {30,17,17,17,17,17,30},{31,16,16,30,16,16,31},{31,16,16,30,16,16,16},
+    {14,17,16,23,17,17,14},{17,17,17,31,17,17,17},{14,4,4,4,4,4,14},
+    {7,2,2,2,2,18,12},{17,18,20,24,20,18,17},{16,16,16,16,16,16,31},
+    {17,27,21,21,17,17,17},{17,25,21,19,17,17,17},{14,17,17,17,17,17,14},
+    {30,17,17,30,16,16,16},{14,17,17,17,21,18,13},{30,17,17,30,20,18,17},
+    {15,16,16,14,1,1,30},{31,4,4,4,4,4,4},{17,17,17,17,17,17,14},
+    {17,17,17,17,17,10,4},{17,17,17,21,21,21,10},{17,17,10,4,10,17,17},
+    {17,17,10,4,4,4,4},{31,1,2,4,8,16,31}
+};
+
+static void drawMenuTitle(const uint8_t* title, int16_t x)
+{
+    for (uint16_t character = 0; character < title[0]; ++character, x += 6) {
+        uint8_t c = title[character + 1];
+        if (c >= 'a' && c <= 'z') c = (uint8_t)(c - ('a' - 'A'));
+        if (c < 'A' || c > 'Z') {
+            // NewMenu(128) carries the classic Apple-menu symbol.  The System
+            // font resource is not shipped, so retain its distinct silhouette.
+            static const uint8_t apple[7] = {4,2,14,31,31,14,4};
+            for (uint16_t row = 0; row < 7; ++row)
+                for (uint16_t column = 0; column < 5; ++column)
+                    if (apple[row] & (16u >> column))
+                        setPackedPixel(s_colorScreen, 512 / 2, 0, 0,
+                                       (int16_t)(x + column), (int16_t)(6 + row), 15);
+            continue;
+        }
+        for (uint16_t row = 0; row < 7; ++row)
+            for (uint16_t column = 0; column < 5; ++column)
+                if (kMenuFont[c - 'A'][row] & (16u >> column))
+                    setPackedPixel(s_colorScreen, 512 / 2, 0, 0,
+                                   (int16_t)(x + column), (int16_t)(6 + row), 15);
+    }
+}
+
+static bool drawMenuBar()
+{
+    if (!s_menuManager.initialized) return false;
+    fillColorRect(0, 0, 20, 512, 0);
+    fillColorRect(19, 0, 20, 512, 15);
+    int16_t x = 8;
+    for (uint16_t i = 0; i < s_menuManager.count; ++i) {
+        if (!s_menuManager.entries[i].inMenuBar) continue;
+        uint8_t** handle = s_menuManager.entries[i].handle;
+        if (!handle || !*handle || handleSize(handle) < 16) return false;
+        uint8_t* menu = *handle;
+        uint16_t width = (uint16_t)(menu[14] * 6 + 14);
+        if (x + width > 512) return false;
+        write16(menu + 2, width);
+        drawMenuTitle(menu + 14, (int16_t)(x + 7));
+        x = (int16_t)(x + width);
+    }
+    static const uint8_t bounds[8] = {0,0, 0,0, 0,20, 2,0}; // (0,0)-(20,512)
+    markDirty(bounds);
+    return true;
+}
+
 static void initTextEdit()
 {
     // TEInit creates an empty private scrap handle and resets its manager globals.
@@ -2812,6 +2873,12 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
         if (menu) {
             if (g_stageCDepth < 76) g_stageCDepth = 76;
             return 3;
+        }
+    }
+    if (trap == 0xa937) {                    // DrawMenuBar()
+        if (drawMenuBar()) {
+            if (g_stageCDepth < 77) g_stageCDepth = 77;
+            return 1;
         }
     }
     if (trap == 0xa9cc) {                    // TEInit()

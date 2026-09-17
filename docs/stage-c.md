@@ -170,8 +170,12 @@ post-intro continuation is:
 
 76. `GetMenu` (validated packed `MENU` resource cloned into a mutable movable handle)
 
-The current loud stop is `DrawMenuBar`, confirmed at `load+$0676` after the complete initial
-menu-construction pass by the depth-76 run.
+77. `DrawMenuBar` (visible inserted titles and separator; hierarchical menus remain off-bar)
+
+The menu bar uses an explicit compact compatibility alphabet because the two shipped resource forks
+do not contain the Macintosh System file's Chicago bitmap font; it does not claim font-level pixel
+identity. The current loud stop is `ReleaseResource`, confirmed in `Score+$0A74` by the depth-77
+run.
 
 `amiga/stage_c.gdb` breaks on `VetteScreen::showLoudStop`, after the report is complete, and prints
 the depth, trap identity, selector, runtime `(segment, offset)`, absolute PC, USP and its first
