@@ -297,6 +297,7 @@ static const TrapName s_trapNames[] = {
     {0xa97c,"DIALOG MANAGER","GETNEWDIALOG"}, {0xa981,"DIALOG MANAGER","DRAWDIALOG"},
     {0xab1d,"QUICKDRAW","QDEXTENSIONS"},
     {0xaa95,"PALETTE MANAGER","SETPALETTE"}, {0xa146,"TRAP MANAGER","GETTRAPADDRESS"},
+    {0xaa2e,"GRAPHICS DEVICE MANAGER","INITGDEVICE"},
     {0xa047,"TRAP MANAGER","SETTRAPADDRESS"}, {0xa983,"DIALOG MANAGER","DISPOSEDIALOG"},
     {0xa850,"QUICKDRAW","INITCURSOR"}, {0xa9bc,"QUICKDRAW","GETPICTURE"},
     {0xa8f6,"QUICKDRAW","DRAWPICTURE"}, {0xa89b,"QUICKDRAW","PENSIZE"},
@@ -383,9 +384,34 @@ static bool redirectLowMemoryGlobals(uint8_t* a5)
 static void blockMove(uint8_t* source, uint8_t* destination, uint32_t count)
 {
     if (destination > source && destination < source + count) {
-        while (count) { --count; destination[count] = source[count]; }
+        source += count;
+        destination += count;
+        if (((uint32_t)source ^ (uint32_t)destination) & 1) {
+            while (count) { --source; --destination; *destination = *source; --count; }
+            return;
+        }
+        if ((uint32_t)source & 1) {
+            --source; --destination; *destination = *source; --count;
+        }
+        while (count >= 2) {
+            source -= 2; destination -= 2;
+            *(uint16_t*)destination = *(const uint16_t*)source;
+            count -= 2;
+        }
+        if (count) { --source; --destination; *destination = *source; }
     } else {
-        for (uint32_t i = 0; i < count; ++i) destination[i] = source[i];
+        if (((uint32_t)source ^ (uint32_t)destination) & 1) {
+            while (count--) *destination++ = *source++;
+            return;
+        }
+        if ((uint32_t)source & 1) {
+            *destination++ = *source++; --count;
+        }
+        while (count >= 2) {
+            *(uint16_t*)destination = *(const uint16_t*)source;
+            source += 2; destination += 2; count -= 2;
+        }
+        if (count) *destination = *source;
     }
 }
 
@@ -841,31 +867,37 @@ static WindowSlot* windowSlot(uint8_t* window)
     return 0;
 }
 
-static bool disposeDialog(uint8_t* dialog)
+static bool disposeWindow(uint8_t* window)
 {
-    WindowSlot* slot = windowSlot(dialog);
-    if (!slot || !slot->dialog) return false;
-    uint8_t* next = (uint8_t*)read32(dialog + 144);
-    if (s_windowList == dialog) s_windowList = next;
+    WindowSlot* slot = windowSlot(window);
+    if (!slot) return false;
+    uint8_t* next = (uint8_t*)read32(window + 144);
+    if (s_windowList == window) s_windowList = next;
     else {
         for (uint16_t i = 0; i < sizeof(s_windows) / sizeof(s_windows[0]); ++i) {
             uint8_t* candidate = s_windows[i].used ? s_windows[i].window : 0;
-            if (candidate && (uint8_t*)read32(candidate + 144) == dialog) {
+            if (candidate && (uint8_t*)read32(candidate + 144) == window) {
                 write32(candidate + 144, (uint32_t)next);
                 break;
             }
         }
     }
-    if ((uint8_t*)read32(s_qdThePort) == dialog)
+    if ((uint8_t*)read32(s_qdThePort) == window)
         write32(s_qdThePort, (uint32_t)s_windowManagerPort);
-    dialog[110] = 0;
-    write32(dialog + 144, 0);
+    window[110] = 0;
+    write32(window + 144, 0);
     slot->used = false;
     slot->window = 0;
     slot->dialog = false;
     slot->dialogItemCount = 0;
     slot->dialogDrawn = false;
     return true;
+}
+
+static bool disposeDialog(uint8_t* dialog)
+{
+    WindowSlot* slot = windowSlot(dialog);
+    return slot && slot->dialog && disposeWindow(dialog);
 }
 
 static int32_t resourceHandleIndex(uint8_t** handle);
@@ -1150,7 +1182,7 @@ static bool drawPackedMonochromePictureBits(const uint8_t* picture, uint32_t siz
     const uint8_t* rasterSource = picture + offset;
     const uint8_t* rasterDestination = picture + offset + 8;
     uint16_t mode = read16(picture + offset + 16);
-    if (mode != 0) return false;
+    if (mode != 0 && mode != 1) return false; // srcCopy or srcOr
     offset += 18;
 
     uint16_t height = (uint16_t)(sourceBottom - sourceTop);
@@ -1233,6 +1265,12 @@ static bool drawPackedMonochromePictureBits(const uint8_t* picture, uint32_t siz
                         & (uint8_t)(0x80 >> (sourceColumn & 7)) ? 15 : 0;
                     uint16_t destinationColumn = (uint16_t)(x - mapLeft);
                     uint8_t& destinationByte = destinationRow[destinationColumn >> 1];
+                    if (mode == 1) {
+                        uint8_t destinationValue = destinationColumn & 1
+                            ? (uint8_t)(destinationByte & 0x0f)
+                            : (uint8_t)(destinationByte >> 4);
+                        value = (uint8_t)(destinationValue | value);
+                    }
                     if (destinationColumn & 1)
                         destinationByte = (uint8_t)((destinationByte & 0xf0) | value);
                     else destinationByte = (uint8_t)((destinationByte & 0x0f) | (value << 4));
@@ -1687,6 +1725,77 @@ static bool copyBits(const uint8_t* sourceBitmap, const uint8_t* destinationBitm
         }
         return true;
     }
+
+    // An unscaled transfer has a one-to-one source/destination mapping and
+    // does not need the byte-per-pixel expansion buffer below.  Walk in the
+    // memmove direction when both BitMaps share storage so odd-aligned and
+    // clipped self-copies retain the original source pixels.
+    if (unscaled) {
+        int16_t visibleTop = toTop;
+        int16_t visibleLeft = toLeft;
+        int16_t visibleBottom = toBottom;
+        int16_t visibleRight = toRight;
+        if (visibleTop < destinationTop) visibleTop = destinationTop;
+        if (visibleTop < clipTop) visibleTop = clipTop;
+        if (visibleLeft < destinationLeft) visibleLeft = destinationLeft;
+        if (visibleLeft < clipLeft) visibleLeft = clipLeft;
+        if (visibleBottom > destinationBottom) visibleBottom = destinationBottom;
+        if (visibleBottom > clipBottom) visibleBottom = clipBottom;
+        if (visibleRight > destinationRight) visibleRight = destinationRight;
+        if (visibleRight > clipRight) visibleRight = clipRight;
+        if (visibleTop >= visibleBottom || visibleLeft >= visibleRight) return true;
+
+        int16_t firstY = visibleTop, lastY = visibleBottom, stepY = 1;
+        int16_t firstX = visibleLeft, lastX = visibleRight, stepX = 1;
+        if (sourcePixels == destinationPixels
+            && toTop - destinationTop > fromTop - sourceTop) {
+            firstY = (int16_t)(visibleBottom - 1);
+            lastY = (int16_t)(visibleTop - 1);
+            stepY = -1;
+        }
+        if (sourcePixels == destinationPixels
+            && toLeft - destinationLeft > fromLeft - sourceLeft) {
+            firstX = (int16_t)(visibleRight - 1);
+            lastX = (int16_t)(visibleLeft - 1);
+            stepX = -1;
+        }
+        for (int16_t destinationY = firstY; destinationY != lastY;
+             destinationY = (int16_t)(destinationY + stepY)) {
+            int16_t sourceY = (int16_t)(fromTop + destinationY - toTop);
+            const uint8_t* sourceRow = sourceY >= sourceTop && sourceY < sourceBottom
+                ? sourcePixels
+                    + multiplyUnsigned16((uint16_t)(sourceY - sourceTop), sourceRowBytes)
+                : 0;
+            uint8_t* destinationRow = destinationPixels
+                + multiplyUnsigned16((uint16_t)(destinationY - destinationTop),
+                                     destinationRowBytes);
+            for (int16_t destinationX = firstX; destinationX != lastX;
+                 destinationX = (int16_t)(destinationX + stepX)) {
+                int16_t sourceX = (int16_t)(fromLeft + destinationX - toLeft);
+                uint8_t value = 0;
+                if (sourceRow && sourceX >= sourceLeft && sourceX < sourceRight) {
+                    uint16_t sourceColumn = (uint16_t)(sourceX - sourceLeft);
+                    uint8_t sourceByte = sourceRow[sourceColumn >> 1];
+                    value = sourceColumn & 1 ? (uint8_t)(sourceByte & 0x0f)
+                                             : (uint8_t)(sourceByte >> 4);
+                }
+                uint16_t destinationColumn = (uint16_t)(destinationX - destinationLeft);
+                uint8_t& destinationByte = destinationRow[destinationColumn >> 1];
+                if (mode != 0) {
+                    uint8_t destinationValue = destinationColumn & 1
+                        ? (uint8_t)(destinationByte & 0x0f)
+                        : (uint8_t)(destinationByte >> 4);
+                    if (mode == 1) value = (uint8_t)(destinationValue | value);
+                    else value = (uint8_t)(destinationValue & (uint8_t)(~value & 0x0f));
+                }
+                if (destinationColumn & 1)
+                    destinationByte = (uint8_t)((destinationByte & 0xf0) | value);
+                else destinationByte = (uint8_t)((destinationByte & 0x0f) | (value << 4));
+            }
+        }
+        return true;
+    }
+
     uint32_t temporaryBytes = multiplyUnsigned16(width, height);
     uint8_t* temporary = (uint8_t*)AllocMem(temporaryBytes, 0);
     if (!temporary) return false;
@@ -2223,6 +2332,16 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
         if (g_stageCDepth < 18) g_stageCDepth = 18;
         return 1;
     }
+    if (trap == 0xaa2e) {                    // InitGDevice(refNum, mode, device)
+        uint8_t** deviceHandle = (uint8_t**)read32(userStack);
+        int16_t refNum = (int16_t)read16(userStack + 8);
+        if (deviceHandle == &s_mainDeviceMaster && *deviceHandle == s_mainDevice
+            && refNum == (int16_t)read16(s_mainDevice)) {
+            write32(s_mainDevice + 42, read32(userStack + 4)); // gdMode
+            if (g_stageCDepth < 67) g_stageCDepth = 67;
+            return 11;
+        }
+    }
     if (trap == 0xa064) {                    // MoveHHi(Handle in A0)
         uint8_t** handle = (uint8_t**)regs[8];
         // Resource data is in the permanently resident archive, already outside
@@ -2365,6 +2484,12 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
                    userStack[0] != 0);
         if (g_stageCDepth < 25) g_stageCDepth = 25;
         return 11;
+    }
+    if (trap == 0xa914) {                    // DisposeWindow(window)
+        if (disposeWindow((uint8_t*)read32(userStack))) {
+            if (g_stageCDepth < 66) g_stageCDepth = 66;
+            return 5;
+        }
     }
     if (trap == 0xa873) {                    // SetPort(GrafPtr)
         write32(s_qdThePort, read32(userStack));
