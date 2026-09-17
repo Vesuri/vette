@@ -111,6 +111,30 @@ VERTB vector is ours ~68 fields earlier, while the display is still the OS's non
 where LOF is always 1.  Measured over the whole run that read **0.636** — not 1.0, so it does not
 look dead; not 0.5, so it does not look right either.  Counted from the takeover it is 0.500.
 
+### ⭐ The picture on the glass — `[MEASURED]`, and it took a human plus a screenshot
+
+The last part of Stage A that no probe could reach.  Measured off an FS-UAE **Full**-frame capture
+(754×576 — the whole PAL frame at hires × interlaced resolution, so one captured pixel is one
+displayed pixel), by taking the bounding box of everything that is not border:
+
+| | measured | wanted |
+|---|---|---|
+| window size | **512 × 320** | 512 × 320, the `[MEASURED]` Macintosh window |
+| horizontal centre | lores **289** | 289 — the centre of the standard PAL window `$81..$1C1` |
+| vertical centre | line **172** | 172 (`VS_CENTER_Y`) |
+
+So the mode is 1:1 and undistorted: no clipped row or column, no doubled or dropped line, square
+pixels (hires × interlaced), and the window centred where the derivation put it.
+⚠ **Do not read the capture's own margins as off-centring.** They are asymmetric — 138 hires px of
+border on the left, 104 on the right — because FS-UAE's capture region starts at lores hpos 92 /
+line 26 and is itself 8.5 lores left of the standard window's centre.  Derive the window's position
+from the *register units* the bounding box implies, not from the PNG's margins.
+
+⭐⭐ **Two defects were found here and NEITHER was visible to any headless check** — the Macintosh
+cursor composited into the captured asset, and the interlace field polarity inverted (§above).  That
+is the argument for keeping a human-eyeball step with a written list of what to look for, rather
+than treating a green probe run as the end of a display bring-up.
+
 ## VBI: take over the VERTB IntVector
 
 Not `AddIntServer(INTB_VERTB, …)`.  Replacing exec's `IntVector` wholesale drops

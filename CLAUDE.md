@@ -17,7 +17,7 @@ of every session, so nothing dated, no measurement history, no "X now works" ach
 the machine over and shows a *captured Macintosh frame* in the locked mode; `./run.sh`,
 `./diag_run.sh` and the gdb stub are verified end to end. **No Macintosh code executes** — no
 loader, no A5 world, no trap layer, no input, no sound. ⛔ **Never report the display path as "the
-intro screen works"**: it displays a screenshot (`docs/open-work.md` §Stage A).
+intro screen works"**: it displays a screenshot (`docs/open-work.md` §TARGET 1).
 **Do not read an inherited doc's confident present tense as a description of this repo** — every ⚑
 doc describes the prior ports.
 ⭐ What else runs: the **Macintosh reference loop** (MAME boots and launches the game unattended,

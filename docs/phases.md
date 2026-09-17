@@ -34,7 +34,8 @@ Build infrastructure only; no game code. **Exit criteria:**
       `screenReady=1`, a chip-RAM checksum identical to the host's, and a long/short field ratio of
       0.500. ⚠ The original criterion was Revs's (`FPSCOUNT` + `painted=0`); this port has nothing
       to paint per frame yet, so the equivalent evidence is the field parity and the checksum.
-      The one part a probe cannot cover — the picture on the glass — is `docs/open-work.md` §Stage A.
+      ⭐ The one part a probe cannot cover — the picture on the glass — is **also done**, and it
+      found two defects no probe could see (`docs/amiga-arch.md` §The picture on the glass).
 - [ ] The standing checks from `docs/amiga-lessons.md` exist as counters and `.gdb` scripts.
 
 ⭐ Do not skip the last two. Revs's Phase 0 is the reason its Amiga side was never in doubt while
