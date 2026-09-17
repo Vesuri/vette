@@ -168,8 +168,10 @@ post-intro continuation is:
 
 75. `InsertMenu` (ordered menu-bar entries; `beforeID == -1` retains hierarchical menus off-bar)
 
-The current loud stop is resource-backed `GetMenu(222)`, confirmed at `load+$054A` by the depth-75
-run.
+76. `GetMenu` (validated packed `MENU` resource cloned into a mutable movable handle)
+
+The current loud stop is `DrawMenuBar`, confirmed at `load+$0676` after the complete initial
+menu-construction pass by the depth-76 run.
 
 `amiga/stage_c.gdb` breaks on `VetteScreen::showLoudStop`, after the report is complete, and prints
 the depth, trap identity, selector, runtime `(segment, offset)`, absolute PC, USP and its first

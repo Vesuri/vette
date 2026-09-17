@@ -334,7 +334,7 @@ static const TrapName s_trapNames[] = {
     {0xa93a,"MENU MANAGER","DISABLEITEM"}, {0xa931,"MENU MANAGER","NEWMENU"},
     {0xa933,"MENU MANAGER","APPENDMENU"}, {0xa94d,"MENU MANAGER","ADDRESMENU"},
     {0xa935,"MENU MANAGER","INSERTMENU"},
-    {0xa9bf,"MENU MANAGER","GETRMENU"},
+    {0xa9bf,"MENU MANAGER","GETMENU"},
     {0xa937,"MENU MANAGER","DRAWMENUBAR"}, {0xa970,"EVENT MANAGER","GETNEXTEVENT"},
     {0xa9b4,"EVENT MANAGER","SYSTEMTASK"}, {0xaa94,"PALETTE MANAGER","ACTIVATEPALETTE"},
     {0xa874,"QUICKDRAW","GETPORT"}
@@ -2464,6 +2464,30 @@ static bool insertMenu(uint8_t** handle, int16_t beforeID)
     return true;
 }
 
+static uint8_t** getMenu(int16_t id)
+{
+    uint8_t** resource = getResource(0x4d454e55UL, id); // 'MENU'
+    uint32_t size = resourceHandleSize(resource);
+    if (!resource || !*resource || size < 16 || (int16_t)read16(*resource) != id) return 0;
+
+    // Validate the packed MenuInfo title and item records before exposing them
+    // as mutable manager state.  Each item is a Pascal string followed by its
+    // icon, key equivalent, mark, and style bytes; a zero length terminates it.
+    const uint8_t* source = *resource;
+    uint32_t offset = 15UL + source[14];
+    if (offset >= size) return 0;
+    while (source[offset]) {
+        uint32_t next = offset + 5UL + source[offset];
+        if (next >= size) return 0;
+        offset = next;
+    }
+
+    uint8_t** menu = newHandle(size, false);
+    if (!menu || !*menu) return 0;
+    for (uint32_t i = 0; i < size; ++i) (*menu)[i] = source[i];
+    return menu;
+}
+
 static void initTextEdit()
 {
     // TEInit creates an empty private scrap handle and resets its manager globals.
@@ -2780,6 +2804,14 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
         if (insertMenu((uint8_t**)read32(userStack + 2), (int16_t)read16(userStack))) {
             if (g_stageCDepth < 75) g_stageCDepth = 75;
             return 7;
+        }
+    }
+    if (trap == 0xa9bf) {                    // GetMenu(resourceID) -> MenuHandle
+        uint8_t** menu = getMenu((int16_t)read16(userStack));
+        write32(userStack + 2, (uint32_t)menu);
+        if (menu) {
+            if (g_stageCDepth < 76) g_stageCDepth = 76;
+            return 3;
         }
     }
     if (trap == 0xa9cc) {                    // TEInit()
