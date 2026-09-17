@@ -7,10 +7,10 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — current loud stop
 
-⭐ **HEAD OF QUEUE: `InsertMenu`, called by `load+$0542`.** The packaged resource archive
-contains no `DRVR` entries, so the preceding `AddResMenu(menu, 'DRVR')` is a validated empty
-append. Implement only menu-list state semantics and continue toward the garage. Do not add
-dialog/UI traps to conceal an upstream failure.
+⭐ **HEAD OF QUEUE: `GetMenu` for resource ID 222, called by `load+$054A`.** The Menu Manager
+now retains ordered visible and hierarchical menu handles. Decode the shipped `MENU` resource into
+a movable menu handle, then continue toward the garage. Do not add dialog/UI traps to conceal an
+upstream failure.
 
 The MAME A-trap log remains a measured reference-run inventory → `docs/trap-log.md`,
 but Stage C has proved that it is **not an exact standalone-port first-use script**. The port has

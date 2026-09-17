@@ -199,6 +199,11 @@ static WindowManagerState s_windowManager;
 struct MenuManagerState {
     bool initialized;
     uint8_t** colorTable;
+    struct Entry {
+        uint8_t** handle;
+        bool inMenuBar;
+    } entries[16];
+    uint16_t count;
 };
 static MenuManagerState s_menuManager;
 
@@ -328,6 +333,7 @@ static const TrapName s_trapNames[] = {
     {0xa04d,"MEMORY MANAGER","PURGEMEM"}, {0xa04c,"MEMORY MANAGER","COMPACTMEM"},
     {0xa93a,"MENU MANAGER","DISABLEITEM"}, {0xa931,"MENU MANAGER","NEWMENU"},
     {0xa933,"MENU MANAGER","APPENDMENU"}, {0xa94d,"MENU MANAGER","ADDRESMENU"},
+    {0xa935,"MENU MANAGER","INSERTMENU"},
     {0xa9bf,"MENU MANAGER","GETRMENU"},
     {0xa937,"MENU MANAGER","DRAWMENUBAR"}, {0xa970,"EVENT MANAGER","GETNEXTEVENT"},
     {0xa9b4,"EVENT MANAGER","SYSTEMTASK"}, {0xaa94,"PALETTE MANAGER","ACTIVATEPALETTE"},
@@ -2307,6 +2313,7 @@ static void initMenus()
 {
     s_menuManager.initialized = true;
     s_menuManager.colorTable = 0;
+    s_menuManager.count = 0;
 
     // InitMenus optionally adopts the menu-color table resource.  Its ID is not
     // prescribed, so mirror the Resource Manager search and take the first 'mctb'.
@@ -2421,6 +2428,39 @@ static bool addResourceMenu(uint8_t** menu, uint32_t type)
         if (!s_resourceArchive.item(i, item)) return false;
         if (item.type == type && item.nameLength) return false;
     }
+    return true;
+}
+
+static bool insertMenu(uint8_t** handle, int16_t beforeID)
+{
+    if (!s_menuManager.initialized || !handle || !*handle || handleSize(handle) < 16
+        || s_menuManager.count >= sizeof(s_menuManager.entries) / sizeof(s_menuManager.entries[0]))
+        return false;
+
+    int16_t id = (int16_t)read16(*handle);
+    for (uint16_t i = 0; i < s_menuManager.count; ++i)
+        if (s_menuManager.entries[i].handle == handle
+            || (s_menuManager.entries[i].handle && *s_menuManager.entries[i].handle
+                && (int16_t)read16(*s_menuManager.entries[i].handle) == id)) return false;
+
+    bool inMenuBar = beforeID != -1;
+    uint16_t position = s_menuManager.count;
+    if (inMenuBar && beforeID != 0) {
+        for (uint16_t i = 0; i < s_menuManager.count; ++i) {
+            uint8_t** existing = s_menuManager.entries[i].handle;
+            if (s_menuManager.entries[i].inMenuBar && existing && *existing
+                && (int16_t)read16(*existing) == beforeID) {
+                position = i;
+                break;
+            }
+        }
+        if (position == s_menuManager.count) return false;
+    }
+    for (uint16_t i = s_menuManager.count; i > position; --i)
+        s_menuManager.entries[i] = s_menuManager.entries[i - 1];
+    s_menuManager.entries[position].handle = handle;
+    s_menuManager.entries[position].inMenuBar = inMenuBar;
+    ++s_menuManager.count;
     return true;
 }
 
@@ -2734,6 +2774,12 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
         if (addResourceMenu((uint8_t**)read32(userStack + 4), read32(userStack))) {
             if (g_stageCDepth < 74) g_stageCDepth = 74;
             return 9;
+        }
+    }
+    if (trap == 0xa935) {                    // InsertMenu(menu, beforeID)
+        if (insertMenu((uint8_t**)read32(userStack + 2), (int16_t)read16(userStack))) {
+            if (g_stageCDepth < 75) g_stageCDepth = 75;
+            return 7;
         }
     }
     if (trap == 0xa9cc) {                    // TEInit()

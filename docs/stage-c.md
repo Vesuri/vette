@@ -166,7 +166,10 @@ post-intro continuation is:
 
 74. `AddResMenu` (the requested `DRVR` type has no entries in either packaged resource fork)
 
-The current loud stop is `InsertMenu`, confirmed at `load+$0542` by the depth-74 run.
+75. `InsertMenu` (ordered menu-bar entries; `beforeID == -1` retains hierarchical menus off-bar)
+
+The current loud stop is resource-backed `GetMenu(222)`, confirmed at `load+$054A` by the depth-75
+run.
 
 `amiga/stage_c.gdb` breaks on `VetteScreen::showLoudStop`, after the report is complete, and prints
 the depth, trap identity, selector, runtime `(segment, offset)`, absolute PC, USP and its first
