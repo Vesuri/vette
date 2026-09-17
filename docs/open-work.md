@@ -7,10 +7,10 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — current loud stop
 
-⭐ **HEAD OF QUEUE: `SystemTask`, called by `Main+$29E6`, immediately before `GetNextEvent`.**
-The initial Macintosh event queue is empty, so `FlushEvents` accepts the register masks without
-altering live Amiga input state. Implement the cooperative system-task work required by this loop
-and continue into the garage. Do not add dialog/UI traps to conceal an upstream failure.
+⭐ **HEAD OF QUEUE: `GetNextEvent`, called by `Main+$29F2`.** There are no desk accessories or
+System processes to service, so `SystemTask` now runs the compatibility VBL callbacks and presents
+accumulated dirty Mac pixels, fixing the post-skip black display. Implement actual event records and
+input polling next; do not add dialog/UI traps to conceal an upstream failure.
 
 The MAME A-trap log remains a measured reference-run inventory → `docs/trap-log.md`,
 but Stage C has proved that it is **not an exact standalone-port first-use script**. The port has

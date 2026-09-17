@@ -188,6 +188,12 @@ implemented trap.
 The current loud stop is `SystemTask` at `Main+$29E6`, immediately before `GetNextEvent`, confirmed
 by the depth-79 run.
 
+80. `SystemTask` (service compatibility VBL work and present accumulated dirty pixels)
+
+The current loud stop is `GetNextEvent` at `Main+$29F2`, confirmed by the depth-80 run. Because
+`SystemTask` now presents dirty pixels, the post-intro screen is no longer left black while the main
+loop starts.
+
 `amiga/stage_c.gdb` breaks on `VetteScreen::showLoudStop`, after the report is complete, and prints
 the depth, trap identity, selector, runtime `(segment, offset)`, absolute PC, USP and its first
 words, all data/address registers, and nearby instructions. It then exits, so `diag_run.sh` stops

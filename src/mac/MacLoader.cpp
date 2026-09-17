@@ -2754,6 +2754,21 @@ static void scheduleVBLTask()
     }
 }
 
+static void serviceMacRuntime()
+{
+    scheduleVBLTask();
+    stabilizeIntroAnimation();
+    updateIntroAudio();
+    if (s_screenDirty && s_loudStopScreen
+        && s_loudStopScreen->presentMacFrame(
+            s_colorScreen, s_windowManagerColors,
+            s_pixelsDirty ? s_dirtyTop : 0, s_pixelsDirty ? s_dirtyLeft : 0,
+            s_pixelsDirty ? s_dirtyBottom : 0, s_pixelsDirty ? s_dirtyRight : 0)) {
+        s_screenDirty = false;
+        s_pixelsDirty = false;
+    }
+}
+
 static int32_t resourceHandleIndex(uint8_t** handle)
 {
     uint32_t address = (uint32_t)handle;
@@ -2813,6 +2828,14 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
         // combined masks in D0 are still accepted exactly as a register trap;
         // live mouse/key state is not an event-queue entry and is untouched.
         if (g_stageCDepth < 79) g_stageCDepth = 79;
+        return 1;
+    }
+    if (trap == 0xa9b4) {                    // SystemTask()
+        // There are no desk accessories or System processes in the standalone
+        // port.  This cooperative-loop call is the natural point to run the
+        // Mac compatibility callbacks and present accumulated dirty pixels.
+        serviceMacRuntime();
+        if (g_stageCDepth < 80) g_stageCDepth = 80;
         return 1;
     }
     if (trap == 0xa9a0) {                    // GetResource(type:4, id:2) -> Handle result:4
@@ -3274,17 +3297,7 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
         }
     }
     if (trap == 0xa974) {                    // Button() -> Boolean
-        scheduleVBLTask();
-        stabilizeIntroAnimation();
-        updateIntroAudio();
-        if (s_screenDirty && s_loudStopScreen
-            && s_loudStopScreen->presentMacFrame(
-                s_colorScreen, s_windowManagerColors,
-                s_pixelsDirty ? s_dirtyTop : 0, s_pixelsDirty ? s_dirtyLeft : 0,
-                s_pixelsDirty ? s_dirtyBottom : 0, s_pixelsDirty ? s_dirtyRight : 0)) {
-            s_screenDirty = false;
-            s_pixelsDirty = false;
-        }
+        serviceMacRuntime();
         bool pressed = AmigaHardware::isLeftMouseButtonPressed();
 #ifdef VETTE_SKIP_INTRO
         static bool firstButtonPoll = true;
