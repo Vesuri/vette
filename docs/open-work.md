@@ -59,8 +59,8 @@ late Menu Manager operations, `MoveWindow`/`DisposeWindow`/`PaintBehind`, and
 `UnLoadSeg` and `GetGDevice` were both required during startup.
 
 4. **Stage C — the trap layer, driven by the port's loud-stop order.**
-   ⭐ **50 distinct traps currently execute; the next stop is `GetNamedResource` from copied
-   support code at absolute PC `$003D5386`.**
+   ⭐ **67 distinct traps execute after one diagnostic intro click; `InsetRect` is implemented at
+   the latest stop (`Initialize+$1AFA`), with `FrameRoundRect` immediately next for verification.**
    Implement first-use-first, re-running after each one; progress is countable ("N traps deep,
    halted at *M*"). The MAME rows remain a useful floor and semantic cross-check, and the load-bearing
    ones are `SetPort`/`ClipRect`/`PenSize`/`TextMode` (stateful QuickDraw port), `GetResource` +

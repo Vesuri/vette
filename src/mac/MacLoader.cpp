@@ -4,6 +4,7 @@
 #include "MacLoader.h"
 #include "ResourceArchive.h"
 #include "platform/amiga/VetteScreen.h"
+#include "platform/amiga/framework/AmigaHardware.h"
 
 extern "C" {
 extern uint8_t vette_code_0[],  vette_code_0_end[];
@@ -74,6 +75,7 @@ static uint16_t s_currentResourceFork = 0;  // application resource file at proc
 
 struct WindowSlot {
     uint8_t record[170];                    // WindowRecord plus DialogRecord tail
+    uint8_t* window;
     bool used;
     uint8_t structureRegion[10];
     uint8_t* structureRegionMaster;
@@ -91,6 +93,7 @@ struct WindowSlot {
     bool updating;
     bool dialog;
     uint16_t dialogItemCount;
+    uint8_t** dialogItemHandles[32];
     bool dialogDrawn;
 };
 static WindowSlot s_windows[8];
@@ -236,9 +239,13 @@ static const TrapName s_trapNames[] = {
     {0xa122,"MEMORY MANAGER","NEWHANDLE"},
     {0xa128,"MEMORY MANAGER","RECOVERHANDLE"},
     {0xa025,"MEMORY MANAGER","GETHANDLESIZE"},
+    {0xa024,"MEMORY MANAGER","SETHANDLESIZE"},
     {0xa9ef,"MEMORY MANAGER","PTRANDHAND"},
     {0xa02a,"MEMORY MANAGER","HUNLOCK"}, {0xa049,"MEMORY MANAGER","HPURGE"},
+    {0xa04a,"MEMORY MANAGER","HNOPURGE"},
     {0xa03b,"TIME MANAGER","DELAY"},
+    {0xa03c,"TEXT UTILITIES","CMPSTRING"}, {0xa23c,"TEXT UTILITIES","CMPSTRING"},
+    {0xa43c,"TEXT UTILITIES","CMPSTRING"}, {0xa63c,"TEXT UTILITIES","CMPSTRING"},
     {0xa033,"VERTICAL RETRACE","VINSTALL"},
     {0xa998,"RESOURCE MANAGER","USERESFILE"}, {0xa994,"RESOURCE MANAGER","CURRESFILE"},
     {0xaa46,"WINDOW MANAGER","GETNEWCWINDOW"}, {0xa91b,"WINDOW MANAGER","MOVEWINDOW"},
@@ -254,8 +261,11 @@ static const TrapName s_trapNames[] = {
     {0xa047,"TRAP MANAGER","SETTRAPADDRESS"}, {0xa983,"DIALOG MANAGER","DISPOSEDIALOG"},
     {0xa850,"QUICKDRAW","INITCURSOR"}, {0xa9bc,"QUICKDRAW","GETPICTURE"},
     {0xa8f6,"QUICKDRAW","DRAWPICTURE"}, {0xa89b,"QUICKDRAW","PENSIZE"},
+    {0xa89c,"QUICKDRAW","PENMODE"}, {0xa8a1,"QUICKDRAW","FRAMERECT"},
+    {0xa8a9,"QUICKDRAW","INSETRECT"}, {0xa8b0,"QUICKDRAW","FRAMEROUNDRECT"},
     {0xa8ec,"QUICKDRAW","COPYBITS"}, {0xa8a3,"QUICKDRAW","ERASERECT"},
     {0xa87b,"QUICKDRAW","CLIPRECT"}, {0xa974,"EVENT MANAGER","BUTTON"},
+    {0xa98d,"DIALOG MANAGER","GETDITEM"}, {0xa98f,"DIALOG MANAGER","SETITEXT"},
     {0xa914,"WINDOW MANAGER","DISPOSEWINDOW"}, {0xa90d,"WINDOW MANAGER","PAINTBEHIND"},
     {0xa04d,"MEMORY MANAGER","PURGEMEM"}, {0xa04c,"MEMORY MANAGER","COMPACTMEM"},
     {0xa93a,"MENU MANAGER","DISABLEITEM"}, {0xa931,"MENU MANAGER","NEWMENU"},
@@ -342,6 +352,91 @@ static uint8_t** getResource(uint32_t type, int16_t id)
 static uint8_t asciiUpper(uint8_t c)
 {
     return c >= 'a' && c <= 'z' ? (uint8_t)(c - ('a' - 'A')) : c;
+}
+
+// EqualString's register trap compares MacRoman bytes.  Bit 10 of the trap
+// word makes case count; bit 9 makes diacritical marks count.  These tables
+// are the complete MacRoman lowercase and mark-stripping maps, rather than an
+// ASCII approximation that would quietly mis-handle resource names.
+static const uint8_t kMacRomanLower[256] = {
+    0x00,0x01,0x02,0x03,0x04,0x05,0x06,0x07,0x08,0x09,0x0a,0x0b,0x0c,0x0d,0x0e,0x0f,
+    0x10,0x11,0x12,0x13,0x14,0x15,0x16,0x17,0x18,0x19,0x1a,0x1b,0x1c,0x1d,0x1e,0x1f,
+    0x20,0x21,0x22,0x23,0x24,0x25,0x26,0x27,0x28,0x29,0x2a,0x2b,0x2c,0x2d,0x2e,0x2f,
+    0x30,0x31,0x32,0x33,0x34,0x35,0x36,0x37,0x38,0x39,0x3a,0x3b,0x3c,0x3d,0x3e,0x3f,
+    0x40,0x61,0x62,0x63,0x64,0x65,0x66,0x67,0x68,0x69,0x6a,0x6b,0x6c,0x6d,0x6e,0x6f,
+    0x70,0x71,0x72,0x73,0x74,0x75,0x76,0x77,0x78,0x79,0x7a,0x5b,0x5c,0x5d,0x5e,0x5f,
+    0x60,0x61,0x62,0x63,0x64,0x65,0x66,0x67,0x68,0x69,0x6a,0x6b,0x6c,0x6d,0x6e,0x6f,
+    0x70,0x71,0x72,0x73,0x74,0x75,0x76,0x77,0x78,0x79,0x7a,0x7b,0x7c,0x7d,0x7e,0x7f,
+    0x8a,0x8c,0x8d,0x8e,0x96,0x9a,0x9f,0x87,0x88,0x89,0x8a,0x8b,0x8c,0x8d,0x8e,0x8f,
+    0x90,0x91,0x92,0x93,0x94,0x95,0x96,0x97,0x98,0x99,0x9a,0x9b,0x9c,0x9d,0x9e,0x9f,
+    0xa0,0xa1,0xa2,0xa3,0xa4,0xa5,0xa6,0xa7,0xa8,0xa9,0xaa,0xab,0xac,0xad,0xbe,0xbf,
+    0xb0,0xb1,0xb2,0xb3,0xb4,0xb5,0xb6,0xb7,0xb8,0xb9,0xba,0xbb,0xbc,0xbd,0xbe,0xbf,
+    0xc0,0xc1,0xc2,0xc3,0xc4,0xc5,0xc6,0xc7,0xc8,0xc9,0xca,0x88,0x8b,0x9b,0xcf,0xcf,
+    0xd0,0xd1,0xd2,0xd3,0xd4,0xd5,0xd6,0xd7,0xd8,0xd8,0xda,0xdb,0xdc,0xdd,0xde,0xdf,
+    0xe0,0xe1,0xe2,0xe3,0xe4,0x89,0x90,0x87,0x91,0x8f,0x92,0x94,0x95,0x93,0x97,0x99,
+    0xf0,0x98,0x9c,0x9e,0x9d,0xf5,0xf6,0xf7,0xf8,0xf9,0xfa,0xfb,0xfc,0xfd,0xfe,0xff
+};
+
+static const uint8_t kMacRomanWithoutMarks[256] = {
+    0x00,0x01,0x02,0x03,0x04,0x05,0x06,0x07,0x08,0x09,0x0a,0x0b,0x0c,0x0d,0x0e,0x0f,
+    0x10,0x11,0x12,0x13,0x14,0x15,0x16,0x17,0x18,0x19,0x1a,0x1b,0x1c,0x1d,0x1e,0x1f,
+    0x20,0x21,0x22,0x23,0x24,0x25,0x26,0x27,0x28,0x29,0x2a,0x2b,0x2c,0x2d,0x2e,0x2f,
+    0x30,0x31,0x32,0x33,0x34,0x35,0x36,0x37,0x38,0x39,0x3a,0x3b,0x3c,0x3d,0x3e,0x3f,
+    0x40,0x41,0x42,0x43,0x44,0x45,0x46,0x47,0x48,0x49,0x4a,0x4b,0x4c,0x4d,0x4e,0x4f,
+    0x50,0x51,0x52,0x53,0x54,0x55,0x56,0x57,0x58,0x59,0x5a,0x5b,0x5c,0x5d,0x5e,0x5f,
+    0x60,0x61,0x62,0x63,0x64,0x65,0x66,0x67,0x68,0x69,0x6a,0x6b,0x6c,0x6d,0x6e,0x6f,
+    0x70,0x71,0x72,0x73,0x74,0x75,0x76,0x77,0x78,0x79,0x7a,0x7b,0x7c,0x7d,0x7e,0x7f,
+    0x41,0x41,0x43,0x45,0x4e,0x4f,0x55,0x61,0x61,0x61,0x61,0x61,0x61,0x63,0x65,0x65,
+    0x65,0x65,0x69,0x69,0x69,0x69,0x6e,0x6f,0x6f,0x6f,0x6f,0x6f,0x75,0x75,0x75,0x75,
+    0xa0,0xa1,0xa2,0xa3,0xa4,0xa5,0xa6,0xa7,0xa8,0xa9,0xaa,0xab,0xac,0x3d,0xae,0xaf,
+    0xb0,0xb1,0xb2,0xb3,0xb4,0xb5,0xb6,0xb7,0xb8,0xb9,0xba,0xbb,0xbc,0xbd,0xbe,0xbf,
+    0xc0,0xc1,0xc2,0xc3,0xc4,0xc5,0xc6,0xc7,0xc8,0xc9,0xca,0x41,0x41,0x4f,0xce,0xcf,
+    0xd0,0xd1,0xd2,0xd3,0xd4,0xd5,0xd6,0xd7,0x79,0x59,0xda,0xdb,0xdc,0xdd,0xde,0xdf,
+    0xe0,0xe1,0xe2,0xe3,0xe4,0x41,0x45,0x41,0x45,0x45,0x49,0x49,0x49,0x49,0x4f,0x4f,
+    0xf0,0x4f,0x55,0x55,0x55,0xf5,0xf6,0xf7,0xf8,0xf9,0xfa,0xfb,0xfc,0xfd,0xfe,0xff
+};
+
+static uint8_t normalizedMacRoman(uint8_t value, bool caseSensitive, bool marksSensitive)
+{
+    if (!marksSensitive) value = kMacRomanWithoutMarks[value];
+    if (!caseSensitive) value = kMacRomanLower[value];
+    return value;
+}
+
+static bool equalMacRomanStrings(const uint8_t* first, uint16_t firstLength,
+                                 const uint8_t* second, uint16_t secondLength,
+                                 bool caseSensitive, bool marksSensitive)
+{
+    if (!first || !second || firstLength != secondLength) return false;
+    for (uint16_t i = 0; i < firstLength; ++i)
+        if (normalizedMacRoman(first[i], caseSensitive, marksSensitive)
+            != normalizedMacRoman(second[i], caseSensitive, marksSensitive)) return false;
+    return true;
+}
+
+static bool resourceNameEquals(const ResourceArchive::Item& item, const uint8_t* name)
+{
+    if (!name || name[0] != item.nameLength) return false;
+    for (uint16_t i = 0; i < item.nameLength; ++i)
+        if (asciiUpper(name[i + 1]) != asciiUpper(item.name[i])) return false;
+    return true;
+}
+
+static uint8_t** getNamedResource(uint32_t type, const uint8_t* name)
+{
+    for (uint16_t pass = 0; pass < s_resourceArchive.forkCount(); ++pass) {
+        uint16_t fork = (uint16_t)(s_currentResourceFork + pass);
+        if (fork >= s_resourceArchive.forkCount()) fork -= s_resourceArchive.forkCount();
+        for (uint32_t i = 0; i < s_resourceArchive.resourceCount(); ++i) {
+            ResourceArchive::Item item;
+            if (!s_resourceArchive.item(i, item)) return 0;
+            if (item.fork == fork && item.type == type && resourceNameEquals(item, name)) {
+                s_resourceMasters[i] = (uint8_t*)item.data;
+                return &s_resourceMasters[i];
+            }
+        }
+    }
+    return 0;
 }
 
 static bool pascalEquals(const uint8_t* value, const char* expected)
@@ -537,6 +632,7 @@ static uint8_t* newColorWindow(int16_t id, uint8_t* storage, uint8_t* behind)
         if (!s_windows[i].used) { slot = &s_windows[i]; break; }
     if (!slot) return 0;
     slot->used = true;
+    slot->dialog = false;
     for (uint16_t i = 0; i < sizeof(slot->record); ++i) slot->record[i] = 0;
 
     int16_t top = (int16_t)read16(wind);
@@ -544,6 +640,7 @@ static uint8_t* newColorWindow(int16_t id, uint8_t* storage, uint8_t* behind)
     int16_t bottom = (int16_t)read16(wind + 4);
     int16_t right = (int16_t)read16(wind + 6);
     uint8_t* window = storage ? storage : slot->record;
+    slot->window = window;
     if (storage)
         for (uint16_t i = 0; i < 156; ++i) storage[i] = 0;
 
@@ -587,7 +684,9 @@ static uint8_t* newDialog(int16_t id, uint8_t* storage, uint8_t* behind)
     if (!slot) return 0;
     slot->used = true;
     slot->dialog = true;
+    for (uint16_t i = 0; i < 32; ++i) slot->dialogItemHandles[i] = 0;
     uint8_t* dialog = storage ? storage : slot->record;
+    slot->window = dialog;
     for (uint16_t i = 0; i < sizeof(slot->record); ++i) dialog[i] = 0;
 
     int16_t top = (int16_t)read16(dlog);
@@ -638,11 +737,39 @@ static void moveWindow(uint8_t* window, int16_t h, int16_t v, bool front)
 static WindowSlot* windowSlot(uint8_t* window)
 {
     for (uint16_t i = 0; i < sizeof(s_windows) / sizeof(s_windows[0]); ++i)
-        if (s_windows[i].used && s_windows[i].record == window) return &s_windows[i];
+        if (s_windows[i].used && s_windows[i].window == window) return &s_windows[i];
     return 0;
 }
 
+static bool disposeDialog(uint8_t* dialog)
+{
+    WindowSlot* slot = windowSlot(dialog);
+    if (!slot || !slot->dialog) return false;
+    uint8_t* next = (uint8_t*)read32(dialog + 144);
+    if (s_windowList == dialog) s_windowList = next;
+    else {
+        for (uint16_t i = 0; i < sizeof(s_windows) / sizeof(s_windows[0]); ++i) {
+            uint8_t* candidate = s_windows[i].used ? s_windows[i].window : 0;
+            if (candidate && (uint8_t*)read32(candidate + 144) == dialog) {
+                write32(candidate + 144, (uint32_t)next);
+                break;
+            }
+        }
+    }
+    if ((uint8_t*)read32(s_qdThePort) == dialog)
+        write32(s_qdThePort, (uint32_t)s_windowManagerPort);
+    dialog[110] = 0;
+    write32(dialog + 144, 0);
+    slot->used = false;
+    slot->window = 0;
+    slot->dialog = false;
+    slot->dialogItemCount = 0;
+    slot->dialogDrawn = false;
+    return true;
+}
+
 static int32_t resourceHandleIndex(uint8_t** handle);
+static uint8_t** newHandle(uint32_t size, bool clear);
 
 static uint32_t resourceHandleSize(uint8_t** handle)
 {
@@ -689,6 +816,789 @@ static bool drawDialog(uint8_t* dialog)
     write32(s_qdThePort, (uint32_t)dialog);
     fillColorRect((int16_t)read16(dialog + 16), (int16_t)read16(dialog + 18),
                   (int16_t)read16(dialog + 20), (int16_t)read16(dialog + 22), 0);
+    return true;
+}
+
+static bool getDialogItem(uint8_t* dialog, uint16_t itemNumber,
+                          uint8_t* itemType, uint8_t* itemHandle, uint8_t* box)
+{
+    WindowSlot* slot = windowSlot(dialog);
+    uint8_t** itemsHandle = slot && slot->dialog ? (uint8_t**)read32(dialog + 156) : 0;
+    uint32_t size = resourceHandleSize(itemsHandle);
+    if (!itemsHandle || !*itemsHandle || !itemNumber || !itemType || !itemHandle || !box
+        || size < 2 || itemNumber > (uint16_t)(read16(*itemsHandle) + 1)) return false;
+    const uint8_t* items = *itemsHandle;
+    uint32_t offset = 2;
+    for (uint16_t number = 1; number < itemNumber; ++number) {
+        if (offset + 14 > size) return false;
+        offset += 14 + items[offset + 13];
+        if (offset & 1) ++offset;
+    }
+    if (offset + 14 > size || offset + 14UL + items[offset + 13] > size) return false;
+    uint8_t type = items[offset + 12];
+    write16(itemType, type);
+    uint8_t** handle = (uint8_t**)read32(items + offset);
+    if (!handle && (type & 0x7f) == 8 && itemNumber <= 32) { // statText
+        handle = slot->dialogItemHandles[itemNumber - 1];
+        if (!handle) {
+            uint8_t length = items[offset + 13];
+            handle = newHandle((uint32_t)length + 1, false);
+            if (!handle) return false;
+            (*handle)[0] = length;
+            for (uint16_t i = 0; i < length; ++i) (*handle)[i + 1] = items[offset + 14 + i];
+            slot->dialogItemHandles[itemNumber - 1] = handle;
+        }
+    }
+    write32(itemHandle, (uint32_t)handle);
+    for (uint16_t i = 0; i < 8; ++i) box[i] = items[offset + 4 + i];
+    return true;
+}
+
+static bool unpackPackBitsRow(const uint8_t* packed, uint32_t packedSize,
+                              uint8_t* unpacked, uint16_t rowBytes)
+{
+    uint32_t source = 0;
+    uint16_t destination = 0;
+    while (source < packedSize && destination < rowBytes) {
+        int8_t header = (int8_t)packed[source++];
+        if (header >= 0) {
+            uint16_t count = (uint16_t)header + 1;
+            if (source + count > packedSize || destination + count > rowBytes) return false;
+            for (uint16_t i = 0; i < count; ++i) unpacked[destination++] = packed[source++];
+        } else if (header != -128) {
+            uint16_t count = (uint16_t)(1 - header);
+            if (source >= packedSize || destination + count > rowBytes) return false;
+            uint8_t value = packed[source++];
+            for (uint16_t i = 0; i < count; ++i) unpacked[destination++] = value;
+        }
+    }
+    return destination == rowBytes && source == packedSize;
+}
+
+static uint32_t multiplyUnsigned16(uint16_t first, uint16_t second)
+{
+    uint32_t product = 0;
+    uint32_t addend = first;
+    while (second) {
+        if (second & 1) product += addend;
+        addend <<= 1;
+        second >>= 1;
+    }
+    return product;
+}
+
+static uint8_t packedPixel(const uint8_t* pixels, uint16_t rowBytes,
+                           int16_t boundsTop, int16_t boundsLeft, int16_t x, int16_t y)
+{
+    const uint8_t* byte = pixels + multiplyUnsigned16((uint16_t)(y - boundsTop), rowBytes)
+                         + (uint16_t)(x - boundsLeft) / 2;
+    return (x - boundsLeft) & 1 ? (uint8_t)(*byte & 0x0f) : (uint8_t)(*byte >> 4);
+}
+
+static void setPackedPixel(uint8_t* pixels, uint16_t rowBytes,
+                           int16_t boundsTop, int16_t boundsLeft,
+                           int16_t x, int16_t y, uint8_t value)
+{
+    uint8_t* byte = pixels + multiplyUnsigned16((uint16_t)(y - boundsTop), rowBytes)
+                    + (uint16_t)(x - boundsLeft) / 2;
+    if ((x - boundsLeft) & 1) *byte = (uint8_t)((*byte & 0xf0) | (value & 0x0f));
+    else *byte = (uint8_t)((*byte & 0x0f) | ((value & 0x0f) << 4));
+}
+
+static uint32_t multiplyDivide(uint16_t value, uint16_t multiplier, uint16_t divisor)
+{
+    if (!divisor) return 0;
+    if (multiplier == divisor) return value;
+    uint32_t product = 0;
+    uint32_t addend = value;
+    uint16_t factor = multiplier;
+    while (factor) {
+        if (factor & 1) product += addend;
+        addend <<= 1;
+        factor >>= 1;
+    }
+    uint32_t quotient = 0;
+    uint32_t remainder = 0;
+    for (int16_t bit = 31; bit >= 0; --bit) {
+        remainder = (remainder << 1) | ((product >> bit) & 1);
+        if (remainder >= divisor) {
+            remainder -= divisor;
+            quotient |= 1UL << bit;
+        }
+    }
+    return quotient;
+}
+
+static bool drawPackedPictureBits(const uint8_t* picture, uint32_t size, uint32_t& offset,
+                                  const uint8_t* pictureFrame, const uint8_t* targetRect)
+{
+    if (offset + 46 > size) return false;
+    const uint8_t* pixMap = picture + offset;
+    uint16_t rowBytes = (uint16_t)(read16(pixMap) & 0x3fff);
+    uint16_t pixelSize = read16(pixMap + 28);
+    if (!(read16(pixMap) & 0x8000) || (pixelSize != 4 && pixelSize != 8) || !rowBytes)
+        return false;
+    int16_t sourceTop = (int16_t)read16(pixMap + 2);
+    int16_t sourceLeft = (int16_t)read16(pixMap + 4);
+    int16_t sourceBottom = (int16_t)read16(pixMap + 6);
+    int16_t sourceRight = (int16_t)read16(pixMap + 8);
+    if (sourceBottom <= sourceTop || sourceRight <= sourceLeft) return false;
+    offset += 46;
+
+    if (offset + 8 > size) return false;
+    const uint8_t* colorTable = picture + offset;
+    uint16_t colorFlags = read16(colorTable + 4);
+    uint16_t finalColor = read16(colorTable + 6);
+    if (pixelSize == 8 && finalColor > 255) return false;
+    uint32_t colorBytes = 8UL + ((uint32_t)finalColor + 1) * 8;
+    if (offset + colorBytes > size) return false;
+    uint8_t colorMap[256];
+    for (uint16_t i = 0; i < 256; ++i) colorMap[i] = 0;
+    if (pixelSize == 8) {
+        for (uint16_t i = 0; i <= finalColor; ++i) {
+            const uint8_t* sourceColor = colorTable + 8 + (uint32_t)i * 8;
+            uint16_t sourceIndex = colorFlags & 0x8000 ? i : read16(sourceColor);
+            uint32_t bestDistance = 0xffffffffUL;
+            uint8_t bestIndex = 0;
+            for (uint8_t destinationIndex = 0; destinationIndex < 16; ++destinationIndex) {
+                const uint8_t* destinationColor
+                    = s_windowManagerColors + 8 + (uint16_t)destinationIndex * 8;
+                uint16_t sr = read16(sourceColor + 2), sg = read16(sourceColor + 4);
+                uint16_t sb = read16(sourceColor + 6);
+                uint16_t dr = read16(destinationColor + 2), dg = read16(destinationColor + 4);
+                uint16_t db = read16(destinationColor + 6);
+                uint32_t distance = (sr > dr ? sr - dr : dr - sr)
+                                  + (sg > dg ? sg - dg : dg - sg)
+                                  + (sb > db ? sb - db : db - sb);
+                if (distance < bestDistance) {
+                    bestDistance = distance;
+                    bestIndex = destinationIndex;
+                }
+            }
+            if (sourceIndex < 256) colorMap[sourceIndex] = bestIndex;
+        }
+    }
+    offset += colorBytes;
+    if (offset + 18 > size) return false;
+    const uint8_t* rasterSource = picture + offset;
+    const uint8_t* rasterDestination = picture + offset + 8;
+    uint16_t mode = read16(picture + offset + 16);
+    if (mode != 0) return false;              // srcCopy is the measured title path
+    offset += 18;
+
+    uint16_t height = (uint16_t)(sourceBottom - sourceTop);
+    uint32_t pixelBytes = multiplyUnsigned16(rowBytes, height);
+    uint8_t* pixels = (uint8_t*)AllocMem(pixelBytes, 0);
+    if (!pixels) return false;
+    bool valid = true;
+    for (uint16_t row = 0; row < height && valid; ++row) {
+        if (offset + (rowBytes > 250 ? 2 : 1) > size) { valid = false; break; }
+        uint16_t packedSize;
+        if (rowBytes > 250) { packedSize = read16(picture + offset); offset += 2; }
+        else packedSize = picture[offset++];
+        if (offset + packedSize > size
+            || !unpackPackBitsRow(picture + offset, packedSize,
+                                  pixels + multiplyUnsigned16(row, rowBytes), rowBytes)) {
+            valid = false; break;
+        }
+        offset += packedSize;
+    }
+    if (offset & 1) ++offset;
+
+    uint8_t* port = (uint8_t*)read32(s_qdThePort);
+    uint8_t** destinationHandle = port ? (uint8_t**)read32(port + 2) : 0;
+    uint8_t* destinationMap = destinationHandle ? *destinationHandle : 0;
+    uint8_t* destinationPixels = destinationMap ? (uint8_t*)read32(destinationMap) : 0;
+    uint16_t destinationRowBytes = destinationMap ? (uint16_t)(read16(destinationMap + 4) & 0x3fff) : 0;
+    if (!valid || !destinationPixels || read16(destinationMap + 32) != 4) valid = false;
+
+    int16_t frameTop = (int16_t)read16(pictureFrame);
+    int16_t frameLeft = (int16_t)read16(pictureFrame + 2);
+    int16_t frameBottom = (int16_t)read16(pictureFrame + 4);
+    int16_t frameRight = (int16_t)read16(pictureFrame + 6);
+    int16_t targetTop = (int16_t)read16(targetRect);
+    int16_t targetLeft = (int16_t)read16(targetRect + 2);
+    int16_t targetBottom = (int16_t)read16(targetRect + 4);
+    int16_t targetRight = (int16_t)read16(targetRect + 6);
+    int16_t rasterTop = (int16_t)read16(rasterDestination);
+    int16_t rasterLeft = (int16_t)read16(rasterDestination + 2);
+    int16_t rasterBottom = (int16_t)read16(rasterDestination + 4);
+    int16_t rasterRight = (int16_t)read16(rasterDestination + 6);
+    int16_t copyTop = (int16_t)read16(rasterSource);
+    int16_t copyLeft = (int16_t)read16(rasterSource + 2);
+    int16_t copyBottom = (int16_t)read16(rasterSource + 4);
+    int16_t copyRight = (int16_t)read16(rasterSource + 6);
+    int16_t mapTop = destinationMap ? (int16_t)read16(destinationMap + 6) : 0;
+    int16_t mapLeft = destinationMap ? (int16_t)read16(destinationMap + 8) : 0;
+    int16_t mapBottom = destinationMap ? (int16_t)read16(destinationMap + 10) : 0;
+    int16_t mapRight = destinationMap ? (int16_t)read16(destinationMap + 12) : 0;
+    if (frameBottom <= frameTop || frameRight <= frameLeft || targetBottom <= targetTop
+        || targetRight <= targetLeft || rasterBottom <= rasterTop || rasterRight <= rasterLeft
+        || copyBottom <= copyTop || copyRight <= copyLeft) valid = false;
+
+    if (valid) {
+        for (int16_t y = targetTop; y < targetBottom; ++y) {
+            if (y < mapTop || y >= mapBottom) continue;
+            int16_t pictureY = (int16_t)(frameTop + multiplyDivide(
+                (uint16_t)(y - targetTop), (uint16_t)(frameBottom - frameTop),
+                (uint16_t)(targetBottom - targetTop)));
+            if (pictureY < rasterTop || pictureY >= rasterBottom) continue;
+            int16_t sourceY = (int16_t)(copyTop + multiplyDivide(
+                (uint16_t)(pictureY - rasterTop), (uint16_t)(copyBottom - copyTop),
+                (uint16_t)(rasterBottom - rasterTop)));
+            const uint8_t* sourceRow = pixels
+                + multiplyUnsigned16((uint16_t)(sourceY - sourceTop), rowBytes);
+            uint8_t* destinationRow = destinationPixels
+                + multiplyUnsigned16((uint16_t)(y - mapTop), destinationRowBytes);
+            for (int16_t x = targetLeft; x < targetRight; ++x) {
+                if (x < mapLeft || x >= mapRight) continue;
+                int16_t pictureX = (int16_t)(frameLeft + multiplyDivide(
+                    (uint16_t)(x - targetLeft), (uint16_t)(frameRight - frameLeft),
+                    (uint16_t)(targetRight - targetLeft)));
+                if (pictureX < rasterLeft || pictureX >= rasterRight) continue;
+                int16_t sourceX = (int16_t)(copyLeft + multiplyDivide(
+                    (uint16_t)(pictureX - rasterLeft), (uint16_t)(copyRight - copyLeft),
+                    (uint16_t)(rasterRight - rasterLeft)));
+                if (sourceY >= sourceTop && sourceY < sourceBottom
+                    && sourceX >= sourceLeft && sourceX < sourceRight) {
+                    uint16_t sourceColumn = (uint16_t)(sourceX - sourceLeft);
+                    uint8_t value;
+                    if (pixelSize == 4) {
+                        uint8_t sourceByte = sourceRow[sourceColumn >> 1];
+                        value = sourceColumn & 1 ? (uint8_t)(sourceByte & 0x0f)
+                                                 : (uint8_t)(sourceByte >> 4);
+                    } else value = colorMap[sourceRow[sourceColumn]];
+                    uint16_t destinationColumn = (uint16_t)(x - mapLeft);
+                    uint8_t& destinationByte = destinationRow[destinationColumn >> 1];
+                    if (destinationColumn & 1)
+                        destinationByte = (uint8_t)((destinationByte & 0xf0) | value);
+                    else destinationByte = (uint8_t)((destinationByte & 0x0f) | (value << 4));
+                }
+            }
+        }
+    }
+    FreeMem(pixels, pixelBytes);
+    return valid;
+}
+
+static bool drawPackedMonochromePictureBits(const uint8_t* picture, uint32_t size,
+                                            uint32_t& offset,
+                                            const uint8_t* pictureFrame,
+                                            const uint8_t* targetRect)
+{
+    if (offset + 28 > size) return false;
+    uint16_t rowBytesWord = read16(picture + offset);
+    uint16_t rowBytes = (uint16_t)(rowBytesWord & 0x3fff);
+    if ((rowBytesWord & 0x8000) || !rowBytes) return false; // BitMap, not PixMap
+    int16_t sourceTop = (int16_t)read16(picture + offset + 2);
+    int16_t sourceLeft = (int16_t)read16(picture + offset + 4);
+    int16_t sourceBottom = (int16_t)read16(picture + offset + 6);
+    int16_t sourceRight = (int16_t)read16(picture + offset + 8);
+    if (sourceBottom <= sourceTop || sourceRight <= sourceLeft
+        || rowBytes < ((uint16_t)(sourceRight - sourceLeft) + 7) / 8) return false;
+    offset += 10;
+
+    const uint8_t* rasterSource = picture + offset;
+    const uint8_t* rasterDestination = picture + offset + 8;
+    uint16_t mode = read16(picture + offset + 16);
+    if (mode != 0) return false;
+    offset += 18;
+
+    uint16_t height = (uint16_t)(sourceBottom - sourceTop);
+    uint32_t pixelBytes = multiplyUnsigned16(rowBytes, height);
+    uint8_t* pixels = (uint8_t*)AllocMem(pixelBytes, 0);
+    if (!pixels) return false;
+    bool valid = true;
+    for (uint16_t row = 0; row < height && valid; ++row) {
+        if (offset + (rowBytes > 250 ? 2 : 1) > size) { valid = false; break; }
+        uint16_t packedSize;
+        if (rowBytes > 250) { packedSize = read16(picture + offset); offset += 2; }
+        else packedSize = picture[offset++];
+        if (offset + packedSize > size
+            || !unpackPackBitsRow(picture + offset, packedSize,
+                                  pixels + multiplyUnsigned16(row, rowBytes), rowBytes)) {
+            valid = false; break;
+        }
+        offset += packedSize;
+    }
+
+    uint8_t* port = (uint8_t*)read32(s_qdThePort);
+    uint8_t** destinationHandle = port ? (uint8_t**)read32(port + 2) : 0;
+    uint8_t* destinationMap = destinationHandle ? *destinationHandle : 0;
+    uint8_t* destinationPixels = destinationMap ? (uint8_t*)read32(destinationMap) : 0;
+    uint16_t destinationRowBytes = destinationMap
+        ? (uint16_t)(read16(destinationMap + 4) & 0x3fff) : 0;
+    if (!valid || !destinationPixels || read16(destinationMap + 32) != 4) valid = false;
+
+    int16_t frameTop = (int16_t)read16(pictureFrame);
+    int16_t frameLeft = (int16_t)read16(pictureFrame + 2);
+    int16_t frameBottom = (int16_t)read16(pictureFrame + 4);
+    int16_t frameRight = (int16_t)read16(pictureFrame + 6);
+    int16_t targetTop = (int16_t)read16(targetRect);
+    int16_t targetLeft = (int16_t)read16(targetRect + 2);
+    int16_t targetBottom = (int16_t)read16(targetRect + 4);
+    int16_t targetRight = (int16_t)read16(targetRect + 6);
+    int16_t rasterTop = (int16_t)read16(rasterDestination);
+    int16_t rasterLeft = (int16_t)read16(rasterDestination + 2);
+    int16_t rasterBottom = (int16_t)read16(rasterDestination + 4);
+    int16_t rasterRight = (int16_t)read16(rasterDestination + 6);
+    int16_t copyTop = (int16_t)read16(rasterSource);
+    int16_t copyLeft = (int16_t)read16(rasterSource + 2);
+    int16_t copyBottom = (int16_t)read16(rasterSource + 4);
+    int16_t copyRight = (int16_t)read16(rasterSource + 6);
+    int16_t mapTop = destinationMap ? (int16_t)read16(destinationMap + 6) : 0;
+    int16_t mapLeft = destinationMap ? (int16_t)read16(destinationMap + 8) : 0;
+    int16_t mapBottom = destinationMap ? (int16_t)read16(destinationMap + 10) : 0;
+    int16_t mapRight = destinationMap ? (int16_t)read16(destinationMap + 12) : 0;
+    if (frameBottom <= frameTop || frameRight <= frameLeft || targetBottom <= targetTop
+        || targetRight <= targetLeft || rasterBottom <= rasterTop || rasterRight <= rasterLeft
+        || copyBottom <= copyTop || copyRight <= copyLeft) valid = false;
+
+    if (valid) {
+        for (int16_t y = targetTop; y < targetBottom; ++y) {
+            if (y < mapTop || y >= mapBottom) continue;
+            int16_t pictureY = (int16_t)(frameTop + multiplyDivide(
+                (uint16_t)(y - targetTop), (uint16_t)(frameBottom - frameTop),
+                (uint16_t)(targetBottom - targetTop)));
+            if (pictureY < rasterTop || pictureY >= rasterBottom) continue;
+            int16_t sourceY = (int16_t)(copyTop + multiplyDivide(
+                (uint16_t)(pictureY - rasterTop), (uint16_t)(copyBottom - copyTop),
+                (uint16_t)(rasterBottom - rasterTop)));
+            const uint8_t* sourceRow = pixels
+                + multiplyUnsigned16((uint16_t)(sourceY - sourceTop), rowBytes);
+            uint8_t* destinationRow = destinationPixels
+                + multiplyUnsigned16((uint16_t)(y - mapTop), destinationRowBytes);
+            for (int16_t x = targetLeft; x < targetRight; ++x) {
+                if (x < mapLeft || x >= mapRight) continue;
+                int16_t pictureX = (int16_t)(frameLeft + multiplyDivide(
+                    (uint16_t)(x - targetLeft), (uint16_t)(frameRight - frameLeft),
+                    (uint16_t)(targetRight - targetLeft)));
+                if (pictureX < rasterLeft || pictureX >= rasterRight) continue;
+                int16_t sourceX = (int16_t)(copyLeft + multiplyDivide(
+                    (uint16_t)(pictureX - rasterLeft), (uint16_t)(copyRight - copyLeft),
+                    (uint16_t)(rasterRight - rasterLeft)));
+                if (sourceY >= sourceTop && sourceY < sourceBottom
+                    && sourceX >= sourceLeft && sourceX < sourceRight) {
+                    uint16_t sourceColumn = (uint16_t)(sourceX - sourceLeft);
+                    uint8_t value = sourceRow[sourceColumn >> 3]
+                        & (uint8_t)(0x80 >> (sourceColumn & 7)) ? 15 : 0;
+                    uint16_t destinationColumn = (uint16_t)(x - mapLeft);
+                    uint8_t& destinationByte = destinationRow[destinationColumn >> 1];
+                    if (destinationColumn & 1)
+                        destinationByte = (uint8_t)((destinationByte & 0xf0) | value);
+                    else destinationByte = (uint8_t)((destinationByte & 0x0f) | (value << 4));
+                }
+            }
+        }
+    }
+    FreeMem(pixels, pixelBytes);
+    return valid;
+}
+
+static bool drawDirectPictureBits(const uint8_t* picture, uint32_t size, uint32_t& offset,
+                                  const uint8_t* pictureFrame, const uint8_t* targetRect)
+{
+    if (offset + 68 > size) return false;
+    offset += 4;                            // baseAddr is not stored in a PICT PixMap
+    const uint8_t* pixMap = picture + offset;
+    uint16_t rowBytes = (uint16_t)(read16(pixMap) & 0x3fff);
+    int16_t sourceTop = (int16_t)read16(pixMap + 2);
+    int16_t sourceLeft = (int16_t)read16(pixMap + 4);
+    int16_t sourceBottom = (int16_t)read16(pixMap + 6);
+    int16_t sourceRight = (int16_t)read16(pixMap + 8);
+    if (!(read16(pixMap) & 0x8000) || read16(pixMap + 12) != 4
+        || read16(pixMap + 26) != 16 || read16(pixMap + 28) != 32
+        || read16(pixMap + 30) != 3 || read16(pixMap + 32) != 8
+        || sourceBottom <= sourceTop || sourceRight <= sourceLeft || !rowBytes) return false;
+    uint16_t width = (uint16_t)(sourceRight - sourceLeft);
+    uint16_t componentRowBytes = (uint16_t)(width + width + width);
+    if (rowBytes < (uint16_t)(width << 2)) return false;
+    offset += 46;
+
+    const uint8_t* rasterSource = picture + offset;
+    const uint8_t* rasterDestination = picture + offset + 8;
+    uint16_t mode = read16(picture + offset + 16);
+    if (mode != 0 && mode != 0x0040) return false; // srcCopy or ditherCopy
+    offset += 18;
+
+    uint16_t height = (uint16_t)(sourceBottom - sourceTop);
+    uint32_t pixelBytes = multiplyUnsigned16(componentRowBytes, height);
+    uint8_t* pixels = (uint8_t*)AllocMem(pixelBytes, 0);
+    if (!pixels) return false;
+    bool valid = true;
+    for (uint16_t row = 0; row < height && valid; ++row) {
+        if (offset + (rowBytes > 250 ? 2 : 1) > size) { valid = false; break; }
+        uint16_t packedSize;
+        if (rowBytes > 250) { packedSize = read16(picture + offset); offset += 2; }
+        else packedSize = picture[offset++];
+        if (offset + packedSize > size
+            || !unpackPackBitsRow(picture + offset, packedSize,
+                                  pixels + multiplyUnsigned16(row, componentRowBytes),
+                                  componentRowBytes)) {
+            valid = false; break;
+        }
+        offset += packedSize;
+    }
+    if (offset & 1) ++offset;
+
+    uint8_t colorMap[256];
+    static const uint16_t levels3[8] = {
+        0x0000,0x2492,0x4924,0x6db6,0x9249,0xb6db,0xdb6d,0xffff
+    };
+    static const uint16_t levels2[4] = { 0x0000,0x5555,0xaaaa,0xffff };
+    for (uint16_t key = 0; key < 256; ++key) {
+        uint16_t sr = levels3[key >> 5];
+        uint16_t sg = levels3[(key >> 2) & 7];
+        uint16_t sb = levels2[key & 3];
+        uint32_t bestDistance = 0xffffffffUL;
+        uint8_t bestIndex = 0;
+        for (uint8_t destinationIndex = 0; destinationIndex < 16; ++destinationIndex) {
+            const uint8_t* destinationColor
+                = s_windowManagerColors + 8 + (uint16_t)destinationIndex * 8;
+            uint16_t dr = read16(destinationColor + 2), dg = read16(destinationColor + 4);
+            uint16_t db = read16(destinationColor + 6);
+            uint32_t distance = (sr > dr ? sr - dr : dr - sr)
+                              + (sg > dg ? sg - dg : dg - sg)
+                              + (sb > db ? sb - db : db - sb);
+            if (distance < bestDistance) {
+                bestDistance = distance;
+                bestIndex = destinationIndex;
+            }
+        }
+        colorMap[key] = bestIndex;
+    }
+
+    uint8_t* port = (uint8_t*)read32(s_qdThePort);
+    uint8_t** destinationHandle = port ? (uint8_t**)read32(port + 2) : 0;
+    uint8_t* destinationMap = destinationHandle ? *destinationHandle : 0;
+    uint8_t* destinationPixels = destinationMap ? (uint8_t*)read32(destinationMap) : 0;
+    uint16_t destinationRowBytes = destinationMap
+        ? (uint16_t)(read16(destinationMap + 4) & 0x3fff) : 0;
+    if (!valid || !destinationPixels || read16(destinationMap + 32) != 4) valid = false;
+
+    int16_t frameTop = (int16_t)read16(pictureFrame);
+    int16_t frameLeft = (int16_t)read16(pictureFrame + 2);
+    int16_t frameBottom = (int16_t)read16(pictureFrame + 4);
+    int16_t frameRight = (int16_t)read16(pictureFrame + 6);
+    int16_t targetTop = (int16_t)read16(targetRect);
+    int16_t targetLeft = (int16_t)read16(targetRect + 2);
+    int16_t targetBottom = (int16_t)read16(targetRect + 4);
+    int16_t targetRight = (int16_t)read16(targetRect + 6);
+    int16_t rasterTop = (int16_t)read16(rasterDestination);
+    int16_t rasterLeft = (int16_t)read16(rasterDestination + 2);
+    int16_t rasterBottom = (int16_t)read16(rasterDestination + 4);
+    int16_t rasterRight = (int16_t)read16(rasterDestination + 6);
+    int16_t copyTop = (int16_t)read16(rasterSource);
+    int16_t copyLeft = (int16_t)read16(rasterSource + 2);
+    int16_t copyBottom = (int16_t)read16(rasterSource + 4);
+    int16_t copyRight = (int16_t)read16(rasterSource + 6);
+    int16_t mapTop = destinationMap ? (int16_t)read16(destinationMap + 6) : 0;
+    int16_t mapLeft = destinationMap ? (int16_t)read16(destinationMap + 8) : 0;
+    int16_t mapBottom = destinationMap ? (int16_t)read16(destinationMap + 10) : 0;
+    int16_t mapRight = destinationMap ? (int16_t)read16(destinationMap + 12) : 0;
+    if (frameBottom <= frameTop || frameRight <= frameLeft || targetBottom <= targetTop
+        || targetRight <= targetLeft || rasterBottom <= rasterTop || rasterRight <= rasterLeft
+        || copyBottom <= copyTop || copyRight <= copyLeft) valid = false;
+
+    if (valid) {
+        for (int16_t y = targetTop; y < targetBottom; ++y) {
+            if (y < mapTop || y >= mapBottom) continue;
+            int16_t pictureY = (int16_t)(frameTop + multiplyDivide(
+                (uint16_t)(y - targetTop), (uint16_t)(frameBottom - frameTop),
+                (uint16_t)(targetBottom - targetTop)));
+            if (pictureY < rasterTop || pictureY >= rasterBottom) continue;
+            int16_t sourceY = (int16_t)(copyTop + multiplyDivide(
+                (uint16_t)(pictureY - rasterTop), (uint16_t)(copyBottom - copyTop),
+                (uint16_t)(rasterBottom - rasterTop)));
+            const uint8_t* sourceRow = pixels
+                + multiplyUnsigned16((uint16_t)(sourceY - sourceTop), componentRowBytes);
+            uint8_t* destinationRow = destinationPixels
+                + multiplyUnsigned16((uint16_t)(y - mapTop), destinationRowBytes);
+            for (int16_t x = targetLeft; x < targetRight; ++x) {
+                if (x < mapLeft || x >= mapRight) continue;
+                int16_t pictureX = (int16_t)(frameLeft + multiplyDivide(
+                    (uint16_t)(x - targetLeft), (uint16_t)(frameRight - frameLeft),
+                    (uint16_t)(targetRight - targetLeft)));
+                if (pictureX < rasterLeft || pictureX >= rasterRight) continue;
+                int16_t sourceX = (int16_t)(copyLeft + multiplyDivide(
+                    (uint16_t)(pictureX - rasterLeft), (uint16_t)(copyRight - copyLeft),
+                    (uint16_t)(rasterRight - rasterLeft)));
+                if (sourceY >= sourceTop && sourceY < sourceBottom
+                    && sourceX >= sourceLeft && sourceX < sourceRight) {
+                    uint16_t column = (uint16_t)(sourceX - sourceLeft);
+                    uint8_t red = sourceRow[column];
+                    uint8_t green = sourceRow[width + column];
+                    uint8_t blue = sourceRow[width + width + column];
+                    uint8_t value = colorMap[(red & 0xe0) | ((green >> 3) & 0x1c)
+                                             | (blue >> 6)];
+                    uint16_t destinationColumn = (uint16_t)(x - mapLeft);
+                    uint8_t& destinationByte = destinationRow[destinationColumn >> 1];
+                    if (destinationColumn & 1)
+                        destinationByte = (uint8_t)((destinationByte & 0xf0) | value);
+                    else destinationByte = (uint8_t)((destinationByte & 0x0f) | (value << 4));
+                }
+            }
+        }
+    }
+    FreeMem(pixels, pixelBytes);
+    return valid;
+}
+
+static bool drawVersionOnePicture(const uint8_t* picture, uint32_t size,
+                                  const uint8_t* frame, const uint8_t* targetRect)
+{
+    uint32_t offset = 12;                    // version opcode $11, version byte $01
+    bool drewPixels = false;
+    while (offset < size) {
+        uint8_t opcode = picture[offset++];
+        if (opcode == 0xff) return drewPixels;
+        if (opcode == 0x00) continue;
+        if (opcode == 0xa0) { if (offset + 2 > size) return false; offset += 2; continue; }
+        if (opcode == 0x01) {
+            if (offset + 2 > size) return false;
+            uint16_t bytes = read16(picture + offset);
+            if (bytes < 2 || offset + bytes > size) return false;
+            offset += bytes; continue;
+        }
+        if (opcode == 0x0a) { if (offset + 8 > size) return false; offset += 8; continue; }
+        if (opcode == 0x98) {
+            if (!drawPackedMonochromePictureBits(picture, size, offset, frame, targetRect))
+                return false;
+            drewPixels = true; continue;
+        }
+        return false;
+    }
+    return false;
+}
+
+static bool drawPicture(uint8_t** pictureHandle, const uint8_t* targetRect)
+{
+    uint32_t size = resourceHandleSize(pictureHandle);
+    if (!pictureHandle || !*pictureHandle || !targetRect || size < 12) return false;
+    const uint8_t* picture = *pictureHandle;
+    const uint8_t* frame = picture + 2;
+    if (picture[10] == 0x11 && picture[11] == 0x01)
+        return drawVersionOnePicture(picture, size, frame, targetRect);
+    uint32_t offset = 10;
+    bool drewPixels = false;
+    while (offset + 2 <= size) {
+        uint16_t opcode = read16(picture + offset); offset += 2;
+        if (opcode == 0x00ff) return drewPixels;
+        if (opcode == 0x0000 || opcode == 0x001e) continue;
+        if (opcode == 0x0011) { if (offset + 2 > size) return false; offset += 2; continue; }
+        if (opcode == 0x0c00) { if (offset + 24 > size) return false; offset += 24; continue; }
+        if (opcode == 0x0001) {
+            if (offset + 2 > size) return false;
+            uint16_t bytes = read16(picture + offset);
+            if (bytes < 2 || offset + bytes > size) return false;
+            offset += bytes; continue;
+        }
+        if (opcode == 0x000a) { if (offset + 8 > size) return false; offset += 8; continue; }
+        if (opcode == 0x00a1) {
+            if (offset + 4 > size) return false;
+            uint16_t bytes = read16(picture + offset + 2);
+            if (offset + 4UL + bytes > size) return false;
+            offset += 4UL + bytes; if (offset & 1) ++offset; continue;
+        }
+        if (opcode == 0x0098) {
+            if (!drawPackedPictureBits(picture, size, offset, frame, targetRect)) return false;
+            drewPixels = true; continue;
+        }
+        if (opcode == 0x009a) {
+            if (!drawDirectPictureBits(picture, size, offset, frame, targetRect)) return false;
+            drewPixels = true; continue;
+        }
+        return false;                        // retain the loud stop for every unseen opcode
+    }
+    return false;
+}
+
+static bool currentPortPixels(uint8_t*& pixels, uint16_t& rowBytes,
+                              int16_t& top, int16_t& left, int16_t& bottom, int16_t& right)
+{
+    uint8_t* port = (uint8_t*)read32(s_qdThePort);
+    uint8_t** mapHandle = port ? (uint8_t**)read32(port + 2) : 0;
+    uint8_t* map = mapHandle ? *mapHandle : 0;
+    if (!map || read16(map + 32) != 4) return false;
+    pixels = (uint8_t*)read32(map);
+    rowBytes = (uint16_t)(read16(map + 4) & 0x3fff);
+    top = (int16_t)read16(map + 6); left = (int16_t)read16(map + 8);
+    bottom = (int16_t)read16(map + 10); right = (int16_t)read16(map + 12);
+    return pixels && rowBytes;
+}
+
+static bool frameRect(const uint8_t* rectangle)
+{
+    uint8_t* port = (uint8_t*)read32(s_qdThePort);
+    uint8_t* pixels;
+    uint16_t rowBytes;
+    int16_t mapTop, mapLeft, mapBottom, mapRight;
+    if (!port || !rectangle
+        || !currentPortPixels(pixels, rowBytes, mapTop, mapLeft, mapBottom, mapRight)) return false;
+    int16_t top = (int16_t)read16(rectangle);
+    int16_t left = (int16_t)read16(rectangle + 2);
+    int16_t bottom = (int16_t)read16(rectangle + 4);
+    int16_t right = (int16_t)read16(rectangle + 6);
+    int16_t penHeight = (int16_t)read16(port + 52);
+    int16_t penWidth = (int16_t)read16(port + 54);
+    if (top >= bottom || left >= right || penHeight <= 0 || penWidth <= 0
+        || read16(port + 56) != 0) return false;
+    for (int16_t y = top; y < bottom; ++y) {
+        if (y < mapTop || y >= mapBottom) continue;
+        uint8_t* row = pixels + multiplyUnsigned16((uint16_t)(y - mapTop), rowBytes);
+        for (int16_t x = left; x < right; ++x) {
+            if (x < mapLeft || x >= mapRight) continue;
+            if (y >= top + penHeight && y < bottom - penHeight
+                && x >= left + penWidth && x < right - penWidth) continue;
+            uint16_t column = (uint16_t)(x - mapLeft);
+            uint8_t& byte = row[column >> 1];
+            if (column & 1) byte = (uint8_t)(byte | 0x0f);
+            else byte = (uint8_t)(byte | 0xf0);
+        }
+    }
+    return true;
+}
+
+static bool eraseRect(const uint8_t* rectangle)
+{
+    uint8_t* pixels;
+    uint16_t rowBytes;
+    int16_t mapTop, mapLeft, mapBottom, mapRight;
+    if (!rectangle
+        || !currentPortPixels(pixels, rowBytes, mapTop, mapLeft, mapBottom, mapRight)) return false;
+    int16_t top = (int16_t)read16(rectangle);
+    int16_t left = (int16_t)read16(rectangle + 2);
+    int16_t bottom = (int16_t)read16(rectangle + 4);
+    int16_t right = (int16_t)read16(rectangle + 6);
+    if (top >= bottom || left >= right) return false;
+    for (int16_t y = top; y < bottom; ++y) {
+        if (y < mapTop || y >= mapBottom) continue;
+        uint8_t* row = pixels + multiplyUnsigned16((uint16_t)(y - mapTop), rowBytes);
+        for (int16_t x = left; x < right; ++x) {
+            if (x < mapLeft || x >= mapRight) continue;
+            uint16_t column = (uint16_t)(x - mapLeft);
+            uint8_t& byte = row[column >> 1];
+            if (column & 1) byte = (uint8_t)(byte & 0xf0);
+            else byte = (uint8_t)(byte & 0x0f);
+        }
+    }
+    return true;
+}
+
+static bool bitmapPixels(const uint8_t* bitmap, uint8_t*& pixels, uint16_t& rowBytes,
+                         int16_t& top, int16_t& left, int16_t& bottom, int16_t& right)
+{
+    if (!bitmap) return false;
+    uint8_t* map = 0;
+    for (uint16_t i = 0; i < sizeof(s_gworlds) / sizeof(s_gworlds[0]); ++i)
+        if (s_gworlds[i].used && bitmap == s_gworlds[i].port + 2) map = s_gworlds[i].pixMap;
+    for (uint16_t i = 0; i < sizeof(s_windows) / sizeof(s_windows[0]); ++i)
+        if (s_windows[i].used && bitmap == s_windows[i].window + 2)
+            map = s_windowManagerPixMap;
+    if (bitmap == s_windowManagerPort + 2) map = s_windowManagerPixMap;
+    if (!map || read16(map + 32) != 4) return false;
+    pixels = (uint8_t*)read32(map);
+    rowBytes = (uint16_t)(read16(map + 4) & 0x3fff);
+    top = (int16_t)read16(map + 6); left = (int16_t)read16(map + 8);
+    bottom = (int16_t)read16(map + 10); right = (int16_t)read16(map + 12);
+    return pixels && rowBytes;
+}
+
+static bool copyBits(const uint8_t* sourceBitmap, const uint8_t* destinationBitmap,
+                     const uint8_t* sourceRect, const uint8_t* destinationRect,
+                     uint16_t mode, const uint8_t* maskRegion)
+{
+    if (!sourceRect || !destinationRect || (mode != 0 && mode != 3) || maskRegion) return false;
+    uint8_t *sourcePixels, *destinationPixels;
+    uint16_t sourceRowBytes, destinationRowBytes;
+    int16_t sourceTop, sourceLeft, sourceBottom, sourceRight;
+    int16_t destinationTop, destinationLeft, destinationBottom, destinationRight;
+    if (!bitmapPixels(sourceBitmap, sourcePixels, sourceRowBytes,
+                      sourceTop, sourceLeft, sourceBottom, sourceRight)
+        || !bitmapPixels(destinationBitmap, destinationPixels, destinationRowBytes,
+                         destinationTop, destinationLeft, destinationBottom, destinationRight))
+        return false;
+    int16_t fromTop = (int16_t)read16(sourceRect);
+    int16_t fromLeft = (int16_t)read16(sourceRect + 2);
+    int16_t fromBottom = (int16_t)read16(sourceRect + 4);
+    int16_t fromRight = (int16_t)read16(sourceRect + 6);
+    int16_t toTop = (int16_t)read16(destinationRect);
+    int16_t toLeft = (int16_t)read16(destinationRect + 2);
+    int16_t toBottom = (int16_t)read16(destinationRect + 4);
+    int16_t toRight = (int16_t)read16(destinationRect + 6);
+    if (fromBottom <= fromTop || fromRight <= fromLeft
+        || toBottom <= toTop || toRight <= toLeft) return false;
+    uint16_t width = (uint16_t)(toRight - toLeft);
+    uint16_t height = (uint16_t)(toBottom - toTop);
+    int16_t clipTop = destinationTop, clipLeft = destinationLeft;
+    int16_t clipBottom = destinationBottom, clipRight = destinationRight;
+    uint8_t* currentPort = (uint8_t*)read32(s_qdThePort);
+    if (currentPort && destinationBitmap == currentPort + 2) {
+        uint8_t** clipHandle = (uint8_t**)read32(currentPort + 28);
+        uint8_t* clip = clipHandle ? *clipHandle : 0;
+        if (clip && read16(clip) >= 10) {
+            clipTop = (int16_t)read16(clip + 2); clipLeft = (int16_t)read16(clip + 4);
+            clipBottom = (int16_t)read16(clip + 6); clipRight = (int16_t)read16(clip + 8);
+        }
+    }
+    uint32_t temporaryBytes = multiplyUnsigned16(width, height);
+    uint8_t* temporary = (uint8_t*)AllocMem(temporaryBytes, 0);
+    if (!temporary) return false;
+    for (uint16_t y = 0; y < height; ++y) {
+        uint8_t* temporaryRow = temporary + multiplyUnsigned16(y, width);
+        int16_t sourceY = (int16_t)(fromTop + multiplyDivide(
+            y, (uint16_t)(fromBottom - fromTop), height));
+        for (uint16_t x = 0; x < width; ++x) {
+            int16_t sourceX = (int16_t)(fromLeft + multiplyDivide(
+                x, (uint16_t)(fromRight - fromLeft), width));
+            uint8_t value = 0;
+            if (sourceY >= sourceTop && sourceY < sourceBottom
+                && sourceX >= sourceLeft && sourceX < sourceRight) {
+                const uint8_t* row = sourcePixels
+                    + multiplyUnsigned16((uint16_t)(sourceY - sourceTop), sourceRowBytes);
+                uint16_t column = (uint16_t)(sourceX - sourceLeft);
+                uint8_t byte = row[column >> 1];
+                value = column & 1 ? (uint8_t)(byte & 0x0f) : (uint8_t)(byte >> 4);
+            }
+            temporaryRow[x] = value;
+        }
+    }
+    for (uint16_t y = 0; y < height; ++y) {
+        const uint8_t* temporaryRow = temporary + multiplyUnsigned16(y, width);
+        int16_t destinationY = (int16_t)(toTop + y);
+        if (destinationY < destinationTop || destinationY >= destinationBottom
+            || destinationY < clipTop || destinationY >= clipBottom) continue;
+        uint8_t* row = destinationPixels
+            + multiplyUnsigned16((uint16_t)(destinationY - destinationTop), destinationRowBytes);
+        for (uint16_t x = 0; x < width; ++x) {
+            int16_t destinationX = (int16_t)(toLeft + x);
+            if (destinationX < destinationLeft || destinationX >= destinationRight
+                || destinationX < clipLeft || destinationX >= clipRight) continue;
+            uint8_t value = temporaryRow[x];
+            uint16_t column = (uint16_t)(destinationX - destinationLeft);
+            uint8_t& byte = row[column >> 1];
+            if (mode == 3) {                 // srcBic: destination AND NOT source
+                uint8_t destinationValue = column & 1 ? (uint8_t)(byte & 0x0f)
+                                                       : (uint8_t)(byte >> 4);
+                value = (uint8_t)(destinationValue & (uint8_t)(~value & 0x0f));
+            }
+            if (column & 1) byte = (uint8_t)((byte & 0xf0) | value);
+            else byte = (uint8_t)((byte & 0x0f) | (value << 4));
+        }
+    }
+    FreeMem(temporary, temporaryBytes);
+    return true;
+}
+
+static bool clipRect(const uint8_t* rectangle)
+{
+    uint8_t* port = (uint8_t*)read32(s_qdThePort);
+    uint8_t** clipHandle = port ? (uint8_t**)read32(port + 28) : 0;
+    uint8_t* clip = clipHandle ? *clipHandle : 0;
+    if (!rectangle || !clip) return false;
+    write16(clip, 10);
+    writeRect(clip + 2, (int16_t)read16(rectangle), (int16_t)read16(rectangle + 2),
+              (int16_t)read16(rectangle + 4), (int16_t)read16(rectangle + 6));
     return true;
 }
 
@@ -911,6 +1821,21 @@ static uint32_t handleSize(uint8_t** handle)
     return 0;
 }
 
+static int16_t setHandleSize(uint8_t** handle, uint32_t newSize)
+{
+    HandleAllocation* allocation = handleAllocation(handle);
+    if (!allocation) return -109;
+    if (allocation->locked) return -117;     // memLockedErr
+    uint8_t* data = (uint8_t*)AllocMem(newSize ? newSize : 1, 0);
+    if (!data) return -108;
+    uint32_t retained = allocation->size < newSize ? allocation->size : newSize;
+    for (uint32_t i = 0; i < retained; ++i) data[i] = allocation->master[i];
+    FreeMem(allocation->master, allocation->size ? allocation->size : 1);
+    allocation->master = data;
+    allocation->size = newSize;
+    return 0;
+}
+
 static int16_t pointerAndHandle(const uint8_t* source, uint8_t** handle, uint32_t size)
 {
     HandleAllocation* allocation = handleAllocation(handle);
@@ -991,6 +1916,13 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
         write32(userStack + 6, (uint32_t)getResource(type, id));
         if (g_stageCDepth < 3) g_stageCDepth = 3;
         return 7;
+    }
+    if (trap == 0xa9a1) {                    // GetNamedResource(type:4, name:4) -> Handle result:4
+        uint8_t** handle = getNamedResource(read32(userStack + 4),
+                                             (const uint8_t*)read32(userStack));
+        write32(userStack + 8, (uint32_t)handle);
+        if (g_stageCDepth < 51) g_stageCDepth = 51;
+        return 9;
     }
     if (trap == 0xa86e) {                    // InitGraf(&qd.thePort)
         initGraf((uint8_t*)read32(userStack));
@@ -1131,7 +2063,17 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
         else if (HandleAllocation* allocation = handleAllocation(handle)) {
             allocation->purgeable = true; s_memoryManager.error = 0;
         } else validatePermanentHandle(handle);
-        if (g_stageCDepth < 51) g_stageCDepth = 51;
+        if (g_stageCDepth < 65) g_stageCDepth = 65;
+        return 1;
+    }
+    if (trap == 0xa04a) {                    // HNoPurge(Handle in A0)
+        uint8_t** handle = (uint8_t**)regs[8];
+        int32_t index = resourceHandleIndex(handle);
+        if (index >= 0) { s_resourcePurgeable[index] = false; s_memoryManager.error = 0; }
+        else if (HandleAllocation* allocation = handleAllocation(handle)) {
+            allocation->purgeable = false; s_memoryManager.error = 0;
+        } else validatePermanentHandle(handle);
+        if (g_stageCDepth < 52) g_stageCDepth = 52;
         return 1;
     }
     if (trap == 0xa994) {                    // CurResFile() -> refNum
@@ -1173,6 +2115,11 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
         if (g_stageCDepth < 49) g_stageCDepth = 49;
         return 1;
     }
+    if (trap == 0xa024) {                    // SetHandleSize(Handle in A0, D0 size)
+        s_memoryManager.error = setHandleSize((uint8_t**)regs[8], regs[0]);
+        if (g_stageCDepth < 54) g_stageCDepth = 54;
+        return 1;
+    }
     if (trap == 0xa9ef) {                    // PtrAndHand(A0 source, A1 handle, D0 size)
         int16_t error = pointerAndHandle((const uint8_t*)regs[8],
                                          (uint8_t**)regs[9], regs[0]);
@@ -1191,6 +2138,16 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
         s_ticks += regs[8];
         regs[0] = s_ticks;
         if (g_stageCDepth < 42) g_stageCDepth = 42;
+        return 1;
+    }
+    if ((trap & 0xf9ff) == 0xa03c) {          // CmpString / EqualString register trap
+        uint16_t firstLength = (uint16_t)(regs[0] >> 16);
+        uint16_t secondLength = (uint16_t)regs[0];
+        bool equal = equalMacRomanStrings((const uint8_t*)regs[8], firstLength,
+                                           (const uint8_t*)regs[9], secondLength,
+                                           (trap & 0x0400) != 0, (trap & 0x0200) != 0);
+        regs[0] = equal ? 0 : 1;              // ROM result; glue flips it for EqualString
+        if (g_stageCDepth < 53) g_stageCDepth = 53;
         return 1;
     }
     if (trap == 0xa033) {                    // VInstall(VBLTaskPtr in A0) -> OSErr in D0
@@ -1278,11 +2235,85 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
         if (g_stageCDepth < 35) g_stageCDepth = 35;
         return 3;
     }
+    if (trap == 0xa89b) {                    // PenSize(horizontal, vertical)
+        uint8_t* port = (uint8_t*)read32(s_qdThePort);
+        if (port) {
+            write16(port + 52, read16(userStack));
+            write16(port + 54, read16(userStack + 2));
+        }
+        if (g_stageCDepth < 58) g_stageCDepth = 58;
+        return 5;
+    }
+    if (trap == 0xa89c) {                    // PenMode(mode)
+        uint8_t* port = (uint8_t*)read32(s_qdThePort);
+        if (port) write16(port + 56, read16(userStack));
+        if (g_stageCDepth < 59) g_stageCDepth = 59;
+        return 3;
+    }
+    if (trap == 0xa87b) {                    // ClipRect(Rect*)
+        if (clipRect((const uint8_t*)read32(userStack))) {
+            if (g_stageCDepth < 63) g_stageCDepth = 63;
+            return 5;
+        }
+    }
+    if (trap == 0xa8a9) {                    // InsetRect(Rect*, dh, dv)
+        uint8_t* rectangle = (uint8_t*)read32(userStack + 4);
+        int16_t dh = (int16_t)read16(userStack + 2);
+        int16_t dv = (int16_t)read16(userStack);
+        if (rectangle) {
+            writeRect(rectangle, (int16_t)(read16(rectangle) + dv),
+                      (int16_t)(read16(rectangle + 2) + dh),
+                      (int16_t)(read16(rectangle + 4) - dv),
+                      (int16_t)(read16(rectangle + 6) - dh));
+            if (g_stageCDepth < 68) g_stageCDepth = 68;
+            return 9;
+        }
+    }
+    if (trap == 0xa974) {                    // Button() -> Boolean
+        write16(userStack, AmigaHardware::isLeftMouseButtonPressed() ? 1 : 0);
+        if (g_stageCDepth < 64) g_stageCDepth = 64;
+        return 1;
+    }
+    if (trap == 0xa8a1) {                    // FrameRect(rectangle)
+        if (frameRect((const uint8_t*)read32(userStack))) {
+            if (g_stageCDepth < 60) g_stageCDepth = 60;
+            return 5;
+        }
+    }
+    if (trap == 0xa8a3) {                    // EraseRect(rectangle)
+        if (eraseRect((const uint8_t*)read32(userStack))) {
+            if (g_stageCDepth < 62) g_stageCDepth = 62;
+            return 5;
+        }
+    }
     if (trap == 0xa9b9) {                    // GetCursor(id) -> CursHandle
         write32(userStack + 2,
                 (uint32_t)getResource(0x43555253UL, (int16_t)read16(userStack))); // 'CURS'
         if (g_stageCDepth < 36) g_stageCDepth = 36;
         return 3;
+    }
+    if (trap == 0xa9bc) {                    // GetPicture(id) -> PicHandle
+        write32(userStack + 2,
+                (uint32_t)getResource(0x50494354UL, (int16_t)read16(userStack))); // 'PICT'
+        if (g_stageCDepth < 56) g_stageCDepth = 56;
+        return 3;
+    }
+    if (trap == 0xa8f6) {                    // DrawPicture(PicHandle, destination Rect)
+        if (drawPicture((uint8_t**)read32(userStack + 4),
+                        (const uint8_t*)read32(userStack))) {
+            if (g_stageCDepth < 57) g_stageCDepth = 57;
+            return 9;
+        }
+    }
+    if (trap == 0xa8ec) {                    // CopyBits(src, dst, srcRect, dstRect, mode, mask)
+        if (copyBits((const uint8_t*)read32(userStack + 18),
+                     (const uint8_t*)read32(userStack + 14),
+                     (const uint8_t*)read32(userStack + 10),
+                     (const uint8_t*)read32(userStack + 6), read16(userStack + 4),
+                     (const uint8_t*)read32(userStack))) {
+            if (g_stageCDepth < 61) g_stageCDepth = 61;
+            return 23;
+        }
     }
     if (trap == 0xa851) {                    // SetCursor(Cursor*)
         s_cursor.image = (const uint8_t*)read32(userStack);
@@ -1298,9 +2329,31 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
         if (g_stageCDepth < 38) g_stageCDepth = 38;
         return 11;
     }
+    if (trap == 0xa98d) {                    // GetDItem(dialog, itemNo, type*, handle*, box*)
+        if (getDialogItem((uint8_t*)read32(userStack + 14), read16(userStack + 12),
+                          (uint8_t*)read32(userStack + 8), (uint8_t*)read32(userStack + 4),
+                          (uint8_t*)read32(userStack))) {
+            if (g_stageCDepth < 66) g_stageCDepth = 66;
+            return 19;
+        }
+    }
+    if (trap == 0xa98f) {                    // SetIText(itemHandle, Pascal string)
+        uint8_t** handle = (uint8_t**)read32(userStack + 4);
+        const uint8_t* text = (const uint8_t*)read32(userStack);
+        if (handle && text && setHandleSize(handle, (uint32_t)text[0] + 1) == 0) {
+            for (uint16_t i = 0; i <= text[0]; ++i) (*handle)[i] = text[i];
+            if (g_stageCDepth < 67) g_stageCDepth = 67;
+            return 9;
+        }
+    }
     if (trap == 0xa981) {                    // DrawDialog(dialog)
         drawDialog((uint8_t*)read32(userStack));
         if (g_stageCDepth < 39) g_stageCDepth = 39;
+        return 5;
+    }
+    if (trap == 0xa983) {                    // DisposeDialog(dialog)
+        disposeDialog((uint8_t*)read32(userStack));
+        if (g_stageCDepth < 55) g_stageCDepth = 55;
         return 5;
     }
     if (trap == 0xab1d && regs[0] == 0) {    // QDExtensions: NewGWorld

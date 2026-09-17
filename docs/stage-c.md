@@ -6,12 +6,17 @@ port's execution order, which is now known to differ from the earlier MAME first
 
 ## Current checkpoint
 
-The Amiga run executes **50 distinct implemented traps** and halts loudly at:
+With one debugger-forced intro click, the Amiga run executes **67 distinct implemented traps** and
+halts loudly at:
 
 ```
-$A9A1  RESOURCE MANAGER / GETNAMEDRESOURCE
-caller: dynamically allocated code at absolute PC $003D5386
+$A8A9  QUICKDRAW / INSETRECT
+caller: Initialize+$1AFA
 ```
+
+`InsetRect` is implemented in the current tree; the next verification run should advance to the
+immediately following `FrameRoundRect`. The production `Button` implementation reads the Amiga CIA
+left-button bit—the forced click exists only in diagnostic builds used to cross the intro wait.
 
 The successful first-use order is:
 
@@ -65,6 +70,23 @@ The successful first-use order is:
 48. `SetTrapAddress`
 49. `GetHandleSize`
 50. `PtrAndHand`
+51. `GetNamedResource`
+52. `HNoPurge`
+53. `CmpString` / `EqualString`
+54. `SetHandleSize`
+55. `DisposeDialog`
+56. `GetPicture`
+57. `DrawPicture`
+58. `PenSize`
+59. `PenMode`
+60. `FrameRect`
+61. `CopyBits`
+62. `EraseRect`
+63. `ClipRect`
+64. `Button`
+65. `HPurge`
+66. `GetDItem`
+67. `SetIText`
 
 `amiga/stage_c.gdb` breaks on the loud-stop renderer and prints the depth, trap identity,
 selector, runtime `(segment, offset)`, absolute PC, USP, all data/address registers, and nearby
@@ -121,9 +143,16 @@ window, and `ActivatePalette` copies its 16 `RGBColor` entries into the active c
 fresh seed. Cursor resources likewise remain Handles until the game dereferences and installs one.
 
 `GetNewDialog` now builds the `DialogRecord` from the shipped `DLOG`/`DITL` pair and `DrawDialog`
-validates the item stream, selects the dialog port, and paints its background. Offscreen QuickDraw
-allocates a real 4-bit `GWorld`/`PixMap` and pixel store; selectors 0, 1, and 12 are respectively
-`NewGWorld`, `LockPixels`, and `NoPurgePixels`.
+validates the item stream, selects the dialog port, and paints its background. `GetDItem` walks that
+stream and materializes movable text handles for static-text items; `SetIText` resizes and fills them.
+Offscreen QuickDraw allocates a real 4-bit `GWorld`/`PixMap` and pixel store; selectors 0, 1, and 12
+are respectively `NewGWorld`, `LockPixels`, and `NoPurgePixels`.
+
+The scoped PICT interpreter now handles the measured v2 4-bit and 8-bit indexed `PackBitsRect`, v1
+1-bit `PackBitsRect`, and component-packed 32-bit `DirectBitsRect` paths. It maps embedded/direct RGB
+through the active 16-color table. `CopyBits` supports the measured `srcCopy` and `srcBic` transfers,
+including scaling, overlap safety, and the current rectangular clip; unsupported opcodes and modes
+still fall through to the loud stop.
 
 The trap-address table is stateful. The observed `GetTrapAddress`/`SetTrapAddress` pair now records
 the game's replacement for `$A9F4 ExitToShell`; routing a later invocation through that replacement
