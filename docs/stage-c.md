@@ -179,9 +179,9 @@ run.
 
 78. `ReleaseResource` (invalidate the archive-backed master pointer; permit a later reload)
 
-The next loud stop is `FlushEvents` at `Main+$1F36`. Its report incorrectly says depth 2 because a
-later `UnLoadSeg` assigns rather than monotonically advances the diagnostic counter; that reporting
-bug is fixed before continuing the event path.
+The next loud stop is `FlushEvents` at `Main+$1F36`. A later `UnLoadSeg` originally made this report
+depth 2 by assigning its historical row; the handler now advances monotonically like every other
+implemented trap.
 
 `amiga/stage_c.gdb` breaks on `VetteScreen::showLoudStop`, after the report is complete, and prints
 the depth, trap identity, selector, runtime `(segment, offset)`, absolute PC, USP and its first

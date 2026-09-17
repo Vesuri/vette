@@ -9,9 +9,8 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ⭐ **HEAD OF QUEUE: `FlushEvents`, called by `Main+$1F36`.** Releasing an archive-backed
 resource now invalidates its master pointer and attributes while preserving the immutable bytes for
-a later reload. First restore the diagnostic depth counter's monotonicity (a later `UnLoadSeg`
-incorrectly assigns 2), then implement the measured event-queue operation. Do not add dialog/UI
-traps to conceal an upstream failure.
+a later reload. Implement the measured event-queue operation and continue into the garage. Do not
+add dialog/UI traps to conceal an upstream failure.
 
 The MAME A-trap log remains a measured reference-run inventory → `docs/trap-log.md`,
 but Stage C has proved that it is **not an exact standalone-port first-use script**. The port has

@@ -2804,7 +2804,7 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
         return 1;
     }
     if (trap == 0xa9f1) {                    // _UnLoadSeg(Ptr), deliberately kept resident
-        g_stageCDepth = 2;
+        if (g_stageCDepth < 2) g_stageCDepth = 2;
         return 5;                             // handled + four parameter bytes consumed
     }
     if (trap == 0xa9a0) {                    // GetResource(type:4, id:2) -> Handle result:4
