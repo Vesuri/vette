@@ -13,10 +13,12 @@ of every session, so nothing dated, no measurement history, no "X now works" ach
 `docs/` file and, if it changes how to work, add or amend one line here. The same discipline governs
 `docs/rename.md` and `docs/open-work.md` (queues, never logs).
 
-⚠⚠ **NOTHING IN THIS REPO HAS BEEN BUILT OR RUN.** The structure, the vendored framework, the
-inherited docs and the FS-UAE scripts are in place; there is no port code, no disassembly, and the
-source archive has not been opened. **Do not read an inherited doc's confident present tense as a
-description of this repo** — every ⚑ doc describes the prior ports.
+⚠⚠ **NOTHING ON THE AMIGA SIDE HAS BEEN BUILT OR RUN.** There is no port code and the inherited
+FS-UAE scripts are renamed but unverified. **Do not read an inherited doc's confident present tense
+as a description of this repo** — every ⚑ doc describes the prior ports.
+⭐ What *does* run: the **Macintosh reference loop** (MAME boots and launches the game unattended,
+framebuffer/CLUT capture proven) and the `tools/` pipeline (archive → segments → sweeps). So a claim
+about the **original** can be measured today; a claim about the **port** cannot be, yet.
 
 > **This project is the third run at a process that worked twice, and the FIRST of a new kind.**
 > *Rescue on Fractalus!* (`~/Documents/Rescue on Fractalus`, Atari 8-bit) and *Revs*
@@ -216,7 +218,7 @@ Hard-won detail lives in `docs/`, not here. **Read the relevant one BEFORE worki
 | **`docs/faithfulness-seam.md`** ⭐ | **Before converting, rewriting or reimplementing ANY routine.** The three-way choice this port has and the prior ports did not |
 | **`docs/source-inventory.md`** ⭐⭐ | **What is actually in the shipped game** — the 11 named `CODE` segments, the 23 data types, the 160 objects. Read it before estimating anything |
 | **`docs/mac-reference-loop.md`** ⭐ | Anything about ground truth, or before trusting a claim about what the original does |
-| **`docs/mac-hardware.md`** | Touching the trap layer, the display, input or sound. ⚠ Mostly `[ASSUMED]` — replace rows, don't build on them |
+| **`docs/mac-hardware.md`** | Touching the trap layer, the display, input or sound. ⭐ The **display surface** and the **68020 question** are `[MEASURED]`; the trap/low-memory rows are still `[ASSUMED]` — replace those, don't build on them |
 | `docs/toolchain.md` | Running the pipeline: resource/segment tools, Ghidra headless, the builds |
 | `docs/perf-method.md` ⚑ | Quoting, sizing or judging ANY performance number |
 | `docs/m68k-optimisation.md` ⚑ | Optimising a hot function or writing an asm twin (68000 rules) |

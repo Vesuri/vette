@@ -3,7 +3,9 @@
 > **Read this before touching the trap layer, the display, input or sound.** It is the direct
 > counterpart of the prior ports' `docs/atari-hardware.md` / `docs/bbc-hardware.md`.
 >
-> ⚠⚠ **EVERYTHING HERE IS `[ASSUMED]` UNTIL THE BINARY SAYS OTHERWISE.** This file is seeded from
+> ⚠⚠ **ASSUME EVERY ROW IS `[ASSUMED]` UNLESS IT SAYS OTHERWISE.** Two sections no longer are, and
+> they are marked ⭐⭐ `[MEASURED]`: **the display surface** and **the 68020 question**. Everything
+> else — This file is seeded from
 > general knowledge of the platform, which is exactly the material the postmortem warns calcifies
 > into documented fact. **Every row gets replaced by a `[DERIVED]` one from the trap map
 > (`make traps`) and the reference loop.** Do not build against a row that is still `[ASSUMED]`

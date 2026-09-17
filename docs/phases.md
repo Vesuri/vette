@@ -25,7 +25,7 @@ principle — *decide the mechanical policy before applying it 500 times* — an
 
 Build infrastructure only; no game code. **Exit criteria:**
 
-- [ ] The source archive is unpacked and its contents catalogued (blocked — `docs/open-work.md` #1).
+- [x] The source archive is unpacked and its contents catalogued → `docs/source-inventory.md`.
 - [ ] `src/platform/platform.h` exists and is written from *this* port's boundary.
 - [ ] The Amiga build links: `out/Vette.exe`, with `muldiv-audit` and `probe-audit` clean on every
       link.
@@ -41,11 +41,19 @@ harder questions were being settled.
 
 **Exit criteria:**
 
-- [ ] An emulator is chosen, installed, and driven from a `make` target.
-- [ ] A framebuffer capture at a named moment, reproducibly.
-- [ ] Breakpoint + register + memory reads from a script (the capability the trap inventory needs).
-- [ ] A scripted input sequence that reaches actual gameplay, deterministically.
-- [ ] ⭐ A **positive control** in every capture — a landmark proving the run got where it claims.
+- [x] An emulator is chosen and installed (**MAME 0.289 / `mac2fdhd`**) and driven headlessly.
+      ⚠ From a documented invocation, not yet from a `make` target.
+- [x] A framebuffer capture at a named moment, reproducibly — and re-rendered host-side from the
+      live PixMap + CLUT, diffed against MAME's own screenshot.
+- [x] Memory reads from a script (Lua). ⚠ **Breakpoints + register reads are NOT exercised yet**,
+      and that is the capability the trap inventory runs on.
+- [x] A scripted input sequence that reaches the game, deterministically — boot → launch → garage
+      screen, unattended. ⚠ Not yet *gameplay*: the driving view has never been reached.
+- [x] ⭐ A **positive control** in every capture — completion is read from `CurApName` in the Mac's
+      own low memory, so a run that did nothing reports "Finder" instead of passing quietly.
+
+⛔ **The one thing still open here is the A-trap log** (`docs/open-work.md` #1) — without it Phase 2's
+trap map is a static guess.
 
 ⚠ **This gates Phase 2.** Revs proved its memory image against real hardware in Phase 1 and then
 discovered in Phase 2 that the image had been the wrong input all along. The reference is what makes

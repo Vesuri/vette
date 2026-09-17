@@ -36,11 +36,13 @@ centre of gravity**, and it is the thing to size before anything else.
 |---|---|
 | Disassembly/analysis workflow | **Claude drives Ghidra headless**; user reviews text artifacts in-repo |
 | Fidelity | **Faithful 1:1 port** — replicate behaviour exactly, parity before any improvement |
-| Ground truth | **The original under a Macintosh emulator.** NEVER the dev-host backend, never the Amiga build. Which emulator is open — `docs/mac-reference-loop.md` |
+| Ground truth | **The original under a Macintosh emulator.** NEVER the dev-host backend, never the Amiga build. The emulator is decided (below) — `docs/mac-reference-loop.md` |
 | Repo | Commit directly to `main`, one logical change per commit |
 | Source material | Kept **local only, never committed** — `tmp/` is local by policy, and `.gitignore` covers every shape a Mac application arrives in |
 | **Port strategy** | ⭐⭐ **Option A: keep the original 68000 instructions, port the seams.** The segments are near-model, so there is nothing to relocate; the cost lands entirely in the trap layer. `docs/faithfulness-seam.md` §The rule |
 | **The build** | ⭐ **`Color VETTE!`.** Not the B&W one. See below — 16 colours maps onto 4 Amiga bitplanes, so the colour build is not the expensive choice it would be at 8bpp |
+| **Reference emulator** | ⭐ **MAME 0.289, driver `mac2fdhd`** (Mac II FDHD, `-nb9 mdc48`, `-ramsize 8M`). Chosen on the capability list, not reputation — it has watchpoints, a Lua API *and* an m68k gdb stub. `docs/mac-reference-loop.md` |
+| **Amiga screen mode** | ⭐⭐ **4 bitplanes, hires INTERLACED** (user decision). 16 colours at 512 px wide with 342 lines available. ⚠ Free of bitplane-DMA penalty only on **AGA**; an OCS/68000 fallback is open decision #2 |
 | **Copy protection** | ⭐ **Patched out, not reproduced.** The one deliberate, named departure from 1:1 — see `docs/faithfulness-seam.md` §The copy protection |
 
 ## Open decisions
@@ -48,19 +50,26 @@ centre of gravity**, and it is the thing to size before anything else.
 These are genuinely open and are the right things to settle before building. They are ordered by
 how much else depends on them.
 
-1. ⭐ **The reference emulator.** `docs/mac-reference-loop.md` §Candidates, evaluated against the
-   capability list there rather than on accuracy reputation. The capability that decides it is
-   scripted breakpoints + register reads, because that is what makes the trap inventory possible.
-2. ⭐ **The display architecture.** 512×342 at ~60 Hz onto a PAL planar Amiga at 50 Hz, now with
-   **colour**. Every part is still a decision — the width (512 is not a free Amiga mode), the height
-   (342 vs 256 lines), the depth, and the 17% timing difference.
-   ⭐⭐ **The depth question got a good answer:** the Color build ships 8 `pltt` palettes of
-   **16 entries** each, so `[DERIVED]` the game is a **16-colour** program, not 256. 16 colours is
-   **4 Amiga bitplanes** — an ordinary OCS configuration, and cheaper per pixel than the 5 bitplanes
-   Revs needs. So choosing Color costs bitplane DMA and blit width, not a colour-reduction pass.
-   ⚠ `[ASSUMED]` until confirmed from the binary: that the game's offscreen/window depth really is
-   4bpp. The `pltt` count is evidence about palettes, not proof about the drawing surface — see
-   `docs/open-work.md`. → `docs/mac-hardware.md` question 5.
+1. ⭐⭐ **The OCS / 68000 fallback mode, if there is one.** The primary mode is locked (4bpp hires
+   laced). ⭐ It is *reachable* on a 68000 — `[MEASURED]`, the game contains **zero 68020-only
+   instructions** in either build (`docs/mac-hardware.md`) — but hires 4bpp bitplane DMA starves a
+   68000 for most of the display window, so OCS needs a different mode or no support at all. The
+   candidates, and none is free:
+   - **lores + overscan, cropped.** ⚠ Lores overscan tops out around **368 px** against the game's
+     512, so this is a ~28% width crop plus a vertical one, and it removes the player's periphery.
+   - **lores + a 2:1 horizontal squeeze** folded into the chunky→planar merge. Nearly free there,
+     but it is a resample and has to be judged against the reference loop.
+   - **no OCS support.** Honest, and the one to pick if the frame rate is unusable anyway.
+   ⚠ **Do not settle this before the in-game surface size is measured** (#2) — a 512 × 342 driving
+   view makes every crop worse than the garage screen's 512 × 320 suggests.
+2. ⚠⚠ **Is the in-game surface 512 × 320 or 512 × 342?** The garage screen paints **512 × 320**
+   `[MEASURED]`, but a **512 × 342** window — the compact-Mac screen size — already exists behind it
+   and the driving view is the likely occupant. One reference-loop probe of the front `portRect`
+   past the garage screen settles it, and #1 depends on the answer.
+   ⭐⭐ **The depth question is CLOSED and no longer an assumption:** `[MEASURED]` 4 bpp, chunky,
+   `pixelType` 0, two palette indices per byte, **high nibble = left pixel**, 16-entry CLUT.
+   ⚠ And the CLUT is not what the player saw — a **gamma table** sits between it and the DAC, so the
+   Amiga palette is derived from the *displayed* colour. → `docs/mac-hardware.md` §The display surface.
 3. **Machine target.** RoF needed 1 MB and did not fit a bare 512 KB A500. Unknown here and not
    guessable: it depends on whether the original segments stay resident and on how the display is
    arranged. **Decide when the first real measurement exists, not before.**
@@ -73,8 +82,8 @@ how much else depends on them.
    ⚠ This port's differentials are different again (there is no transliteration oracle), so the
    question is open rather than answered by either precedent.
 
-⚠ `docs/mac-hardware.md` question 5 is referenced by #4 above; the numbering here shifted when the
-build choice was added, so trust the titles rather than any number quoted elsewhere.
+⚠ **Trust the titles above, not the numbers** — this list has been renumbered twice as decisions
+locked, and other docs quote it by number.
 
 ## The source material
 
@@ -195,10 +204,14 @@ amiga/                  Amiga build infrastructure: Makefile, env.sh, run.sh, de
 
 ## Status
 
-- [ ] **Phase 0 — Scaffolding.** ⚠ The repo structure, the vendored framework, the inherited docs
-      and the FS-UAE scripts are in place; **no code is written and nothing has been run.** The
-      inherited Amiga scripts are renamed but unverified. `docs/open-work.md` has the exit criteria.
-- [ ] Phase 1 — The Macintosh reference loop
+- [ ] **Phase 0 — Scaffolding.** ⚠ Nothing on the **Amiga** side has been built or run: no port
+      code, and the inherited FS-UAE scripts are renamed but unverified. The repo structure, the
+      vendored framework and the inherited docs are in place. `docs/open-work.md` has the exit criteria.
+- [x] **Phase 1 — The Macintosh reference loop.** ⭐ It **drives**: MAME boots the reference volume
+      and launches `Color VETTE!` unattended, completion read from the Mac's own low memory, and the
+      game runs to its garage screen. Framebuffer + CLUT capture and host-side re-render are proven
+      against MAME's own screenshots. ⚠ One capability is still missing — an **A-trap log**
+      (`docs/open-work.md` #1), which is what Phase 2's trap map runs on.
 - [ ] Phase 2 — Complete static map (segments, the jump table, the trap map, the A5 world)
 - [ ] Phase 3 — The trap layer
 - [ ] Phase 4 — End-to-end skeleton on the target, then profile, then set a target
@@ -210,9 +223,11 @@ See `docs/phases.md` for exit criteria and the gating between phases.
 
 ## Immediate next step
 
-**Unblock the source archive** (`docs/open-work.md` #1) and **settle the three open decisions that
-gate everything else** — the port strategy, the reference emulator, and the display architecture.
+**Get the Amiga executable to the game's intro screen** (user goal), in the staged order
+`docs/open-work.md` #1-#4 sets out. ⭐ The gate in front of it is the **trap log**: option A runs the
+original code, so what has to be implemented is exactly the set of A-line traps the game executes
+between launch and the intro, in first-use order — and that is a *measurement*, not an estimate.
 
-⚠ Resist starting Phase 0 code around them. The postmortem's one-sentence lesson is *build the
-discovery and validation infrastructure exhaustively up front instead of growing it reactively*, and
-"write some platform code while the strategy is undecided" is exactly the reactive version.
+⚠ Resist implementing traps by reading Inside Macintosh's index. The postmortem's one-sentence
+lesson is *build the discovery and validation infrastructure exhaustively up front instead of
+growing it reactively*, and "guess which QuickDraw calls the intro needs" is the reactive version.
