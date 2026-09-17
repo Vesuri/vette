@@ -1,15 +1,22 @@
 # Stage C — live trap-layer bring-up
 
 Stage C runs the original resident `CODE` segments and advances one loud stop at a time. The
-acceptance boundary is still the game's own intro pixels; this document records the standalone
-port's execution order, which is now known to differ from the earlier MAME first-use table.
+acceptance boundary now includes the game's complete animated and audible intro; this document
+records the standalone port's execution order, which is now known to differ from the earlier MAME
+first-use table.
 
 ## Current checkpoint
 
-With one debugger-forced intro click, the Amiga run executes **65 distinct successful-path traps**
-and continues for a three-minute warp run without entering the game's error dialog or reaching an
-unimplemented trap. The production `Button` implementation reads the Amiga CIA left-button bit—the
-forced click exists only in diagnostic builds used to cross the intro wait.
+With one debugger-forced intro click, the Amiga run completes the intro without entering the game's
+error dialog, disposes its window, and halts loudly at the next operation: unimplemented
+`PaintBehind`, called by `Intro+$0B10`. The production `Button` implementation reads the Amiga CIA
+left-button bit—the forced click exists only in diagnostic builds used to cross the intro wait.
+
+The full-sequence acceptance run passes on both A4000/040 and the target A1200 with 2 MiB chip and
+8 MiB fast RAM. Both end with every tracked phase flag set, the tram at `(310,0)-(440,134)`, one
+completed logo composite, and byte-identical final chunky framebuffers. The audio probe reaches
+state 2 after `Signature` finishes, confirming that the opening loop has been replaced and the
+centred Paula music pair has stopped before the loud stop.
 
 An earlier run appeared to advance through `GetDItem`, `SetIText`, `InsetRect`, and
 `FrameRoundRect`. That was a false branch: the fixed four-entry `GWorldSlot` table filled while
@@ -51,9 +58,10 @@ when a sprite crosses the left or bottom clip edge. The general scaling/odd-alig
 the correctness fallback.
 
 The complete intro sound cue set is now driven by the original code's own Bogas one-shot flags.
-`Opening song` loops, centred on two Paula voices, while `cable car bell`, `Engine`, `mic`, and
-`Signature` use the two effects voices. The bell and mic/signature therefore layer over rather than
-terminating the music. Instrument bytes come from the converted `INST` resources; short instruments
+`Opening song` loops, centred on two Paula voices, while `cable car bell`, `Engine`, and `mic` use
+the two effects voices and therefore layer over rather than terminating the piano. At the logo cue,
+`Signature` replaces the opening loop on the centred pair, stops the engine, and plays once.
+Instrument bytes come from the converted `INST` resources; short instruments
 have their eight-byte Bogas header removed before DMA. All five play at PAL period 319, the closest
 Paula rate to the measured Macintosh 11.127 kHz playback.
 
@@ -138,6 +146,11 @@ The successful first-use order is:
 63. `ClipRect`
 64. `Button`
 65. `HPurge`
+66. `DisposeWindow`
+
+`InitGDevice` is also exercised before the current stop; its late discovery is recorded as depth
+67 rather than inserted into this historical first-use list without a fresh trace. `PaintBehind`
+is the next unimplemented call.
 
 `amiga/stage_c.gdb` watches the loud-stop state transition and prints the depth, trap identity,
 selector, runtime `(segment, offset)`, absolute PC, USP, all data/address registers, and nearby

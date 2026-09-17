@@ -157,6 +157,7 @@ static IntroSample s_introSamples[] = {
     {12083, 0, 0}                         // Signature
 };
 static bool s_introSoundStarted[5];
+static uint32_t s_introMusicEndTick;
 static uint32_t s_introEffectEndTick[2];  // Paula channels 2 and 3
 static bool s_introLogoHeld;
 static bool s_introLogoParked;
@@ -597,9 +598,24 @@ static void updateIntroAudio()
         s_introSoundStarted[3] = true;
     }
     if (!s_introSoundStarted[4] && read16(s_currentA5 - 0x54)) {
-        playIntroSample(4, 2, 64);            // replaces the looping engine
-        s_introEffectEndTick[0] = g_macTicks + 243;
+        // Signature is the logo music, not another effect over the opening
+        // piano.  Replace the centred music pair and silence the engine voice;
+        // unlike Opening song, Signature is a one-shot.
+        stopIntroChannel(0);
+        stopIntroChannel(1);
+        stopIntroChannel(2);
+        playIntroSample(4, 0, 48);
+        playIntroSample(4, 1, 48);
+        s_introMusicEndTick = g_macTicks + 243;
+        s_introEffectEndTick[0] = 0;
         s_introSoundStarted[4] = true;
+    }
+    if (s_introMusicEndTick
+        && (int32_t)(g_macTicks - s_introMusicEndTick) >= 0) {
+        stopIntroChannel(0);
+        stopIntroChannel(1);
+        s_introMusicEndTick = 0;
+        if (g_introAudioState != 3) g_introAudioState = 2;
     }
     for (uint16_t i = 0; i < 2; ++i)
         if (s_introEffectEndTick[i]

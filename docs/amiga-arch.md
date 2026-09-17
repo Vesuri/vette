@@ -260,8 +260,9 @@ The `sound` segment is now disassembled far enough to identify its 12 exported w
 block. The intro opens three Bogas contexts, resolves the named instruments during initialization,
 and sets one-shot globals immediately after each load. The current Paula seam follows those original
 flags for `Opening song`, `cable car bell`, `Engine`, `mic`, and `Signature`, so cues stay synchronized
-with the original animation state. Music occupies a centred pair and loops; the remaining pair layers
-effects over it. This is intentionally the measured intro surface, not yet a claim that every Bogas
+with the original animation state. The opening music occupies a centred pair and loops until the logo;
+the one-shot `Signature` replaces it there, while the remaining pair layers the earlier effects over
+the opening. This is intentionally the measured intro surface, not yet a claim that every Bogas
 command needed by the driving game has been reproduced. → `docs/source-inventory.md` §Audio.
 ⚠ Inherited placement rule that will apply whatever the backend is: audio work goes **AFTER** the
 copper work in the handler, because a Paula DMA restart busy-waits on the beam and nothing that

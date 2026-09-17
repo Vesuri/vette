@@ -5,9 +5,13 @@ that session touched). ⚠⚠ **This is a QUEUE, not a log:** an entry is **DELE
 closes it, and what the work taught goes in the doc that was wrong. `make todo` prints this file
 plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
-## Blocking — nothing else can start
+## Blocking — current loud stop
 
-*Nothing.* The MAME A-trap log remains a measured reference-run inventory → `docs/trap-log.md`,
+⭐ **HEAD OF QUEUE: `PaintBehind`, called by `Intro+$0B10`.** The complete intro now passes and
+`DisposeWindow` succeeds; implement only the Window Manager semantics required to cross this loud
+stop and continue toward the garage. Do not add dialog/UI traps to conceal an upstream failure.
+
+The MAME A-trap log remains a measured reference-run inventory → `docs/trap-log.md`,
 but Stage C has proved that it is **not an exact standalone-port first-use script**. The port has
 already executed initialization calls absent from, or much later in, that 51-row ordering. Treat
 51 and the intro's 36 as floors until the tracer omission is explained. Three earlier questions
@@ -36,7 +40,7 @@ the game patches exactly one trap (`_ExitToShell`), `%A5Init` calls exactly one 
    that are still open**, part (a) (`PROJECT.md` #2),
    which asks the same question about the **driving** surface — take both probes at once.
 
-## ⭐⭐ TARGET 1 — the intro screen, painted by the game's own code — COMPLETE
+## ⭐⭐ TARGET 1 — the complete intro, run by the game's own code — COMPLETE
 
 The MAME capture proves that its first 36 logged traps suffice to paint the reference intro at
 frame 1758. Stage C's own loud-stop loop is now the implementation order and has already found
@@ -57,15 +61,23 @@ with `amiga/stage_c_capture.gdb` followed by `tools/verify_stage_c_intro.py`. Th
 crop is `(64,91,512,320)`; the one-row correction is recorded in `docs/stage-c.md` while the
 separate 323-row destination-rectangle question remains queued.
 
+⭐ **The complete animated intro also passes on the target A1200 configuration** (2 MiB chip,
+8 MiB fast): the tram rings at the summit and parks at `(310,0)-(440,134)`, the Corvette/singer/mic
+sequence completes, and the original `CopyBits` composition produces the striped VETTE logo. The
+opening piano and the bell/engine/mic cues come from the converted `INST` resources; `Signature`
+replaces the piano at the logo, plays once, and then stops. The final A1200 and A4000 chunky captures
+are byte-identical. Execution then disposes the intro window and loud-stops at the first genuinely
+unimplemented operation: `PaintBehind`, `Intro+$0B10`.
+
 ⚠⚠ **Read the honesty rule before starting any of these: each stage states what it PROVES, and a
 stage that shows the right picture for the wrong reason is a failure, not a milestone.** Displaying
 a converted Mac screenshot is a display-path proof and nothing more — it must never be reported as
 "the intro screen works".
 
 ⛔ **Deferred until execution asks for them:** the Event Manager (`GetNextEvent`, `SystemTask`),
-late Menu Manager operations, `MoveWindow`/`DisposeWindow`/`PaintBehind`, and
-`PurgeMem`/`CompactMem`. Do not defer a trap that the loud-stop loop actually reaches:
-`UnLoadSeg` and `GetGDevice` were both required during startup.
+late Menu Manager operations, and `PurgeMem`/`CompactMem`. `MoveWindow` and `DisposeWindow` are now
+implemented. The current loud stop is `PaintBehind`; it is the next trap-layer task after this
+completed intro checkpoint. Do not defer a trap that the loud-stop loop actually reaches.
 
 ⚠ **Refer to an item by its TITLE, not its number.** The list is renumbered every time an entry is
 closed and deleted, so a `#N` written in another doc goes quietly wrong — three of them already had.
