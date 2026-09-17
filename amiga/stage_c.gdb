@@ -3,12 +3,12 @@
 set pagination off
 set confirm off
 
-watch g_stageBState
+# g_stageBState is written before the trap report fields, so watching it can
+# stop on a half-built report.  showLoudStop is called only after every field
+# is populated and immediately before the permanent loud-stop loop.
+break VetteScreen::showLoudStop
 commands
   silent
-  if g_stageBState != 3
-    continue
-  end
 end
 continue
 
@@ -19,6 +19,8 @@ printf "selector          = %d (-1 = N/A)\n", g_trapSelector
 printf "caller            = segment %u + $%04X\n", g_trapSegment, g_trapOffset
 printf "absolute PC       = $%08X\n", g_trapPC
 printf "USP               = $%08X\n", g_trapUserStack
+printf "USP words         = "
+x/8hx g_trapUserStack
 printf "D0-D7/A0-A6:\n"
 x/15wx g_trapRegisters
 x/8i g_trapPC-8

@@ -364,15 +364,30 @@ static bool redirectLowMemoryGlobals(uint8_t* a5)
     // Those addresses belong to exception vectors / AmigaOS on this machine, so redirect
     // the same-width instructions to reserved application-parameter slots above A5.
     if (read16(vette_code_1 + 0x570) != 0x2038 || read16(vette_code_1 + 0x572) != 0x0156
-        || read16(vette_code_1 + 0x8a6) != 0x2078 || read16(vette_code_1 + 0x8a8) != 0x09de
-        || read16(vette_code_2 + 0x8c4) != 0x2078 || read16(vette_code_2 + 0x8c6) != 0x09ee)
+        || read16(vette_code_1 + 0x8a6) != 0x2078 || read16(vette_code_1 + 0x8a8) != 0x09de)
         return false;
     write16(vette_code_1 + 0x570, 0x202d);  // MOVE.L 4(A5),D0: RndSeed
     write16(vette_code_1 + 0x572, 4);
     write16(vette_code_1 + 0x8a6, 0x206d);  // MOVEA.L 8(A5),A0: WMgrPort
     write16(vette_code_1 + 0x8a8, 8);
-    write16(vette_code_2 + 0x8c4, 0x206d);  // MOVEA.L 12(A5),A0: GrayRgn
-    write16(vette_code_2 + 0x8c6, 12);
+
+    // GrayRgn ($09EE) is read in ten reachable places using both MOVEA.L and
+    // MOVE.L-to-stack encodings.  They all use the absolute-word source EA,
+    // which can be redirected at identical width to the 12(A5) shadow.
+    uint16_t grayReferences = 0;
+    for (uint16_t segment = 1; segment <= 10; ++segment) {
+        uint8_t* code = s_segments[segment].begin;
+        uint32_t size = (uint32_t)(s_segments[segment].end - code);
+        for (uint32_t offset = 2; offset + 1 < size; offset += 2) {
+            uint16_t opcode = read16(code + offset - 2);
+            if (read16(code + offset) == 0x09ee && (opcode & 0x003f) == 0x0038) {
+                write16(code + offset - 2, (uint16_t)((opcode & 0xffc0) | 0x002d));
+                write16(code + offset, 12);
+                ++grayReferences;
+            }
+        }
+    }
+    if (grayReferences != 16) return false;
 
     // Ticks ($016A) is read directly at 87 instruction sites.  Every measured
     // encoding uses absolute-word source EA $38; d16(A5) is the same width, so
@@ -445,6 +460,22 @@ static void blockClear(uint8_t* destination, uint32_t count)
         count -= 2;
     }
     if (count) *destination = 0;
+}
+
+static void blockFill(uint8_t* destination, uint32_t count, uint8_t value)
+{
+    if (!count) return;
+    if ((uint32_t)destination & 1) {
+        *destination++ = value;
+        if (!--count) return;
+    }
+    uint16_t pair = (uint16_t)((value << 8) | value);
+    while (count >= 2) {
+        *(uint16_t*)destination = pair;
+        destination += 2;
+        count -= 2;
+    }
+    if (count) *destination = value;
 }
 
 static uint8_t** getResource(uint32_t type, int16_t id)
@@ -1043,6 +1074,51 @@ static bool disposeWindow(uint8_t* window)
     return true;
 }
 
+static bool paintBehind(uint8_t* startWindow, uint8_t** clobberedRegion)
+{
+    WindowSlot* slot = windowSlot(startWindow);
+    uint8_t* region = clobberedRegion ? *clobberedRegion : 0;
+    if (!slot || !region || read16(region) != 10) return false;
+
+    // The measured post-intro call starts at the newly allocated, still hidden
+    // garage window.  There are no visible windows behind it, so PaintBehind
+    // exposes only the desktop inside GrayRgn.  Retain the loud stop if a later
+    // call actually needs WDEF drawing for a window farther down the chain.
+    for (uint8_t* behind = (uint8_t*)read32(startWindow + 144); behind;
+         behind = (uint8_t*)read32(behind + 144))
+        if (behind[110]) return false;
+
+    int16_t top = (int16_t)read16(region + 2);
+    int16_t left = (int16_t)read16(region + 4);
+    int16_t bottom = (int16_t)read16(region + 6);
+    int16_t right = (int16_t)read16(region + 8);
+    if (top < 0) top = 0;
+    if (left < 0) left = 0;
+    if (bottom > 320) bottom = 320;
+    if (right > 512) right = 512;
+    if (top >= bottom || left >= right) return true;
+
+    // Classic desktop gray alternates the reserved black and white palette
+    // entries.  Work in packed 4-bpp bytes, preserving boundary nibbles.
+    for (int16_t y = top; y < bottom; ++y) {
+        uint8_t pattern = (y & 1) ? 0x0f : 0xf0;
+        uint8_t* row = s_colorScreen + (uint32_t)y * (512 / 2);
+        int16_t x = left;
+        if (x & 1) {
+            row[x >> 1] = (uint8_t)((row[x >> 1] & 0xf0) | (pattern & 0x0f));
+            ++x;
+        }
+        uint16_t firstByte = (uint16_t)(x >> 1);
+        uint16_t fullBytes = (uint16_t)((right - x) >> 1);
+        blockFill(row + firstByte, fullBytes, pattern);
+        x = (int16_t)(x + fullBytes * 2);
+        if (x < right)
+            row[x >> 1] = (uint8_t)((row[x >> 1] & 0x0f) | (pattern & 0xf0));
+    }
+    markDirty(region + 2);
+    return true;
+}
+
 static bool disposeDialog(uint8_t* dialog)
 {
     WindowSlot* slot = windowSlot(dialog);
@@ -1051,6 +1127,8 @@ static bool disposeDialog(uint8_t* dialog)
 
 static int32_t resourceHandleIndex(uint8_t** handle);
 static uint8_t** newHandle(uint32_t size, bool clear);
+static uint32_t handleSize(uint8_t** handle);
+static int16_t setHandleSize(uint8_t** handle, uint32_t newSize);
 
 static uint32_t resourceHandleSize(uint8_t** handle)
 {
@@ -2245,6 +2323,89 @@ static void initMenus()
     for (uint32_t i = 0; i < (512 / 2) * 20; ++i) s_colorScreen[i] = 0;
 }
 
+static bool disableMenuItem(uint8_t** menu, uint16_t item)
+{
+    // Intro updates the future game-menu state before Load has obtained MENU
+    // 222, so the first three calls intentionally carry a nil MenuHandle.
+    if (!menu) return true;
+    if (!*menu || item >= 32 || handleSize(menu) < 14) return false;
+    uint32_t enabled = read32(*menu + 10);
+    enabled &= ~(1UL << item);
+    write32(*menu + 10, enabled);
+    return true;
+}
+
+static uint8_t** newMenu(int16_t id, const uint8_t* title)
+{
+    if (!title) return 0;
+    uint16_t titleLength = title[0];
+    uint8_t** handle = newHandle((uint32_t)16 + titleLength, true);
+    if (!handle || !*handle) return 0;
+    uint8_t* menu = *handle;
+    write16(menu, (uint16_t)id);
+    write32(menu + 10, 0xffffffffUL);         // title and future items enabled
+    menu[14] = (uint8_t)titleLength;
+    for (uint16_t i = 0; i < titleLength; ++i) menu[15 + i] = title[i + 1];
+    menu[15 + titleLength] = 0;              // end of item list
+    return handle;
+}
+
+static bool appendMenu(uint8_t** handle, const uint8_t* specification)
+{
+    if (!handle || !*handle || !specification) return false;
+    uint32_t size = handleSize(handle);
+    uint8_t* menu = *handle;
+    if (size < 16 || size < (uint32_t)16 + menu[14]) return false;
+    uint32_t end = 15 + menu[14];
+    uint16_t itemNumber = 0;
+    while (end < size && menu[end]) {
+        uint8_t length = menu[end];
+        if (end + 5UL + length >= size) return false;
+        end += 5UL + length;
+        ++itemNumber;
+    }
+    if (end >= size) return false;
+
+    uint16_t source = 1;
+    while (source <= specification[0]) {
+        uint16_t start = source;
+        while (source <= specification[0] && specification[source] != ';') ++source;
+        uint16_t finish = source++;
+        bool enabled = true;
+        if (start < finish && specification[start] == '(') { enabled = false; ++start; }
+        uint8_t label[255]; uint16_t labelLength = 0;
+        uint8_t icon = 0, key = 0, mark = 0, style = 0;
+        for (uint16_t i = start; i < finish && labelLength < 255; ++i) {
+            uint8_t c = specification[i];
+            if ((c == '^' || c == '/' || c == '!' || c == '<') && i + 1 < finish) {
+                uint8_t value = specification[++i];
+                if (c == '^') icon = value;
+                else if (c == '/') key = value;
+                else if (c == '!') mark = value;
+                else style = value;
+            } else label[labelLength++] = c;
+        }
+        uint32_t oldEnd = end;
+        if (setHandleSize(handle, size + 5UL + labelLength) != 0) return false;
+        size += 5UL + labelLength;
+        menu = *handle;
+        menu[oldEnd] = (uint8_t)labelLength;
+        for (uint16_t i = 0; i < labelLength; ++i) menu[oldEnd + 1 + i] = label[i];
+        menu[oldEnd + 1 + labelLength] = icon;
+        menu[oldEnd + 2 + labelLength] = key;
+        menu[oldEnd + 3 + labelLength] = mark;
+        menu[oldEnd + 4 + labelLength] = style;
+        end = oldEnd + 5UL + labelLength;
+        menu[end] = 0;
+        ++itemNumber;
+        if (!enabled && itemNumber < 32) {
+            uint32_t flags = read32(menu + 10);
+            write32(menu + 10, flags & ~(1UL << itemNumber));
+        }
+    }
+    return true;
+}
+
 static void initTextEdit()
 {
     // TEInit creates an empty private scrap handle and resets its manager globals.
@@ -2529,6 +2690,28 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
         if (g_stageCDepth < 7) g_stageCDepth = 7;
         return 1;
     }
+    if (trap == 0xa93a) {                    // DisableItem(menu, item)
+        if (disableMenuItem((uint8_t**)read32(userStack + 2), read16(userStack))) {
+            if (g_stageCDepth < 71) g_stageCDepth = 71;
+            return 7;
+        }
+    }
+    if (trap == 0xa931) {                    // NewMenu(id, title) -> MenuHandle
+        uint8_t** menu = newMenu((int16_t)read16(userStack + 4),
+                                 (const uint8_t*)read32(userStack));
+        write32(userStack + 6, (uint32_t)menu);
+        if (menu) {
+            if (g_stageCDepth < 72) g_stageCDepth = 72;
+            return 7;
+        }
+    }
+    if (trap == 0xa933) {                    // AppendMenu(menu, itemList)
+        if (appendMenu((uint8_t**)read32(userStack + 4),
+                       (const uint8_t*)read32(userStack))) {
+            if (g_stageCDepth < 73) g_stageCDepth = 73;
+            return 9;
+        }
+    }
     if (trap == 0xa9cc) {                    // TEInit()
         initTextEdit();
         if (g_stageCDepth < 8) g_stageCDepth = 8;
@@ -2580,6 +2763,33 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
     if (trap == 0xa01c) {                    // FreeMem() -> D0
         regs[0] = AvailMem(MEMF_PUBLIC);
         if (g_stageCDepth < 15) g_stageCDepth = 15;
+        return 1;
+    }
+    if (trap == 0xa04d) {                    // PurgeMem(D0 requested contiguous bytes)
+        uint32_t requested = regs[0];
+        if (AvailMem(MEMF_PUBLIC | MEMF_LARGEST) < requested) {
+            for (uint16_t i = 0; i < s_handleAllocationCount; ++i) {
+                HandleAllocation& allocation = s_handleAllocations[i];
+                if (!allocation.master || allocation.locked || !allocation.purgeable) continue;
+                FreeMem(allocation.master, allocation.size ? allocation.size : 1);
+                allocation.master = 0;       // purged Handle retains its master pointer
+                allocation.size = 0;
+                if (AvailMem(MEMF_PUBLIC | MEMF_LARGEST) >= requested) break;
+            }
+        }
+        s_memoryManager.error
+            = AvailMem(MEMF_PUBLIC | MEMF_LARGEST) >= requested ? 0 : -108;
+        if (g_stageCDepth < 69) g_stageCDepth = 69;
+        return 1;
+    }
+    if (trap == 0xa04c) {                    // CompactMem(D0 requested) -> D0 largest block
+        // Exec's public allocator is process-wide rather than a movable Mac
+        // application zone.  No handle relocation is required while its
+        // largest block already satisfies the request; report that block just
+        // as CompactMem does after attempting compaction.
+        regs[0] = AvailMem(MEMF_PUBLIC | MEMF_LARGEST);
+        s_memoryManager.error = 0;
+        if (g_stageCDepth < 70) g_stageCDepth = 70;
         return 1;
     }
     if (trap == 0xa874) {                    // GetPort(VAR port)
@@ -2770,6 +2980,19 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
             return 5;
         }
     }
+    if (trap == 0xa90d) {                    // PaintBehind(startWindow, clobberedRgn)
+        uint8_t* first = (uint8_t*)read32(userStack);
+        uint8_t* second = (uint8_t*)read32(userStack + 4);
+        // MPW's glue leaves the WindowPtr nearest the return slot for this
+        // Toolbox procedure.  Resolve by record identity as a guard against
+        // repeating the Pascal declaration order at the raw stack boundary.
+        uint8_t* window = windowSlot(first) ? first : second;
+        uint8_t** region = (uint8_t**)(window == first ? second : first);
+        if (paintBehind(window, region)) {
+            if (g_stageCDepth < 68) g_stageCDepth = 68;
+            return 9;
+        }
+    }
     if (trap == 0xa873) {                    // SetPort(GrafPtr)
         write32(s_qdThePort, read32(userStack));
         if (g_stageCDepth < 26) g_stageCDepth = 26;
@@ -2869,7 +3092,15 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
             s_screenDirty = false;
             s_pixelsDirty = false;
         }
-        write16(userStack, AmigaHardware::isLeftMouseButtonPressed() ? 1 : 0);
+        bool pressed = AmigaHardware::isLeftMouseButtonPressed();
+#ifdef VETTE_SKIP_INTRO
+        static bool firstButtonPoll = true;
+        if (firstButtonPoll) {
+            pressed = true;
+            firstButtonPoll = false;
+        }
+#endif
+        write16(userStack, pressed ? 1 : 0);
         if (g_stageCDepth < 64) g_stageCDepth = 64;
         return 1;
     }

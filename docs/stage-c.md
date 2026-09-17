@@ -7,16 +7,21 @@ first-use table.
 
 ## Current checkpoint
 
-With one debugger-forced intro click, the Amiga run completes the intro without entering the game's
-error dialog, disposes its window, and halts loudly at the next operation: unimplemented
-`PaintBehind`, called by `Intro+$0B10`. The production `Button` implementation reads the Amiga CIA
-left-button bit—the forced click exists only in diagnostic builds used to cross the intro wait.
+With the opt-in first-poll intro skip, the Amiga run disposes the intro window, paints the exposed
+desktop, crosses the first post-intro memory and menu-state calls, and halts loudly at unimplemented
+`AddResMenu`, called by `load+$053A`. The production `Button` implementation reads the Amiga CIA
+left-button bit; the synthetic click exists only in `SKIP_INTRO=1` development builds.
 
 The full-sequence acceptance run passes on both A4000/040 and the target A1200 with 2 MiB chip and
 8 MiB fast RAM. Both end with every tracked phase flag set, the tram at `(310,0)-(440,134)`, one
 completed logo composite, and byte-identical final chunky framebuffers. The audio probe reaches
 state 2 after `Signature` finishes, confirming that the opening loop has been replaced and the
 centred Paula music pair has stopped before the loud stop.
+
+For post-intro trap work, `make SKIP_INTRO=1` makes exactly the first `Button()` poll report a press
+and then returns permanently to the real CIA mouse state. This is an opt-in development build; the
+default remains the full intro used by the acceptance probes. Because the Makefile does not track
+flag changes, switch configurations with a clean rebuild.
 
 An earlier run appeared to advance through `GetDItem`, `SetIText`, `InsetRect`, and
 `FrameRoundRect`. That was a false branch: the fixed four-entry `GWorldSlot` table filled while
@@ -149,14 +154,24 @@ The successful first-use order is:
 66. `DisposeWindow`
 
 `InitGDevice` is also exercised before the current stop; its late discovery is recorded as depth
-67 rather than inserted into this historical first-use list without a fresh trace. `PaintBehind`
-is the next unimplemented call.
+67 rather than inserted into this historical first-use list without a fresh trace. The measured
+post-intro continuation is:
 
-`amiga/stage_c.gdb` watches the loud-stop state transition and prints the depth, trap identity,
-selector, runtime `(segment, offset)`, absolute PC, USP, all data/address registers, and nearby
-instructions. The expanded report matters now that Macintosh support code copied into movable
-memory is calling traps outside the 11 resident `CODE` ranges. The build's `muldiv-audit` and
-`probe-audit` are clean.
+68. `PaintBehind`
+69. `PurgeMem`
+70. `CompactMem`
+71. `DisableItem`
+72. `NewMenu`
+73. `AppendMenu`
+
+`AddResMenu` is the next unimplemented call.
+
+`amiga/stage_c.gdb` breaks on `VetteScreen::showLoudStop`, after the report is complete, and prints
+the depth, trap identity, selector, runtime `(segment, offset)`, absolute PC, USP and its first
+words, all data/address registers, and nearby instructions. It then exits, so `diag_run.sh` stops
+FS-UAE immediately instead of waiting out its wall-time ceiling. The expanded report matters now
+that Macintosh support code copied into movable memory is calling traps outside the 11 resident
+`CODE` ranges. The build's `muldiv-audit` and `probe-audit` are clean.
 
 ## Page 0 is not mapped
 
@@ -172,6 +187,12 @@ validated against its shipped opcode, then rewritten at the same width to an A5-
 | `RndSeed` | `$0156` | `4(A5)` | `Main+$0570` |
 | `WMgrPort` | `$09DE` | `8(A5)` | `Main+$08A6` |
 | `GrayRgn` | `$09EE` | `12(A5)` | `Initialize+$08C4` |
+
+Sixteen encoded instructions (ten reachable in the current control-flow inventory) read `GrayRgn`,
+using both `MOVEA.L abs.w` and `MOVE.L abs.w,-(SP)`. They are all redirected to the same `12(A5)`
+shadow by an exact-count scan.
+The stack form was not covered by the first three explicit relocations and was only exposed once
+`PaintBehind` became reachable.
 
 This preserves the original code flow without touching Amiga low memory. More shadows are added
 only when execution reaches them; the inventory shows that most remaining references are `Ticks`,

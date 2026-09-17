@@ -48,7 +48,13 @@ env HOME="$GDBHOME" XDG_CACHE_HOME="$GDBHOME" \
   > "$RUN/gdb-out.log" 2>&1 &
 GDB_PID=$!
 echo "gdb pid=$GDB_PID; running for ${DELAY}s..."
-sleep "$DELAY"
+# Finish immediately when an event-driven gdb script (such as stage_c.gdb)
+# prints its result and exits; snapshot/profiling scripts still run until the
+# wall-time ceiling and receive SIGINT below.
+for i in $(seq 1 "$DELAY"); do
+  kill -0 "$GDB_PID" 2>/dev/null || break
+  sleep 1
+done
 kill -INT "$GDB_PID" 2>/dev/null || true
 # give gdb time to print + detach
 for i in $(seq 1 20); do kill -0 "$GDB_PID" 2>/dev/null || break; sleep 1; done

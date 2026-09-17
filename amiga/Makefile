@@ -5,6 +5,7 @@
 #   make clean           remove obj/ and out/
 #   make PROBES=1        + the timing probes (diag_run.sh needs this)
 #   make FPSCOUNT=1      the HONEST framerate build: one counter, no probe instrumentation
+#   make SKIP_INTRO=1    report one synthetic first mouse press to skip the proven intro
 #   ./run.sh             boot in FS-UAE (CTRL + left mouse button quits)
 #   ./debug.sh           source-level debug via the FS-UAE GDB stub
 #   ./diag_run.sh [secs] headless probe run (needs PROBES=1)
@@ -108,6 +109,13 @@ endif
 # headless auto-run, no instrumentation.  docs/perf-method.md Rule 1.
 ifdef FPSCOUNT
 EXTRA_DEFINES += -DVETTE_FPSCOUNT
+endif
+
+# Development convenience only.  Button() reports pressed on its first poll,
+# then permanently returns to the real CIA mouse state.  The default build
+# retains the complete intro path and its acceptance behavior.
+ifeq ($(SKIP_INTRO),1)
+EXTRA_DEFINES += -DVETTE_SKIP_INTRO
 endif
 
 # ⭐⭐ `make PROBEFIELDS=N PROBES=1` — BOUND THE MEASUREMENT IN EMULATED TIME, not host time.

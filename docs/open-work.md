@@ -7,9 +7,10 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — current loud stop
 
-⭐ **HEAD OF QUEUE: `PaintBehind`, called by `Intro+$0B10`.** The complete intro now passes and
-`DisposeWindow` succeeds; implement only the Window Manager semantics required to cross this loud
-stop and continue toward the garage. Do not add dialog/UI traps to conceal an upstream failure.
+⭐ **HEAD OF QUEUE: `AddResMenu`, called by `load+$053A`.** The opt-in `SKIP_INTRO=1` path now
+crosses `PaintBehind`, `PurgeMem`, `CompactMem`, `DisableItem`, `NewMenu`, and `AppendMenu` and
+halts at the next measured Menu Manager operation. Implement only its state semantics and continue
+toward the garage. Do not add dialog/UI traps to conceal an upstream failure.
 
 The MAME A-trap log remains a measured reference-run inventory → `docs/trap-log.md`,
 but Stage C has proved that it is **not an exact standalone-port first-use script**. The port has
@@ -66,18 +67,19 @@ separate 323-row destination-rectangle question remains queued.
 sequence completes, and the original `CopyBits` composition produces the striped VETTE logo. The
 opening piano and the bell/engine/mic cues come from the converted `INST` resources; `Signature`
 replaces the piano at the logo, plays once, and then stops. The final A1200 and A4000 chunky captures
-are byte-identical. Execution then disposes the intro window and loud-stops at the first genuinely
-unimplemented operation: `PaintBehind`, `Intro+$0B10`.
+are byte-identical. Execution then disposes the intro window. Post-intro bring-up can synthesize
+only the first `Button` result with `make SKIP_INTRO=1`; the default build still runs the complete
+sequence.
 
 ⚠⚠ **Read the honesty rule before starting any of these: each stage states what it PROVES, and a
 stage that shows the right picture for the wrong reason is a failure, not a milestone.** Displaying
 a converted Mac screenshot is a display-path proof and nothing more — it must never be reported as
 "the intro screen works".
 
-⛔ **Deferred until execution asks for them:** the Event Manager (`GetNextEvent`, `SystemTask`),
-late Menu Manager operations, and `PurgeMem`/`CompactMem`. `MoveWindow` and `DisposeWindow` are now
-implemented. The current loud stop is `PaintBehind`; it is the next trap-layer task after this
-completed intro checkpoint. Do not defer a trap that the loud-stop loop actually reaches.
+⛔ **Deferred until execution asks for them:** the Event Manager (`GetNextEvent`, `SystemTask`)
+and unobserved late manager operations. The current loud stop is `AddResMenu`; `PaintBehind`,
+`PurgeMem`, `CompactMem`, `DisableItem`, `NewMenu`, and `AppendMenu` are now implemented because the
+post-intro path reached them. Do not defer a trap that the loud-stop loop actually reaches.
 
 ⚠ **Refer to an item by its TITLE, not its number.** The list is renumbered every time an entry is
 closed and deleted, so a `#N` written in another doc goes quietly wrong — three of them already had.
