@@ -143,8 +143,25 @@ static void markDirty(const uint8_t* rectangle)
 static uint8_t* s_vblTasks[8];
 static uint16_t s_vblTaskCount;
 static uint32_t s_vblLastTick;
-static uint8_t* s_introAudio;
-static uint32_t s_introAudioEndTick;
+
+struct IntroSample {
+    int16_t resourceID;
+    uint8_t* chipData;
+    uint32_t size;
+};
+static IntroSample s_introSamples[] = {
+    {1425, 0, 0},                         // Opening song
+    {19354, 0, 0},                        // cable car bell
+    {11584, 0, 0},                        // Engine
+    {28215, 0, 0},                        // mic
+    {12083, 0, 0}                         // Signature
+};
+static bool s_introSoundStarted[5];
+static uint32_t s_introEffectEndTick[2];  // Paula channels 2 and 3
+static bool s_introLogoHeld;
+static bool s_introLogoParked;
+static uint16_t s_introLogoFrames;
+static uint32_t s_introLastLogoDeadline;
 
 struct GWorldSlot {
     uint8_t port[108];
@@ -415,6 +432,20 @@ static void blockMove(uint8_t* source, uint8_t* destination, uint32_t count)
     }
 }
 
+static void blockClear(uint8_t* destination, uint32_t count)
+{
+    if ((uint32_t)destination & 1) {
+        *destination++ = 0;
+        if (!--count) return;
+    }
+    while (count >= 2) {
+        *(uint16_t*)destination = 0;
+        destination += 2;
+        count -= 2;
+    }
+    if (count) *destination = 0;
+}
+
 static uint8_t** getResource(uint32_t type, int16_t id)
 {
     // GetResource searches the current resource file first.  The system resource chain is
@@ -434,46 +465,148 @@ static uint8_t** getResource(uint32_t type, int16_t id)
     return 0;
 }
 
-static void startIntroAudio()
+static IntroSample* introSample(uint16_t index)
 {
-    if (g_introAudioState) return;
-    ResourceArchive::Item song;
-    // The Bogas driver's named "Opening song" instrument is a complete
-    // unsigned 8-bit stream.  A reference-Mac WAV capture correlates it at
-    // 11,126 Hz: the classic Mac 11.127 kHz rate.  PAL Paula period 319 is
-    // the nearest integer divisor (11,118.8 Hz, about 0.08% low).
-    if (!s_resourceArchive.find(1, 0x494e5354UL, 1425, song) || !song.size
-        || song.size > 131070UL) {
-        g_introAudioState = 3;
-        return;
+    if (index >= sizeof(s_introSamples) / sizeof(s_introSamples[0])) return 0;
+    IntroSample& sample = s_introSamples[index];
+    if (sample.chipData) return &sample;
+
+    ResourceArchive::Item item;
+    if (!s_resourceArchive.find(1, 0x494e5354UL, sample.resourceID, item) || !item.size)
+        return 0;
+    const uint8_t* source = item.data;
+    uint32_t size = item.size;
+    // Short Bogas instruments carry an eight-byte instrument header.  Its
+    // final word is the exact PCM byte count; the long samples are bare PCM.
+    if (size > 8 && read32(source) == 0 && read16(source + 6) == size - 8) {
+        source += 8;
+        size -= 8;
     }
-    uint32_t bytes = (song.size + 1) & ~1UL;
-    s_introAudio = (uint8_t*)AllocMem(bytes, MEMF_CHIP);
-    if (!s_introAudio) { g_introAudioState = 3; return; }
-    for (uint32_t i = 0; i < song.size; ++i) s_introAudio[i] = song.data[i] ^ 0x80;
-    if (bytes != song.size) s_introAudio[song.size] = 0;
+    uint32_t allocated = (size + 1) & ~1UL;
+    if (!size || allocated > 131070UL) return 0;
+    sample.chipData = (uint8_t*)AllocMem(allocated, MEMF_CHIP);
+    if (!sample.chipData) return 0;
+    sample.size = size;
+    for (uint32_t i = 0; i < size; ++i) sample.chipData[i] = source[i] ^ 0x80;
+    if (allocated != size) sample.chipData[size] = 0;
+    return &sample;
+}
 
-    *dmaconPointer = DMAF_AUD0;
-    *(volatile uint32_t*)0xdff0a0 = (uint32_t)s_introAudio;
-    *aud0lenPointer = (uint16_t)(bytes / 2);
-    *aud0perPointer = 319;
-    *aud0volPointer = 64;
-    *dmaconPointer = (uint16_t)(DMAF_SETCLR | DMAF_MASTER | DMAF_AUD0);
+static void playIntroSample(uint16_t sampleIndex, uint16_t channel, uint16_t volume)
+{
+    IntroSample* sample = introSample(sampleIndex);
+    if (!sample || channel > 3) { g_introAudioState = 3; return; }
+    uint16_t dma = (uint16_t)(DMAF_AUD0 << channel);
+    volatile uint8_t* audio = (volatile uint8_t*)(0xdff0a0UL + channel * 16);
+    *dmaconPointer = dma;
+    *(volatile uint32_t*)(audio + 0) = (uint32_t)sample->chipData;
+    *(volatile uint16_t*)(audio + 4) = (uint16_t)((sample->size + 1) / 2);
+    *(volatile uint16_t*)(audio + 6) = 319; // 11,118.8 Hz; Mac nominal 11.127 kHz
+    *(volatile uint16_t*)(audio + 8) = volume;
+    *dmaconPointer = (uint16_t)(DMAF_SETCLR | DMAF_MASTER | dma);
+}
 
-    g_introAudioBytes = song.size;
-    g_introAudioPeriod = 319;
-    s_introAudioEndTick = g_macTicks + 635;  // one-shot: ceil(117558 / 11118.8 * 60)
-    g_introAudioState = 1;
+static void stopIntroChannel(uint16_t channel)
+{
+    uint16_t dma = (uint16_t)(DMAF_AUD0 << channel);
+    volatile uint8_t* audio = (volatile uint8_t*)(0xdff0a0UL + channel * 16);
+    *dmaconPointer = dma;
+    *(volatile uint16_t*)(audio + 8) = 0;
+}
+
+static void stabilizeIntroAnimation()
+{
+    if (!s_currentA5) return;
+    if (read16(s_currentA5 - 0x58)) {
+        uint8_t* tram = s_currentA5 - 0x19e;
+        int16_t left = (int16_t)read16(tram + 2);
+        if (left < 0) {
+            // Intro's cable-car callback has no terminal branch: on a real
+            // Macintosh the later actors finish while it is arriving at x=0,
+            // but a slower host walks it off the lower-left edge.  Apply the
+            // complete overshoot and retire only that callback.
+            write16(tram + 0, (uint16_t)((int16_t)read16(tram + 0) + left));
+            write16(tram + 2, 0);
+            write16(tram + 4, (uint16_t)((int16_t)read16(tram + 4) + left));
+            write16(tram + 6, (uint16_t)((int16_t)read16(tram + 6) - left));
+            write32(s_currentA5 - 0xa2, 0x7fffffffUL);
+        }
+    }
+
+    // The fourth callback is armed from an absolute tick deadline, whereas
+    // the Corvette approach and singer/mic motion advance per completed draw.
+    // On the A1200 compatibility path the absolute deadline can overtake that
+    // work.  Hold it ten ticks ahead until the original code raises its own
+    // mic-hit flag; the logo then follows the completed animation normally.
+    if (read32(s_currentA5 - 0x9a) && !read16(s_currentA5 - 0x52)
+        && !read16(s_currentA5 - 0x8a)) {
+        write32(s_currentA5 - 0x9a, 0x7fffffffUL);
+        s_introLogoHeld = true;
+    } else if (s_introLogoHeld && read16(s_currentA5 - 0x52)
+               && !read16(s_currentA5 - 0x8a)) {
+        write32(s_currentA5 - 0x9a, g_macTicks + 10);
+        s_introLogoHeld = false;
+    }
+
+    if (read16(s_currentA5 - 0x8a) && !s_introLogoParked) {
+        uint32_t deadline = read32(s_currentA5 - 0x9a);
+        if (deadline != s_introLastLogoDeadline && deadline != 0x7fffffffUL) {
+            s_introLastLogoDeadline = deadline;
+            ++s_introLogoFrames;
+        }
+        if (s_introLogoFrames >= 1) {
+            // The first pass constructs the complete VETTE composite.  Later
+            // ten-tick callbacks repeat the same five CopyBits rectangles
+            // without changing their geometry; keep the completed pixels and
+            // begin the original 600-tick hold only after that expensive pass.
+            write32(s_currentA5 - 0x9a, 0x7fffffffUL);
+            write32(s_currentA5 - 0x5004, g_macTicks + 600);
+            s_introLogoParked = true;
+        } else write32(s_currentA5 - 0x5004, 0x7fffffffUL);
+    }
 }
 
 static void updateIntroAudio()
 {
-    if (g_introAudioState == 1
-        && (int32_t)(g_macTicks - s_introAudioEndTick) >= 0) {
-        *dmaconPointer = DMAF_AUD0;
-        *aud0volPointer = 0;
-        g_introAudioState = 2;
+    if (!s_currentA5) return;
+
+    // Follow the original intro's own one-shot flags.  The Mac code sets each
+    // immediately after its BogasLoad call, so animation and sound remain tied
+    // to the same state transitions even when drawing falls behind real time.
+    if (!s_introSoundStarted[0] && read16(s_currentA5 - 0x5a)) {
+        playIntroSample(0, 0, 48);
+        playIntroSample(0, 1, 48);           // centred music
+        s_introSoundStarted[0] = true;
+        g_introAudioBytes = s_introSamples[0].size;
+        g_introAudioPeriod = 319;
+        if (g_introAudioState != 3) g_introAudioState = 1;
     }
+    if (!s_introSoundStarted[1] && read16(s_currentA5 - 0x58)) {
+        playIntroSample(1, 2, 64);
+        s_introEffectEndTick[0] = g_macTicks + 54;
+        s_introSoundStarted[1] = true;
+    }
+    if (!s_introSoundStarted[2] && read16(s_currentA5 - 0x56)) {
+        playIntroSample(2, 2, 40);            // engine loops until the logo sting
+        s_introEffectEndTick[0] = 0;
+        s_introSoundStarted[2] = true;
+    }
+    if (!s_introSoundStarted[3] && read16(s_currentA5 - 0x52)) {
+        playIntroSample(3, 3, 64);
+        s_introEffectEndTick[1] = g_macTicks + 241;
+        s_introSoundStarted[3] = true;
+    }
+    if (!s_introSoundStarted[4] && read16(s_currentA5 - 0x54)) {
+        playIntroSample(4, 2, 64);            // replaces the looping engine
+        s_introEffectEndTick[0] = g_macTicks + 243;
+        s_introSoundStarted[4] = true;
+    }
+    for (uint16_t i = 0; i < 2; ++i)
+        if (s_introEffectEndTick[i]
+            && (int32_t)(g_macTicks - s_introEffectEndTick[i]) >= 0) {
+            stopIntroChannel((uint16_t)(i + 2));
+            s_introEffectEndTick[i] = 0;
+        }
 }
 
 static uint8_t asciiUpper(uint8_t c)
@@ -1558,16 +1691,25 @@ static bool eraseRect(const uint8_t* rectangle)
     int16_t bottom = (int16_t)read16(rectangle + 4);
     int16_t right = (int16_t)read16(rectangle + 6);
     if (top >= bottom || left >= right) return false;
+    if (top < mapTop) top = mapTop;
+    if (left < mapLeft) left = mapLeft;
+    if (bottom > mapBottom) bottom = mapBottom;
+    if (right > mapRight) right = mapRight;
+    if (top >= bottom || left >= right) return true;
+    uint16_t firstColumn = (uint16_t)(left - mapLeft);
+    uint16_t lastColumn = (uint16_t)(right - mapLeft);
     for (int16_t y = top; y < bottom; ++y) {
-        if (y < mapTop || y >= mapBottom) continue;
         uint8_t* row = pixels + multiplyUnsigned16((uint16_t)(y - mapTop), rowBytes);
-        for (int16_t x = left; x < right; ++x) {
-            if (x < mapLeft || x >= mapRight) continue;
-            uint16_t column = (uint16_t)(x - mapLeft);
-            uint8_t& byte = row[column >> 1];
-            if (column & 1) byte = (uint8_t)(byte & 0xf0);
-            else byte = (uint8_t)(byte & 0x0f);
+        uint16_t firstByte = (uint16_t)(firstColumn >> 1);
+        uint16_t lastByte = (uint16_t)((lastColumn + 1) >> 1);
+        if (firstColumn & 1) {
+            row[firstByte] &= 0xf0;
+            ++firstByte;
         }
+        bool keepLowNibble = lastColumn & 1;
+        if (keepLowNibble && lastByte > firstByte) --lastByte;
+        if (lastByte > firstByte) blockClear(row + firstByte, lastByte - firstByte);
+        if (keepLowNibble) row[lastByte] &= 0x0f;
     }
     return true;
 }
@@ -1649,6 +1791,127 @@ static bool copyBits(const uint8_t* sourceBitmap, const uint8_t* destinationBitm
     }
     bool unscaled = fromRight - fromLeft == toRight - toLeft
                  && fromBottom - fromTop == toBottom - toTop;
+    // All intro masks and sprites remain nibble-aligned even when their
+    // destination rectangles cross a GWorld or clip boundary.  Clip first,
+    // then operate on packed bytes.  The old fast paths required the *whole*
+    // rectangle to be in bounds, so the tram's srcOr/srcBic pair fell back to
+    // a pixel-at-a-time loop as soon as it touched the bottom or left edge.
+    // That made the other concurrently scheduled actors lose real time.
+    int16_t packedTop = toTop;
+    int16_t packedLeft = toLeft;
+    int16_t packedBottom = toBottom;
+    int16_t packedRight = toRight;
+    if (packedTop < destinationTop) packedTop = destinationTop;
+    if (packedTop < clipTop) packedTop = clipTop;
+    if (packedTop < toTop + sourceTop - fromTop)
+        packedTop = (int16_t)(toTop + sourceTop - fromTop);
+    if (packedLeft < destinationLeft) packedLeft = destinationLeft;
+    if (packedLeft < clipLeft) packedLeft = clipLeft;
+    if (packedLeft < toLeft + sourceLeft - fromLeft)
+        packedLeft = (int16_t)(toLeft + sourceLeft - fromLeft);
+    if (packedBottom > destinationBottom) packedBottom = destinationBottom;
+    if (packedBottom > clipBottom) packedBottom = clipBottom;
+    if (packedBottom > toTop + sourceBottom - fromTop)
+        packedBottom = (int16_t)(toTop + sourceBottom - fromTop);
+    if (packedRight > destinationRight) packedRight = destinationRight;
+    if (packedRight > clipRight) packedRight = clipRight;
+    if (packedRight > toLeft + sourceRight - fromLeft)
+        packedRight = (int16_t)(toLeft + sourceRight - fromLeft);
+    int16_t packedSourceTop = (int16_t)(fromTop + packedTop - toTop);
+    int16_t packedSourceLeft = (int16_t)(fromLeft + packedLeft - toLeft);
+    bool packedClippedPath = unscaled && packedTop < packedBottom
+        && packedLeft < packedRight
+        && ((packedSourceLeft - sourceLeft) & 1) == 0
+        && ((packedLeft - destinationLeft) & 1) == 0
+        && ((packedRight - packedLeft) & 1) == 0;
+    if (packedClippedPath) {
+        uint16_t copyBytes = (uint16_t)(packedRight - packedLeft) >> 1;
+        uint16_t copyHeight = (uint16_t)(packedBottom - packedTop);
+        int16_t firstY = 0, lastY = (int16_t)copyHeight, stepY = 1;
+        if (sourcePixels == destinationPixels && packedTop > packedSourceTop) {
+            firstY = (int16_t)(copyHeight - 1); lastY = -1; stepY = -1;
+        }
+        for (int16_t y = firstY; y != lastY; y = (int16_t)(y + stepY)) {
+            uint8_t* source = sourcePixels
+                + multiplyUnsigned16((uint16_t)(packedSourceTop + y - sourceTop),
+                                     sourceRowBytes)
+                + (uint16_t)(packedSourceLeft - sourceLeft) / 2;
+            uint8_t* destination = destinationPixels
+                + multiplyUnsigned16((uint16_t)(packedTop + y - destinationTop),
+                                     destinationRowBytes)
+                + (uint16_t)(packedLeft - destinationLeft) / 2;
+            if (mode == 0) {
+                blockMove(source, destination, copyBytes);
+            } else if (sourcePixels == destinationPixels && destination > source
+                       && destination < source + copyBytes) {
+                for (uint16_t x = copyBytes; x; --x) {
+                    uint16_t i = (uint16_t)(x - 1);
+                    if (mode == 1)
+                        destination[i] = (uint8_t)(destination[i] | source[i]);
+                    else
+                        destination[i] = (uint8_t)(destination[i]
+                            & (uint8_t)~source[i]);
+                }
+            } else if (mode == 1) {
+                for (uint16_t x = 0; x < copyBytes; ++x)
+                    destination[x] = (uint8_t)(destination[x] | source[x]);
+            } else {
+                for (uint16_t x = 0; x < copyBytes; ++x)
+                    destination[x] = (uint8_t)(destination[x] & (uint8_t)~source[x]);
+            }
+        }
+        return true;
+    }
+    if (unscaled && sourcePixels != destinationPixels
+        && packedTop < packedBottom && packedLeft < packedRight) {
+        // Cross-GWorld sprite/logo transfers frequently have an odd source or
+        // destination nibble.  They are still one-to-one copies: assemble two
+        // source pixels per destination byte instead of redoing clipping,
+        // bounds tests, multiplies and read/modify/write for every pixel.
+        for (int16_t y = packedTop; y < packedBottom; ++y) {
+            int16_t sourceY = (int16_t)(fromTop + y - toTop);
+            const uint8_t* sourceRow = sourcePixels
+                + multiplyUnsigned16((uint16_t)(sourceY - sourceTop), sourceRowBytes);
+            uint8_t* destinationRow = destinationPixels
+                + multiplyUnsigned16((uint16_t)(y - destinationTop), destinationRowBytes);
+            int16_t x = packedLeft;
+            uint16_t destinationColumn = (uint16_t)(x - destinationLeft);
+            uint16_t sourceColumn = (uint16_t)(fromLeft + x - toLeft - sourceLeft);
+            if (destinationColumn & 1) {
+                uint8_t sourceByte = sourceRow[sourceColumn >> 1];
+                uint8_t value = sourceColumn & 1 ? (uint8_t)(sourceByte & 0x0f)
+                                                 : (uint8_t)(sourceByte >> 4);
+                uint8_t& destinationByte = destinationRow[destinationColumn >> 1];
+                if (mode == 1) value = (uint8_t)((destinationByte & 0x0f) | value);
+                else if (mode == 3)
+                    value = (uint8_t)((destinationByte & 0x0f) & (uint8_t)~value);
+                destinationByte = (uint8_t)((destinationByte & 0xf0) | value);
+                ++x; ++sourceColumn; ++destinationColumn;
+            }
+            for (; x + 1 < packedRight; x += 2, sourceColumn += 2,
+                                              destinationColumn += 2) {
+                uint8_t value;
+                if ((sourceColumn & 1) == 0) value = sourceRow[sourceColumn >> 1];
+                else value = (uint8_t)((sourceRow[sourceColumn >> 1] << 4)
+                    | (sourceRow[(sourceColumn >> 1) + 1] >> 4));
+                uint8_t& destinationByte = destinationRow[destinationColumn >> 1];
+                if (mode == 0) destinationByte = value;
+                else if (mode == 1) destinationByte = (uint8_t)(destinationByte | value);
+                else destinationByte = (uint8_t)(destinationByte & (uint8_t)~value);
+            }
+            if (x < packedRight) {
+                uint8_t sourceByte = sourceRow[sourceColumn >> 1];
+                uint8_t value = sourceColumn & 1 ? (uint8_t)(sourceByte & 0x0f)
+                                                 : (uint8_t)(sourceByte >> 4);
+                uint8_t& destinationByte = destinationRow[destinationColumn >> 1];
+                if (mode == 1) value = (uint8_t)((destinationByte >> 4) | value);
+                else if (mode == 3)
+                    value = (uint8_t)((destinationByte >> 4) & (uint8_t)~value);
+                destinationByte = (uint8_t)((destinationByte & 0x0f) | (value << 4));
+            }
+        }
+        return true;
+    }
     bool packedFastPath = unscaled && mode == 0 && ((fromLeft - sourceLeft) & 1) == 0
         && ((toLeft - destinationLeft) & 1) == 0 && (width & 1) == 0
         && fromTop >= sourceTop && fromBottom <= sourceBottom
@@ -2580,6 +2843,7 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
     }
     if (trap == 0xa974) {                    // Button() -> Boolean
         scheduleVBLTask();
+        stabilizeIntroAnimation();
         updateIntroAudio();
         if (s_screenDirty && s_loudStopScreen
             && s_loudStopScreen->presentMacFrame(
@@ -2588,7 +2852,6 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
                 s_pixelsDirty ? s_dirtyBottom : 0, s_pixelsDirty ? s_dirtyRight : 0)) {
             s_screenDirty = false;
             s_pixelsDirty = false;
-            startIntroAudio();
         }
         write16(userStack, AmigaHardware::isLeftMouseButtonPressed() ? 1 : 0);
         if (g_stageCDepth < 64) g_stageCDepth = 64;

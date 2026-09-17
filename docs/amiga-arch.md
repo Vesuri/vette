@@ -247,7 +247,7 @@ built from QuickDraw primitives, a planar-native trap layer skips chunky entirel
 Deliberately **not** used: the framework's `Production`/`Part`/`Script`/`ProductionRunner`
 timeline, and its `ModulePlayer` / TrackerPacker replay.
 
-**Audio: undecided, but LESS unlike Revs than this doc first claimed.**
+**Audio: Bogas-driven intro cues over four Paula voices.**
 
 ⚠⚠ **CORRECTED.** This section originally said Vette's original drives the Mac Sound Manager / Sound
 Driver directly, making it structurally unlike both prior ports (RoF drove POKEY directly; Revs
@@ -256,12 +256,13 @@ reached the SN76489 only through the MOS sound scheduler, so `src/platform/sound
 "Bogas Driver v2.1"`** plus 16 named `INST` samples — 72% of the whole data file — and the `sound`
 code segment is **732 bytes in both builds**.
 
-So `[INFERRED]` the game talks to a **third-party sampled-instrument driver shipped in its own
-data**, which makes this **the Revs shape after all**: reproduce the *driver's* interface, with a
-Paula sample player underneath, rather than reproduce a Toolbox manager. ⭐ The upside is that the
-surface is enumerable from one 15 KB resource instead of from a trap sweep.
-⚠ Still inference from names and sizes — disassemble `sound` and identify the driver interface before
-building on it. → `docs/source-inventory.md` §Audio.
+The `sound` segment is now disassembled far enough to identify its 12 exported wrappers and command
+block. The intro opens three Bogas contexts, resolves the named instruments during initialization,
+and sets one-shot globals immediately after each load. The current Paula seam follows those original
+flags for `Opening song`, `cable car bell`, `Engine`, `mic`, and `Signature`, so cues stay synchronized
+with the original animation state. Music occupies a centred pair and loops; the remaining pair layers
+effects over it. This is intentionally the measured intro surface, not yet a claim that every Bogas
+command needed by the driving game has been reproduced. → `docs/source-inventory.md` §Audio.
 ⚠ Inherited placement rule that will apply whatever the backend is: audio work goes **AFTER** the
 copper work in the handler, because a Paula DMA restart busy-waits on the beam and nothing that
 waits on the beam may precede the copper writes.

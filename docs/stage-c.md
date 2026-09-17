@@ -45,9 +45,31 @@ previous frame's dirty planar rectangle from front to back before applying the n
 path no longer computes a whole-frame diagnostic checksum.
 
 The intro's aligned `srcCopy`, `srcOr`, and `srcBic` operations stay in packed 4-bpp form. The
-clipped vertical `srcCopy` path adjusts the corresponding source row and retains memmove ordering
-for overlapping GWorld rectangles; non-overlapping boolean transfers combine packed bytes
-directly. The general scaling/odd-alignment path remains the correctness fallback.
+clipped path intersects both source and destination bounds before copying and retains memmove
+ordering for overlapping GWorld rectangles; boolean transfers combine packed bytes directly even
+when a sprite crosses the left or bottom clip edge. The general scaling/odd-alignment path remains
+the correctness fallback.
+
+The complete intro sound cue set is now driven by the original code's own Bogas one-shot flags.
+`Opening song` loops, centred on two Paula voices, while `cable car bell`, `Engine`, `mic`, and
+`Signature` use the two effects voices. The bell and mic/signature therefore layer over rather than
+terminating the music. Instrument bytes come from the converted `INST` resources; short instruments
+have their eight-byte Bogas header removed before DMA. All five play at PAL period 319, the closest
+Paula rate to the measured Macintosh 11.127 kHz playback.
+
+The cable-car callback has no terminal branch and assumes the remaining intro work completes by the
+time its downhill pass reaches the lower-left edge. That assumption fails on the slower compatibility
+path: it keeps consuming frames and walks the tram completely offscreen. Once its destination crosses
+left zero, the port restores the exact `(310,0)-(440,134)` endpoint and retires only that callback.
+This both preserves the intended stopped tram and lets the car/singer/logo callbacks make progress.
+The logo originally has an absolute tick deadline while the Corvette approach and singer/mic motion
+advance per completed draw; on an A1200 the former can overtake the latter, even within one slow
+callback pass. The compatibility layer therefore parks the logo deadline until the Mac code raises
+its own mic-hit flag, then releases it ten ticks later. The first logo pass builds the complete
+VETTE composite with five `CopyBits` calls. Its later ten-tick callbacks repeat those same rectangles
+without changing their geometry, so the compatibility layer retires the redundant redraw only after
+that first pass completes and starts the original 600-tick hold from there. The exit timer therefore
+cannot strand a slow target on an intermediate Corvette frame.
 
 The successful first-use order is:
 
