@@ -198,6 +198,8 @@ PROBE_SYMS = g_vbiCount g_planeChecksum g_screenReady g_laceFields g_longFields 
 PROBE_SYMS += g_stageCDepth
 PROBE_SYMS += g_macTicks
 PROBE_SYMS += g_macFramesQueued g_macFramesPresented
+PROBE_SYMS += g_macVBLCallbackEntry g_macVBLCallbackTask g_macVBLCallbackA5 g_macVBLCallbackReturn
+PROBE_SYMS += g_introAudioState g_introAudioBytes g_introAudioPeriod
 ifdef PROBES
 PROBE_SYMS +=
 endif

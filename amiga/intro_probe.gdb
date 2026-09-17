@@ -10,6 +10,7 @@ printf "\n===== INTRO PROBE =====\n"
 printf "vbi=%u macTicks=%u stageCDepth=%u loudStopState=%u\n", g_vbiCount, g_macTicks, g_stageCDepth, g_stageBState
 printf "screenDirty=%u framePending=%u checksum=$%08X\n", s_screenDirty, s_loudStopScreen->m_framePending, s_loudStopScreen->m_checksum
 printf "Mac frames queued=%u presented=%u\n", g_macFramesQueued, g_macFramesPresented
+printf "intro audio state=%u bytes=%u Paula period=%u\n", g_introAudioState, g_introAudioBytes, g_introAudioPeriod
 printf "VBL tasks=%u\n", s_vblTaskCount
 set $i = 0
 while $i < s_vblTaskCount

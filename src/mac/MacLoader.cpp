@@ -1,5 +1,6 @@
 #include <proto/exec.h>
 #include <exec/memory.h>
+#include <hardware/dmabits.h>
 
 #include "MacLoader.h"
 #include "ResourceArchive.h"
@@ -37,6 +38,13 @@ volatile uint16_t g_blockMoveCount = 0;
 volatile uint16_t g_stageCDepth = 1;       // _BlockMove is row 1
 volatile uint32_t g_macTicks = 0;
 volatile uint32_t* g_macTicksAddress = 0;
+volatile uint32_t g_macVBLCallbackEntry = 0;
+volatile uint32_t g_macVBLCallbackTask = 0;
+volatile uint32_t g_macVBLCallbackA5 = 0;
+volatile uint32_t g_macVBLCallbackReturn = 0;
+volatile uint16_t g_introAudioState = 0;
+volatile uint32_t g_introAudioBytes = 0;
+volatile uint16_t g_introAudioPeriod = 0;
 char g_trapManager[24] = "";
 char g_trapRoutine[24] = "";
 }
@@ -134,6 +142,9 @@ static void markDirty(const uint8_t* rectangle)
 // would give Line-A traps the wrong exception/USP context.
 static uint8_t* s_vblTasks[8];
 static uint16_t s_vblTaskCount;
+static uint32_t s_vblLastTick;
+static uint8_t* s_introAudio;
+static uint32_t s_introAudioEndTick;
 
 struct GWorldSlot {
     uint8_t port[108];
@@ -395,6 +406,48 @@ static uint8_t** getResource(uint32_t type, int16_t id)
         }
     }
     return 0;
+}
+
+static void startIntroAudio()
+{
+    if (g_introAudioState) return;
+    ResourceArchive::Item song;
+    // The Bogas driver's named "Opening song" instrument is a complete
+    // unsigned 8-bit stream.  A reference-Mac WAV capture correlates it at
+    // 11,126 Hz: the classic Mac 11.127 kHz rate.  PAL Paula period 319 is
+    // the nearest integer divisor (11,118.8 Hz, about 0.08% low).
+    if (!s_resourceArchive.find(1, 0x494e5354UL, 1425, song) || !song.size
+        || song.size > 131070UL) {
+        g_introAudioState = 3;
+        return;
+    }
+    uint32_t bytes = (song.size + 1) & ~1UL;
+    s_introAudio = (uint8_t*)AllocMem(bytes, MEMF_CHIP);
+    if (!s_introAudio) { g_introAudioState = 3; return; }
+    for (uint32_t i = 0; i < song.size; ++i) s_introAudio[i] = song.data[i] ^ 0x80;
+    if (bytes != song.size) s_introAudio[song.size] = 0;
+
+    *dmaconPointer = DMAF_AUD0;
+    *(volatile uint32_t*)0xdff0a0 = (uint32_t)s_introAudio;
+    *aud0lenPointer = (uint16_t)(bytes / 2);
+    *aud0perPointer = 319;
+    *aud0volPointer = 64;
+    *dmaconPointer = (uint16_t)(DMAF_SETCLR | DMAF_MASTER | DMAF_AUD0);
+
+    g_introAudioBytes = song.size;
+    g_introAudioPeriod = 319;
+    s_introAudioEndTick = g_macTicks + 635;  // one-shot: ceil(117558 / 11118.8 * 60)
+    g_introAudioState = 1;
+}
+
+static void updateIntroAudio()
+{
+    if (g_introAudioState == 1
+        && (int32_t)(g_macTicks - s_introAudioEndTick) >= 0) {
+        *dmaconPointer = DMAF_AUD0;
+        *aud0volPointer = 0;
+        g_introAudioState = 2;
+    }
 }
 
 static uint8_t asciiUpper(uint8_t c)
@@ -889,13 +942,8 @@ static bool unpackPackBitsRow(const uint8_t* packed, uint32_t packedSize,
 
 static uint32_t multiplyUnsigned16(uint16_t first, uint16_t second)
 {
-    uint32_t product = 0;
-    uint32_t addend = first;
-    while (second) {
-        if (second & 1) product += addend;
-        addend <<= 1;
-        second >>= 1;
-    }
+    uint32_t product = first;
+    __asm__ volatile ("mulu.w %1,%0" : "+d" (product) : "d" (second));
     return product;
 }
 
@@ -921,24 +969,13 @@ static uint32_t multiplyDivide(uint16_t value, uint16_t multiplier, uint16_t div
 {
     if (!divisor) return 0;
     if (multiplier == divisor) return value;
-    uint32_t product = 0;
-    uint32_t addend = value;
-    uint16_t factor = multiplier;
-    while (factor) {
-        if (factor & 1) product += addend;
-        addend <<= 1;
-        factor >>= 1;
-    }
-    uint32_t quotient = 0;
-    uint32_t remainder = 0;
-    for (int16_t bit = 31; bit >= 0; --bit) {
-        remainder = (remainder << 1) | ((product >> bit) & 1);
-        if (remainder >= divisor) {
-            remainder -= divisor;
-            quotient |= 1UL << bit;
-        }
-    }
-    return quotient;
+    uint32_t quotient = value;
+    __asm__ volatile ("mulu.w %1,%0" : "+d" (quotient) : "d" (multiplier));
+    // Every caller maps one 16-bit coordinate between rectangles, so the
+    // quotient is itself a 16-bit coordinate.  DIVU.W leaves that quotient in
+    // the low word and the remainder in the high word.
+    __asm__ volatile ("divu.w %1,%0" : "+d" (quotient) : "d" (divisor));
+    return quotient & 0xffff;
 }
 
 static bool drawPackedPictureBits(const uint8_t* picture, uint32_t size, uint32_t& offset,
@@ -1930,7 +1967,34 @@ static int16_t installVBLTask(uint8_t* task)
     write32(task, 0);
     if (s_vblTaskCount) write32(s_vblTasks[s_vblTaskCount - 1], (uint32_t)task);
     s_vblTasks[s_vblTaskCount++] = task;
+    s_vblLastTick = g_macTicks;
     return 0;
+}
+
+static void scheduleVBLTask()
+{
+    if (!s_vblTaskCount || g_macVBLCallbackEntry) return;
+    uint32_t now = g_macTicks;
+    uint32_t elapsed = now - s_vblLastTick;
+    if (!elapsed) return;
+    s_vblLastTick = now;
+    for (uint16_t i = 0; i < s_vblTaskCount; ++i) {
+        uint8_t* task = s_vblTasks[i];
+        int32_t count = (int16_t)read16(task + 10);
+        count -= (int32_t)elapsed;
+        if (count > 0) {
+            write16(task + 10, (uint16_t)count);
+            continue;
+        }
+        // MacEntry.s substitutes a user-mode trampoline for the normal trap
+        // return PC.  The pending flag is cleared before the callback executes,
+        // so any Line-A traps made by the driver nest normally.
+        write16(task + 10, 0);
+        g_macVBLCallbackTask = (uint32_t)task;
+        g_macVBLCallbackA5 = (uint32_t)s_currentA5;
+        g_macVBLCallbackEntry = read32(task + 6);
+        return;
+    }
 }
 
 static int32_t resourceHandleIndex(uint8_t** handle)
@@ -2326,6 +2390,8 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
         }
     }
     if (trap == 0xa974) {                    // Button() -> Boolean
+        scheduleVBLTask();
+        updateIntroAudio();
         if (s_screenDirty && s_loudStopScreen
             && s_loudStopScreen->presentMacFrame(
                 s_colorScreen, s_windowManagerColors,
@@ -2333,6 +2399,7 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
                 s_pixelsDirty ? s_dirtyBottom : 0, s_pixelsDirty ? s_dirtyRight : 0)) {
             s_screenDirty = false;
             s_pixelsDirty = false;
+            startIntroAudio();
         }
         write16(userStack, AmigaHardware::isLeftMouseButtonPressed() ? 1 : 0);
         if (g_stageCDepth < 64) g_stageCDepth = 64;

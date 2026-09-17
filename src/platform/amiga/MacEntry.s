@@ -29,6 +29,26 @@ vette_line_a_handler:
 	move.l a0,usp
 	movem.l (sp)+,d0-d7/a0-a6
 	addq.l #2,2(sp)
+	tst.l g_macVBLCallbackEntry
+	beq.s 2f
+	move.l 2(sp),g_macVBLCallbackReturn
+	move.l #vette_user_vbl_trampoline,2(sp)
+2:
 	rte
 1:
 	bra.s 1b
+
+| Entered by RTE in user mode, with the original application's registers and
+| USP restored.  Run one due Macintosh VBLTask and resume at the instruction
+| following the trap that provided this safe scheduling point.
+	.globl vette_user_vbl_trampoline
+vette_user_vbl_trampoline:
+	movem.l d0-d7/a0-a6,-(sp)
+	move.l g_macVBLCallbackEntry,a1
+	clr.l g_macVBLCallbackEntry
+	move.l g_macVBLCallbackTask,a0
+	move.l g_macVBLCallbackA5,a5
+	jsr (a1)
+	movem.l (sp)+,d0-d7/a0-a6
+	move.l g_macVBLCallbackReturn,-(sp)
+	rts
