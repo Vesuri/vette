@@ -85,6 +85,49 @@ converges on the BBC's own interleaving rather than diverging from it.
 never `Wait()`.  ⚠ Everything between them must be `Wait()`-free — the `WaitTOF()` pairs and every
 library open/close stay outside.
 
+## ⭐ Chunky → planar: what Kalms' collection does and does not give us
+
+⭐ **This port is a c2p problem** in a way neither prior port was: the game's drawing surface is
+**chunky 4 bpp, two palette indices per byte, high nibble = left pixel** (`docs/mac-hardware.md`),
+and the Amiga is planar. `https://github.com/Kalmalyzer/kalms-c2p` is the reference collection
+(public domain outside its `others/` subdirectory).
+
+⭐ **There IS a 4-bitplane routine: `normal/c2p1x1_4_c5_gen.s`** (plus a 2-bitplane one). Signature
+`c2p1x1_4_c5_gen(void *chunky in a0, void *bitplanes in a1)` after a `_init(chunkyx, chunkyy,
+scroffsy)`. ⚠ The collection targets **68020-68060**, CPU-only — consistent with our locked
+hires-interlaced/AGA mode, and a reminder that an OCS/68000 fallback gets no help from it at all.
+
+⚠⚠ **But its input is ONE BYTE PER PIXEL, low nibble used — not our packed two-per-byte.** `[DERIVED]`
+from the source: `_init` computes `mulu.w d0,d1` (width × height, no halving) and stores that as a
+**byte** count which the main loop adds straight onto the source pointer as an end sentinel; the
+inner loop fetches eight longwords per pass and emits 32 pixels, so 32 source bytes → 32 pixels.
+
+⭐⭐ **And here is the trap worth knowing before anyone "just skips the first stage".** The routine's
+own first step is a nibble merge, which looks exactly like what our data already is:
+
+```
+move.l  (a0)+,d0        ; Merge 4x1
+lsl.l   #4,d0
+or.l    (a0)+,d0
+```
+
+⚠ It is **not** the same packing. That pairs pixel *i* with pixel *i+4* — the first longword's four
+pixels against the *next* longword's four — because the later transposition stages are built around
+that shuffle. Ours pairs **adjacent** pixels. So our format is neither the routine's input nor its
+first intermediate, and entering one stage in would transpose the picture wrongly while still
+producing a plausible-looking image. `[DERIVED]` from those three instructions, **not yet run.**
+
+⭐ **How to settle it cheaply when it matters:** the repo ships a `_test.c` per routine. Feed it a
+known ramp and read the planes back — that answers the pairing question by measurement instead of by
+reading shifts, and it is the kind of thing to do *before* building on the answer.
+
+⚠ **So the options are re-derive the early merge stages for nibble-packed input, or pre-expand
+nibbles to bytes** (doubling source reads and the buffer). ⛔ **Do not pick one by argument.** Both
+are measurable, and the measurement belongs in the optimisation phase, not in front of the first
+frame. ⚠⚠ **Nor is it yet known that c2p is on the critical path at all** — if the driving view is
+built from QuickDraw primitives, a planar-native trap layer skips chunky entirely
+(`docs/open-work.md` #20).
+
 ## Two-layer split
 
 | Layer | Source | What we take |
