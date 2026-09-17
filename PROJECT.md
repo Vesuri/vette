@@ -210,8 +210,11 @@ amiga/                  Amiga build infrastructure: Makefile, env.sh, run.sh, de
 - [x] **Phase 1 — The Macintosh reference loop.** ⭐ It **drives**: MAME boots the reference volume
       and launches `Color VETTE!` unattended, completion read from the Mac's own low memory, and the
       game runs to its garage screen. Framebuffer + CLUT capture and host-side re-render are proven
-      against MAME's own screenshots. ⚠ One capability is still missing — an **A-trap log**
-      (`docs/open-work.md` #1), which is what Phase 2's trap map runs on.
+      against MAME's own screenshots. ⭐⭐ **The A-trap log is done** → `docs/trap-log.md`: **38
+      traps** called by the game's own `CODE` segments, first-use ordered, every caller resolved to
+      `(segment, offset)`, segment bases pinned by matching each extracted resource's own bytes in
+      memory. ⚠ It is a **FLOOR**: the window ends at the menu, so `FRED` and `Communication`
+      never ran.
 - [ ] Phase 2 — Complete static map (segments, the jump table, the trap map, the A5 world)
 - [ ] Phase 3 — The trap layer
 - [ ] Phase 4 — End-to-end skeleton on the target, then profile, then set a target
@@ -224,9 +227,17 @@ See `docs/phases.md` for exit criteria and the gating between phases.
 ## Immediate next step
 
 **Get the Amiga executable to the game's intro screen** (user goal), in the staged order
-`docs/open-work.md` #1-#4 sets out. ⭐ The gate in front of it is the **trap log**: option A runs the
-original code, so what has to be implemented is exactly the set of A-line traps the game executes
-between launch and the intro, in first-use order — and that is a *measurement*, not an estimate.
+`docs/open-work.md` #3-#6 sets out — Stage A (display path) → B (loader) → C (trap layer) →
+D (`DrawPicture`). ⭐ The gate that was in front of it is **gone**: the trap log is measured
+(`docs/trap-log.md`), so Stage C has an order and Stage D has a size.
+
+⭐ What the measurement changed about the plan, concretely:
+- **18 traps, not 38, stand between launch and a painted intro screen.** Rows 1–18 of the table.
+- **`DrawPicture` is 16 calls and `GetPicture` 47** — the PICT interpreter is sized, and it is small.
+- **`GetNextEvent` is not on the intro path at all**; it first appears at the menu. The intro polls
+  `Button` from `Intro+0224`, so Stage C needs no Event Manager to reach the goal.
+- **`Traffic` calls `GetPicture`** (`Traffic+663C`) and is resident during the intro, so that
+  segment is not purely the driving rasteriser.
 
 ⚠ Resist implementing traps by reading Inside Macintosh's index. The postmortem's one-sentence
 lesson is *build the discovery and validation infrastructure exhaustively up front instead of

@@ -111,6 +111,11 @@ project.** RoF replaced the Atari OS wholesale; Revs serviced a closed MOS surfa
 the Segment Loader and the Sound Manager. **Inventory it from the binary before estimating
 anything, and treat the inventory as a FLOOR** — Revs's looked closed after a static sweep and three
 more calls were found by *running* it.
+⭐⭐ **The RUN-TIME inventory exists and is the work list: `docs/trap-log.md`, 38 traps, first-use
+ordered.** Implement in that order. ⚠⚠ **"Called from RAM" is NOT "called by the game"** — the
+System's ROM-patch block at `$7Cxxxx` and the low system heap call traps *on the game's behalf*, and
+counting those put three traps on the work list that the port never has to service. A caller counts
+only if a mapped `CODE` segment claims it.
 
 ⚠ **Ghidra 12.1 has no classic-Mac resource-fork loader** (verified against this install: 68000
 processor yes, HFS+ for iOS only). Extract the `CODE` resources with `tools/hfs_extract.py segments`
@@ -217,6 +222,7 @@ Hard-won detail lives in `docs/`, not here. **Read the relevant one BEFORE worki
 | `docs/phases.md` | The gating between phases, and what each phase owes |
 | **`docs/faithfulness-seam.md`** ⭐ | **Before converting, rewriting or reimplementing ANY routine.** The three-way choice this port has and the prior ports did not |
 | **`docs/source-inventory.md`** ⭐⭐ | **What is actually in the shipped game** — the 11 named `CODE` segments, the 23 data types, the 160 objects. Read it before estimating anything |
+| **`docs/trap-log.md`** ⭐⭐ | **The port's WORK LIST, measured** — the 38 traps the game's own segments call, in first-use order, with callers as `(segment, offset)`. Read it before implementing any trap, and read its §The four ways before re-running the tracer |
 | **`docs/mac-reference-loop.md`** ⭐ | Anything about ground truth, or before trusting a claim about what the original does |
 | **`docs/mac-hardware.md`** | Touching the trap layer, the display, input or sound. ⭐ The **display surface** and the **68020 question** are `[MEASURED]`; the trap/low-memory rows are still `[ASSUMED]` — replace those, don't build on them |
 | `docs/toolchain.md` | Running the pipeline: resource/segment tools, Ghidra headless, the builds |

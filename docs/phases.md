@@ -45,15 +45,23 @@ harder questions were being settled.
       ⚠ From a documented invocation, not yet from a `make` target.
 - [x] A framebuffer capture at a named moment, reproducibly — and re-rendered host-side from the
       live PixMap + CLUT, diffed against MAME's own screenshot.
-- [x] Memory reads from a script (Lua). ⚠ **Breakpoints + register reads are NOT exercised yet**,
-      and that is the capability the trap inventory runs on.
+- [x] Memory reads from a script (Lua), **and register reads + a working instrumentation hook**:
+      `space:install_read_tap()` on the ROM's Line-A dispatcher plus `cpu.state["SP"]`, which is
+      what the trap inventory actually runs on. ⚠ Debugger **breakpoints** are still unexercised
+      and turned out not to be needed — ⛔ do not re-derive that route.
+      ⚠⚠ Three tap gotchas each fake a clean "no traps" result: `docs/trap-log.md` §The four ways.
 - [x] A scripted input sequence that reaches the game, deterministically — boot → launch → garage
       screen, unattended. ⚠ Not yet *gameplay*: the driving view has never been reached.
 - [x] ⭐ A **positive control** in every capture — completion is read from `CurApName` in the Mac's
       own low memory, so a run that did nothing reports "Finder" instead of passing quietly.
 
-⛔ **The one thing still open here is the A-trap log** (`docs/open-work.md` #1) — without it Phase 2's
-trap map is a static guess.
+- [x] ⭐⭐ **The A-trap log** → `docs/trap-log.md`: 38 traps called by the game's own segments,
+      first-use ordered, callers resolved to `(segment, offset)`, segment bases pinned by matching
+      each extracted resource's own bytes in memory. ⚠ It is a **FLOOR** — the window ends at the
+      menu, so `FRED` and `Communication` never ran.
+
+⭐ **Phase 1 is CLOSED.** Phase 2's trap map is no longer a static guess; it is a cross-check of a
+measurement, and `docs/trap-log.md` says what each method can and cannot see.
 
 ⚠ **This gates Phase 2.** Revs proved its memory image against real hardware in Phase 1 and then
 discovered in Phase 2 that the image had been the wrong input all along. The reference is what makes

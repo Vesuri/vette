@@ -31,6 +31,29 @@
   (every circuit's race view against a real BBC, byte for byte) was the single most useful gate it
   built; the equivalent here is a framebuffer diff against the emulator.
 
+## ⭐⭐ Instrumenting the game's execution: taps on the Line-A dispatcher
+
+The mechanism the A-trap log runs on, and the one to reuse for any "what does the game do at
+run time" question. `tools/mac_traps.lua` is the worked example; `docs/trap-log.md` is its output.
+
+- ⭐ `space:install_read_tap(lo, hi, name, cb)` on **ROM opcode fetches** works and is cheap enough
+  for 200 000 hits in a 130 s run. ⚠ `lo` must be **4-byte aligned** (it rejects `$16A` and names
+  the address it wanted). ⚠⚠ **Keep the return value in a Lua variable — it OWNS the tap** and the
+  collector removes it otherwise, silently, mid-run.
+- ⛔ Taps do **not** see CPU exception-vector fetches, RAM data reads, or Lua's own reads. So a tap
+  on the Line-A **vector** `$28` is useless; tap where the vector *points*.
+- ⚠⚠ The dispatcher **moves** during boot (`$40802950` → `$4080210A` → `$408064BA`). Poll `$28`
+  every frame and re-arm on change, or the tap goes deaf before the game even launches.
+- `cpu.state["SP"]` at tap time is the supervisor stack pointer, and the group-2 frame is `SR:w`
+  then `PC:l`. ⭐ `[MEASURED]` **the stacked PC points AT the `$Axxx` word**, not past it.
+- ⭐⭐ **Resolving a caller PC to `(segment, offset)`:** the loaded jump-table entry is
+  `[segnum:w][$4EF9][addr:l]` — the segment **number** survives, the routine offset does not. Get
+  the number from the entry, then pin the base by finding the unique address in
+  `(lowest export − seglen, lowest export]` where the extracted resource's first 8 bytes appear.
+  That is also the proof that a near-model segment is loaded verbatim with nothing relocated.
+  ⚠ Segments come and go, so refresh the map periodically and accumulate; a snapshot misfiles every
+  trap called from a segment that was not resident when it was taken.
+
 ## What the loop must be able to do
 
 Ranked by how much each capability bought in the prior ports. **A candidate emulator should be
