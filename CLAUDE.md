@@ -13,12 +13,16 @@ of every session, so nothing dated, no measurement history, no "X now works" ach
 `docs/` file and, if it changes how to work, add or amend one line here. The same discipline governs
 `docs/rename.md` and `docs/open-work.md` (queues, never logs).
 
-⚠⚠ **NOTHING ON THE AMIGA SIDE HAS BEEN BUILT OR RUN.** There is no port code and the inherited
-FS-UAE scripts are renamed but unverified. **Do not read an inherited doc's confident present tense
-as a description of this repo** — every ⚑ doc describes the prior ports.
-⭐ What *does* run: the **Macintosh reference loop** (MAME boots and launches the game unattended,
+⚠⚠ **ON THE AMIGA SIDE, EXACTLY ONE THING IS BUILT AND RUN: THE DISPLAY.** `out/Vette.exe` takes
+the machine over and shows a *captured Macintosh frame* in the locked mode; `./run.sh`,
+`./diag_run.sh` and the gdb stub are verified end to end. **No Macintosh code executes** — no
+loader, no A5 world, no trap layer, no input, no sound. ⛔ **Never report the display path as "the
+intro screen works"**: it displays a screenshot (`docs/open-work.md` §Stage A).
+**Do not read an inherited doc's confident present tense as a description of this repo** — every ⚑
+doc describes the prior ports.
+⭐ What else runs: the **Macintosh reference loop** (MAME boots and launches the game unattended,
 framebuffer/CLUT capture proven) and the `tools/` pipeline (archive → segments → sweeps). So a claim
-about the **original** can be measured today; a claim about the **port** cannot be, yet.
+about the **original** can be measured today; a claim about the **game running on the port** cannot.
 
 > **This project is the third run at a process that worked twice, and the FIRST of a new kind.**
 > *Rescue on Fractalus!* (`~/Documents/Rescue on Fractalus`, Atari 8-bit) and *Revs*
@@ -158,7 +162,7 @@ reason from `docs/faithfulness-seam.md` #2. Consequences that are rules, not not
 
 ## Build / run / debug
 
-⚠ None of this is verified in this repo yet. Phase 0 (`docs/phases.md`).
+⭐ The Amiga side of this is **verified** (Stage A); the host `make` is not built yet.
 
 ### Host — from repo root
 ```
@@ -274,6 +278,13 @@ Hard-won detail lives in `docs/`, not here. **Read the relevant one BEFORE worki
 - **RAM is uniformly slow — there is no "fast RAM" on the target A500.** Optimise by reducing the
   NUMBER of accesses, never by moving data to a "cheaper" buffer, and never explain a measurement
   with fast-vs-chip RAM. It is a 68020-era distinction. (`docs/m68k-optimisation.md`)
+- ⭐⭐ **`src/platform/amiga/VetteScreen.cpp` is the SINGLE OWNER of the display mode registers**
+  (BPLCON0-3, FMODE, DIWSTRT/DIWSTOP, DDFSTRT/DDFSTOP, BPLxMOD) and derives every one of them from
+  the measured 512×320 surface. ⛔ **Do not call the framework's `setPlayfield()`** from either
+  class — both accept an `interlace` argument and `(void)` it, so neither ever sets LACE, and this
+  port's mode is hires **interlaced**. It is a silent no-op of exactly the forbidden kind.
+  ⚠ `AmigaHardware::isLongFrame()` does not link either; read VPOSR bit 15.
+  (`docs/amiga-arch.md` §THE VENDORED `setPlayfield()`)
 - **Copper bitplane POINTER swaps happen in the VBI ISR, never mid-frame** — a torn pointer garbages
   the whole viewport for a frame. Colour-only pokes mid-frame are tolerable; `SPRxPT` operands are
   stricter still (the copper reads them at scanline 16).

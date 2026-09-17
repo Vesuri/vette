@@ -35,7 +35,8 @@ step 2 a measurement rather than a formula copied out of a doc: the gamma fit is
 confirmed only if the worst channel error is <= 1/255 (pure rounding).
 
 Writes <out-base>.planes (interleaved bitplanes, ready for .incbin),
-<out-base>.pal (16 Amiga COLORxx words, one per line, as text), and
+<out-base>.pal (16 Amiga COLORxx words, one per line, as text),
+<out-base>.palbin (the same 16 words, big-endian binary, for .incbin), and
 <out-base>_amiga.png (what the Amiga will show, simulated) next to
 <out-base>_mac.png (what the Macintosh showed).
 """
@@ -141,6 +142,16 @@ with open(a.outbase + ".pal", "w") as f:
     for i, (r, g, b) in enumerate(amiga):
         f.write("0x%03X\n" % ((r << 8) | (g << 4) | b))
 print(f"wrote {a.outbase}.pal  16 COLORxx words")
+
+# ⭐ ...and the same 16 words as BINARY, big-endian, for .incbin.  Two files rather
+# than one on purpose: the text .pal is what a human diffs against the table in
+# docs/mac-hardware.md, and the .palbin is what the Amiga loads.  Generating both
+# from the same `amiga` list is the only way they cannot drift apart.
+with open(a.outbase + ".palbin", "wb") as f:
+    for (r, g, b) in amiga:
+        w = (r << 8) | (g << 4) | b
+        f.write(bytes((w >> 8, w & 0xFF)))
+print(f"wrote {a.outbase}.palbin  32 bytes")
 
 # ---------------------------------------------------------------- 3. the images
 def flat(img):

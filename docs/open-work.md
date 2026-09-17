@@ -68,13 +68,21 @@ the Event Manager (`GetNextEvent`, `SystemTask`), the Menu Manager (`NewMenu`, `
 `GetRMenu`, `DrawMenuBar`, `DisableItem`), `MoveWindow`/`DisposeWindow`/`PaintBehind`,
 `GetGDevice`/`GetMainDevice`/`GetCTSeed`, `PurgeMem`/`CompactMem`, `UnLoadSeg`.
 
-6. ⭐ **Stage A — the display path, with a captured frame.** Amiga skeleton in the locked mode
-   (4 bitplanes, hires **interlaced**), a copper list, VERTB, the frame pump, and a host-side
-   converter that turns a `tools/mac_probe_fb.lua` dump into planar bitplanes + a palette derived
-   from the **displayed** colour (the gamma table, `docs/mac-hardware.md`).
-   **Proves:** the screen mode, geometry, plane order, nibble order and palette — and it builds the
-   pixel differential that every later stage is judged by. **Does NOT prove:** anything about the
-   game. ⭐ Also satisfies most of Phase 0's exit criteria, so it is not a detour.
+6. ⭐ **Stage A — the ONE thing left is the eyeball check, and it needs a human at the screen.**
+   The display path is built and measured headlessly: `out/Vette.exe` takes the machine over, brings
+   up 512×320 in 4 bitplanes hires interlaced and shows Target 1's captured Macintosh frame from
+   chip RAM. `EXTRA_ARGS="--warp_mode=1" GDBSCRIPT=stage_a.gdb ./diag_run.sh 30` reads
+   `screenReady=1`, `planeChecksum=0x597A969D` (identical to `python3 tools/planes_checksum.py
+   amiga/assets/intro.planes`, so the whole asset path is proven byte for byte) and
+   `long/lace=0.500` with VPOSR alternating.
+   ⚠⚠ **What no probe here can cover:** whether the picture is centred and undistorted **on the
+   glass**, and whether the two interlace fields are the right way round — the field polarity is
+   `[ASSUMED]` in `VetteScreen::vbiUpdate()` and getting it backwards displaces every row by one
+   scanline, which reads as a slightly soft image rather than as a fault. Run `cd amiga && ./run.sh`
+   and compare against `amiga/assets/intro_amiga.png` (what it should look like) and
+   `intro_mac.png` (what the Macintosh showed). **Then delete this item.**
+   ⚠ **And it proves nothing about the game** — it displays a converted Macintosh screenshot. See
+   the honesty rule above.
 7. ⭐⭐ **Stage B — the loader: the game's own code executes on the Amiga.** Place all 11 `CODE`
    segments resident, build the A5 world (31 272 B below `a5`; 32 B + the 4 072 B / 509-entry jump
    table above), pre-patch every entry from unloaded form to `JMP abs.l`, run `%A5Init`, install our
@@ -106,6 +114,9 @@ the Event Manager (`GetNextEvent`, `SystemTask`), the Menu Manager (`NewMenu`, `
    **Then:** the intro screen is rendered by the game's own code, and the Stage A differential says
    whether it is right.
 
+⚠ **Refer to an item by its TITLE, not its number.** The list is renumbered every time an entry is
+closed and deleted, so a `#N` written in another doc goes quietly wrong — three of them already had.
+
 ## Small, cheap, and wrong if left
 
 ⚠ **The game's year is not settled.** The intro art reads **"© 1991 SPHERE, INC"**; `PROJECT.md`,
@@ -118,58 +129,69 @@ date in a pilot project's docs propagates to every port after it.
 10. **`src/platform/platform.h` + `Platform.cpp`** — the abstraction. ⚠ Deliberately NOT copied from
    either prior port: both interfaces are shaped around a 6502 memory bus and an OS-call marshalling
    ABI this port does not have. Write it from this port's own boundary, which the trap map defines.
-11. **`PlatformAmiga` + the app skeleton** — `main()` + VERTB takeover + the frame pump, per
-   `docs/amiga-arch.md`. Nothing here is implemented; the doc is the shape to build.
-12. **Verify the inherited FS-UAE loop end to end.** `amiga/{env,run,debug,diag_run}.sh` came over and
-   are renamed but **unrun**. A plain build reading `painted=0` and an `FPSCOUNT=1` build reading a
-   real framerate with nothing to draw is the exit criterion. → `docs/headless-fsuae.md`.
-13. **Port the standing checks.** `docs/amiga-lessons.md` prescribes counters that "must read 0"
+11. **Port the standing checks.** `docs/amiga-lessons.md` prescribes counters that "must read 0"
    (`g_beamPresentsLate`) and probe scripts (`beam_watch.gdb`, `fill_catch.gdb`) that **do not exist
    in this repo**. A rule that names a counter is an instruction to build it.
-14. **`PROBE_SYMS` + `make probe-audit` + `make muldiv-audit`** in `amiga/Makefile` from the first
-   link. ⚠ A gc-dropped probe counter reads as *instruction bytes*, not zero
-   (`docs/method-lessons.md`).
-15. **Close the inherited silent no-op.** `BitmapAssembler.s`'s two non-interleaved arms are
+12. **Close the inherited silent no-op.** `BitmapAssembler.s`'s two non-interleaved arms are
    unimplemented and retagged `[ASSUMED]`; either assert at `Bitmap` construction that nothing builds
    a non-interleaved one, or implement them. → `src/platform/amiga/framework/UPSTREAM.md`.
-16. **Two dormant link traps in the vendored framework**, verified by partial-linking it here. Both
-    are invisible until the first caller: `AmigaHardware::isLongFrame()`'s ASSEMBLER bridge `jsr`s a
-    symbol **no `.s` defines** (undefined-symbol error), and `Bitmap::patternWithMask()` pulls in
-    `__mulsi3` (fails the mandatory `muldiv-audit`, with a message that names `__mulsi3` rather than
-    the caller). Fix the one you need when you need it, not speculatively. →
+13. **One dormant link trap left in the vendored framework.** `Bitmap::patternWithMask()` pulls in
+    `__mulsi3`, so it fails the mandatory `muldiv-audit` — with a message that names `__mulsi3`
+    rather than the caller. Fix it when something needs it, not speculatively. →
     `src/platform/amiga/framework/UPSTREAM.md` §Two latent link traps.
+    ✅ The other one is no longer dormant: `AmigaHardware::isLongFrame()`'s ASSEMBLER bridge `jsr`s
+    `_isLongFrame__13AmigaHardwareFv`, which no `.s` defines, and the interlaced display was its
+    first caller. **Not fixed — routed around**, because the whole function is one VPOSR read
+    (`VetteScreen::vbiUpdate()`). Left here because a future caller will hit it again.
+
+14. ⚠⚠ **⛔ Do not call the framework's `setPlayfield()` — it discards `interlace` silently.**
+    Both `AmigaHardware::setPlayfield()` and `CopperList::setPlayfield()` accept the flag and
+    `(void)` it, so neither ever writes BPLCON0's LACE bit; `CopperList`'s also drops `height` and
+    `centerY`. It additionally hardcodes a 320-lores DIW window and uses the *lores* DDFSTRT
+    formula for hires. Since `PROJECT.md` locks this port to **hires interlaced**, calling it would
+    have produced a plausible half-resolution picture with nothing reporting a problem.
+    `VetteScreen` owns those registers instead. **Decide once, for the series:** fix the vendored
+    framework (and feed it upstream) or mark the two functions unusable so the next Mac 68k port
+    does not rediscover this. → `docs/amiga-arch.md` §THE VENDORED `setPlayfield()`.
+
+15. ⚠ **The quit chord is the BARE left mouse button, not `CTRL`+LMB.** `amiga/run.sh` documents
+    the CTRL qualifier and explains why it exists: the Macintosh is a one-button machine, so the
+    game **will** bind the bare button. Reading CTRL needs the keyboard layer, which Stage A does
+    not have. ⚠⚠ **This must be fixed BEFORE the first trap that reads the mouse button**
+    (`Button`, row 30 of `docs/trap-log.md`, which the intro polls) — after that, quitting and
+    clicking are the same gesture. → `src/platform/amiga/PlatformAmiga.cpp`.
 
 ## Phase 1+ — carried forward, not yet actionable
 
-17. **Write `ghidra_scripts/DumpTraps.java`.** The trap map is the abstraction boundary and there is
+16. **Write `ghidra_scripts/DumpTraps.java`.** The trap map is the abstraction boundary and there is
     no inherited script for it (Revs's `DumpHwAccesses.java` hardcodes BBC I/O ranges and was not
     carried over). → `docs/toolchain.md`.
-18. **Fill `ghidra_scripts/entrypoints.csv` from `CODE 0`.** The jump table makes the postmortem's
+17. **Fill `ghidra_scripts/entrypoints.csv` from `CODE 0`.** The jump table makes the postmortem's
     §1.1 sweep *enumerable* rather than a search — take the win.
-19. **Read the manual / the extras before the binary.** RoF's `docs/manual.md` earned its place.
+18. **Read the manual / the extras before the binary.** RoF's `docs/manual.md` earned its place.
     Present and unread: `scans/Manual.pdf` (5.2 MB), `Map.jpg`, `MapInfo_1/2.jpg`, `KeyChart.jpg`,
     `Package.pdf`, `web_docs/cheats.txt`. ⭐ `KeyChart.jpg` is the input map and `cheats.txt` may
     name states worth reaching in the reference loop.
-20. **Decode the `VETTE!.Data` record formats.** The *inventory* is done
+19. **Decode the `VETTE!.Data` record formats.** The *inventory* is done
     (`docs/source-inventory.md`); the formats are not. ⭐ Start with **`PERF`** — eight records of
     exactly 110 bytes with meaningful names (`Stock`, `ZR1`, `F40`, …), which is the cheapest
     possible place to calibrate a decode. Then `OBJS` (160 models, recurring exact sizes, and
     `QUAD`'s `Quad Discripter Data` says the renderer is quad-based) and `MAPS`. ⚠ Do this against
     the `load` segment's disassembly, not by pattern-guessing — RoF's postmortem §1.2 is about
     exactly this.
-21. **Confirm or kill the `OBJS` two-level-of-detail reading.** The `C`/`S` name pairs
+20. **Confirm or kill the `OBJS` two-level-of-detail reading.** The `C`/`S` name pairs
     (`F40C`/`F40S1`, `GenericC`/`GenericS`, `Taxi`/`TaxiS`, …) `[INFERRED]` a near/far pair per
     object. It is load-bearing for the Amiga frame budget, so it should be confirmed early rather
     than discovered during optimisation. → `docs/source-inventory.md` §OBJS.
-22. **Explain the `Communication` segment and `COMM` 0.** 9.1 KB of code in *both* builds plus a
+21. **Explain the `Communication` segment and `COMM` 0.** 9.1 KB of code in *both* builds plus a
     2 490 B resource, in a 1989 single-player driving game. Modem head-to-head is a guess. It matters
     because 9 KB of code that the port may not need at all is 10% of the whole job.
-23. **Explain `FRED`** — 6.5 KB in both builds, name says nothing. ⭐ New evidence, and it is a
+22. **Explain `FRED`** — 6.5 KB in both builds, name says nothing. ⭐ New evidence, and it is a
     strong hint: `FRED` exports **242 of the 509 jump-table entries** — 6 508 bytes across 242
     externally-callable routines is **~27 bytes each**, so `[INFERRED]` it is a library of small leaf
     routines (maths/trig/fixed-point being the obvious candidates, which would fit the table-driven
     trig already found in the data). Cheap to settle: disassemble a dozen of its entries.
-24. ⭐ **The two display questions that are still open** — the mode itself is now locked
+23. ⭐ **The two display questions that are still open** — the mode itself is now locked
     (4 bitplanes, hires interlaced; `PROJECT.md` §Decisions), so what remains is:
     **(a)** is the **in-game** surface 512 × 320 or **512 × 342**? One reference-loop probe of the
     front `WindowRecord`'s `portRect` past the garage screen. ⭐ Cheap, and do it on the next
@@ -182,7 +204,7 @@ date in a pilot project's docs propagates to every port after it.
     ⛔ **Do not settle that from inference** — #1's trap log plus a write tap over the live GWorld's
     pixel range answers it by measurement. → `docs/mac-hardware.md` question 5.
 
-25. ⭐ **Locate the copy-protection check, then patch it out.** Decision locked — patched, not
+24. ⭐ **Locate the copy-protection check, then patch it out.** Decision locked — patched, not
     reproduced (`docs/faithfulness-seam.md` §The copy protection; required for a WHDLoad release).
     Targets: `VETTE!.Data`'s `COPY 1 "Protect"` (1 991 B) for the data side, and the check itself in
     the code — `Initialize` first, `Main` second. ⚠⚠ **Read the routine before defeating it.** 1 991

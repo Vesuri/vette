@@ -27,11 +27,14 @@ Build infrastructure only; no game code. **Exit criteria:**
 
 - [x] The source archive is unpacked and its contents catalogued → `docs/source-inventory.md`.
 - [ ] `src/platform/platform.h` exists and is written from *this* port's boundary.
-- [ ] The Amiga build links: `out/Vette.exe`, with `muldiv-audit` and `probe-audit` clean on every
+- [x] The Amiga build links: `out/Vette.exe`, with `muldiv-audit` and `probe-audit` clean on every
       link.
-- [ ] A headless FS-UAE run reports a real framerate on an `FPSCOUNT=1` build and `painted=0` on a
-      plain one — i.e. display takeover, the VERTB handler, the copper list and the frame pump are
-      verified **on the target**, not assumed from the inherited docs.
+- [x] Display takeover, the VERTB handler, the copper list and the frame pump verified **on the
+      target** rather than assumed from the inherited docs — `amiga/stage_a.gdb` reads
+      `screenReady=1`, a chip-RAM checksum identical to the host's, and a long/short field ratio of
+      0.500. ⚠ The original criterion was Revs's (`FPSCOUNT` + `painted=0`); this port has nothing
+      to paint per frame yet, so the equivalent evidence is the field parity and the checksum.
+      The one part a probe cannot cover — the picture on the glass — is `docs/open-work.md` §Stage A.
 - [ ] The standing checks from `docs/amiga-lessons.md` exist as counters and `.gdb` scripts.
 
 ⭐ Do not skip the last two. Revs's Phase 0 is the reason its Amiga side was never in doubt while

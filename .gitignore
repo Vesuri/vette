@@ -99,3 +99,10 @@ amiga/*_probe.sh
 # None of it is ours to distribute.  Broad on purpose — *.rom alone would not
 # cover a .zip romset, a device ROM named *.bin, or a boot image.
 /ref/
+
+# Stage A's generated assets — derived from the copyrighted game byte for byte
+# (a Macintosh framebuffer capture repacked as Amiga bitplanes), so they are LOCAL ONLY,
+# exactly like tmp/ and ref/.  src/platform/amiga/incbin.s carries the regeneration command.
+/amiga/assets/
+*.planes
+*.palbin

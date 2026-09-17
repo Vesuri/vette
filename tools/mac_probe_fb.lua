@@ -60,7 +60,17 @@ mac.run(function()
 	-- as a broken pixel-format guess rather than as two different moments in time.
 	-- The garage screen is static, so snapshotting either side of the dump proves
 	-- nothing moved while it was being read.
-	mac.wait(2700)
+	-- ⭐ WHICH MOMENT: $VETTE_FB_AT is an ABSOLUTE frame number, the same clock
+	-- docs/trap-log.md quotes, so a capture can be aimed at a measured event.
+	--   4218 = the garage screen (static, the default, and what the pixel-format
+	--          proof was taken on)
+	--   1770 = the INTRO art complete and the overlay not yet drawn (art done at
+	--          1758, first overlay DrawPicture at 1782) -- Target 1's own frame
+	-- ⚠ The window between 1758 and 1782 is 24 frames wide.  The two mac.shot()
+	-- calls bracketing the dump are what prove nothing moved during it; if they
+	-- disagree with the re-render, the moment is wrong, not the format.
+	local at = tonumber(os.getenv("VETTE_FB_AT") or "4218")
+	mac.wait_for(string.format("frame %d", at), function() return mac.frames() >= at end, 9000)
 	mac.shot()                                       -- the frame we will diff against
 
 	local gd = deref(u32(0x8A4))                     -- MainDevice

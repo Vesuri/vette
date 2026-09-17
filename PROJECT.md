@@ -235,6 +235,17 @@ San Francisco title art, matched against the MAME reference capture of frame 175
 differential. Staged in `docs/open-work.md` #6–#9: Stage A (display path) → B (loader) →
 C (the 36 traps) → D (`DrawPicture`).
 
+⭐⭐ **Stage A is done and measured: the Amiga display path works.** The port takes the machine
+over, brings up 512×320 in 4 bitplanes hires interlaced and displays Target 1's captured Macintosh
+frame out of chip RAM; the chip-RAM checksum matches the host-computed one byte for byte and the
+long/short field ratio is 0.500. ⛔ **That is a display-path proof and nothing more** — no
+Macintosh code runs yet. `tools/mac_fb_to_amiga.py` is the pixel differential every later stage is
+judged by, and it prices each transformation separately: chunky→planar is asserted **lossless**,
+the CLUT→DAC gamma of 1.435 is re-measured against MAME on every run (worst channel 1/255), and
+the OCS 4-bit quantisation floor is **8/255 worst channel, 1.52/255 mean**. ⚠ A finished Target 1
+must differ from the Macintosh by *exactly* that and no more — **a smaller difference means the
+palette that ran is not the one derived here.**
+
 ⭐ Every gate that stood in front of it is gone — the trap log is measured, arguments included
 (`docs/trap-log.md`):
 

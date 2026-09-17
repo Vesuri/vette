@@ -40,8 +40,28 @@ port.
 | `unar` / `lsar` 1.10.7 | `brew install unar` | the StuffIt 5 archive — **the only tool that reads SIT5** | ✅ |
 | `tools/ndif2raw.py` | ours | NDIF disk image → raw sectors (nothing off the shelf does this) | ✅ |
 | `tools/hfs_extract.py` | ours | read the HFS volume; extract forks; `CODE`/`PICT`/`snd ` resources | ✅ |
-| `tools/mac_fb_to_amiga.py` | ours | ⭐ a framebuffer dump → **Amiga interleaved bitplanes + a 16-entry `COLORxx` palette**, with every lossy step priced. **This is the Stage A pixel differential.** Pass `--reference <MAME.png>` and it re-measures the CLUT→DAC gamma against the emulator's own output on every run | ✅ |
+| `tools/mac_fb_to_amiga.py` | ours | ⭐ a framebuffer dump → **Amiga interleaved bitplanes + a 16-entry `COLORxx` palette**, with every lossy step priced. **This is the Stage A pixel differential.** Pass `--reference <MAME.png>` and it re-measures the CLUT→DAC gamma against the emulator's own output on every run. Writes `.planes`, `.pal` (text, for reading) and `.palbin` (binary, for `.incbin`) | ✅ |
+| `tools/planes_checksum.py` | ours | the **host half of the Stage A acceptance test**: the checksum of a `.planes` blob, to compare against the one the Amiga computes over its own chip RAM (`amiga/stage_a.gdb`). ⚠ Rotate-then-xor, not a sum — a sum is blind to byte order, which is how every plausible failure of this path goes wrong | ✅ |
 | **a Macintosh emulator** | — | the ground-truth reference loop (`docs/mac-reference-loop.md`) | ❓ |
+
+### ⭐ Regenerating Stage A's assets (they are NOT committed — derived from the game)
+
+```
+VETTE_FB_AT=1770 <the MAME headless recipe with -autoboot_script tools/mac_probe_fb.lua>
+python3 tools/mac_fb_to_amiga.py ref/mame/snap/intro/fb_screen.raw \
+    ref/mame/snap/intro/fb_screen.clut 320 480 amiga/assets/intro \
+    --crop 64,92,512,320 --reference ref/mame/snap/intro/mac2fdhd/0000.png
+```
+
+`VETTE_FB_AT` is an **absolute frame number**, not a delay: ⭐ **1770** is the intro art complete
+and before the first overlay `DrawPicture` at 1782 (Target 1's reference), **4218** is the garage
+screen, which is static and was the pixel-format proof. ⚠ A guessed wait instead of an absolute
+frame is the mistake `CLAUDE.md` forbids for every MAME driver.
+⚠ The crop is the game window inside the 640×480 screen, `(64,92)`–`(575,411)`, and it must be
+word-aligned — the tool rejects it otherwise, because the copper and the blitter address bitplanes
+in words.
+⚠⚠ **Each scene reloads the CLUT**, so the intro's 16 colours are NOT the garage's. Capture the
+frame you are matching; do not reuse a palette across scenes.
 
 `tools/ghidra` is a **symlink to the shared install at `~/.local/share/ghidra`** — the same one the
 *Rescue on Fractalus* and *Revs* repos point at, so the ~874 MB extracted distribution exists once

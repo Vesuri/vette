@@ -26,6 +26,57 @@ DMA before the scene's one-time register setup and the OS copper will run throug
 intermittently reset those registers — a bug that only shows up when an OS-copper frame happens
 to land after your write.
 
+## ⚠⚠ THE VENDORED `setPlayfield()` CANNOT PRODUCE THIS PORT'S MODE — and it fails SILENTLY
+
+`[MEASURED]` by reading both implementations, then by building the mode by hand.  ⛔ **Do not
+call `AmigaHardware::setPlayfield()` or `CopperList::setPlayfield()` in this port, and do not
+"simplify" `VetteScreen` back onto them.**  Three defects, and the first is the dangerous kind:
+
+1. ⭐⭐ **Both take an `interlace` argument and both `(void)`-discard it.**  Neither ever writes
+   BPLCON0's LACE bit (`CopperList.cpp:158` also drops `height` and `centerY`).  `PROJECT.md`
+   locks this port's display to **4 bitplanes, hires interlaced**, so the call would have
+   produced a plausible half-resolution picture out of 320 rows of data with nothing reporting a
+   problem.  That is exactly `CLAUDE.md`'s "a silent no-op is the most expensive translation
+   choice", inside the framework rather than in our own code.
+2. **The DIW window is hardcoded to 320 lores / 640 hires** (`0x81`…`0x1c1`, DIWHIGH `0x2100`).
+   This port's window is 512 hires px, which is 256 lores wide and has to be centred inside the
+   standard one.
+3. **The hires DDFSTRT uses the LORES formula.**  `DDFSTRT = (HSTART-9)/2` is common to both, but
+   the fetch step is 4 colour clocks per word in hires against 8 in lores, so
+   `DDFSTOP = DDFSTRT + 4*(words-2)`.  The framework's "hires" branch yields the standard *lores*
+   value.
+
+**What this port does instead:** `src/platform/amiga/VetteScreen.cpp` is the **single owner** of
+BPLCON0-3, FMODE, DIWSTRT/DIWSTOP, DDFSTRT/DDFSTOP and BPL1MOD/BPL2MOD, derives every one of them
+from the two measured facts (a 512×320 Macintosh surface; 4 planes hires interlaced) and
+`static_assert`s the derivation.  Two owners for one write-only register is how a value ends up
+fixed in the wrong file.
+
+### ⭐ The interlaced-field arithmetic, since it is not obvious
+
+One PAL field carries **half** the picture.  With the rows interleaved (all 4 planes of row *y*,
+then all 4 of row *y+1*; stride 256 B), the long field's plane *k* starts at `base + k*64` and the
+short field's at `base + 256 + k*64`.  A bitplane pointer advances 64 B as it fetches a line, and
+must reach the same plane **two** rows down, so `BPL1MOD = BPL2MOD = 2*256 - 64 = 448`.
+The pointers are re-pointed **first** in the VERTB handler, every field.
+
+⚠⚠ **`AmigaHardware::isLongFrame()` DOES NOT LINK in this configuration** — its GCC+ASSEMBLER
+bridge `jsr`s `_isLongFrame__13AmigaHardwareFv`, which no `.s` defines (`docs/open-work.md` had it
+logged as a dormant trap; the interlaced display is the first caller, so it is dormant no longer).
+Read `VPOSR` bit 15 directly; it is one instruction.
+
+### ⚠ How the field parity is verified, and the wrong answer it gave twice
+
+There is no headless screenshot on FS-UAE, so the program records what it did and
+`amiga/stage_a.gdb` reads it (§Build).  **Not** by reading BPLCON0 back: it is write-only and
+reads as `0xFFFF`, a test that can never fail.  The evidence is the long/short **field ratio**,
+which a display that ignored LACE cannot produce — plus the raw VPOSR words, which separate "LACE
+is dead" (a constant `A000`) from "the read is wrong" (`FFFF`).
+⚠⚠ **And the ratio must be counted from when the mode registers are written, not from boot.** The
+VERTB vector is ours ~68 fields earlier, while the display is still the OS's non-interlaced one
+where LOF is always 1.  Measured over the whole run that read **0.636** — not 1.0, so it does not
+look dead; not 0.5, so it does not look right either.  Counted from the takeover it is 0.500.
+
 ## VBI: take over the VERTB IntVector
 
 Not `AddIntServer(INTB_VERTB, …)`.  Replacing exec's `IntVector` wholesale drops
@@ -126,7 +177,7 @@ nibbles to bytes** (doubling source reads and the buffer). ⛔ **Do not pick one
 are measurable, and the measurement belongs in the optimisation phase, not in front of the first
 frame. ⚠⚠ **Nor is it yet known that c2p is on the critical path at all** — if the driving view is
 built from QuickDraw primitives, a planar-native trap layer skips chunky entirely
-(`docs/open-work.md` #20).
+(`docs/open-work.md` §"The two display questions that are still open").
 
 ## Two-layer split
 

@@ -9,11 +9,9 @@
 #   ./debug.sh           source-level debug via the FS-UAE GDB stub
 #   ./diag_run.sh [secs] headless probe run (needs PROBES=1)
 #
-# ⚠⚠ THIS BUILD DOES NOT LINK YET — there is no app code (no PlatformAmiga, no main).  The
-# source lists below are WILDCARDED on purpose so the Makefile is usable as soon as the first
-# file lands, rather than needing to be written at the same time as the first file.  Everything
-# structural — the flags, the two mandatory audits, the asm-twin seam template — is inherited
-# from the Revs port and is the part worth having early.
+# Scope: this builds STAGE A only — the display takeover and one captured Macintosh frame
+# (docs/open-work.md).  No Macintosh 68000 code is linked in yet, so the source lists stay
+# WILDCARDED: src/mac/ and the rest of src/platform/ are picked up as soon as they exist.
 #
 # ⚠⚠ `make clean` BEFORE any PROBES=1 build and AFTER editing a widely-included header.
 # This Makefile tracks neither the flag nor header deps, so a partial rebuild links stale
@@ -191,7 +189,10 @@ VASMFLAGS = -m68010 -Felf -quiet -x -no-opt -nowarn=62 $(EXTRA_VASMDEFS)
 # ⚠ Keep a symbol in the CONFIGURATION its script is run against: a counter that only EXISTS
 # under PROBES must be added under `ifdef PROBES`, or `--undefined=` is unsatisfiable and a plain
 # `make` fails at probe-audit — which is the audit working, not a bug in it.
-PROBE_SYMS =
+# Stage A's acceptance globals (src/platform/amiga/PlatformAmiga.cpp).  These are read by
+# amiga/stage_a.gdb in a PLAIN build -- the display path is not probe instrumentation, so
+# they are unconditional rather than under `ifdef PROBES`.
+PROBE_SYMS = g_vbiCount g_planeChecksum g_screenReady g_laceFields g_longFields g_lofSamples
 ifdef PROBES
 PROBE_SYMS +=
 endif
@@ -267,7 +268,9 @@ obj/gcc8_a_support.o : $(SUPPORT)/gcc8_a_support.s
 # ⚠ .incbin dependencies are INVISIBLE to `gcc -MMD`, so list them explicitly here as they
 # appear.  Without it, regenerating an embedded blob leaves a stale copy in the binary while the
 # on-disk file looks correct.  Paths are relative to this amiga/ directory.
-INCBIN_DEPS :=
+# Stage A: Target 1's captured Macintosh frame.  ⚠ NOT COMMITTED (derived from the game);
+# incbin.s carries the regeneration command.
+INCBIN_DEPS := assets/intro.planes assets/intro.palbin
 obj/incbin.o : $(AMIGA_SRC)/incbin.s $(INCBIN_DEPS)
 	$(info ASM  $<)
 	@$(AS) $(ASFLAGS) -o $@ "$(abspath $(AMIGA_SRC)/incbin.s)"

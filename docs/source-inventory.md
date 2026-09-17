@@ -51,7 +51,7 @@ prior two ports had to recover the equivalent by hand, which is what `docs/renam
 
 | seg | B&W | Color | name | ⚠ `[INFERRED]` from the name only |
 |---|---|---|---|---|
-| 0 | 4 072 | 4 088 | — | **the jump table** + Segment Loader header. Not code. `docs/open-work.md` #12 |
+| 0 | 4 072 | 4 088 | — | **the jump table** + Segment Loader header. Not code. `docs/open-work.md` §"Fill `ghidra_scripts/entrypoints.csv` from `CODE 0`" |
 | 1 | 32 606 | 24 994 | `Main` | the main loop / event loop |
 | 2 | 5 448 | 7 032 | `Initialize` | startup |
 | 3 | 9 106 | 9 110 | `Communication` | ⚠ **unexplained.** A 1989 driving game with a `Communication` segment in *both* builds, near-identical in size, and a `COMM` resource. Modem head-to-head play is the obvious guess and it is only a guess |
@@ -155,7 +155,7 @@ fixed-format records whose length follows the model's complexity, and `QUAD`'s
 ## The trap surface — a preliminary FLOOR, not an inventory
 
 ⚠⚠ **These are screening numbers and must not be quoted as the trap inventory.** The inventory is
-Phase 2's flow-following sweep (`docs/open-work.md` #11), and ⚑ the postmortem's rule stands: treat
+Phase 2's flow-following sweep (`docs/open-work.md` §"Write `ghidra_scripts/DumpTraps.java`"), and ⚑ the postmortem's rule stands: treat
 any static count as a **floor** — Revs's surface looked closed after a static sweep and three more
 calls appeared only when it was *run*.
 
