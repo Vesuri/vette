@@ -13,7 +13,7 @@
 
 ## The target machine — `[ASSUMED]`, and it needs deciding, not assuming
 
-*Vette!* (Spectrum HoloByte, 1989) shipped for the compact Macs. Which machine the 1.02 build
+*Vette!* (Spectrum HoloByte / Sphere, Inc., v1.02 © 1991) shipped for the compact Macs. Which machine the 1.02 build
 actually requires — a Plus, an SE, a machine with a bigger screen, 1 MB or more — is a question for
 the binary and the documentation in the archive, and it matters because it fixes the reference
 machine and the performance comparison.

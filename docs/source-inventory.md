@@ -8,6 +8,22 @@
 >
 > How to regenerate any of it: `docs/toolchain.md` §From the archive to the segments.
 
+## ⭐ What the build says about itself — `[MEASURED]`
+
+`vers` 1 and `VETT` 0, **identical in both builds**:
+
+```
+VETTE! version 1.02
+© 1991 Sphere, Inc.
+```
+
+So the game the port must match is **1991**, and Spectrum HoloByte is the division — Sphere, Inc.
+is the copyright holder (the box rear says so too: *"Spectrum HoloByte, a division of Sphere,
+Inc."*). ⚠ **The 1989 these docs used to carry was unsourced** and has been removed everywhere; the
+first release year of *Vette!* on any platform is still unmeasured, is not the same question, and
+is not load-bearing. The only year in the archive's own artwork is the **1989 stock Corvette** in
+the feature list — a car model year, which is very likely where the wrong date came from.
+
 ## The shape of it
 
 Two applications and one data file, in `VETTE!/VETTE! Folder/` on the 8049 KiB volume.
@@ -54,7 +70,7 @@ prior two ports had to recover the equivalent by hand, which is what `docs/renam
 | 0 | 4 072 | 4 088 | — | **the jump table** + Segment Loader header. Not code. `docs/open-work.md` §"Fill `ghidra_scripts/entrypoints.csv` from `CODE 0`" |
 | 1 | 32 606 | 24 994 | `Main` | the main loop / event loop |
 | 2 | 5 448 | 7 032 | `Initialize` | startup |
-| 3 | 9 106 | 9 110 | `Communication` | ⚠ **unexplained.** A 1989 driving game with a `Communication` segment in *both* builds, near-identical in size, and a `COMM` resource. Modem head-to-head play is the obvious guess and it is only a guess |
+| 3 | 9 106 | 9 110 | `Communication` | ⚠ **unexplained.** A single-player driving game with a `Communication` segment in *both* builds, near-identical in size, and a `COMM` resource. Modem head-to-head play is the obvious guess and it is only a guess |
 | 4 | 1 618 | 1 668 | `load` | resource loading; `VETTE!.Data` is the likely subject |
 | 5 | 4 600 | 4 628 | `Score` | scoring / results |
 | 6 | 27 862 | 27 958 | `Traffic` | traffic simulation — the second-largest segment, and identical in size across builds |

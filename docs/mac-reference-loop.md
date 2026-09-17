@@ -291,7 +291,13 @@ not installs: **MacsBug 6.2.x** (the A-trap log for capability 3) and **ResEdit 
    plain Finder (MultiFinder **off**) sits close to bare ROM. System 7 always runs the Process
    Manager, patches far more of the trap table and layers 32-Bit QuickDraw over Color QuickDraw —
    all of it noise in an A-trap log, exactly where capability 3 needs signal.
-2. **Period-correct.** VETTE! 1.02 is 1989; System 7 is 1991.
+2. ⚠ **Period-correctness is NOT an argument here, and it used to be listed as one.** This build is
+   `© 1991 Sphere, Inc.` — `[MEASURED]` from `vers` 1 / `VETT` 0 in both builds — and System 7 is
+   1991 too, so the dates do not separate the two systems at all. The old entry read *"VETTE! 1.02
+   is 1989; System 7 is 1991"*, and the 1989 in it was unsourced (the game's DOS release, most
+   likely). ⭐ **The decision stands on 1 and 3, which are the real reasons**; it never depended on
+   this one. Recorded rather than deleted because a retired argument that quietly stays on a list
+   gets re-used as support the next time the decision is questioned.
 3. **Cheap and deterministic.** Boots fast, small RAM and disk, one application, no background
    processes competing for events or time — a reference capture must be cheap to repeat.
 

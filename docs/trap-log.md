@@ -38,8 +38,9 @@ drop the Finder's boot noise — and in doing so it discarded **the game's own f
 creation. Target 1 is twice the size it appeared to be. Nothing is *removed* from the old 18; 18
 more sit in front of them.
 
-⚠ The intro art carries **"© 1991 SPHERE, INC"**, while `PROJECT.md` and `CLAUDE.md` describe the
-game as 1989. The two have not been reconciled — do not quote either date as settled.
+⭐ The intro art's **"© 1991 SPHERE, INC"** is the game's own date and it is now `[MEASURED]`
+everywhere: `vers` 1 and `VETT` 0 in **both** builds read *"VETTE! version 1.02 / © 1991 Sphere,
+Inc."*. The 1989 the docs used to carry was unsourced — see `docs/mac-reference-loop.md`.
 
 ## 51 traps in the window, and how the callers split
 

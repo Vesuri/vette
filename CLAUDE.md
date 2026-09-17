@@ -1,6 +1,7 @@
 # Vette! — Macintosh 68000 → Amiga port
 
-Porting Spectrum HoloByte's 1989 Macintosh driving simulation *Vette!* to the Amiga from the Mac
+Porting Spectrum HoloByte's Macintosh driving simulation *Vette!* — v1.02, **© 1991 Sphere, Inc.**
+`[MEASURED]` from the `vers`/`VETT 0` resources of both builds — to the Amiga from the Mac
 application. ⭐ **The code is already 68000 and can stay 68000** (`[MEASURED]` — zero 68020-only instructions in
 either build, `docs/mac-hardware.md`) — this is a port of the *seams*
 (OS/Toolbox calls, display, input, sound), not a translation across processor families like the

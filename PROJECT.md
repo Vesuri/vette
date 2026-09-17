@@ -1,6 +1,6 @@
 # Vette! — Macintosh 68000 → Amiga port
 
-Port Spectrum HoloByte's 1989 Macintosh driving simulation *Vette!* to the Amiga by
+Port Spectrum HoloByte's Macintosh driving simulation *Vette!* (v1.02, © 1991 Sphere, Inc.) to the Amiga by
 reverse-engineering the Mac application, keeping its 68000 code where that is the right answer,
 abstracting every OS/Toolbox call behind a platform layer, and implementing that layer for the
 Amiga.
@@ -232,7 +232,7 @@ See `docs/phases.md` for exit criteria and the gating between phases.
 
 The first target is **the intro screen painted by the game's own code**: the Golden Gate /
 San Francisco title art, matched against the MAME reference capture of frame 1758 under a pixel
-differential. Staged in `docs/open-work.md` #6–#8: Stage B (loader) →
+differential. Staged in `docs/open-work.md` #5–#7: Stage B (loader) →
 C (the 36 traps) → D (`DrawPicture`).
 
 ⭐⭐ **Stage A is done and measured: the Amiga display path works.** The port takes the machine
