@@ -19,10 +19,22 @@ VETTE! version 1.02
 
 So the game the port must match is **1991**, and Spectrum HoloByte is the division — Sphere, Inc.
 is the copyright holder (the box rear says so too: *"Spectrum HoloByte, a division of Sphere,
-Inc."*). ⚠ **The 1989 these docs used to carry was unsourced** and has been removed everywhere; the
-first release year of *Vette!* on any platform is still unmeasured, is not the same question, and
-is not load-bearing. The only year in the archive's own artwork is the **1989 stock Corvette** in
-the feature list — a car model year, which is very likely where the wrong date came from.
+Inc."*). ⚠ **The 1989 these docs used to carry was unsourced** and has been removed everywhere.
+
+⭐ **`[ASSUMED]` — and this is the whole answer, not an open question:** *Vette!* came out on DOS in
+**1989** and this Macintosh build is a **1991** port of it, so both dates were right about
+different things and the docs simply attached the DOS one to the Mac binary. Nothing in the port
+depends on which, so **do not spend a measurement on it** — note the two-platform reading and move
+on. (The archive's own box, which is the IBM one, is consistent with that: *"Actual screens from
+IBM EGA version"*. Its only year is the **1989 stock Corvette** in the feature list — a car model
+year, and a second plausible source of the confusion.)
+
+⚠⚠ **What the date DID cost, and the reason this is written down at all:**
+`docs/mac-reference-loop.md` listed *"period-correct: VETTE! 1.02 is 1989; System 7 is 1991"* as
+reason 2 of 3 for running System 6.0.8. That premise is false however the 1989 is explained — this
+build is 1991 too — and a dead premise sitting in a numbered list of justifications reads as
+support the next time the decision is questioned. **The lesson is about retiring an argument
+loudly, not about the year.**
 
 ## The shape of it
 
