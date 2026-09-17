@@ -138,8 +138,9 @@ bool VetteScreen::initialize(const uint8_t* picture, const uint16_t* palette16)
         m_copper[VS_CL_COLORS + i] = copperMove(color00 + i * 2, palette16[i]);
     m_copper[VS_CL_END] = 0xfffffffe;
 
-    // Point the copper at the LONG field before anything displays, so the first field out of
-    // the gate is a whole picture rather than four dangling pointers.
+    // Fill in a valid set of bitplane pointers for whichever field is next, before anything
+    // displays, so the first field out of the gate is a whole picture rather than four
+    // dangling pointers.  Which row set that is comes from vbiUpdate()'s LOF test.
     vbiUpdate();
 
     writeModeRegisters();
@@ -172,18 +173,24 @@ void VetteScreen::vbiUpdate()
 {
     if (!m_copper || !m_chip) return;   // the ISR must never see a half-built screen
 
-    // ⭐ Which field is about to be displayed decides which of the two row sets the
-    // bitplane pointers name.  LOF (VPOSR bit 15) is set for the LONG field, which
-    // displays rows 0, 2, 4, ...; the short field displays rows 1, 3, 5, ...
-    // ⚠ [ASSUMED] polarity.  Getting it backwards does not blank the screen -- it shows
-    // the picture with its two half-resolution fields swapped, i.e. every row displaced
-    // by one scanline.  It reads as a slightly soft image, not as a fault, so it is on
-    // the Stage A eyeball checklist (docs/open-work.md), not left to look right.
+    // ⭐ Which field the copper is ABOUT TO DISPLAY decides which of the two row sets the
+    // bitplane pointers name: the long field shows rows 0, 2, 4, ..., the short field
+    // rows 1, 3, 5, ..., so the pointers move by one kRowStride between them.
+    // ⚠⚠ [MEASURED] POLARITY, AND IT IS THE OPPOSITE OF THE OBVIOUS READING OF LOF.
+    // VPOSR bit 15 (LOF) is set for the long field, but what this handler reads is the
+    // parity of the field whose vertical blank it is standing in -- ALREADY ENTERED, not
+    // the one the list it is writing will serve.  The copper list is re-fetched from
+    // COP1LC at the top of the NEXT field, so writing `long rows when LOF is set` serves
+    // the long field's pointers to the short field and vice versa.  Shipped that way
+    // first: the intro's copyright overlay rendered DOUBLED, each thin horizontal stroke
+    // repeated one scanline down, because both fields were showing each other's rows.
+    // ⚠ It does NOT blank or tear, so it cannot be caught by a frame-boundary probe or
+    // by the long/lace ratio (still exactly 0.500 either way) -- only on the glass.
     // ⚠ AmigaHardware::isLongFrame() used to be an undefined symbol at LINK time in this
     // build's GCC+ASSEMBLER configuration (its bridge `jsr`ed a routine no .s defined);
     // it is fixed and unconditional now, and it is exactly this test.
     uint32_t base = (uint32_t)m_chip;
-    if (!AmigaHardware::isLongFrame()) base += kRowStride;   // LOF clear = short field
+    if (AmigaHardware::isLongFrame()) base += kRowStride;   // LOF set here => SHORT field next
 
     for (uint16_t k = 0; k < kPlanes; k++) {
         uint32_t p = base + (uint32_t)k * kBytesPerRow;

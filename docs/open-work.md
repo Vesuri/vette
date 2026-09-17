@@ -76,14 +76,16 @@ the Event Manager (`GetNextEvent`, `SystemTask`), the Menu Manager (`NewMenu`, `
    amiga/assets/intro.planes`, so the whole asset path is proven byte for byte) and
    `long/lace=0.500` with VPOSR alternating.
    ⚠⚠ **What no probe here can cover:** whether the picture is centred and undistorted **on the
-   glass**, and whether the two interlace fields are the right way round — the field polarity is
-   `[ASSUMED]` in `VetteScreen::vbiUpdate()` and getting it backwards displaces every row by one
-   scanline, which reads as a slightly soft image rather than as a fault. Run `cd amiga && ./run.sh`
-   and compare against `amiga/assets/intro_amiga.png` (what it should look like) and
-   `intro_mac.png` (what the Macintosh showed). **Then delete this item.**
-   ✅ **Already found this way, and fixed:** the first capture had the *Macintosh* mouse cursor
-   baked into the asset at `(32,8)` — the Mac II composites the cursor into the framebuffer, so a
-   framebuffer dump contains it (`docs/toolchain.md` §Regenerating Stage A's assets).
+   glass**. Run `cd amiga && ./run.sh` and compare against `amiga/assets/intro_amiga.png` (what it
+   should look like) and `intro_mac.png` (what the Macintosh showed). **Then delete this item.**
+   ✅ **Two defects already found this way, both fixed, and NEITHER was visible to any probe:**
+   - the *Macintosh* mouse cursor baked into the asset at `(32,8)` — the Mac II composites the
+     cursor into the framebuffer, so a framebuffer dump contains it
+     (`docs/toolchain.md` §Regenerating Stage A's assets);
+   - the **interlace field polarity inverted** in `VetteScreen::vbiUpdate()` — every thin
+     horizontal feature doubled one scanline down. It is `[MEASURED]` now, and the long/short
+     field ratio read 0.500 with it both right and wrong
+     (`docs/amiga-lessons.md` §the VBI's LOF read names the field that is ENDING).
    ⚠ **And it proves nothing about the game** — it displays a converted Macintosh screenshot. See
    the honesty rule above.
 7. ⭐⭐ **Stage B — the loader: the game's own code executes on the Amiga.** Place all 11 `CODE`

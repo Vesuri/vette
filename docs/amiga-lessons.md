@@ -130,6 +130,22 @@ Two things follow:
   (`amiga/beam_watch.gdb`, `g_beamPresentsLate` — a standing check that must read 0), not the
   bytes afterwards.
 
+### ⭐⭐ In INTERLACED mode the VBI's LOF read names the field that is ENDING — Vette, 2026-09-17
+
+A handler that re-points bitplanes per field has to know which of the two row sets to name, and
+`VPOSR` bit 15 (LOF, set for the long field) is the only source.  The obvious code —
+`if (isLongFrame()) point at the long field's rows` — is **backwards**.  The copper list the
+handler writes is not re-fetched from `COP1LC` until the top of the *next* field, and by the time
+the VERTB handler runs LOF already names the field whose vertical blank this is.  Invert the test.
+
+⚠⚠ **And no probe can catch it**, which is why it is here.  Nothing blanks, tears or drops: both
+fields still display, each simply showing the other's rows.  A long/short field ratio — the
+standard headless proof that LACE is alive at all — reads exactly 0.500 with the polarity right
+*and* wrong.  **A measurement of *whether* the fields alternate cannot measure *which is which*.**
+On the glass it shows as **doubling**: every thin horizontal feature repeated one scanline down, so
+one-pixel text is unreadable while a solid picture just looks soft.  Put it on a human-eyeball
+checklist and say what to look for, rather than trusting it to look right.
+
 ### `SPRxPT` operands obey the same rule, with an earlier deadline
 The copper executes a list's sprite-pointer MOVEs at **scanline 16** (`d[0] = copperWait(16,0)`),
 and the sprite's control-word DMA fetch is at **~scanline 25**.  So a per-frame `SPRxPT`

@@ -86,6 +86,19 @@ The pointers are re-pointed **first** in the VERTB handler, every field.
 parity.  **Fixed** by taking it out of the bridged set altogether: the body is one register read and
 a bit test (`VPOSR` bit 15), and it is now unconditional on both compilers.
 
+⚠⚠ **AND THE POLARITY IS THE OPPOSITE OF THE OBVIOUS READING OF LOF** — `[MEASURED]`, on the
+glass, after shipping it the other way round first.  LOF (`VPOSR` bit 15) is set for the long
+field, so `if (isLongFrame()) use the long field's rows` looks right and is wrong: by the time the
+VERTB handler runs, the bit already names **the field whose vertical blank this is**, while the
+copper list the handler is writing is not re-fetched from `COP1LC` until the top of the **next**
+field.  So the test must be inverted — `LOF set` here means *the short field is next*.
+⚠ **Nothing headless can catch this.** It does not blank, tear or drop a frame, and the long/short
+ratio stays exactly 0.500 either way, because both fields are still being displayed — just with
+each other's rows.  What it looks like on the glass is **doubling**: every thin horizontal feature
+repeated one scanline down (the intro's one-pixel copyright overlay was unreadable), and a solid
+picture merely looking soft.  ⭐ The general lesson is in `docs/amiga-lessons.md`: a probe that
+measures *whether* the two fields alternate cannot measure *which is which*.
+
 ### ⚠ How the field parity is verified, and the wrong answer it gave twice
 
 There is no headless screenshot on FS-UAE, so the program records what it did and
