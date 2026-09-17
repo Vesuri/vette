@@ -93,7 +93,6 @@ struct WindowSlot {
     bool updating;
     bool dialog;
     uint16_t dialogItemCount;
-    uint8_t** dialogItemHandles[32];
     bool dialogDrawn;
 };
 static WindowSlot s_windows[8];
@@ -123,7 +122,10 @@ struct GWorldSlot {
     bool locked;
     bool purgeable;
 };
-static GWorldSlot s_gworlds[4];
+// Initialize can keep six offscreen worlds alive at once.  This is capacity,
+// not emulated heap exhaustion: a full slot table must never masquerade as a
+// Macintosh memFullErr while Exec still has memory available.
+static GWorldSlot s_gworlds[8];
 
 struct FontManagerState {
     bool initialized;
@@ -684,7 +686,6 @@ static uint8_t* newDialog(int16_t id, uint8_t* storage, uint8_t* behind)
     if (!slot) return 0;
     slot->used = true;
     slot->dialog = true;
-    for (uint16_t i = 0; i < 32; ++i) slot->dialogItemHandles[i] = 0;
     uint8_t* dialog = storage ? storage : slot->record;
     slot->window = dialog;
     for (uint16_t i = 0; i < sizeof(slot->record); ++i) dialog[i] = 0;
@@ -816,41 +817,6 @@ static bool drawDialog(uint8_t* dialog)
     write32(s_qdThePort, (uint32_t)dialog);
     fillColorRect((int16_t)read16(dialog + 16), (int16_t)read16(dialog + 18),
                   (int16_t)read16(dialog + 20), (int16_t)read16(dialog + 22), 0);
-    return true;
-}
-
-static bool getDialogItem(uint8_t* dialog, uint16_t itemNumber,
-                          uint8_t* itemType, uint8_t* itemHandle, uint8_t* box)
-{
-    WindowSlot* slot = windowSlot(dialog);
-    uint8_t** itemsHandle = slot && slot->dialog ? (uint8_t**)read32(dialog + 156) : 0;
-    uint32_t size = resourceHandleSize(itemsHandle);
-    if (!itemsHandle || !*itemsHandle || !itemNumber || !itemType || !itemHandle || !box
-        || size < 2 || itemNumber > (uint16_t)(read16(*itemsHandle) + 1)) return false;
-    const uint8_t* items = *itemsHandle;
-    uint32_t offset = 2;
-    for (uint16_t number = 1; number < itemNumber; ++number) {
-        if (offset + 14 > size) return false;
-        offset += 14 + items[offset + 13];
-        if (offset & 1) ++offset;
-    }
-    if (offset + 14 > size || offset + 14UL + items[offset + 13] > size) return false;
-    uint8_t type = items[offset + 12];
-    write16(itemType, type);
-    uint8_t** handle = (uint8_t**)read32(items + offset);
-    if (!handle && (type & 0x7f) == 8 && itemNumber <= 32) { // statText
-        handle = slot->dialogItemHandles[itemNumber - 1];
-        if (!handle) {
-            uint8_t length = items[offset + 13];
-            handle = newHandle((uint32_t)length + 1, false);
-            if (!handle) return false;
-            (*handle)[0] = length;
-            for (uint16_t i = 0; i < length; ++i) (*handle)[i + 1] = items[offset + 14 + i];
-            slot->dialogItemHandles[itemNumber - 1] = handle;
-        }
-    }
-    write32(itemHandle, (uint32_t)handle);
-    for (uint16_t i = 0; i < 8; ++i) box[i] = items[offset + 4 + i];
     return true;
 }
 
@@ -2256,19 +2222,6 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
             return 5;
         }
     }
-    if (trap == 0xa8a9) {                    // InsetRect(Rect*, dh, dv)
-        uint8_t* rectangle = (uint8_t*)read32(userStack + 4);
-        int16_t dh = (int16_t)read16(userStack + 2);
-        int16_t dv = (int16_t)read16(userStack);
-        if (rectangle) {
-            writeRect(rectangle, (int16_t)(read16(rectangle) + dv),
-                      (int16_t)(read16(rectangle + 2) + dh),
-                      (int16_t)(read16(rectangle + 4) - dv),
-                      (int16_t)(read16(rectangle + 6) - dh));
-            if (g_stageCDepth < 68) g_stageCDepth = 68;
-            return 9;
-        }
-    }
     if (trap == 0xa974) {                    // Button() -> Boolean
         write16(userStack, AmigaHardware::isLeftMouseButtonPressed() ? 1 : 0);
         if (g_stageCDepth < 64) g_stageCDepth = 64;
@@ -2329,23 +2282,6 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
         if (g_stageCDepth < 38) g_stageCDepth = 38;
         return 11;
     }
-    if (trap == 0xa98d) {                    // GetDItem(dialog, itemNo, type*, handle*, box*)
-        if (getDialogItem((uint8_t*)read32(userStack + 14), read16(userStack + 12),
-                          (uint8_t*)read32(userStack + 8), (uint8_t*)read32(userStack + 4),
-                          (uint8_t*)read32(userStack))) {
-            if (g_stageCDepth < 66) g_stageCDepth = 66;
-            return 19;
-        }
-    }
-    if (trap == 0xa98f) {                    // SetIText(itemHandle, Pascal string)
-        uint8_t** handle = (uint8_t**)read32(userStack + 4);
-        const uint8_t* text = (const uint8_t*)read32(userStack);
-        if (handle && text && setHandleSize(handle, (uint32_t)text[0] + 1) == 0) {
-            for (uint16_t i = 0; i <= text[0]; ++i) (*handle)[i] = text[i];
-            if (g_stageCDepth < 67) g_stageCDepth = 67;
-            return 9;
-        }
-    }
     if (trap == 0xa981) {                    // DrawDialog(dialog)
         drawDialog((uint8_t*)read32(userStack));
         if (g_stageCDepth < 39) g_stageCDepth = 39;
@@ -2357,8 +2293,8 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
         return 5;
     }
     if (trap == 0xab1d && regs[0] == 0) {    // QDExtensions: NewGWorld
-        uint8_t* world = newGWorld((const uint8_t*)read32(userStack + 12),
-                                   read16(userStack + 16));
+        const uint8_t* bounds = (const uint8_t*)read32(userStack + 12);
+        uint8_t* world = newGWorld(bounds, read16(userStack + 16));
         write32((uint8_t*)read32(userStack + 18), (uint32_t)world);
         write16(userStack + 22, world ? 0 : (uint16_t)-108);
         if (g_stageCDepth < 40) g_stageCDepth = 40;

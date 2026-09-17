@@ -6,17 +6,18 @@ port's execution order, which is now known to differ from the earlier MAME first
 
 ## Current checkpoint
 
-With one debugger-forced intro click, the Amiga run executes **67 distinct implemented traps** and
-halts loudly at:
+With one debugger-forced intro click, the Amiga run executes **65 distinct successful-path traps**
+and continues for a three-minute warp run without entering the game's error dialog or reaching an
+unimplemented trap. The production `Button` implementation reads the Amiga CIA left-button bit—the
+forced click exists only in diagnostic builds used to cross the intro wait.
 
-```
-$A8A9  QUICKDRAW / INSETRECT
-caller: Initialize+$1AFA
-```
-
-`InsetRect` is implemented in the current tree; the next verification run should advance to the
-immediately following `FrameRoundRect`. The production `Button` implementation reads the Amiga CIA
-left-button bit—the forced click exists only in diagnostic builds used to cross the intro wait.
+An earlier run appeared to advance through `GetDItem`, `SetIText`, `InsetRect`, and
+`FrameRoundRect`. That was a false branch: the fixed four-entry `GWorldSlot` table filled while
+Exec still had ample memory, so the fifth `NewGWorld` returned `memFullErr`. The game translated
+that into error ID 04, "NewGWorld error, Offscreen allocation error," and opened dialog 700. The
+table now has capacity for all six simultaneously live offscreen worlds. Those four error-dialog-
+only traps are deliberately unimplemented again, so a regression stops at `GetDItem` and exposes
+the upstream failure instead of teaching the port to render it.
 
 The successful first-use order is:
 
@@ -85,10 +86,8 @@ The successful first-use order is:
 63. `ClipRect`
 64. `Button`
 65. `HPurge`
-66. `GetDItem`
-67. `SetIText`
 
-`amiga/stage_c.gdb` breaks on the loud-stop renderer and prints the depth, trap identity,
+`amiga/stage_c.gdb` watches the loud-stop state transition and prints the depth, trap identity,
 selector, runtime `(segment, offset)`, absolute PC, USP, all data/address registers, and nearby
 instructions. The expanded report matters now that Macintosh support code copied into movable
 memory is calling traps outside the 11 resident `CODE` ranges. The build's `muldiv-audit` and

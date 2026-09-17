@@ -59,8 +59,12 @@ late Menu Manager operations, `MoveWindow`/`DisposeWindow`/`PaintBehind`, and
 `UnLoadSeg` and `GetGDevice` were both required during startup.
 
 4. **Stage C — the trap layer, driven by the port's loud-stop order.**
-   ⭐ **67 distinct traps execute after one diagnostic intro click; `InsetRect` is implemented at
-   the latest stop (`Initialize+$1AFA`), with `FrameRoundRect` immediately next for verification.**
+   ⭐ **65 distinct successful-path traps execute after one diagnostic intro click; a three-minute
+   warp run continues without another loud stop.** A four-slot host `GWorld` table had falsely
+   reported `memFullErr` on the fifth of six live offscreen worlds, sending the game into error
+   dialog 700. The capacity is now eight. `GetDItem`, `SetIText`, `InsetRect`, and `FrameRoundRect`
+   remain deliberately unimplemented because they were observed only on that diagnostic error path;
+   if it regresses, the first one will stop loudly and point back to the real failure.
    Implement first-use-first, re-running after each one; progress is countable ("N traps deep,
    halted at *M*"). The MAME rows remain a useful floor and semantic cross-check, and the load-bearing
    ones are `SetPort`/`ClipRect`/`PenSize`/`TextMode` (stateful QuickDraw port), `GetResource` +

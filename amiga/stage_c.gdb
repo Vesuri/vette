@@ -3,7 +3,13 @@
 set pagination off
 set confirm off
 
-tbreak VetteScreen::showLoudStop
+watch g_stageBState
+commands
+  silent
+  if g_stageBState != 3
+    continue
+  end
+end
 continue
 
 printf "\n===== STAGE C =====\n"
