@@ -7,9 +7,9 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — current loud stop
 
-⭐ **HEAD OF QUEUE: `GetMouse` (`$A972`) at `Main+$0A38`.** `PtInRect` identifies the garage ACCEPT
-control and `InvertRect` draws its pressed state. The game next polls the pointer in local
-coordinates while the button is held. Implement that real mouse query; do not add dialog/UI traps
+⭐ **HEAD OF QUEUE: `StillDown` (`$A973`) at `Main+$0A60`.** The pressed ACCEPT control now tracks
+the current local pointer and tests whether the button remains held. Implement the live CIA-backed
+button-state query, including deterministic release for `GARAGE_CLICK`; do not add dialog/UI traps
 to conceal an upstream failure.
 
 The MAME A-trap log remains a measured reference-run inventory → `docs/trap-log.md`,

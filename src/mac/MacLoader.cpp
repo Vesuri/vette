@@ -347,6 +347,7 @@ static const TrapName s_trapNames[] = {
     {0xa935,"MENU MANAGER","INSERTMENU"},
     {0xa9bf,"MENU MANAGER","GETMENU"},
     {0xa937,"MENU MANAGER","DRAWMENUBAR"}, {0xa970,"EVENT MANAGER","GETNEXTEVENT"},
+    {0xa972,"EVENT MANAGER","GETMOUSE"},
     {0xa9b4,"EVENT MANAGER","SYSTEMTASK"}, {0xaa94,"PALETTE MANAGER","ACTIVATEPALETTE"},
     {0xa874,"QUICKDRAW","GETPORT"}, {0xa871,"QUICKDRAW","GLOBALTOLOCAL"}
 };
@@ -3452,6 +3453,15 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
         userStack[8] = inside ? 1 : 0;
         if (g_stageCDepth < 84) g_stageCDepth = 84;
         return 9;
+    }
+    if (trap == 0xa972) {                    // GetMouse(Point*)
+        uint8_t* point = (uint8_t*)read32(userStack);
+        if (point) {
+            write16(point, (uint16_t)s_mouseY);
+            write16(point + 2, (uint16_t)s_mouseX);
+        }
+        if (g_stageCDepth < 86) g_stageCDepth = 86;
+        return 5;
     }
     if (trap == 0xa8a4) {                    // InvertRect(Rect*)
         const uint8_t* rectangle = (const uint8_t*)read32(userStack);

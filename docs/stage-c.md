@@ -240,6 +240,11 @@ The next loud stop is `$A972` (`GetMouse`) at `Main+$0A38`. It is inside the pre
 loop and requests a current local point; the earlier `$A871` call transforms the event record's
 already-captured global point.
 
+86. `GetMouse` (current crop-relative point in the active graphics port)
+
+The next loud stop is `$A973` (`StillDown`) at `Main+$0A60`, after the game retests the current
+point against the same ACCEPT rectangle and restores the pressed visual state.
+
 `amiga/stage_c.gdb` breaks on `VetteScreen::showLoudStop`, after the report is complete, and prints
 the depth, trap identity, selector, runtime `(segment, offset)`, absolute PC, USP and its first
 words, all data/address registers, and nearby instructions. It then exits, so `diag_run.sh` stops
