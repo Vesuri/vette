@@ -467,6 +467,10 @@ boundaries. Execution proceeds to `$A916 HideWindow` at segment 1 + `$2150`.
 desktop repaint. That is enough for the game to retire the selector and enter segment 6, where the
 next loud stop is Menu Manager `$A945 CheckItem` at `+$08CC`.
 
+`CheckItem` traverses the classic variable-length menu item records and updates only the mark byte
+(`$12` for checked, zero for clear). It performs no menu rendering. The measured clear of item 1
+advances road setup to `DrawPicture` at segment 1 + `$2328`.
+
 The trap-address table is stateful. The observed `GetTrapAddress`/`SetTrapAddress` pair now records
 the game's replacement for `$A9F4 ExitToShell`; routing a later invocation through that replacement
 remains part of completing the trap bridge.

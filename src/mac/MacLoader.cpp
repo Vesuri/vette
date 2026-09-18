@@ -352,6 +352,7 @@ static const TrapName s_trapNames[] = {
     {0xa914,"WINDOW MANAGER","DISPOSEWINDOW"}, {0xa90d,"WINDOW MANAGER","PAINTBEHIND"},
     {0xa04d,"MEMORY MANAGER","PURGEMEM"}, {0xa04c,"MEMORY MANAGER","COMPACTMEM"},
     {0xa939,"MENU MANAGER","ENABLEITEM"}, {0xa93a,"MENU MANAGER","DISABLEITEM"},
+    {0xa945,"MENU MANAGER","CHECKITEM"},
     {0xa931,"MENU MANAGER","NEWMENU"},
     {0xa933,"MENU MANAGER","APPENDMENU"}, {0xa94d,"MENU MANAGER","ADDRESMENU"},
     {0xa935,"MENU MANAGER","INSERTMENU"},
@@ -2872,6 +2873,27 @@ static bool enableMenuItem(uint8_t** menu, uint16_t item)
     return true;
 }
 
+static bool checkMenuItem(uint8_t** handle, uint16_t requestedItem, bool checked)
+{
+    if (!handle || !*handle || !requestedItem) return false;
+    uint8_t* menu = *handle;
+    uint32_t size = handleSize(handle);
+    if (size < 16 || size < (uint32_t)16 + menu[14]) return false;
+    uint32_t offset = 15 + menu[14];
+    uint16_t item = 1;
+    while (offset < size && menu[offset]) {
+        uint8_t length = menu[offset];
+        if (offset + 5UL + length > size) return false;
+        if (item == requestedItem) {
+            menu[offset + 3 + length] = checked ? 0x12 : 0; // classic checkMark
+            return true;
+        }
+        offset += 5UL + length;
+        ++item;
+    }
+    return false;
+}
+
 static uint8_t** newMenu(int16_t id, const uint8_t* title)
 {
     if (!title) return 0;
@@ -3610,6 +3632,13 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
     if (trap == 0xa939) {                    // EnableItem(menu, item)
         if (enableMenuItem((uint8_t**)read32(userStack + 2), read16(userStack)))
             return 7;
+    }
+    if (trap == 0xa945) {                    // CheckItem(menu, item, checked)
+        if (checkMenuItem((uint8_t**)read32(userStack + 4), read16(userStack + 2),
+                          read16(userStack) != 0)) {
+            if (g_stageCDepth < 92) g_stageCDepth = 92;
+            return 9;
+        }
     }
     if (trap == 0xa931) {                    // NewMenu(id, title) -> MenuHandle
         uint8_t** menu = newMenu((int16_t)read16(userStack + 4),

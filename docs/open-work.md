@@ -7,10 +7,10 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — current loud stop
 
-⭐ **HEAD OF QUEUE: implement the measured Menu Manager `$A945 CheckItem` bookkeeping.**
-`HideWindow` now retires the course-selector window without drawing replacement UI, and execution
-enters segment 6. At `+$08CC` the game clears the checkmark on item 1. Maintain only the menu
-item's check state; do not render menus or implement modal UI.
+⭐ **HEAD OF QUEUE: decode the road-setup `DrawPicture` at segment 1 + `$2328`.** `CheckItem`
+now updates only the classic per-item mark byte, and road setup advances to a real drawing call.
+Measure its PICT resource, destination rectangle, version, and first unsupported opcode before
+extending the scoped interpreter.
 
 The MAME A-trap log remains a measured reference-run inventory → `docs/trap-log.md`,
 but Stage C has proved that it is **not an exact standalone-port first-use script**. The port has
