@@ -318,6 +318,13 @@ the clipped, odd-nibble, overlap-safe, and scaled fallbacks. Both standing audit
 short A1200 run clears the drawing call and stops at `EnableItem(menu, 7)` (`$A939`,
 `Main+$13BE`), immediately before the game's existing `DisableItem(menu, 5)` call.
 
+That pair is the normal garage-to-driving menu-state transition, not an error path: both calls use
+the same live menu handle, enabling item 7 and then disabling item 5. `EnableItem` now mirrors the
+existing `DisableItem` implementation by changing only the menu record's enable bitfield; it does
+not draw or synthesize menu UI. The next short A1200 run produces no loud stop and reaches
+`presentMacFrame` with a live dirty rectangle `(165,177)-(316,505)`, so execution has advanced into
+active driving graphics. The next boundary is a one-shot capture of that first presented frame.
+
 `amiga/stage_c.gdb` breaks on `VetteScreen::showLoudStop`, after the report is complete, and prints
 the depth, trap identity, selector, runtime `(segment, offset)`, absolute PC, USP and its first
 words, all data/address registers, and nearby instructions. It then exits, so `diag_run.sh` stops

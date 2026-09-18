@@ -7,11 +7,12 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — current loud stop
 
-⭐ **HEAD OF QUEUE: account for the driving-state menu transition.** `CopyBits` mode 6
-(`notSrcXor`) is implemented and the measured call at `Main+$199A` now completes. The next loud
-stop is `$A939` (`EnableItem`) at `Main+$13BE`, called as `EnableItem(menu, 7)` and immediately
-followed by the already implemented `DisableItem(menu, 5)`. Establish whether this is the normal
-garage-to-driving state transition and, if so, mirror `DisableItem`'s menu-state bookkeeping. Do
+⭐ **HEAD OF QUEUE: capture the first active driving frame.** The normal garage-to-driving state
+transition enables menu item 7 and disables item 5; `EnableItem` now mirrors the existing menu
+bitfield bookkeeping without drawing UI. No loud stop occurs in the next short A1200 run, which
+reaches a live dirty conversion of `(165,177)-(316,505)`. Add a one-shot capture on the first
+presentation after that transition and render the game-produced chunky surface and live palette.
+Use it to identify the exact driving state reached before adding any further synthetic input. Do
 not implement visible or modal UI merely to conceal an upstream failure.
 
 The MAME A-trap log remains a measured reference-run inventory → `docs/trap-log.md`,

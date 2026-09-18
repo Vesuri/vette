@@ -346,7 +346,8 @@ static const TrapName s_trapNames[] = {
     {0xa98d,"DIALOG MANAGER","GETDITEM"}, {0xa98f,"DIALOG MANAGER","SETITEXT"},
     {0xa914,"WINDOW MANAGER","DISPOSEWINDOW"}, {0xa90d,"WINDOW MANAGER","PAINTBEHIND"},
     {0xa04d,"MEMORY MANAGER","PURGEMEM"}, {0xa04c,"MEMORY MANAGER","COMPACTMEM"},
-    {0xa93a,"MENU MANAGER","DISABLEITEM"}, {0xa931,"MENU MANAGER","NEWMENU"},
+    {0xa939,"MENU MANAGER","ENABLEITEM"}, {0xa93a,"MENU MANAGER","DISABLEITEM"},
+    {0xa931,"MENU MANAGER","NEWMENU"},
     {0xa933,"MENU MANAGER","APPENDMENU"}, {0xa94d,"MENU MANAGER","ADDRESMENU"},
     {0xa935,"MENU MANAGER","INSERTMENU"},
     {0xa9bf,"MENU MANAGER","GETMENU"},
@@ -2579,6 +2580,14 @@ static bool disableMenuItem(uint8_t** menu, uint16_t item)
     return true;
 }
 
+static bool enableMenuItem(uint8_t** menu, uint16_t item)
+{
+    if (!menu) return true;
+    if (!*menu || item >= 32 || handleSize(menu) < 14) return false;
+    write32(*menu + 10, read32(*menu + 10) | (1UL << item));
+    return true;
+}
+
 static uint8_t** newMenu(int16_t id, const uint8_t* title)
 {
     if (!title) return 0;
@@ -3298,6 +3307,10 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
             if (g_stageCDepth < 71) g_stageCDepth = 71;
             return 7;
         }
+    }
+    if (trap == 0xa939) {                    // EnableItem(menu, item)
+        if (enableMenuItem((uint8_t**)read32(userStack + 2), read16(userStack)))
+            return 7;
     }
     if (trap == 0xa931) {                    // NewMenu(id, title) -> MenuHandle
         uint8_t** menu = newMenu((int16_t)read16(userStack + 4),
