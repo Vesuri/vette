@@ -505,14 +505,19 @@ that caller invokes the already implemented `FlushEvents`.
 
 `ShowCursor` restores the same tracked visibility flag, again without synthesizing cursor pixels.
 The verified run reaches implemented depth 94 and continues through the 30-second safety ceiling
-without another loud stop. The next task is to capture and classify that live driving-loop state.
+without another loud stop. The call is at `Initialize+$18FA`, not FRED, and is followed by
+`FlushEvents`, register restoration and `RTS` back to the event loop.
 
-The 30-second chunky capture is the first genuine road-screen output. The lower portion contains
-the game-drawn cockpit, dashboard and steering wheel, while approximately the upper 198 displayed
-rows remain white. The live dirty rectangle is the complete `(0,0)-(342,512)` Macintosh port and
-the interrupt lands in `serviceMacRuntime`, with depth still 94. This is therefore an active game
-loop rather than a loud stop; a later-frame capture must distinguish unfinished setup from a missing
-upper-viewport renderer or conversion path.
+The 30-second chunky capture is the completed driving setup canvas. The lower portion contains the
+game-drawn cockpit, dashboard and steering wheel, while approximately the upper 198 displayed rows
+remain white. The live dirty rectangle is the complete `(0,0)-(342,512)` Macintosh port and the
+interrupt lands in the event-loop compatibility service, with depth still 94.
+
+`amiga/driving_gworld_capture.gdb` establishes that this is waiting for driving input rather than
+missing assets. Five live GWorlds are 512×512 with the game's measured 260-byte stride. A sixth is
+a deliberate 3904×144 surface with 1956-byte rows and contains the complete repeating skyline and
+roadside panorama. The stride-aware `tools/render_amiga_chunky.py` renders all six without stripping
+their row padding. The next deterministic input is keypad `8`, the game's acceleration control.
 
 The trap-address table is stateful. The observed `GetTrapAddress`/`SetTrapAddress` pair now records
 the game's replacement for `$A9F4 ExitToShell`; routing a later invocation through that replacement

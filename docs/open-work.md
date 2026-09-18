@@ -7,12 +7,11 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — current loud stop
 
-⭐ **HEAD OF QUEUE: determine why the first driving road view remains white.** The depth-94 capture
-is genuine game output: it contains the cockpit, dashboard and steering wheel, while the upper
-roughly 198 rows are white. Dirty bounds cover the full 512×342 port and the sampled PC is servicing
-the live game loop, not stopped in a trap. Capture a later presented frame or isolate the writer for
-the upper viewport; decide whether this is incomplete setup, a missing direct renderer, or a pixel
-conversion problem before implementing anything new.
+⭐ **HEAD OF QUEUE: advance the deterministic path with keypad `8` acceleration.** The depth-94
+screen is the completed driving setup canvas, not a failed road frame. `ShowCursor` returns from
+`Initialize+$18FA` to the event loop; five 512×512 atlases and the 3904×144 skyline strip are loaded
+correctly in live GWorlds. After depth 94, emit one ordinary Macintosh keypad-8 key-down/up pair
+through `GetNextEvent`, leaving production input unchanged, and follow the next loud stop.
 
 The MAME A-trap log remains a measured reference-run inventory → `docs/trap-log.md`,
 but Stage C has proved that it is **not an exact standalone-port first-use script**. The port has
