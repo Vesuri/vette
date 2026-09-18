@@ -7,15 +7,18 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — current loud stop
 
-⭐ **HEAD OF QUEUE: drive the game-produced road loop to its next loud stop.** The blank upper
+⭐ **HEAD OF QUEUE: profile the trap-free driving renderer before another long run.** The blank upper
 viewport was an intermediate frame. The live VBL queue contained a one-tick sound task and a
 three-tick driving task; returning after the first due record starved the latter forever. The
 scheduler now ages every record and selects callbacks round-robin, and the three direct `$0174`
 readers share a complete A5-relative KeyMap shadow. The first game-drawn road frame now contains
 skyline, traffic, mirror and cockpit without another trap. Keypad 8 is held through the direct
 KeyMap path at the Course One transition; consecutive driving-task captures differ and the original
-throttle global advances from 3 to 6. Let the loud stop now identify the next missing compatibility
-operation during sustained driving.
+throttle global advances from 3 to 21 over 30 ticks. Direct `_BlockMove` writes now mark bounded
+dirty regions and the same run measures 34 frames queued / 34 presented. A 180-second sustained
+A1200 run reaches no loud stop and remains in original 3D transform/raster code at depth 93. Add a
+bounded frame-cadence/hotspot probe, fix only a measured compatibility-layer bottleneck if one
+exists, then let the loud stop identify the next missing operation during sustained driving.
 
 The MAME A-trap log remains a measured reference-run inventory → `docs/trap-log.md`,
 but Stage C has proved that it is **not an exact standalone-port first-use script**. The port has

@@ -589,9 +589,22 @@ roadside panorama, traffic, rear-view mirror and cockpit are all present. No new
 produce it; the blocker was callback scheduling, not an unimplemented drawing primitive.
 
 `amiga/driving_motion.gdb` captures the chunky surface at two consecutive driving-task returns.
-On the A1200 acceptance configuration the held KeyMap word is `$0010`, the original throttle global
-advances from 3 to 6, and the two 81,920-byte surfaces differ (`f9eb1e3e…` versus `8e540ac2…`). This
-is a measured moving road renderer, not two samples of the same setup canvas.
+Its regression interval is 30 Macintosh ticks rather than adjacent callbacks, because several
+three-tick callbacks can occur inside one renderer update. On the A1200 acceptance configuration
+the held KeyMap word is `$0010`, the original throttle global advances from 3 to 21, and the two
+81,920-byte surfaces differ (`f9eb1e3e…` versus `8e540ac2…`). This is a measured moving road
+renderer, not two samples of the same setup canvas.
+
+The driving renderer also uses `_BlockMove` as a direct packed-pixel primitive, bypassing
+QuickDraw's rectangle calls. The bridge now intersects each destination span with `s_colorScreen`
+and converts that byte range into a conservative pixel dirty rectangle. Presentation is attempted
+at every handled Line-A safe point, while `VetteScreen`'s pending-frame guard limits conversion to
+what the VBI can consume. The same motion probe measures 34 frames queued and all 34 presented;
+road-buffer changes therefore reach the Amiga display rather than remaining invisible host state.
+
+A subsequent 180-second A1200 sustained-driving run reaches no loud stop and remains in the
+original 3D transform/raster routines at implemented depth 93. The next boundary is performance
+measurement of that trap-free renderer, not another speculative manager implementation.
 
 The trap-address table is stateful. The observed `GetTrapAddress`/`SetTrapAddress` pair now records
 the game's replacement for `$A9F4 ExitToShell`; routing a later invocation through that replacement

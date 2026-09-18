@@ -128,13 +128,8 @@ static volatile uint8_t s_unsupportedPictureOpcode;
 static volatile uint32_t s_unsupportedPictureOffset;
 static uint16_t read16(const uint8_t* p);
 
-static void markDirty(const uint8_t* rectangle)
+static void markDirtyBounds(int16_t top, int16_t left, int16_t bottom, int16_t right)
 {
-    if (!rectangle) return;
-    int16_t top = (int16_t)read16(rectangle);
-    int16_t left = (int16_t)read16(rectangle + 2);
-    int16_t bottom = (int16_t)read16(rectangle + 4);
-    int16_t right = (int16_t)read16(rectangle + 6);
     if (top >= bottom || left >= right) return;
     if (!s_pixelsDirty) {
         s_dirtyTop = top; s_dirtyLeft = left;
@@ -147,6 +142,13 @@ static void markDirty(const uint8_t* rectangle)
         if (right > s_dirtyRight) s_dirtyRight = right;
     }
     s_screenDirty = true;
+}
+
+static void markDirty(const uint8_t* rectangle)
+{
+    if (!rectangle) return;
+    markDirtyBounds((int16_t)read16(rectangle), (int16_t)read16(rectangle + 2),
+                    (int16_t)read16(rectangle + 4), (int16_t)read16(rectangle + 6));
 }
 
 // VBLTask is a 14-byte 68k record: qLink, qType, vblAddr, vblCount,
@@ -494,6 +496,25 @@ static bool disableCopyProtection()
 
 static void blockMove(const uint8_t* source, uint8_t* destination, uint32_t count)
 {
+    // The driving renderer uses _BlockMove as a direct packed-pixel primitive,
+    // bypassing QuickDraw's rectangle calls.  Convert the touched byte span to
+    // a conservative screen-space dirty rectangle before the pointers move.
+    uint8_t* screenEnd = s_colorScreen + sizeof(s_colorScreen);
+    uint8_t* moveEnd = destination + count;
+    if (destination < screenEnd && moveEnd > s_colorScreen) {
+        uint8_t* first = destination > s_colorScreen ? destination : s_colorScreen;
+        uint8_t* final = moveEnd < screenEnd ? moveEnd : screenEnd;
+        uint32_t firstOffset = (uint32_t)(first - s_colorScreen);
+        uint32_t finalOffset = (uint32_t)(final - s_colorScreen);
+        int16_t top = (int16_t)(firstOffset / 256);
+        int16_t bottom = (int16_t)((finalOffset + 255) / 256);
+        int16_t left = 0, right = 512;
+        if (top + 1 == bottom) {
+            left = (int16_t)((firstOffset & 255) * 2);
+            right = (int16_t)(((finalOffset - 1) & 255) * 2 + 2);
+        }
+        markDirtyBounds(top, left, bottom, right);
+    }
     if (destination > source && destination < source + count) {
         source += count;
         destination += count;
@@ -3626,11 +3647,8 @@ static void realizeSelectorGridPen()
     }
 }
 
-static void serviceMacRuntime()
+static void presentMacRuntime()
 {
-    scheduleVBLTask();
-    stabilizeIntroAnimation();
-    updateIntroAudio();
     if (s_pixelsDirty && s_dirtyTop == 165 && s_dirtyLeft == 177
         && s_dirtyBottom == 316 && s_dirtyRight == 505)
         realizeSelectorGridPen();
@@ -3642,6 +3660,14 @@ static void serviceMacRuntime()
         s_screenDirty = false;
         s_pixelsDirty = false;
     }
+}
+
+static void serviceMacRuntime()
+{
+    scheduleVBLTask();
+    stabilizeIntroAnimation();
+    updateIntroAudio();
+    presentMacRuntime();
 }
 
 struct KeyTranslation {
@@ -3895,6 +3921,7 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
     // due VBL work.  Restricting this to SystemTask left callbacks frozen while
     // the road renderer made only QuickDraw/BlockMove calls.
     scheduleVBLTask();
+    presentMacRuntime();
     uint32_t pc = read32(frame + 2);
     uint16_t trap = read16((const uint8_t*)pc);
     if (trap == 0xa02e) {                    // _BlockMove: A0, A1, D0; registers preserved
