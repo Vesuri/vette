@@ -215,8 +215,13 @@ production build. It emits one ordinary mouse-down/up pair at the reference run'
 point `(357,252)`, the garage screen's ACCEPT button. Live Amiga coordinates are relative to the
 displayed crop, whose Macintosh origin is `(64,91)`; `EventRecord.where` now adds that origin and
 therefore reports the global coordinates the original Window Manager expects. The first scripted
-click stops at `$A924` (`FrontWindow`) in `Main+$0C9E`, with depth still 81 because that trap is not
-yet implemented.
+click reached `$A924` (`FrontWindow`) in `Main+$0C9E`.
+
+82. `FrontWindow` (first visible window in the maintained front-to-back chain)
+
+The next loud stop is `$A871` (`GetMouse`) at `Main+$0CB4`, immediately after the game installs the
+front window's port. That ordering confirms this is the normal click hit-testing path rather than
+an error dialog.
 
 `amiga/stage_c.gdb` breaks on `VetteScreen::showLoudStop`, after the report is complete, and prints
 the depth, trap identity, selector, runtime `(segment, offset)`, absolute PC, USP and its first

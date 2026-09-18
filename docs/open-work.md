@@ -7,10 +7,9 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — current loud stop
 
-⭐ **HEAD OF QUEUE: `FrontWindow` (`$A924`) at `Main+$0C9E`.** A deterministic click on the garage
-screen's ACCEPT button passes through the real `GetNextEvent` path and reaches the game's window
-ownership check. Implement the existing front-window state query; do not add dialog/UI traps to
-conceal an upstream failure.
+⭐ **HEAD OF QUEUE: `GetMouse` (`$A871`) at `Main+$0CB4`.** The garage ACCEPT click passes the
+front-window ownership check, selects that window's port, and asks for the pointer in local
+coordinates. Implement that input query; do not add dialog/UI traps to conceal an upstream failure.
 
 The MAME A-trap log remains a measured reference-run inventory → `docs/trap-log.md`,
 but Stage C has proved that it is **not an exact standalone-port first-use script**. The port has

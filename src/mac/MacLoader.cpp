@@ -320,7 +320,7 @@ static const TrapName s_trapNames[] = {
     {0xa033,"VERTICAL RETRACE","VINSTALL"},
     {0xa998,"RESOURCE MANAGER","USERESFILE"}, {0xa994,"RESOURCE MANAGER","CURRESFILE"},
     {0xaa46,"WINDOW MANAGER","GETNEWCWINDOW"}, {0xa91b,"WINDOW MANAGER","MOVEWINDOW"},
-    {0xa915,"WINDOW MANAGER","SHOWWINDOW"},
+    {0xa915,"WINDOW MANAGER","SHOWWINDOW"}, {0xa924,"WINDOW MANAGER","FRONTWINDOW"},
     {0xaa92,"PALETTE MANAGER","GETNEWPALETTE"}, {0xa873,"QUICKDRAW","SETPORT"},
     {0xaa28,"COLOR MANAGER","GETCTSEED"}, {0xa91f,"WINDOW MANAGER","SELECTWINDOW"},
     {0xa922,"WINDOW MANAGER","BEGINUPDATE"}, {0xa923,"WINDOW MANAGER","ENDUPDATE"},
@@ -3424,6 +3424,13 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
         if (windowSlot(window)) window[110] = 1;
         if (g_stageCDepth < 31) g_stageCDepth = 31;
         return 5;
+    }
+    if (trap == 0xa924) {                    // FrontWindow() -> WindowPtr
+        uint8_t* front = s_windowList;
+        while (front && !front[110]) front = (uint8_t*)read32(front + 144);
+        write32(userStack, (uint32_t)front);
+        if (g_stageCDepth < 82) g_stageCDepth = 82;
+        return 1;
     }
     if (trap == 0xa91f) {                    // SelectWindow(window)
         uint8_t* window = (uint8_t*)read32(userStack);
