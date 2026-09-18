@@ -663,6 +663,16 @@ packed those rows directly from 8-bit PackBits into mapped 4-bit temporary stora
 153 callbacks over 380 ticks and was removed. The resource-level repetition, not another nibble
 loop variant, is now the measured optimization seam.
 
+Host-side PICT expansion was tested at that seam and rejected. A private archive sidecar first
+cached all 91 eligible 8-bit/16-color rasters (1,083,812 bytes); two identical cadence runs fell
+to 123 callbacks over 322 ticks. Restricting it to the 35 unique 512×24 panorama strips and packing
+two verified 4-bit source indices per byte reduced the sidecar to 215,040 bytes, but fell farther
+to 108 callbacks over 315 ticks. Both variants left all 572 Macintosh resource payloads byte-exact,
+and the broad version still passed the complete 163,840-pixel intro differential, so correctness
+was not the cause. The measurements do not isolate archive-memory locality from the altered mapping
+loop, but they do reject embedded decoded rasters as a combined strategy. The sidecar implementation
+was removed; future resource-level work must preserve the control's fresh-working-memory behavior.
+
 The trap-address table is stateful. The observed `GetTrapAddress`/`SetTrapAddress` pair now records
 the game's replacement for `$A9F4 ExitToShell`; routing a later invocation through that replacement
 remains part of completing the trap bridge.

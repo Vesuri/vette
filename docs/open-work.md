@@ -30,8 +30,10 @@ does not reach it. Per-row direct decode, identity-palette detection, literal-lo
 single-entry palette caching are measured regressions; profile and optimize at the PICT-call or
 resource level rather than retrying those local variants. `driving_pict_progress.gdb` now shows
 the dominant workload: 38 large 8-bit, 512×24 PackBits strips build the 3,392-pixel wrapping
-roadside panorama. Investigate caching or host-side preconversion of those immutable resources;
-an in-decoder 8→4-bit fusion was slower.
+roadside panorama. An in-decoder 8→4-bit fusion was slower. Host-predecoded archive sidecars were
+also rejected: caching all eligible rasters fell to 123/322, while a 215,040-byte packed cache of
+only the 35 unique panorama strips fell to 108/315, versus the 183/302 control. Preserve the
+decoder's fresh-working-memory locality and look above the per-resource decode loop next.
 
 The MAME A-trap log remains a measured reference-run inventory → `docs/trap-log.md`,
 but Stage C has proved that it is **not an exact standalone-port first-use script**. The port has
