@@ -640,6 +640,12 @@ a plain byte copy instead of a second palette walk. The cadence probe advances 1
 intro regression still matches all 163,840 displayed Macintosh pixels and both planar buffers and
 copper colors exactly.
 
+`amiga/driving_setup_boundary.gdb` measures completion at the game's `Main+$29E6` `SystemTask`
+immediately before `GetNextEvent`, rather than treating a queued conversion of an intermediate
+surface as completion. The optimized build still does not reach that boundary during a
+120-second warp run. Replacing the translated-row byte copy with aligned word transfers produced
+inconsistent cadence and a lower repeatable control result, so that experiment was removed.
+
 The trap-address table is stateful. The observed `GetTrapAddress`/`SetTrapAddress` pair now records
 the game's replacement for `$A9F4 ExitToShell`; routing a later invocation through that replacement
 remains part of completing the trap bridge.

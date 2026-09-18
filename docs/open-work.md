@@ -24,7 +24,9 @@ built. Packing pairs of mapped 8-bit pixels, expanding PackBits in words, and tr
 4-bit pixels while decompressing raise measured callback progress from 0.535 to 0.606 per tick,
 about 13 percent, but the first frame still does not complete in the bounded run. Continue
 profiling the PICT path and locate the game's original frame-completion signal; do not poll the
-81,920-byte surface again or present partially constructed frames.
+81,920-byte surface again or present partially constructed frames. `driving_setup_boundary.gdb`
+now tests the stable `Main+$29E6` `SystemTask` boundary directly; the current 120-second warp run
+does not reach it.
 
 The MAME A-trap log remains a measured reference-run inventory → `docs/trap-log.md`,
 but Stage C has proved that it is **not an exact standalone-port first-use script**. The port has
