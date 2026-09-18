@@ -463,6 +463,10 @@ exact check of the six original words at `Main+$05FE`, the loader substitutes th
 answer. The requester is never allocated, while all unrelated dialog traps remain loud-stop
 boundaries. Execution proceeds to `$A916 HideWindow` at segment 1 + `$2150`.
 
+`HideWindow` changes only the measured `WindowRecord` visibility flag; it does not synthesize a
+desktop repaint. That is enough for the game to retire the selector and enter segment 6, where the
+next loud stop is Menu Manager `$A945 CheckItem` at `+$08CC`.
+
 The trap-address table is stateful. The observed `GetTrapAddress`/`SetTrapAddress` pair now records
 the game's replacement for `$A9F4 ExitToShell`; routing a later invocation through that replacement
 remains part of completing the trap bridge.

@@ -7,11 +7,10 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — current loud stop
 
-⭐ **HEAD OF QUEUE: implement the measured `$A916 HideWindow` state transition.** The manual
-challenge is now removed by a byte-guarded patch at `Main+$05FE` that writes the exact two A5
-globals left by the correct-answer branch and returns before allocating its requester. Unrelated
-dialog UI remains unsupported. Road setup now reaches `HideWindow` at segment 1 + `$2150`; update
-only the window visibility/current-port state required to retire the selector before driving.
+⭐ **HEAD OF QUEUE: implement the measured Menu Manager `$A945 CheckItem` bookkeeping.**
+`HideWindow` now retires the course-selector window without drawing replacement UI, and execution
+enters segment 6. At `+$08CC` the game clears the checkmark on item 1. Maintain only the menu
+item's check state; do not render menus or implement modal UI.
 
 The MAME A-trap log remains a measured reference-run inventory → `docs/trap-log.md`,
 but Stage C has proved that it is **not an exact standalone-port first-use script**. The port has
