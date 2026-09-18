@@ -207,7 +207,9 @@ the depth, trap identity, selector, runtime `(segment, offset)`, absolute PC, US
 words, all data/address registers, and nearby instructions. It then exits, so `diag_run.sh` stops
 FS-UAE immediately instead of waiting out its wall-time ceiling. The expanded report matters now
 that Macintosh support code copied into movable memory is calling traps outside the 11 resident
-`CODE` ranges. The build's `muldiv-audit` and `probe-audit` are clean.
+`CODE` ranges. If the runner instead interrupts a healthy long-running loop at its safety ceiling,
+the script reports that no loud stop was observed and does not print zeroed trap fields as a false
+stop. The build's `muldiv-audit` and `probe-audit` are clean.
 
 ## Page 0 is not mapped
 

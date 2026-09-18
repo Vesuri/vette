@@ -2,6 +2,7 @@
 # Run with: EXTRA_ARGS="--warp_mode=1" GDBSCRIPT=stage_c.gdb ./diag_run.sh 20
 set pagination off
 set confirm off
+set $loud_stop_hit = 0
 
 # g_stageBState is written before the trap report fields, so watching it can
 # stop on a half-built report.  showLoudStop is called only after every field
@@ -9,8 +10,18 @@ set confirm off
 break VetteScreen::showLoudStop
 commands
   silent
+  set $loud_stop_hit = 1
 end
 continue
+
+if $loud_stop_hit == 0
+  printf "\n===== STAGE C =====\n"
+  printf "no loud stop observed before the runner's wall-time ceiling\n"
+  printf "implemented depth = %u trap(s)\n", g_stageCDepth
+  printf "===================\n\n"
+  detach
+  quit
+end
 
 printf "\n===== STAGE C =====\n"
 printf "implemented depth = %u trap(s) in measured first-use order\n", g_stageCDepth
