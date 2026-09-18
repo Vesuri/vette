@@ -630,6 +630,16 @@ same bounded A1200 cadence probe, callback progress rises from 162 over 303 tick
 slower and was removed. The first complete-frame boundary is still the next target; partial surface
 scans remain explicitly rejected.
 
+`amiga/driving_pict_calls.gdb` records the actual first-frame raster geometry. The road canvas is
+assembled from consecutive unscaled 4-bit PackBits strips with 16-entry color tables: eight strips
+cover `(0,0)-(146,512)`, followed by three covering `(0,0)-(198,144)`, then dashboard and roadside
+pieces. The decoder now applies the packed-byte palette table while expanding those 4-bit rows.
+Repeated PackBits runs therefore translate their value once, and the later aligned raster copy is
+a plain byte copy instead of a second palette walk. The cadence probe advances 183 callbacks over
+302 ticks (0.606/tick), about 13 percent above the original 0.535/tick baseline. The established
+intro regression still matches all 163,840 displayed Macintosh pixels and both planar buffers and
+copper colors exactly.
+
 The trap-address table is stateful. The observed `GetTrapAddress`/`SetTrapAddress` pair now records
 the game's replacement for `$A9F4 ExitToShell`; routing a later invocation through that replacement
 remains part of completing the trap bridge.

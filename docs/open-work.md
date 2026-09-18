@@ -20,10 +20,11 @@ was rejected: it presented partial construction and cut callback progress from 1
 baseline 303-tick cadence queues no new completed frame. A spaced exception-PC sampler disproves
 the earlier attribution to the game's 3D code: 10 of 16 samples are in the compatibility PICT
 decoder and two are in chunky-to-planar conversion while the initial road artwork is still being
-built. Packing pairs of mapped 8-bit pixels and expanding PackBits in words raises measured
-callback progress per tick by about 8 percent, but the first frame still does not complete in the
-bounded run. Continue profiling the PICT path and locate the game's original frame-completion
-signal; do not poll the 81,920-byte surface again or present partially constructed frames.
+built. Packing pairs of mapped 8-bit pixels, expanding PackBits in words, and translating packed
+4-bit pixels while decompressing raise measured callback progress from 0.535 to 0.606 per tick,
+about 13 percent, but the first frame still does not complete in the bounded run. Continue
+profiling the PICT path and locate the game's original frame-completion signal; do not poll the
+81,920-byte surface again or present partially constructed frames.
 
 The MAME A-trap log remains a measured reference-run inventory → `docs/trap-log.md`,
 but Stage C has proved that it is **not an exact standalone-port first-use script**. The port has

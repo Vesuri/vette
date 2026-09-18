@@ -1354,7 +1354,8 @@ static bool drawDialog(uint8_t* dialog)
 }
 
 static bool unpackPackBitsRow(const uint8_t* packed, uint32_t packedSize,
-                              uint8_t* unpacked, uint16_t rowBytes)
+                              uint8_t* unpacked, uint16_t rowBytes,
+                              const uint8_t* byteMap = 0)
 {
     uint32_t source = 0;
     uint16_t destination = 0;
@@ -1366,7 +1367,10 @@ static bool unpackPackBitsRow(const uint8_t* packed, uint32_t packedSize,
             const uint8_t* literal = packed + source;
             uint8_t* output = unpacked + destination;
             uint16_t left = count;
-            if ((((uint32_t)literal ^ (uint32_t)output) & 1) == 0) {
+            if (byteMap) {
+                for (uint16_t i = 0; i < left; ++i) *output++ = byteMap[*literal++];
+                left = 0;
+            } else if ((((uint32_t)literal ^ (uint32_t)output) & 1) == 0) {
                 if ((uint32_t)literal & 1) {
                     *output++ = *literal++;
                     --left;
@@ -1385,6 +1389,7 @@ static bool unpackPackBitsRow(const uint8_t* packed, uint32_t packedSize,
             uint16_t count = (uint16_t)(1 - header);
             if (source >= packedSize || destination + count > rowBytes) return false;
             uint8_t value = packed[source++];
+            if (byteMap) value = byteMap[value];
             uint8_t* output = unpacked + destination;
             uint16_t left = count;
             if ((uint32_t)output & 1) {
@@ -1513,6 +1518,7 @@ static bool drawIndexedPictureBits(const uint8_t* picture, uint32_t size, uint32
     uint8_t* pixels = (uint8_t*)AllocMem(pixelBytes, 0);
     if (!pixels) return false;
     bool valid = true;
+    bool pixelsMapped = packed && pixelSize == 4;
     if (!packed) {
         if (offset + pixelBytes > size) valid = false;
         else {
@@ -1527,7 +1533,8 @@ static bool drawIndexedPictureBits(const uint8_t* picture, uint32_t size, uint32
             else packedSize = picture[offset++];
             if (offset + packedSize > size
                 || !unpackPackBitsRow(picture + offset, packedSize,
-                                      pixels + multiplyUnsigned16(row, rowBytes), rowBytes)) {
+                                      pixels + multiplyUnsigned16(row, rowBytes), rowBytes,
+                                      pixelsMapped ? packedColorMap : 0)) {
                 valid = false; break;
             }
             offset += packedSize;
@@ -1608,8 +1615,12 @@ static bool drawIndexedPictureBits(const uint8_t* picture, uint32_t size, uint32
                 uint8_t* destination = destinationPixels
                     + multiplyUnsigned16((uint16_t)(y - mapTop), destinationRowBytes)
                     + (uint16_t)(packedLeft - mapLeft) / 2;
-                for (uint16_t x = 0; x < copyBytes; ++x)
-                    destination[x] = packedColorMap[source[x]];
+                if (pixelsMapped) {
+                    for (uint16_t x = 0; x < copyBytes; ++x) destination[x] = source[x];
+                } else {
+                    for (uint16_t x = 0; x < copyBytes; ++x)
+                        destination[x] = packedColorMap[source[x]];
+                }
             }
             usedPackedRows = true;
         } else if (pixelSize == 8) {
@@ -1673,7 +1684,7 @@ static bool drawIndexedPictureBits(const uint8_t* picture, uint32_t size, uint32
                         uint8_t sourceByte = sourceRow[sourceColumn >> 1];
                         uint8_t sourceValue = sourceColumn & 1
                             ? (uint8_t)(sourceByte & 0x0f) : (uint8_t)(sourceByte >> 4);
-                        value = colorMap[sourceValue];
+                        value = pixelsMapped ? sourceValue : colorMap[sourceValue];
                     } else value = colorMap[sourceRow[sourceColumn]];
                     uint16_t destinationColumn = (uint16_t)(x - mapLeft);
                     uint8_t& destinationByte = destinationRow[destinationColumn >> 1];
