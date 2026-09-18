@@ -252,6 +252,13 @@ After `StillDown` returns false, the garage control tracker completes and the ga
 ended at depth 87. The next check is a framebuffer/state capture: absence of a trap establishes
 control-flow health, but does not by itself identify which front-end state ACCEPT selected.
 
+`amiga/garage_capture.gdb` now performs that settled-state capture, and
+`tools/render_amiga_chunky.py` renders the packed surface with the live OCS palette. The captured
+image remains the same garage/car-selection screen: ACCEPT is no longer inverted, and no later
+screen has replaced it. Thus the hit test and tracking loop work, but the caller has not dispatched
+a visible state change. The next probe belongs around `Main+$0A00` and must record the returned
+control index and the caller branch—not infer success from the lack of a trap.
+
 `amiga/stage_c.gdb` breaks on `VetteScreen::showLoudStop`, after the report is complete, and prints
 the depth, trap identity, selector, runtime `(segment, offset)`, absolute PC, USP and its first
 words, all data/address registers, and nearby instructions. It then exits, so `diag_run.sh` stops

@@ -7,11 +7,11 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — current loud stop
 
-⭐ **HEAD OF QUEUE: inspect the post-ACCEPT state.** The complete press/track/release path now
-returns to a stable event loop at depth 87 with no loud stop. Capture the live chunky framebuffer
-and relevant game state after the scripted click, compare it with the reference run's first
-post-ACCEPT screen, then drive the next deliberate interaction. Do not add dialog/UI traps to
-conceal an upstream failure.
+⭐ **HEAD OF QUEUE: trace the garage control result around `Main+$0A00`.** The complete ACCEPT
+press/track/release path is recognized and returns to a stable event loop at depth 87, but a live
+post-click capture remains on the same garage/car-selection screen. Inspect the returned control
+index and its caller's state dispatch to determine why no screen transition occurs. Do not add
+dialog/UI traps to conceal an upstream failure.
 
 The MAME A-trap log remains a measured reference-run inventory → `docs/trap-log.md`,
 but Stage C has proved that it is **not an exact standalone-port first-use script**. The port has
