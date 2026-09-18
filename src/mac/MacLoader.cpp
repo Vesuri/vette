@@ -2933,22 +2933,23 @@ static bool nextEvent(uint16_t mask, uint8_t* event)
 #ifdef VETTE_GARAGE_CLICK
             // The synthetic press becomes a real hardware-up observation here;
             // count it as the scripted release so it is not emitted twice.
-            if (!buttonDown && s_garageClickPhase == 1) s_garageClickPhase = 2;
+            if (!buttonDown && (s_garageClickPhase & 1)) ++s_garageClickPhase;
 #endif
         }
     }
 
 #ifdef VETTE_GARAGE_CLICK
-    // MAME's deterministic reference run clicks ACCEPT at the Macintosh global
-    // point (357,252).  Our visible 512x320 crop begins at (64,91), so keep the
-    // live local mouse state in crop coordinates while delivering a normal
-    // mouseDown/mouseUp pair through the Event Manager below.
-    if (!transition && s_garageClickPhase < 2) {
-        uint16_t clickWhat = s_garageClickPhase ? 2 : 1;
+    // Leave the garage through its two real control modes: ACCEPT in the
+    // six-control car chooser, then the top plate in the three-control plate
+    // chooser.  The visible 512x320 crop begins at Macintosh global (64,91),
+    // so keep the live state local while emitting ordinary mouse events.
+    if (!transition && s_garageClickPhase < 4) {
+        bool plateClick = s_garageClickPhase >= 2;
+        uint16_t clickWhat = (s_garageClickPhase & 1) ? 2 : 1;
         if (mask & (1u << clickWhat)) {
-            s_mouseX = 293;
-            s_mouseY = 161;
-            buttonDown = s_garageClickPhase == 0;
+            s_mouseX = plateClick ? 413 : 293;
+            s_mouseY = plateClick ? 69 : 161;
+            buttonDown = (s_garageClickPhase & 1) == 0;
             s_mouseButtonDown = buttonDown;
             what = clickWhat;
             transition = true;

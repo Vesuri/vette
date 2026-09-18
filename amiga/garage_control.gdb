@@ -17,6 +17,26 @@ commands
   printf "mode = %d\n", *(short *)($a5-21546)
   printf "six rectangles (top,left,bottom,right):\n"
   x/24hd $a5-21806
+  disable 1
+  continue
+end
+
+# The index-5 branch stores mode 1 immediately before this instruction.
+break *vette_code_2+0xfc4
+commands
+  silent
+  printf "mode after dispatch = %d\n", *(short *)($a5-21546)
+  printf "three mode-1 rectangles (top,left,bottom,right):\n"
+  x/12hd $a5-21590
+  disable 2
+  continue
+end
+
+# Return from the same tracker after it is called with the three-entry table.
+break *vette_code_2+0xd10
+commands
+  silent
+  printf "selected mode-1 index = %d\n", $d0
   printf "==========================\n\n"
   detach
   quit

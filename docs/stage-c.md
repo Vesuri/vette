@@ -265,6 +265,14 @@ event loop. Mode 1 dispatches a separate table of three rectangles. The apparent
 capture is therefore an intermediate garage state; the next deterministic step is to measure and
 select the forward control from that second table.
 
+The three mode-1 rectangles are `(50,373)-(88,453)`, `(94,373)-(131,453)`, and
+`(137,373)-(175,453)`, exactly covering the three license plates drawn on the right side of the
+garage. `GARAGE_CLICK=1` now emits a second ordinary mouse-down/up pair at local `(413,69)`, inside
+the top plate. The original tracker returns index 0 and enters the common post-garage branch at
+`Main+$0FC8`. `amiga/garage_control.gdb` verifies both indices and both rectangle tables. A
+20-second warped `stage_c.gdb` run produced no loud stop after this transition and remained at
+depth 87, so the next diagnostic is a code-boundary progress probe rather than a longer blind run.
+
 `amiga/stage_c.gdb` breaks on `VetteScreen::showLoudStop`, after the report is complete, and prints
 the depth, trap identity, selector, runtime `(segment, offset)`, absolute PC, USP and its first
 words, all data/address registers, and nearby instructions. It then exits, so `diag_run.sh` stops

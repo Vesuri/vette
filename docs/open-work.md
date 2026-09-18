@@ -7,13 +7,12 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — current loud stop
 
-⭐ **HEAD OF QUEUE: drive the garage's second, three-control mode.** The complete ACCEPT
-press/track/release path returns control index 5 for rectangle `(150,266)-(169,313)`. Its shipped
-caller draws PICT 17619 and changes the garage handler from mode 0's six rectangles to mode 1's
-three rectangles; the apparently unchanged capture is therefore an intermediate state, not a
-missed click. Measure those three rectangles, identify the authentic forward control, and extend
-the deterministic input only far enough to reach the next loud stop. Do not add dialog/UI traps
-to conceal an upstream failure.
+⭐ **HEAD OF QUEUE: trace the post-garage transition without lengthening blind runs.** The
+development path now selects ACCEPT and then the top license plate through the real event and
+control-tracking code. The second tracker returns index 0 and enters `Main+$0FC8`; a 20-second
+warped run reaches no loud stop. Add a code-boundary probe to locate progress through that shipped
+transition, then continue to the first unimplemented trap. Do not add dialog/UI traps to conceal
+an upstream failure.
 
 The MAME A-trap log remains a measured reference-run inventory → `docs/trap-log.md`,
 but Stage C has proved that it is **not an exact standalone-port first-use script**. The port has
