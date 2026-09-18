@@ -304,6 +304,14 @@ the 68020. The build audits pass and a short A1200 run clears the table construc
 the interrupt lands in
 `drawPackedPictureBits` while decoding byte 25,010 of a 58,484-byte PICT for the driving setup.
 
+A pre-decode probe corrected that incomplete timeout snapshot: the picture resource is 63,940
+bytes and its first packed opcode is a 4-bit, 256-byte-row strip with source and destination
+`(0,0)-(20,512)`. The picture frame and requested target are both `(0,0)-(323,512)`. The generic
+renderer had therefore walked a 512×323 target for every strip and evaluated two scale divisions
+for every touched pixel, even though both mappings were one-to-one. A guarded path now clips and
+copies byte-aligned, unscaled 4-bit rows directly. The build audits pass, the picture completes in
+the next short A1200 run, and the loud stop advances to a mode-6 `CopyBits` at `Main+$199A`.
+
 `amiga/stage_c.gdb` breaks on `VetteScreen::showLoudStop`, after the report is complete, and prints
 the depth, trap identity, selector, runtime `(segment, offset)`, absolute PC, USP and its first
 words, all data/address registers, and nearby instructions. It then exits, so `diag_run.sh` stops

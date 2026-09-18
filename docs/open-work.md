@@ -7,12 +7,13 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — current loud stop
 
-⭐ **HEAD OF QUEUE: bound the first driving-picture decode.** `$AA39` is implemented as the
-measured `MakeITable(NIL,NIL,0)` call and depth advances to 88. The rest of the 20-second run is
-inside `drawPackedPictureBits`, decoding a 58,484-byte PICT (observed at byte 25,010) rather than
-at a trap. Add a one-shot boundary after this shipped `DrawPicture` call and measure whether it
-completes; if not, profile the decoder's actual hot opcode/path before optimizing it. Do not make
-blind runs longer and do not add dialog/UI traps to conceal an upstream failure.
+⭐ **HEAD OF QUEUE: implement the measured `notSrcXor` driving transfer.** The first driving PICT
+is 63,940 bytes and consists of unscaled, byte-aligned 4-bit strips; the first measured opcode
+copies `(0,0)-(20,512)` to the identical destination within a 512×323 picture. Direct packed-row
+copies now replace two divisions per pixel, so the PICT completes inside the same short A1200 run.
+The next loud stop is the existing `CopyBits` trap at `Main+199A`, with a null mask and transfer
+mode 6 (`notSrcXor`). Implement that real drawing mode; do not add dialog/UI traps to conceal an
+upstream failure.
 
 The MAME A-trap log remains a measured reference-run inventory → `docs/trap-log.md`,
 but Stage C has proved that it is **not an exact standalone-port first-use script**. The port has
