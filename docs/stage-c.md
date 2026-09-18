@@ -219,11 +219,11 @@ click reached `$A924` (`FrontWindow`) in `Main+$0C9E`.
 
 82. `FrontWindow` (first visible window in the maintained front-to-back chain)
 
-The next loud stop is `$A871` (`GetMouse`) at `Main+$0CB4`, immediately after the game installs the
-front window's port. That ordering confirms this is the normal click hit-testing path rather than
-an error dialog.
+The next loud stop is `$A871` (`GlobalToLocal`) at `Main+$0CB4`, immediately after the game installs
+the front window's port. That ordering confirms this is the normal click hit-testing path rather
+than an error dialog.
 
-83. `GetMouse` (current crop-relative point, matching the active full-window content port)
+83. `GlobalToLocal` (subtract the displayed Macintosh crop origin `(64,91)` from the event point)
 
 The game then enters its garage control hit-test loop and stops at `$A8AD` (`PtInRect`) in
 `Main+$0A1C`.
@@ -233,6 +233,12 @@ The game then enters its garage control hit-test loop and stops at `$A8AD` (`PtI
 The ACCEPT point is inside its control rectangle. The next loud stop is `$A8A4` (`InvertRect`) at
 `Main+$0A2E`; the following shipped instruction sequence calls `StillDown`, identifying this as
 pressed-button feedback rather than unrelated screen decoration.
+
+85. `InvertRect` (clipped packed-4-bpp complement, dirtying only the affected display bounds)
+
+The next loud stop is `$A972` (`GetMouse`) at `Main+$0A38`. It is inside the pressed-button tracking
+loop and requests a current local point; the earlier `$A871` call transforms the event record's
+already-captured global point.
 
 `amiga/stage_c.gdb` breaks on `VetteScreen::showLoudStop`, after the report is complete, and prints
 the depth, trap identity, selector, runtime `(segment, offset)`, absolute PC, USP and its first

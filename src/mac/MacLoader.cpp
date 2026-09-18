@@ -334,6 +334,7 @@ static const TrapName s_trapNames[] = {
     {0xa850,"QUICKDRAW","INITCURSOR"}, {0xa9bc,"QUICKDRAW","GETPICTURE"},
     {0xa8f6,"QUICKDRAW","DRAWPICTURE"}, {0xa89b,"QUICKDRAW","PENSIZE"},
     {0xa89c,"QUICKDRAW","PENMODE"}, {0xa8a1,"QUICKDRAW","FRAMERECT"},
+    {0xa8a4,"QUICKDRAW","INVERTRECT"},
     {0xa8a9,"QUICKDRAW","INSETRECT"}, {0xa8b0,"QUICKDRAW","FRAMEROUNDRECT"},
     {0xa8ad,"QUICKDRAW","PTINRECT"},
     {0xa8ec,"QUICKDRAW","COPYBITS"}, {0xa8a3,"QUICKDRAW","ERASERECT"},
@@ -347,7 +348,7 @@ static const TrapName s_trapNames[] = {
     {0xa9bf,"MENU MANAGER","GETMENU"},
     {0xa937,"MENU MANAGER","DRAWMENUBAR"}, {0xa970,"EVENT MANAGER","GETNEXTEVENT"},
     {0xa9b4,"EVENT MANAGER","SYSTEMTASK"}, {0xaa94,"PALETTE MANAGER","ACTIVATEPALETTE"},
-    {0xa874,"QUICKDRAW","GETPORT"}, {0xa871,"QUICKDRAW","GETMOUSE"}
+    {0xa874,"QUICKDRAW","GETPORT"}, {0xa871,"QUICKDRAW","GLOBALTOLOCAL"}
 };
 
 static bool buildA5World(uint8_t*& a5)
@@ -1821,6 +1822,42 @@ static bool eraseRect(const uint8_t* rectangle)
         if (keepLowNibble && lastByte > firstByte) --lastByte;
         if (lastByte > firstByte) blockClear(row + firstByte, lastByte - firstByte);
         if (keepLowNibble) row[lastByte] &= 0x0f;
+    }
+    return true;
+}
+
+static bool invertRect(const uint8_t* rectangle)
+{
+    uint8_t* pixels;
+    uint16_t rowBytes;
+    int16_t mapTop, mapLeft, mapBottom, mapRight;
+    if (!rectangle
+        || !currentPortPixels(pixels, rowBytes, mapTop, mapLeft, mapBottom, mapRight)) return false;
+    int16_t top = (int16_t)read16(rectangle);
+    int16_t left = (int16_t)read16(rectangle + 2);
+    int16_t bottom = (int16_t)read16(rectangle + 4);
+    int16_t right = (int16_t)read16(rectangle + 6);
+    if (top >= bottom || left >= right) return false;
+    if (top < mapTop) top = mapTop;
+    if (left < mapLeft) left = mapLeft;
+    if (bottom > mapBottom) bottom = mapBottom;
+    if (right > mapRight) right = mapRight;
+    if (top >= bottom || left >= right) return true;
+
+    uint16_t firstColumn = (uint16_t)(left - mapLeft);
+    uint16_t lastColumn = (uint16_t)(right - mapLeft);
+    for (int16_t y = top; y < bottom; ++y) {
+        uint8_t* row = pixels + multiplyUnsigned16((uint16_t)(y - mapTop), rowBytes);
+        uint16_t column = firstColumn;
+        if (column & 1) {
+            row[column >> 1] ^= 0x0f;
+            ++column;
+        }
+        while (column + 1 < lastColumn) {
+            row[column >> 1] ^= 0xff;
+            column = (uint16_t)(column + 2);
+        }
+        if (column < lastColumn) row[column >> 1] ^= 0xf0;
     }
     return true;
 }
@@ -3394,11 +3431,11 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
         if (g_stageCDepth < 26) g_stageCDepth = 26;
         return 5;
     }
-    if (trap == 0xa871) {                    // GetMouse(Point*)
+    if (trap == 0xa871) {                    // GlobalToLocal(Point*)
         uint8_t* point = (uint8_t*)read32(userStack);
         if (point) {
-            write16(point, (uint16_t)s_mouseY);
-            write16(point + 2, (uint16_t)s_mouseX);
+            write16(point, (uint16_t)((int16_t)read16(point) - 91));
+            write16(point + 2, (uint16_t)((int16_t)read16(point + 2) - 64));
         }
         if (g_stageCDepth < 83) g_stageCDepth = 83;
         return 5;
@@ -3415,6 +3452,14 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
         userStack[8] = inside ? 1 : 0;
         if (g_stageCDepth < 84) g_stageCDepth = 84;
         return 9;
+    }
+    if (trap == 0xa8a4) {                    // InvertRect(Rect*)
+        const uint8_t* rectangle = (const uint8_t*)read32(userStack);
+        if (invertRect(rectangle)) {
+            if (currentPortIsScreen()) markDirty(rectangle);
+            if (g_stageCDepth < 85) g_stageCDepth = 85;
+            return 5;
+        }
     }
     if (trap == 0xaa92) {                    // GetNewPalette(id) -> PaletteHandle
         write32(userStack + 2,

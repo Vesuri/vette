@@ -7,9 +7,10 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — current loud stop
 
-⭐ **HEAD OF QUEUE: `InvertRect` (`$A8A4`) at `Main+$0A2E`.** `PtInRect` identifies the garage
-ACCEPT control, and the game next draws its pressed-button feedback before polling `StillDown`.
-Implement the real rectangle inversion; do not add dialog/UI traps to conceal an upstream failure.
+⭐ **HEAD OF QUEUE: `GetMouse` (`$A972`) at `Main+$0A38`.** `PtInRect` identifies the garage ACCEPT
+control and `InvertRect` draws its pressed state. The game next polls the pointer in local
+coordinates while the button is held. Implement that real mouse query; do not add dialog/UI traps
+to conceal an upstream failure.
 
 The MAME A-trap log remains a measured reference-run inventory → `docs/trap-log.md`,
 but Stage C has proved that it is **not an exact standalone-port first-use script**. The port has
