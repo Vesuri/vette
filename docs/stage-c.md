@@ -686,6 +686,11 @@ though only 4-bit PICTs can consume it. Restricting that construction to 4-bit s
 183 callbacks and tightens from 302 to 301 ticks; the exact intro differential still passes all
 163,840 pixels, both planar buffers, and the copper palette.
 
+The 35 panorama resources contain only two distinct embedded color tables (29 share one, six the
+other), but caching their translated 256-byte maps by destination table pointer and seed regressed
+to 153 callbacks over 373 ticks. The resource classification and state path outweighed the avoided
+nearest-color searches, so this cache was removed.
+
 The trap-address table is stateful. The observed `GetTrapAddress`/`SetTrapAddress` pair now records
 the game's replacement for `$A9F4 ExitToShell`; routing a later invocation through that replacement
 remains part of completing the trap bridge.

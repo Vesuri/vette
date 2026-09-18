@@ -37,6 +37,8 @@ decoder's fresh-working-memory locality. Copying the three already-rendered wrap
 lost at 177/395 because per-call validation outweighed the saved decodes. The next optimization
 must amortize setup across the whole panorama rather than add another per-picture cache. Skipping
 the packed-nibble map that 8-bit PICTs cannot use is retained but essentially neutral at 183/301.
+The panorama's two shared source color tables do not provide a shortcut either: caching their
+translated maps regressed to 153/373 and was removed.
 
 The MAME A-trap log remains a measured reference-run inventory → `docs/trap-log.md`,
 but Stage C has proved that it is **not an exact standalone-port first-use script**. The port has
