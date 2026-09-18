@@ -318,12 +318,22 @@ the clipped, odd-nibble, overlap-safe, and scaled fallbacks. Both standing audit
 short A1200 run clears the drawing call and stops at `EnableItem(menu, 7)` (`$A939`,
 `Main+$13BE`), immediately before the game's existing `DisableItem(menu, 5)` call.
 
-That pair is the normal garage-to-driving menu-state transition, not an error path: both calls use
+That pair is the normal post-garage menu-state transition, not an error path: both calls use
 the same live menu handle, enabling item 7 and then disabling item 5. `EnableItem` now mirrors the
 existing `DisableItem` implementation by changing only the menu record's enable bitfield; it does
 not draw or synthesize menu UI. The next short A1200 run produces no loud stop and reaches
 `presentMacFrame` with a live dirty rectangle `(165,177)-(316,505)`, so execution has advanced into
-active driving graphics. The next boundary is a one-shot capture of that first presented frame.
+active game graphics. The next boundary is a one-shot capture of that first presented frame.
+
+That capture exposed the vehicle/performance selector and the rotating car had the characteristic
+cyclic corruption documented by M.A.C.E.'s
+[VetteHack investigation](https://mace.home.blog/vettehack/). Color VETTE! assumes the pre-System
+7.1 `NewGWorld` row stride: round the pixel width to a four-byte boundary and add four bytes of
+slop. The port had rounded correctly but omitted the slop, advertising 256 bytes for a 512-wide
+4-bit GWorld where the game advances by 260. `NewGWorld` now uses the original formula and allocates
+the corresponding buffer. `amiga/driving_capture.gdb` captures the first measured selector update;
+the rendered chunky surface shows a coherent Porsche model and identifies the state as the vehicle
+selector, not yet the road-driving loop.
 
 `amiga/stage_c.gdb` breaks on `VetteScreen::showLoudStop`, after the report is complete, and prints
 the depth, trap identity, selector, runtime `(segment, offset)`, absolute PC, USP and its first

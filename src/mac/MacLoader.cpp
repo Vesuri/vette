@@ -2514,7 +2514,12 @@ static uint8_t* newGWorld(const uint8_t* bounds, uint16_t depth)
     uint16_t pixelDepth = depth ? depth : 4;
     uint16_t width = (uint16_t)(right - left);
     uint16_t height = (uint16_t)(bottom - top);
-    uint16_t rowBytes = (uint16_t)(((uint32_t)width * pixelDepth + 31) >> 5 << 2);
+    // Color VETTE! predates System 7.1 and directly relies on the original
+    // NewGWorld stride: round to a 32-bit boundary, then reserve one more
+    // 32-bit slop word.  Omitting that word makes its 3D renderer advance 260
+    // bytes through a PixMap advertised as 256 bytes wide, producing the
+    // characteristic repeating/cyclic corruption seen on newer Mac systems.
+    uint16_t rowBytes = (uint16_t)((((uint32_t)width * pixelDepth + 31) >> 5 << 2) + 4);
     slot->pixels = (uint8_t*)AllocMem((uint32_t)rowBytes * height, MEMF_CLEAR);
     if (!slot->pixels) return 0;
     slot->used = true;

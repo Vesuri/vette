@@ -7,13 +7,13 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — current loud stop
 
-⭐ **HEAD OF QUEUE: capture the first active driving frame.** The normal garage-to-driving state
-transition enables menu item 7 and disables item 5; `EnableItem` now mirrors the existing menu
-bitfield bookkeeping without drawing UI. No loud stop occurs in the next short A1200 run, which
-reaches a live dirty conversion of `(165,177)-(316,505)`. Add a one-shot capture on the first
-presentation after that transition and render the game-produced chunky surface and live palette.
-Use it to identify the exact driving state reached before adding any further synthetic input. Do
-not implement visible or modal UI merely to conceal an upstream failure.
+⭐ **HEAD OF QUEUE: advance through the vehicle selector.** The first post-garage capture is the
+vehicle/performance selector, with a correctly rendered rotating Porsche and ACCEPT control—not
+the road loop. The cyclic 3D corruption was the known Color VETTE! `NewGWorld` stride dependency;
+the port now supplies the original 32-bit-rounded row plus four-byte slop. Measure the selector's
+control rectangles and extend only the development `GARAGE_CLICK=1` input sequence through the
+chosen vehicle and ACCEPT, then resume the loud-stop loop. Do not implement visible or modal UI
+merely to conceal an upstream failure.
 
 The MAME A-trap log remains a measured reference-run inventory → `docs/trap-log.md`,
 but Stage C has proved that it is **not an exact standalone-port first-use script**. The port has
