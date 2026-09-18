@@ -599,8 +599,19 @@ The driving renderer also uses `_BlockMove` as a direct packed-pixel primitive, 
 QuickDraw's rectangle calls. The bridge now intersects each destination span with `s_colorScreen`
 and converts that byte range into a conservative pixel dirty rectangle. Presentation is attempted
 at every handled Line-A safe point, while `VetteScreen`'s pending-frame guard limits conversion to
-what the VBI can consume. The same motion probe measures 34 frames queued and all 34 presented;
-road-buffer changes therefore reach the Amiga display rather than remaining invisible host state.
+what the VBI can consume. At the second callback the motion probe measures 34 setup frames queued
+and all 34 presented; the direct-store check below is what covers subsequent road pixels.
+
+Most 3D pixels are written by direct 68k stores rather than `_BlockMove`. Once both driving VBL
+tasks exist, the bridge therefore compares the 81,920-byte chunky surface against a fast-RAM shadow
+at the driving task's three-tick cadence. Changed packed bytes update the shadow and produce exact
+top/bottom plus conservative left/right bounds, merged with trap-derived dirt. An unchanged surface
+does not request C2P.
+
+`amiga/driving_cadence.gdb` takes two stops exactly 300 requested Macintosh ticks apart. The first
+A1200 measurement spans 336 ticks and sees two new frames queued and both presented: about 0.30 fps.
+The display path is no longer stale or dropping completed frames; the original 3D renderer itself
+only finishes two distinct chunky updates in 6.72 emulated seconds.
 
 A subsequent 180-second A1200 sustained-driving run reaches no loud stop and remains in the
 original 3D transform/raster routines at implemented depth 93. The next boundary is performance
