@@ -7,11 +7,10 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — current loud stop
 
-⭐ **HEAD OF QUEUE: characterize the monochrome road-screen PICT mapping.** Exact resource lookups
-no longer linearly reparse the 572-entry archive; the packer's validated `(fork,type,id)` ordering
-now supports binary search. With that scan removed, the same bounded run advances into
-`drawPackedMonochromePictureBits`. Probe its frame, target, source and raster rectangles, then add a
-packed conversion only if the mapping is provably unscaled.
+⭐ **HEAD OF QUEUE: implement `$A852 HideCursor` at `Main+$268A`.** The two measured monochrome
+road-screen masks now use their proven unscaled mappings and the next bounded run stops immediately
+after them at this parameterless QuickDraw cursor-state call. Track visibility in the existing
+cursor state; do not synthesize cursor drawing or unrelated UI.
 
 The MAME A-trap log remains a measured reference-run inventory → `docs/trap-log.md`,
 but Stage C has proved that it is **not an exact standalone-port first-use script**. The port has

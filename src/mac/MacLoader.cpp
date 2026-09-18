@@ -1638,7 +1638,59 @@ static bool drawPackedMonochromePictureBits(const uint8_t* picture, uint32_t siz
         || targetRight <= targetLeft || rasterBottom <= rasterTop || rasterRight <= rasterLeft
         || copyBottom <= copyTop || copyRight <= copyLeft) valid = false;
 
-    if (valid) {
+    bool usedUnscaledRows = false;
+    if (valid
+        && frameBottom - frameTop == targetBottom - targetTop
+        && frameRight - frameLeft == targetRight - targetLeft
+        && rasterBottom - rasterTop == copyBottom - copyTop
+        && rasterRight - rasterLeft == copyRight - copyLeft) {
+        int16_t translatedRasterTop = (int16_t)(targetTop + rasterTop - frameTop);
+        int16_t translatedRasterLeft = (int16_t)(targetLeft + rasterLeft - frameLeft);
+        int16_t translatedRasterBottom = (int16_t)(targetTop + rasterBottom - frameTop);
+        int16_t translatedRasterRight = (int16_t)(targetLeft + rasterRight - frameLeft);
+        int16_t packedTop = translatedRasterTop;
+        int16_t packedLeft = translatedRasterLeft;
+        int16_t packedBottom = translatedRasterBottom;
+        int16_t packedRight = translatedRasterRight;
+        if (packedTop < targetTop) packedTop = targetTop;
+        if (packedTop < mapTop) packedTop = mapTop;
+        if (packedTop < translatedRasterTop + sourceTop - copyTop)
+            packedTop = (int16_t)(translatedRasterTop + sourceTop - copyTop);
+        if (packedLeft < targetLeft) packedLeft = targetLeft;
+        if (packedLeft < mapLeft) packedLeft = mapLeft;
+        if (packedLeft < translatedRasterLeft + sourceLeft - copyLeft)
+            packedLeft = (int16_t)(translatedRasterLeft + sourceLeft - copyLeft);
+        if (packedBottom > targetBottom) packedBottom = targetBottom;
+        if (packedBottom > mapBottom) packedBottom = mapBottom;
+        if (packedBottom > translatedRasterTop + sourceBottom - copyTop)
+            packedBottom = (int16_t)(translatedRasterTop + sourceBottom - copyTop);
+        if (packedRight > targetRight) packedRight = targetRight;
+        if (packedRight > mapRight) packedRight = mapRight;
+        if (packedRight > translatedRasterLeft + sourceRight - copyLeft)
+            packedRight = (int16_t)(translatedRasterLeft + sourceRight - copyLeft);
+
+        for (int16_t y = packedTop; y < packedBottom; ++y) {
+            int16_t sourceY = (int16_t)(copyTop + y - translatedRasterTop);
+            const uint8_t* sourceRow = pixels
+                + multiplyUnsigned16((uint16_t)(sourceY - sourceTop), rowBytes);
+            uint8_t* destinationRow = destinationPixels
+                + multiplyUnsigned16((uint16_t)(y - mapTop), destinationRowBytes);
+            int16_t sourceX = (int16_t)(copyLeft + packedLeft - translatedRasterLeft);
+            for (int16_t x = packedLeft; x < packedRight; ++x, ++sourceX) {
+                uint16_t sourceColumn = (uint16_t)(sourceX - sourceLeft);
+                bool set = (sourceRow[sourceColumn >> 3]
+                    & (uint8_t)(0x80 >> (sourceColumn & 7))) != 0;
+                uint16_t destinationColumn = (uint16_t)(x - mapLeft);
+                uint8_t mask = destinationColumn & 1 ? 0x0f : 0xf0;
+                uint8_t& destinationByte = destinationRow[destinationColumn >> 1];
+                if (set) destinationByte |= mask;
+                else if (mode == 0) destinationByte &= (uint8_t)~mask;
+            }
+        }
+        usedUnscaledRows = true;
+    }
+
+    if (valid && !usedUnscaledRows) {
         for (int16_t y = targetTop; y < targetBottom; ++y) {
             if (y < mapTop || y >= mapBottom) continue;
             int16_t pictureY = (int16_t)(frameTop + multiplyDivide(

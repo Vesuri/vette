@@ -491,6 +491,13 @@ lower-bound search while preserving the current-fork-first semantics and the res
 master-pointer slot. The next 20-second run clears the resource scan and reaches the following
 monochrome PICT raster mapper without a loud stop.
 
+That mapper receives two `srcOr` masks. The first has a 289×92 frame, source and raster rectangle,
+is translated to `(92,0)-(184,289)`, and is stored in 38-byte padded 1-bit rows. The second is
+346×161, translated to `(30,160)-(191,506)`, with 44-byte rows. Both mappings are one-to-one. A
+clipped unscaled path now expands each source bit directly into the destination nibble and applies
+`srcCopy` or `srcOr` without four coordinate divisions per pixel. The next bounded run completes
+both images and loud-stops at `$A852 HideCursor`, `Main+$268A`; implemented depth remains 92.
+
 The trap-address table is stateful. The observed `GetTrapAddress`/`SetTrapAddress` pair now records
 the game's replacement for `$A9F4 ExitToShell`; routing a later invocation through that replacement
 remains part of completing the trap bridge.
