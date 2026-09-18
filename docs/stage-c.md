@@ -255,9 +255,15 @@ control-flow health, but does not by itself identify which front-end state ACCEP
 `amiga/garage_capture.gdb` now performs that settled-state capture, and
 `tools/render_amiga_chunky.py` renders the packed surface with the live OCS palette. The captured
 image remains the same garage/car-selection screen: ACCEPT is no longer inverted, and no later
-screen has replaced it. Thus the hit test and tracking loop work, but the caller has not dispatched
-a visible state change. The next probe belongs around `Main+$0A00` and must record the returned
-control index and the caller branch—not infer success from the lack of a trap.
+screen has replaced it. That visual result did not mean the caller missed the click.
+
+`amiga/garage_control.gdb` breaks immediately after the shipped six-rectangle tracker returns.
+The deterministic point is `(v=161,h=293)`, the hit rectangle is exactly
+`(top=150,left=266,bottom=169,right=313)`, and the tracker returns zero-based index 5. The caller's
+index-5 branch draws PICT 17619, changes its state word from mode 0 to mode 1, and returns to the
+event loop. Mode 1 dispatches a separate table of three rectangles. The apparently unchanged
+capture is therefore an intermediate garage state; the next deterministic step is to measure and
+select the forward control from that second table.
 
 `amiga/stage_c.gdb` breaks on `VetteScreen::showLoudStop`, after the report is complete, and prints
 the depth, trap identity, selector, runtime `(segment, offset)`, absolute PC, USP and its first
