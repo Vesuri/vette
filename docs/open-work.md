@@ -7,13 +7,11 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — current loud stop
 
-⭐ **HEAD OF QUEUE: use the post-garage animation's real Button skip to reach the next trap.** The
-development path selects ACCEPT and the top license plate, then enters the shipped plate animation
-at `Main+$10AA`. Its odd-aligned same-PixMap `srcOr`/`srcBic` copies now have a packed-byte path,
-but startup plus the unskipped animation still consumes the short diagnostic window. Emit one
-development-only Button press after the plate selection—the animation explicitly polls Button for
-this purpose—then continue to the first unimplemented trap. Do not add dialog/UI traps to conceal
-an upstream failure.
+⭐ **HEAD OF QUEUE: identify and implement `$AA39` at `Main+$132C`.** The deterministic path now
+uses the post-garage plate animation's own Button skip and immediately reaches this loud stop.
+The caller reserves two long results plus a word argument before the trap; establish the exact
+Toolbox routine and ABI from an authoritative trap table and the surrounding code, then implement
+only that operation. Do not add dialog/UI traps to conceal an upstream failure.
 
 The MAME A-trap log remains a measured reference-run inventory → `docs/trap-log.md`,
 but Stage C has proved that it is **not an exact standalone-port first-use script**. The port has

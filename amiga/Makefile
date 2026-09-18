@@ -120,7 +120,8 @@ EXTRA_DEFINES += -DVETTE_SKIP_INTRO
 endif
 
 # Deterministic Stage-C stepping only.  GetNextEvent selects ACCEPT and then the
-# top license plate through two normal mouse-down/up pairs.  Production builds
+# top license plate through two normal mouse-down/up pairs; Button then skips
+# the plate animation through its shipped input branch.  Production builds
 # always use the live Amiga mouse and never define this.
 ifeq ($(GARAGE_CLICK),1)
 EXTRA_DEFINES += -DVETTE_GARAGE_CLICK

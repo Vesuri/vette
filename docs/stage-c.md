@@ -284,6 +284,13 @@ when the moving destination overlaps its source. The build audits pass. The anim
 still intentionally polls `Button`, giving deterministic bring-up a faithful, bounded way to skip
 it after proving this path.
 
+For `GARAGE_CLICK=1` only, `Button` now reports one press after the two garage selections. This is
+not a control-flow patch: it takes the exact user-skip branch already present in the shipped plate
+animation. Production and plain `SKIP_INTRO=1` builds are unchanged. The next 20-second A1200 run
+exits immediately through the loud-stop breakpoint at `$AA39`, `Main+$132C`, still at implemented
+depth 87. Its caller has reserved two long result slots and pushed a zero word before the trap;
+the operation and ABI are the next measured implementation task.
+
 `amiga/stage_c.gdb` breaks on `VetteScreen::showLoudStop`, after the report is complete, and prints
 the depth, trap identity, selector, runtime `(segment, offset)`, absolute PC, USP and its first
 words, all data/address registers, and nearby instructions. It then exits, so `diag_run.sh` stops

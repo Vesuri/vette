@@ -89,6 +89,7 @@ static int16_t s_mouseX = 256, s_mouseY = 160;
 static bool s_mouseButtonDown;
 #ifdef VETTE_GARAGE_CLICK
 static uint8_t s_garageClickPhase;
+static bool s_garageTransitionSkipped;
 #endif
 
 struct WindowSlot {
@@ -3648,6 +3649,16 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
         if (firstButtonPoll) {
             pressed = true;
             firstButtonPoll = false;
+        }
+#endif
+#ifdef VETTE_GARAGE_CLICK
+        // The shipped plate animation explicitly offers Button as its skip
+        // control.  Once both deterministic garage selections have been
+        // delivered, exercise that real branch once to keep bring-up runs
+        // bounded; production and ordinary SKIP_INTRO builds never do this.
+        if (!s_garageTransitionSkipped && s_garageClickPhase >= 3) {
+            pressed = true;
+            s_garageTransitionSkipped = true;
         }
 #endif
         write16(userStack, pressed ? 1 : 0);
