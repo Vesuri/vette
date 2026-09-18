@@ -1780,11 +1780,79 @@ static bool drawDirectPictureBits(const uint8_t* picture, uint32_t size, uint32_
     return valid;
 }
 
+static const uint8_t kPictureFont[36][7] = {
+    {14,17,19,21,25,17,14},{4,12,4,4,4,4,14},{14,17,1,2,4,8,31},
+    {30,1,1,14,1,1,30},{2,6,10,18,31,2,2},{31,16,16,30,1,1,30},
+    {14,16,16,30,17,17,14},{31,1,2,4,8,8,8},{14,17,17,14,17,17,14},
+    {14,17,17,15,1,1,14},
+    {14,17,17,31,17,17,17},{30,17,17,30,17,17,30},{14,17,16,16,16,17,14},
+    {30,17,17,17,17,17,30},{31,16,16,30,16,16,31},{31,16,16,30,16,16,16},
+    {14,17,16,23,17,17,14},{17,17,17,31,17,17,17},{14,4,4,4,4,4,14},
+    {7,2,2,2,2,18,12},{17,18,20,24,20,18,17},{16,16,16,16,16,16,31},
+    {17,27,21,21,17,17,17},{17,25,21,19,17,17,17},{14,17,17,17,17,17,14},
+    {30,17,17,30,16,16,16},{14,17,17,17,21,18,13},{30,17,17,30,20,18,17},
+    {15,16,16,14,1,1,30},{31,4,4,4,4,4,4},{17,17,17,17,17,17,14},
+    {17,17,17,17,17,10,4},{17,17,17,21,21,21,10},{17,17,10,4,10,17,17},
+    {17,17,10,4,4,4,4},{31,1,2,4,8,16,31}
+};
+
+static uint8_t pictureGlyphRow(uint8_t character, uint16_t row)
+{
+    if (character >= 'a' && character <= 'z') character -= (uint8_t)('a' - 'A');
+    if (character >= '0' && character <= '9') return kPictureFont[character - '0'][row];
+    if (character >= 'A' && character <= 'Z') return kPictureFont[10 + character - 'A'][row];
+    if (character == ':') return (row == 2 || row == 5) ? 4 : 0;
+    return 0;
+}
+
+static bool pictureRoundPixel(int16_t y, int16_t x, int16_t top, int16_t left,
+                              int16_t bottom, int16_t right, uint16_t diameter)
+{
+    if (y < top || y >= bottom || x < left || x >= right) return false;
+    uint16_t radius = (uint16_t)(diameter >> 1);
+    uint16_t halfHeight = (uint16_t)(bottom - top) >> 1;
+    uint16_t halfWidth = (uint16_t)(right - left) >> 1;
+    if (radius > halfHeight) radius = halfHeight;
+    if (radius > halfWidth) radius = halfWidth;
+    if (!radius || (y >= top + radius && y < bottom - radius)
+        || (x >= left + radius && x < right - radius)) return true;
+    int16_t centerY = y < top + radius ? (int16_t)(top + radius - 1)
+                                           : (int16_t)(bottom - radius);
+    int16_t centerX = x < left + radius ? (int16_t)(left + radius - 1)
+                                            : (int16_t)(right - radius);
+    int16_t dy = (int16_t)(y - centerY), dx = (int16_t)(x - centerX);
+    return (uint16_t)(dy * dy + dx * dx) < (uint16_t)(radius * radius);
+}
+
 static bool drawVersionOnePicture(const uint8_t* picture, uint32_t size,
                                   const uint8_t* frame, const uint8_t* targetRect)
 {
     uint32_t offset = 12;                    // version opcode $11, version byte $01
     bool drewPixels = false;
+    uint8_t pattern[8] = { 0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff };
+    int16_t penHeight = 1, penWidth = 1, ovalHeight = 0, ovalWidth = 0;
+    int16_t penV = 0, penH = 0;
+    int16_t lastTop = 0, lastLeft = 0, lastBottom = 0, lastRight = 0;
+    int16_t frameTop = (int16_t)read16(frame), frameLeft = (int16_t)read16(frame + 2);
+    int16_t frameBottom = (int16_t)read16(frame + 4), frameRight = (int16_t)read16(frame + 6);
+    int16_t targetTop = (int16_t)read16(targetRect);
+    int16_t targetLeft = (int16_t)read16(targetRect + 2);
+    int16_t targetBottom = (int16_t)read16(targetRect + 4);
+    int16_t targetRight = (int16_t)read16(targetRect + 6);
+    if (frameBottom - frameTop != targetBottom - targetTop
+        || frameRight - frameLeft != targetRight - targetLeft) return false;
+    int16_t translateV = (int16_t)(targetTop - frameTop);
+    int16_t translateH = (int16_t)(targetLeft - frameLeft);
+    uint8_t* port = (uint8_t*)read32(s_qdThePort);
+    uint8_t** mapHandle = port ? (uint8_t**)read32(port + 2) : 0;
+    uint8_t* map = mapHandle ? *mapHandle : 0;
+    uint8_t* pixels = map ? (uint8_t*)read32(map) : 0;
+    uint16_t rowBytes = map ? (uint16_t)(read16(map + 4) & 0x3fff) : 0;
+    int16_t mapTop = map ? (int16_t)read16(map + 6) : 0;
+    int16_t mapLeft = map ? (int16_t)read16(map + 8) : 0;
+    int16_t mapBottom = map ? (int16_t)read16(map + 10) : 0;
+    int16_t mapRight = map ? (int16_t)read16(map + 12) : 0;
+    if (!pixels || !rowBytes || read16(map + 32) != 4) return false;
     while (offset < size) {
         uint8_t opcode = picture[offset++];
         if (opcode == 0xff) return drewPixels;
@@ -1803,7 +1871,124 @@ static bool drawVersionOnePicture(const uint8_t* picture, uint32_t size,
             if (bytes < 2 || offset + bytes > size) return false;
             offset += bytes; continue;
         }
+        if (opcode == 0x03 || opcode == 0x0d) {
+            if (offset + 2 > size) return false;
+            offset += 2; continue;            // font ID / point size
+        }
+        if (opcode == 0x04) {
+            if (offset >= size) return false;
+            ++offset; continue;               // text face; compact fallback is unstyled
+        }
+        if (opcode == 0x07) {
+            if (offset + 4 > size) return false;
+            penHeight = (int16_t)read16(picture + offset);
+            penWidth = (int16_t)read16(picture + offset + 2);
+            offset += 4; continue;
+        }
+        if (opcode == 0x09) {
+            if (offset + 8 > size) return false;
+            for (uint16_t i = 0; i < 8; ++i) pattern[i] = picture[offset + i];
+            offset += 8; continue;
+        }
         if (opcode == 0x0a) { if (offset + 8 > size) return false; offset += 8; continue; }
+        if (opcode == 0x0b) {
+            if (offset + 4 > size) return false;
+            ovalHeight = (int16_t)read16(picture + offset);
+            ovalWidth = (int16_t)read16(picture + offset + 2);
+            offset += 4; continue;
+        }
+        if (opcode == 0x22) {
+            if (offset + 6 > size) return false;
+            int16_t startV = (int16_t)(read16(picture + offset) + translateV);
+            int16_t startH = (int16_t)(read16(picture + offset + 2) + translateH);
+            int16_t endH = (int16_t)(startH + (int8_t)picture[offset + 4]);
+            int16_t endV = (int16_t)(startV + (int8_t)picture[offset + 5]);
+            int16_t x = startH, y = startV;
+            int16_t dx = endH >= x ? (int16_t)(endH - x) : (int16_t)(x - endH);
+            int16_t sx = x < endH ? 1 : -1;
+            int16_t dy = endV >= y ? (int16_t)(y - endV) : (int16_t)(endV - y);
+            int16_t sy = y < endV ? 1 : -1;
+            int16_t error = (int16_t)(dx + dy);
+            for (;;) {
+                for (int16_t py = 0; py < penHeight; ++py)
+                    for (int16_t px = 0; px < penWidth; ++px) {
+                        int16_t plotY = (int16_t)(y + py), plotX = (int16_t)(x + px);
+                        if (plotY >= mapTop && plotY < mapBottom
+                            && plotX >= mapLeft && plotX < mapRight) {
+                            uint8_t color = pattern[plotY & 7] & (0x80u >> (plotX & 7)) ? 15 : 0;
+                            setPackedPixel(pixels, rowBytes, mapTop, mapLeft, plotX, plotY, color);
+                        }
+                    }
+                if (x == endH && y == endV) break;
+                int16_t twice = (int16_t)(error << 1);
+                if (twice >= dy) { error = (int16_t)(error + dy); x = (int16_t)(x + sx); }
+                if (twice <= dx) { error = (int16_t)(error + dx); y = (int16_t)(y + sy); }
+            }
+            penV = endV; penH = endH;
+            offset += 6; drewPixels = true; continue;
+        }
+        if (opcode == 0x41 || opcode == 0x48) {
+            if (opcode == 0x41) {
+                if (offset + 8 > size) return false;
+                lastTop = (int16_t)(read16(picture + offset) + translateV);
+                lastLeft = (int16_t)(read16(picture + offset + 2) + translateH);
+                lastBottom = (int16_t)(read16(picture + offset + 4) + translateV);
+                lastRight = (int16_t)(read16(picture + offset + 6) + translateH);
+                offset += 8;
+            }
+            for (int16_t y = lastTop; y < lastBottom; ++y)
+                for (int16_t x = lastLeft; x < lastRight; ++x) {
+                    if (y < mapTop || y >= mapBottom || x < mapLeft || x >= mapRight
+                        || !pictureRoundPixel(y, x, lastTop, lastLeft, lastBottom, lastRight,
+                                              (uint16_t)(ovalWidth < ovalHeight
+                                                  ? ovalWidth : ovalHeight))) continue;
+                    bool paint = opcode == 0x41;
+                    if (!paint) {
+                        int16_t innerTop = (int16_t)(lastTop + penHeight);
+                        int16_t innerLeft = (int16_t)(lastLeft + penWidth);
+                        int16_t innerBottom = (int16_t)(lastBottom - penHeight);
+                        int16_t innerRight = (int16_t)(lastRight - penWidth);
+                        paint = !pictureRoundPixel(y, x, innerTop, innerLeft, innerBottom,
+                                                   innerRight,
+                                                   (uint16_t)((ovalWidth < ovalHeight
+                                                       ? ovalWidth : ovalHeight) - 2 * penWidth));
+                    }
+                    if (paint) {
+                        uint8_t color = pattern[y & 7] & (0x80u >> (x & 7)) ? 15 : 0;
+                        setPackedPixel(pixels, rowBytes, mapTop, mapLeft, x, y, color);
+                    }
+                }
+            drewPixels = true; continue;
+        }
+        if (opcode == 0x28 || opcode == 0x2b) {
+            uint16_t prefix = opcode == 0x28 ? 4 : 2;
+            if (offset + prefix + 1 > size) return false;
+            if (opcode == 0x28) {
+                penV = (int16_t)(read16(picture + offset) + translateV);
+                penH = (int16_t)(read16(picture + offset + 2) + translateH);
+            } else {
+                penH = (int16_t)(penH + (int8_t)picture[offset]);
+                penV = (int16_t)(penV + (int8_t)picture[offset + 1]);
+            }
+            uint8_t length = picture[offset + prefix];
+            if (offset + prefix + 1UL + length > size) return false;
+            const uint8_t* text = picture + offset + prefix + 1;
+            for (uint16_t i = 0; i < length; ++i) {
+                for (uint16_t row = 0; row < 7; ++row) {
+                    uint8_t bits = pictureGlyphRow(text[i], row);
+                    for (uint16_t column = 0; column < 5; ++column)
+                        if (bits & (16u >> column)) {
+                            int16_t x = (int16_t)(penH + i * 6 + column);
+                            int16_t y = (int16_t)(penV - 7 + row);
+                            if (y >= mapTop && y < mapBottom && x >= mapLeft && x < mapRight)
+                                setPackedPixel(pixels, rowBytes, mapTop, mapLeft, x, y, 15);
+                        }
+                }
+            }
+            penH = (int16_t)(penH + length * 6);
+            offset += prefix + 1UL + length;
+            drewPixels = true; continue;
+        }
         if (opcode == 0x98) {
             if (!drawPackedMonochromePictureBits(picture, size, offset, frame, targetRect))
                 return false;

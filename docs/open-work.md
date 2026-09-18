@@ -7,12 +7,11 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — current loud stop
 
-⭐ **HEAD OF QUEUE: render the course-description PICT.** The Corvette redraw uses application-fork
-`PICT 6398` (2,120 bytes) at `(10,300)-(110,493)`. Version-1 long comment `$A1` is now decoded, and
-the next honest failure is `$09` (`PenPat`) at byte `$29`. Complete enumeration shows this resource
-uses pen pattern/size, short lines, rounded rectangles, and three text records; it is the visible
-course-description panel, not disposable metadata. Implement that measured version-1 vector/text
-subset and resume the scripted selector path. Do not implement modal UI merely to conceal an
+⭐ **HEAD OF QUEUE: implement the measured `PaintRect`.** Application-fork `PICT 6398` now renders
+through its end using the measured version-1 pen-pattern/size, short-line, rounded-rectangle and
+text subset. The next loud stop moves to the immediately following `$A8A2` (`PaintRect`) at
+`Main+$173A`. Implement the normal QuickDraw patterned rectangle against the current port and its
+clip, then resume the scripted selector path. Do not implement modal UI merely to conceal an
 upstream failure.
 
 The MAME A-trap log remains a measured reference-run inventory → `docs/trap-log.md`,

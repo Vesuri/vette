@@ -351,6 +351,14 @@ the exact unsupported opcode and byte offset. The next boundary is `$09` (`PenPa
 Enumerating the resource shows it is the visible course-description panel: pen pattern/size, short
 lines, rounded rectangles, and three text records rather than another packed bitmap.
 
+The version-1 renderer now executes exactly that enumerated subset. It tracks pen pattern and size,
+draws short lines, paints and frames the measured rounded rectangle, and renders the three text
+records with the same explicit compact-font fallback used for menu titles because the Macintosh
+System font is not present in the game resources. Scaling remains a loud failure; `PICT 6398` has
+identical 193×100 source and destination extents and needs only translation. Both build audits pass,
+and the next bounded run completes `DrawPicture` before stopping at the following `$A8A2`
+(`PaintRect`) call at `Main+$173A`.
+
 `amiga/stage_c.gdb` breaks on `VetteScreen::showLoudStop`, after the report is complete, and prints
 the depth, trap identity, selector, runtime `(segment, offset)`, absolute PC, USP and its first
 words, all data/address registers, and nearby instructions. It then exits, so `diag_run.sh` stops
