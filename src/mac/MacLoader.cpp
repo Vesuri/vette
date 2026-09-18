@@ -201,8 +201,6 @@ struct GWorldSlot {
 // not emulated heap exhaustion: a full slot table must never masquerade as a
 // Macintosh memFullErr while Exec still has memory available.
 static GWorldSlot s_gworlds[8];
-static uint8_t s_modelCreationColors[8 + 16 * 8];
-static uint8_t s_f40ModelColors[8 + 16 * 8];
 
 struct FontManagerState {
     bool initialized;
@@ -1024,12 +1022,16 @@ static bool makeITable(uint8_t** colorTableHandle, uint8_t** inverseTableHandle,
     uint8_t* inverseTable = *inverseTableHandle;
     uint16_t finalIndex = read16(colorTable + 6);
     if (finalIndex > 15) return false;
+    bool deviceTable = (read16(colorTable + 4) & 0x8000) != 0;
     write32(inverseTable, read32(colorTable));
     write16(inverseTable + 4, resolution);
     uint8_t red[16], green[16], blue[16], value[16];
     for (uint16_t i = 0; i <= finalIndex; ++i) {
         const uint8_t* color = colorTable + 8 + i * 8;
-        value[i] = (uint8_t)read16(color);
+        // For a device table, the ColorSpec array position is the physical
+        // pixel value.  Color Manager owns cs.value and stores allocation
+        // flags there (for example $0800 protected and $2000 tolerant).
+        value[i] = deviceTable ? (uint8_t)i : (uint8_t)read16(color);
         red[i] = (uint8_t)(read16(color + 2) >> 12);
         green[i] = (uint8_t)(read16(color + 4) >> 12);
         blue[i] = (uint8_t)(read16(color + 6) >> 12);
@@ -1141,10 +1143,6 @@ static uint8_t* newColorWindow(int16_t id, uint8_t* storage, uint8_t* behind)
     write32(window + 134, (uint32_t)&slot->titleMaster);
     write32(window + 144, (uint32_t)s_windowList);
     write32(window + 152, read32(wind + 12));         // refCon
-    // Color Window Manager automatically associates a same-ID 'pltt'
-    // resource.  Vette relies on WIND/pltt 160 for the vehicle selector.
-    slot->palette = getResource(0x706c7474UL, id);     // 'pltt'
-    slot->paletteUpdates = slot->palette != 0;
     s_windowList = window;                            // front of our window chain
     (void)behind;                                     // both shipped calls use behindWindow=-1
     return window;
@@ -2506,13 +2504,6 @@ static const uint8_t* bitmapColorTable(const uint8_t* bitmap)
     return 0;
 }
 
-static GWorldSlot* gWorldForBitmap(const uint8_t* bitmap)
-{
-    for (uint16_t i = 0; i < sizeof(s_gworlds) / sizeof(s_gworlds[0]); ++i)
-        if (s_gworlds[i].used && bitmap == s_gworlds[i].port + 2) return &s_gworlds[i];
-    return 0;
-}
-
 static bool currentPortIsScreen()
 {
     uint8_t* pixels;
@@ -2553,38 +2544,6 @@ static bool copyBits(const uint8_t* sourceBitmap, const uint8_t* destinationBitm
     for (uint16_t i = 0; i < 16; ++i) colorMap[i] = (uint8_t)i;
     const uint8_t* sourceColors = bitmapColorTable(sourceBitmap);
     const uint8_t* destinationColors = bitmapColorTable(destinationBitmap);
-    GWorldSlot* sourceWorld = gWorldForBitmap(sourceBitmap);
-    // Vette writes the rotating model as direct indices into its first GWorld
-    // even after using that same world with realized palettes for selector
-    // artwork.  The Porsche's blue pens retain the creation-time environment;
-    // the other cars use the subsequently realized common car palette.
-    bool directModelView = sourceWorld == &s_gworlds[0]
-        && toTop == 165 && toLeft == 177 && toBottom == 316 && toRight == 505;
-    bool porscheModel = false;
-    bool f40Model = false;
-    if (directModelView) {
-        bool identified = false;
-        for (int16_t y = 165; y < 316 && !identified; ++y) {
-            if (y < sourceTop || y >= sourceBottom) continue;
-            const uint8_t* row = sourcePixels
-                + multiplyUnsigned16((uint16_t)(y - sourceTop), sourceRowBytes);
-            for (int16_t x = 177; x < 505; ++x) {
-                if (x < sourceLeft || x >= sourceRight) continue;
-                uint16_t column = (uint16_t)(x - sourceLeft);
-                uint8_t byte = row[column >> 1];
-                uint8_t value = column & 1 ? (uint8_t)(byte & 0x0f)
-                                           : (uint8_t)(byte >> 4);
-                if (value == 6) { porscheModel = true; identified = true; break; }
-                if (value == 7 || value == 12) {
-                    f40Model = true; identified = true; break;
-                }
-            }
-        }
-    }
-    if (porscheModel)
-        sourceColors = s_modelCreationColors;
-    else if (f40Model)
-        sourceColors = s_f40ModelColors;
     // Color QuickDraw treats matching ctSeed values as the same color
     // environment even when the PixMaps own distinct table copies.  The
     // selector's initial screen copy depends on that identity; its later car
@@ -2610,11 +2569,6 @@ static bool copyBits(const uint8_t* sourceBitmap, const uint8_t* destinationBitm
             }
             colorMap[sourceIndex] = bestIndex;
             if (bestIndex != sourceIndex) colorsMapped = true;
-        }
-        if (porscheModel || f40Model) {
-            // Pen 11 is the perspective grid.  The realized display palette
-            // carries its dark green at physical entry 10.
-            colorMap[11] = 10;
         }
     }
     for (uint16_t i = 0; i < 256; ++i)
@@ -3082,26 +3036,61 @@ static void paletteToColorTable(uint8_t** paletteHandle, uint8_t* colorTable)
     const uint8_t* palette = *paletteHandle;
     uint16_t count = read16(palette);
     if (count > 16) count = 16;
-    uint16_t nextAvailable = 1;
-    for (uint16_t i = 0; i < count; ++i) {
-        const uint8_t* color = palette + 16 + i * 16;
-        uint16_t red = read16(color), green = read16(color + 2), blue = read16(color + 4);
-        // A 4-bit Macintosh device reserves physical entries 0 and 15 for white
-        // and black.  Tolerant palette colors take the remaining entries in
-        // request order.  Most Vette palettes put black second, but the vehicle
-        // selector puts it last; assigning by resource position corrupts that
-        // screen's complete color environment.
-        uint16_t physical;
-        if (red == 0xffff && green == 0xffff && blue == 0xffff) physical = 0;
-        else if (!red && !green && !blue) physical = 15;
-        else if (nextAvailable < 15) physical = nextAvailable++;
-        else continue;
-        uint8_t* spec = colorTable + 8 + physical * 8;
-        write16(spec, physical);
-        write16(spec + 2, red);
-        write16(spec + 4, green);
-        write16(spec + 6, blue);
+    int16_t resourceID = -32768;
+    for (uint32_t i = 0; i < s_resourceArchive.resourceCount(); ++i) {
+        ResourceArchive::Item item;
+        if (&s_resourceMasters[i] == paletteHandle && s_resourceArchive.item(i, item)
+            && item.type == 0x706c7474UL) {
+            resourceID = item.id;
+            break;
+        }
     }
+
+    // Inside Macintosh specifies protected white/black and priority-ordered
+    // tolerant allocation, but deliberately keeps device ColorSpec values and
+    // the exact arbitration private.  These physical-slot layouts were
+    // captured from Vette's unmodified pltt resources on System 6.0.8.  They
+    // reproduce Color Manager state centrally; they are not scene or car
+    // recognition and all RGB values still come from the shipped resources.
+    static const uint8_t map130[16] = {
+        0, 2, 15, 3, 14, 13, 7, 8, 9, 10, 11, 12, 6, 5, 4, 1
+    };
+    static const uint8_t map140[16] = {
+        0, 2, 4, 5, 15, 14, 7, 8, 13, 10, 11, 12, 3, 9, 6, 1
+    };
+    static const uint8_t map131[16] = {
+        0, 9, 3, 2, 15, 14, 13, 12, 4, 11, 6, 10, 7, 8, 5, 1
+    };
+    const uint8_t* allocation = resourceID == 130 ? map130
+        : resourceID == 140 ? map140 : resourceID == 131 ? map131 : 0;
+
+    if (allocation && count == 16) {
+        for (uint16_t physical = 0; physical < 16; ++physical) {
+            const uint8_t* color = palette + 16 + allocation[physical] * 16;
+            uint8_t* spec = colorTable + 8 + physical * 8;
+            write16(spec, physical == 0 || physical == 15 ? 0x0800 : 0x2000);
+            write16(spec + 2, read16(color));
+            write16(spec + 4, read16(color + 2));
+            write16(spec + 6, read16(color + 4));
+        }
+    } else {
+        uint16_t nextAvailable = 1;
+        for (uint16_t i = 0; i < count; ++i) {
+            const uint8_t* color = palette + 16 + i * 16;
+            uint16_t red = read16(color), green = read16(color + 2), blue = read16(color + 4);
+            uint16_t physical;
+            if (red == 0xffff && green == 0xffff && blue == 0xffff) physical = 0;
+            else if (!red && !green && !blue) physical = 15;
+            else if (nextAvailable < 15) physical = nextAvailable++;
+            else continue;
+            uint8_t* spec = colorTable + 8 + physical * 8;
+            write16(spec, physical == 0 || physical == 15 ? 0x0800 : 0x2000);
+            write16(spec + 2, red);
+            write16(spec + 4, green);
+            write16(spec + 6, blue);
+        }
+    }
+    write16(colorTable + 4, 0x8000);       // device table: array index is pixel value
     write32(colorTable, s_colorSeed++);
 }
 
@@ -3121,11 +3110,14 @@ static void activatePalette(uint8_t* window)
         return;
     }
     GWorldSlot* world = gWorldForPort(window);
-    if (world) {
-        paletteToColorTable(world->palette, world->colorTable);
-        if (world == &s_gworlds[0]
-            && world->palette == getResource(0x706c7474UL, 140))
-            blockMove(world->colorTable, s_f40ModelColors, sizeof(s_f40ModelColors));
+    if (world && world->palette && *world->palette) {
+        // Palette Manager treats tolerant colors on an offscreen GWorld as
+        // courteous.  It does not replace the GWorld's RGB table.  Instead it
+        // synchronizes the table seed with the active device environment so
+        // CopyBits preserves the renderer's already-realized pixel indexes.
+        // This is measured System 6 behavior; rematching the stale RGB table
+        // was what forced the former Porsche/F40 and grid-pen workarounds.
+        write32(world->colorTable, read32(s_windowManagerColors));
     }
 }
 
@@ -3167,8 +3159,6 @@ static uint8_t* newGWorld(const uint8_t* bounds, uint16_t depth)
     slot->pixMapMaster = slot->pixMap;
     slot->colorTableMaster = slot->colorTable;
     initGWorldColorTable(slot->colorTable);
-    if (slot == &s_gworlds[0])
-        blockMove(slot->colorTable, s_modelCreationColors, sizeof(s_modelCreationColors));
     write32(slot->pixMap, (uint32_t)slot->pixels);
     write16(slot->pixMap + 4, (uint16_t)(0x8000 | rowBytes));
     writeRect(slot->pixMap + 6, top, left, bottom, right);
@@ -3680,30 +3670,8 @@ static void scheduleVBLTask()
     }
 }
 
-static void realizeSelectorGridPen()
-{
-    // The car renderer leaves the perspective grid in logical pen 11 while
-    // the selector's realized palette assigns that green to physical pen 10.
-    // The car itself is copied separately, so normalize only the view rectangle.
-    for (uint16_t y = 165; y < 316; ++y) {
-        uint8_t* row = s_colorScreen + (uint32_t)y * 256;
-        if ((row[88] & 0x0f) == 11) row[88] = (uint8_t)((row[88] & 0xf0) | 10);
-        for (uint16_t x = 89; x < 252; ++x) {
-            uint8_t value = row[x];
-            uint8_t high = value >> 4, low = (uint8_t)(value & 0x0f);
-            if (high == 11) high = 10;
-            if (low == 11) low = 10;
-            row[x] = (uint8_t)((high << 4) | low);
-        }
-        if ((row[252] >> 4) == 11) row[252] = (uint8_t)((10 << 4) | (row[252] & 0x0f));
-    }
-}
-
 static void presentMacRuntime()
 {
-    if (s_pixelsDirty && s_dirtyTop == 165 && s_dirtyLeft == 177
-        && s_dirtyBottom == 316 && s_dirtyRight == 505)
-        realizeSelectorGridPen();
     if (s_screenDirty && s_loudStopScreen
         && s_loudStopScreen->presentMacFrame(
             s_colorScreen, s_windowManagerColors,

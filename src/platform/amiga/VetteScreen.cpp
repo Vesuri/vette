@@ -320,10 +320,14 @@ bool VetteScreen::presentMacFrame(const uint8_t* chunky, const uint8_t* colorTab
 
     uint16_t finalIndex = (uint16_t)(colorTable[6] << 8 | colorTable[7]);
     if (finalIndex > 15) finalIndex = 15;
+    bool deviceTable = (colorTable[4] & 0x80) != 0;
     for (uint16_t i = 0; i < 16; ++i) m_nextPalette[i] = 0;
     for (uint16_t i = 0; i <= finalIndex; ++i) {
         const uint8_t* spec = colorTable + 8 + i * 8;
-        uint16_t index = (uint16_t)(spec[0] << 8 | spec[1]);
+        // A device ColorTable uses its array position as the physical pen.
+        // ColorSpec.value is private Color Manager state (protected/tolerant
+        // ownership flags in System 6), not an index suitable for COLORxx.
+        uint16_t index = deviceTable ? i : (uint16_t)(spec[0] << 8 | spec[1]);
         if (index >= 16) continue;
         uint8_t red = gammaToOcs((uint16_t)(spec[2] << 8 | spec[3]));
         uint8_t green = gammaToOcs((uint16_t)(spec[4] << 8 | spec[5]));

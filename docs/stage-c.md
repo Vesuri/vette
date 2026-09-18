@@ -436,19 +436,38 @@ offset zero in an even-aligned slot. `WMgrPort` is intentionally an old-style `G
 reads its embedded `BitMap` bounds directly when centering windows.
 
 `GetNewPalette` loads the shipped `pltt` resource as a Handle. `SetPalette` associates it with a
-window, and `ActivatePalette` copies its 16 `RGBColor` entries into the active color table with a
+window, and `ActivatePalette` realizes its 16 `RGBColor` entries into the active device table with a
 fresh seed. Cursor resources likewise remain Handles until the game dereferences and installs one.
 
 The vehicle selector exposed several Palette Manager details hidden by the intro. `SetPalette`
 activates a palette immediately when its window is frontmost, and `SelectWindow` likewise activates
-the selected window's palette. A new color window also acquires the `pltt` resource matching its
-`WIND` ID automatically; this is how selector window 160 receives palette 160. On a 4-bit device
-white and black retain physical entries 0 and 15;
-the other tolerant colors occupy entries 1 through 14 in request order. This must be decided from
-the colors, not assumed from their resource positions: palettes 128--150 put black second, whereas
-palette 160 puts it last. Finally, indexed 4-bit PICT pixels are mapped through their embedded color
-table just like 8-bit PICT pixels. A packed-byte lookup keeps the unscaled path fast while replacing
-the former identity copy that made the selector use the intro's green/yellow color assignments.
+the selected window's palette. An earlier same-ID `WIND`/`pltt` association was removed after the
+original trap trace showed no such palette-160 request or device realization. Finally, indexed
+4-bit PICT pixels are mapped through their embedded color table just like 8-bit PICT pixels. A
+packed-byte lookup keeps the unscaled path fast while replacing the former identity copy that made
+the selector use the intro's green/yellow color assignments.
+
+The Palette Manager chapter of *Inside Macintosh: Advanced Color Imaging* specifies the public
+rules: white and black are protected, tolerant colors are considered by priority, and a requested
+color may take a device entry when the existing match exceeds its tolerance. It also explicitly
+declares a device `ColorSpec.value` private to Color Manager. On a device color table (`ctFlags` bit
+15), the physical pixel value is therefore the array position, not the `value` field. System 6 uses
+that field for flags such as protected (`$0800`) and tolerant (`$2000`). `MakeITable` now observes
+that distinction instead of interpreting those flags as a pen number.
+
+The documentation does not specify Color Manager's complete slot arbitration. We recorded it from
+the unmodified game on a System 6.0.8 Macintosh in MAME rather than inferring it from screenshots.
+For each physical pen 0--15, the resulting resource-entry order is:
+
+| `pltt` | resource entries in physical-pen order |
+|---|---|
+| 130 | 0, 2, 15, 3, 14, 13, 7, 8, 9, 10, 11, 12, 6, 5, 4, 1 |
+| 140 | 0, 2, 4, 5, 15, 14, 7, 8, 13, 10, 11, 12, 3, 9, 6, 1 |
+| 131 | 0, 9, 3, 2, 15, 14, 13, 12, 4, 11, 6, 10, 7, 8, 5, 1 |
+
+The port applies these measured layouts in Palette Manager emulation, while every RGB value still
+comes from its shipped `pltt` resource. This is centralized device state: there is no Porsche/F40
+detection, model-pixel scan, grid-pen rewrite, or screenshot-derived color substitution.
 
 `NewGWorld` with null color-table and device arguments owns a creation-time snapshot of the current
 device CLUT; it does not keep sharing the mutable active-window table. The rotating-car worlds are
@@ -458,9 +477,8 @@ its snapshot, PICT rendering targets its destination PixMap's table, and `srcCop
 color-map lookup whenever the source and destination PixMaps differ.
 
 Distinct ColorTable handles with the same `ctSeed` describe the same color environment and copy
-indices directly. This preserves the selector's initial full-surface copy. Once activation changes
-the device seed, later rotating-car copies translate from the GWorld snapshot into the new device
-table. Comparing table addresses instead remapped both phases and turned the F40 thumbnail brown.
+indices directly. This preserves the selector's initial full-surface copy. Comparing table addresses
+instead remapped both phases and turned the F40 thumbnail brown.
 
 Color matching follows the main GDevice's four-bit inverse-table resolution, comparing the high
 nibble of each RGB component and retaining the first palette entry on a tie. Comparing full 16-bit
@@ -469,15 +487,11 @@ brown pen; Color QuickDraw's actual quantized comparison ties those candidates a
 
 Vette also passes its offscreen GWorld ports to `SetPalette` and `ActivatePalette`. The measured
 selector transition loads palettes 130, 140, then 131 and associates each with the main window and
-the live worlds. These ports are not Window Manager records. GWorld slots retain the association
-and realize it into their private ColorTables. The first world is shared by palette-realized selector
-artwork and a 3D renderer that writes direct indices in car-specific color environments. The blue
-Porsche uses the creation-time palette 130 mapping; the F40 uses the retained palette 140 mapping;
-the common palette remains available for the other selector drawing. The renderer's logical grid
-pen 11 is realized as physical green pen 10 before presentation. Treating all of those indices as
-one color environment gives a brown F40, pink Porsche, or brown/white grid. The resulting captures
-now show both the blue Porsche and red-shaded F40 against the reference's green grid, and the palette
-remains correct through the in-game dashboard.
+the live worlds. These ports are not Window Manager records. Palette Manager treats tolerant colors
+on an offscreen GWorld as courteous: the original System 6 run retains the GWorld's RGB entries but
+synchronizes its `ctSeed` to the active device environment. Consequently `CopyBits` preserves the
+renderer-authored physical indices. Reproducing that behavior removed the former car-specific
+source-table selection and grid-pixel rewrite.
 
 `GetNewDialog` now builds the `DialogRecord` from the shipped `DLOG`/`DITL` pair and `DrawDialog`
 validates the item stream, selects the dialog port, and paints its background. `GetDItem` walks that
