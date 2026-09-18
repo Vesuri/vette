@@ -7,10 +7,10 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — current loud stop
 
-⭐ **HEAD OF QUEUE: keyboard input and garage interaction.** `GetNextEvent` now accumulates the
-Amiga's wrapping mouse-counter deltas into a clamped 512×320 Macintosh point and reports masked
-left-button transitions. Add keyboard events and verify the first garage interaction. Do not add
-dialog/UI traps to conceal an upstream failure.
+⭐ **HEAD OF QUEUE: first garage interaction.** `GetNextEvent` now reports translated Amiga mouse
+and keyboard events, including the Macintosh virtual-key byte, character byte, and edge-time
+modifier state. Run the first real interaction, follow the game's resulting code path, and stop at
+the next genuinely missing trap. Do not add dialog/UI traps to conceal an upstream failure.
 
 The MAME A-trap log remains a measured reference-run inventory → `docs/trap-log.md`,
 but Stage C has proved that it is **not an exact standalone-port first-use script**. The port has
@@ -102,12 +102,11 @@ closed and deleted, so a `#N` written in another doc goes quietly wrong — thre
     rather than the caller. Fix it when something needs it, not speculatively. →
     `src/platform/amiga/framework/UPSTREAM.md` §Two latent link traps.
 
-8. ⚠ **The quit chord is the BARE left mouse button, not `CTRL`+LMB.** `amiga/run.sh` documents
-    the CTRL qualifier and explains why it exists: the Macintosh is a one-button machine, so the
-    game **will** bind the bare button. Reading CTRL needs the keyboard layer, which Stage A does
-    not have. ⚠⚠ **This must be fixed BEFORE the first trap that reads the mouse button**
-    (`Button`, row 38 of `docs/trap-log.md`, which the intro polls) — after that, quitting and
-    clicking are the same gesture. → `src/platform/amiga/PlatformAmiga.cpp`.
+8. ⚠ **The documented `CTRL`+LMB quit chord is not wired into the live Mac loop.** Keyboard state
+    now exists, but `MacLoader::run()` does not return, so `PlatformAmiga`'s old bare-button wait is
+    unreachable during normal play. Add a deliberate Control+LMB exit request at the event-pump
+    boundary when teardown/return is implemented; do not consume ordinary Macintosh clicks.
+    → `src/platform/amiga/PlatformAmiga.cpp`.
 
 ## Phase 1+ — carried forward, not yet actionable
 

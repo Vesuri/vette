@@ -8,9 +8,9 @@ first-use table.
 ## Current checkpoint
 
 With the opt-in first-poll intro skip, the Amiga run disposes the intro window, paints the exposed
-desktop, crosses the first post-intro memory and menu-state calls, and halts loudly at unimplemented
-`AddResMenu`, called by `load+$053A`. The production `Button` implementation reads the Amiga CIA
-left-button bit; the synthetic click exists only in `SKIP_INTRO=1` development builds.
+desktop, completes post-intro memory and menu setup, and remains in the game's event loop with no
+loud stop. The production `Button` implementation reads the Amiga CIA left-button bit; the
+synthetic click exists only in `SKIP_INTRO=1` development builds.
 
 The full-sequence acceptance run passes on both A4000/040 and the target A1200 with 2 MiB chip and
 8 MiB fast RAM. Both end with every tracked phase flag set, the tram at `(310,0)-(440,134)`, one
@@ -197,10 +197,18 @@ loop starts.
 81. `GetNextEvent` (complete `nullEvent` record for the measured empty-queue poll)
 
 After this call there is no next loud stop in a 45-second event-driven run: the game remains in its
-main loop polling the empty queue. `GetNextEvent` now samples `JOY0DAT` as wrapping signed deltas,
+main loop polling the event queue. `GetNextEvent` samples `JOY0DAT` as wrapping signed deltas,
 accumulates and clamps them to the 512×320 Macintosh surface, returns the live point and `btnState`
-in every record, and emits masked `mouseDown`/`mouseUp` transitions. Keyboard events remain the next
-input-layer feature.
+in every record, and emits masked `mouseDown`/`mouseUp` transitions.
+
+The CIA-A serial-port interrupt is also owned by a 32-entry keyboard edge queue installed before
+Exec is forbidden. Each edge records the modifier state at interrupt time, avoiding a lost Shift
+or Command when a complete press/release happens between Macintosh polls. `GetNextEvent` translates
+Amiga matrix positions into Macintosh ADB virtual-key codes and character codes for letters,
+number-row punctuation, editing/navigation keys, F1–F10, Help, and the four modifiers; key-down and
+key-up respect the requested event mask. A 20-second skip-intro run reached the stable depth-81
+loop with the keyboard vector installed and no loud stop. The next test is a real garage
+interaction rather than another idle soak.
 
 `amiga/stage_c.gdb` breaks on `VetteScreen::showLoudStop`, after the report is complete, and prints
 the depth, trap identity, selector, runtime `(segment, offset)`, absolute PC, USP and its first

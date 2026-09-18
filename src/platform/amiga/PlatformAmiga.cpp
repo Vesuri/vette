@@ -21,6 +21,7 @@
 
 #include "framework/AmigaHardware.h"
 #include "PlatformAmiga.h"
+#include "MacInput.h"
 #include "VetteScreen.h"
 #include "mac/MacLoader.h"
 
@@ -184,6 +185,9 @@ bool PlatformAmiga::run()
     if (ok)
         *dmaconPointer = (uint16_t)(DMAF_SETCLR | DMAF_MASTER | DMAF_COPPER | DMAF_RASTER);
 
+    // Install the keyboard edge queue while Exec calls are still legal.
+    if (ok) ok = vetteInputInitialize();
+
     // --- run -----------------------------------------------------------------
     // Nothing here Wait()s, so multitasking can stay off for the duration.
     Forbid();
@@ -205,6 +209,8 @@ bool PlatformAmiga::run()
     }
 
     Permit();
+
+    vetteInputShutdown();
 
     // --- restore, in reverse --------------------------------------------------
     // VERTB goes back BEFORE the LoadView/WaitTOF restore: WaitTOF() is signalled by
