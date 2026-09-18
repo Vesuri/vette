@@ -452,6 +452,11 @@ bridge returns `$D51CFD76`, measured directly from the master directory block of
 preserves the game's derivation of its `DATE` resource key. Execution then reaches QuickDraw
 `Random` (`$A861`) in road setup.
 
+`Random` uses the original QuickDraw recurrence (`RndSeed * 16807 mod $7FFFFFFF`), returns its
+signed low word with `$8000` mapped to zero, and updates the Page-0 `RndSeed` shadow. No host
+entropy enters the sequence. The next call is `GetDItem` for item 2 of the copy-protection dialog;
+that UI intentionally remains unsupported while the registered `DATE` resource state is resolved.
+
 The trap-address table is stateful. The observed `GetTrapAddress`/`SetTrapAddress` pair now records
 the game's replacement for `$A9F4 ExitToShell`; routing a later invocation through that replacement
 remains part of completing the trap bridge.

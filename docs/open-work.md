@@ -7,12 +7,12 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — current loud stop
 
-⭐ **HEAD OF QUEUE: implement QuickDraw `$A861` (`Random`).** The measured synchronous
-`GetVolInfo` now returns the shipped HFS volume creation date—the only volume field its caller
-reads—and road setup advances to segment 1 + `$06A0`. There it repeatedly calls `Random` until
-the signed result lies in its requested range. Implement the classic `RndSeed` sequence through
-the existing Page-0 shadow; do not substitute host randomness. Do not implement modal UI to
-conceal an upstream failure.
+⭐ **HEAD OF QUEUE: resolve the now-relevant copy-protection state without implementing its UI.**
+The classic deterministic `$A861` (`Random`) sequence now runs through the existing `RndSeed`
+shadow. Road setup then reaches `$A98D GetDItem`, item 2, in segment 1 + `$06EC`: the deferred
+copy-protection dialog has finally become relevant. Inspect the shipped manual and the surrounding
+registration/`DATE` resource logic, then reproduce the registered state at the data boundary.
+Leave the dialog UI unimplemented so a bad registration state continues to stop loudly.
 
 The MAME A-trap log remains a measured reference-run inventory → `docs/trap-log.md`,
 but Stage C has proved that it is **not an exact standalone-port first-use script**. The port has
@@ -23,12 +23,10 @@ the game patches exactly one trap (`_ExitToShell`), `%A5Init` calls exactly one 
 `QDExtensions` is dispatched by `D0` with Target 1 needing selectors 0 (`NewGWorld`) and
 1 (`LockPixels`).
 
-1. ⏸ **The copy-protection password is DEFERRED** (user decision: revisit when it becomes
-   relevant). It has not blocked anything — the game reached the garage screen without ever asking,
-   so either this copy is already registered or the check fires deeper in. ⚠ Do not record "there
-   is no password" as a finding: `readme.txt` says there is one, and the two readings have not been
-   separated. The answers are in `tmp/unpacked/…/scans/Manual.pdf` when it is time. ⚠ Ground truth
-   runs the **unpatched** original; the patch item below is port-side only and does not retire this.
+1. ▶ **The copy-protection password is now relevant.** It first fires after Course One is accepted,
+   at `$A98D GetDItem` for item 2. The answers are in `tmp/unpacked/…/scans/Manual.pdf`. Preserve
+   the loud stop for this unnecessary dialog and reproduce the legitimate registered `DATE`
+   resource state at the data boundary instead. ⚠ Ground truth runs the **unpatched** original.
 
 2. ⚠ **The trap log stops at the MENU, so re-run it for DRIVING.** `FRED` (242 of the 509
    jump-table entries) and `Communication` were never observed resident, so any trap they call is

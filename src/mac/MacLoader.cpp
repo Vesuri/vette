@@ -297,7 +297,7 @@ static void copyString(char* out, const char* in)
 
 struct TrapName { uint16_t word; const char* manager; const char* routine; };
 static const TrapName s_trapNames[] = {
-    {0xa007,"FILE MANAGER","GETVOLINFO"},
+    {0xa007,"FILE MANAGER","GETVOLINFO"}, {0xa861,"QUICKDRAW","RANDOM"},
     {0xa02e,"MEMORY MANAGER","BLOCKMOVE"}, {0xa9f1,"SEGMENT MANAGER","UNLOADSEG"},
     {0xa86e,"QUICKDRAW","INITGRAF"},
     {0xa8fe,"FONT MANAGER","INITFONTS"}, {0xa912,"WINDOW MANAGER","INITWINDOWS"},
@@ -2170,6 +2170,21 @@ static bool getVolumeInfo(uint8_t* parameterBlock)
     return true;
 }
 
+static int16_t quickDrawRandom()
+{
+    uint32_t seed = read32(s_currentA5 + 4); // Page-0 RndSeed shadow
+    uint16_t low = (uint16_t)seed;
+    uint16_t high = (uint16_t)(seed >> 16);
+    uint32_t lowProduct = multiplyUnsigned16(16807, low);
+    uint32_t folded = multiplyUnsigned16(16807, high) + (lowProduct >> 16);
+    seed = ((folded & 0x7fffUL) << 16)
+         + ((folded >> 15) & 0xffffUL)
+         + (lowProduct & 0xffffUL);
+    write32(s_currentA5 + 4, seed);
+    uint16_t result = (uint16_t)seed;
+    return result == 0x8000 ? 0 : (int16_t)result;
+}
+
 static bool invertRect(const uint8_t* rectangle)
 {
     uint8_t* pixels;
@@ -3489,6 +3504,11 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
             if (g_stageCDepth < 89) g_stageCDepth = 89;
             return 1;
         }
+    }
+    if (trap == 0xa861) {                    // Random() -> signed Integer
+        write16(userStack, (uint16_t)quickDrawRandom());
+        if (g_stageCDepth < 90) g_stageCDepth = 90;
+        return 1;
     }
     if (trap == 0xa9f1) {                    // _UnLoadSeg(Ptr), deliberately kept resident
         if (g_stageCDepth < 2) g_stageCDepth = 2;
