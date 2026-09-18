@@ -614,9 +614,21 @@ stack sample caught execution inside the comparison itself. Besides being expens
 in-progress rendering as if it were complete. The correct next boundary is the original renderer's
 frame-completion path, not polling the chunky surface.
 
-A 180-second A1200 sustained-driving run reaches no loud stop and remains in the
-original 3D transform/raster routines at implemented depth 93. The next boundary is performance
-measurement of that trap-free renderer, not another speculative manager implementation.
+A 180-second A1200 sustained-driving run reaches no loud stop at implemented depth 93, but an
+exception-frame PC profile corrects the initial interpretation of where that time is spent.
+`amiga/driving_pc_samples.gdb` samples the interrupted PC from the 68020 exception frame every 30
+Macintosh ticks, avoiding the bias of consecutive VBI samples. Ten of its first 16 samples resolve
+to `drawIndexedPictureBits` or PackBits expansion in the compatibility PICT interpreter, two to
+chunky-to-planar conversion, and none to a resident game CODE segment. The long wait is therefore
+still construction of the first road frame, not sustained execution of the game's 3D renderer.
+
+The common unscaled 8-bit indexed PICT path now maps and packs two source pixels into each
+destination byte rather than doing two nibble read-modify-writes. PackBits literal and repeat runs
+copy or fill aligned words where possible. Both transformations preserve the decoded bytes. On the
+same bounded A1200 cadence probe, callback progress rises from 162 over 303 ticks (0.535/tick) to
+183 over 316 ticks (0.579/tick), about eight percent. A precomputed scaling-map experiment was
+slower and was removed. The first complete-frame boundary is still the next target; partial surface
+scans remain explicitly rejected.
 
 The trap-address table is stateful. The observed `GetTrapAddress`/`SetTrapAddress` pair now records
 the game's replacement for `$A9F4 ExitToShell`; routing a later invocation through that replacement

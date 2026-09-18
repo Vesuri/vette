@@ -7,7 +7,7 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — current loud stop
 
-⭐ **HEAD OF QUEUE: locate the hot routines in the trap-free driving renderer.** The blank upper
+⭐ **HEAD OF QUEUE: finish the first driving frame and identify its completion boundary.** The blank upper
 viewport was an intermediate frame. The live VBL queue contained a one-tick sound task and a
 three-tick driving task; returning after the first due record starved the latter forever. The
 scheduler now ages every record and selects callbacks round-robin, and the three direct `$0174`
@@ -17,10 +17,13 @@ KeyMap path at the Course One transition; consecutive driving-task captures diff
 throttle global advances from 3 to 21 over 30 ticks. Direct `_BlockMove` writes now mark bounded
 dirty regions. Most raster pixels are direct 68k stores, but a three-tick full-surface comparison
 was rejected: it presented partial construction and cut callback progress from 162 to 48. The
-baseline 303-tick cadence queues no new completed frame. A 180-second sustained A1200 run reaches no
-loud stop and remains in original 3D transform/raster code at depth 93. Locate the original
-frame-completion path and take a bounded PC/hotspot profile before choosing a native replacement or
-other measured optimization; do not poll the 81,920-byte surface again.
+baseline 303-tick cadence queues no new completed frame. A spaced exception-PC sampler disproves
+the earlier attribution to the game's 3D code: 10 of 16 samples are in the compatibility PICT
+decoder and two are in chunky-to-planar conversion while the initial road artwork is still being
+built. Packing pairs of mapped 8-bit pixels and expanding PackBits in words raises measured
+callback progress per tick by about 8 percent, but the first frame still does not complete in the
+bounded run. Continue profiling the PICT path and locate the game's original frame-completion
+signal; do not poll the 81,920-byte surface again or present partially constructed frames.
 
 The MAME A-trap log remains a measured reference-run inventory → `docs/trap-log.md`,
 but Stage C has proved that it is **not an exact standalone-port first-use script**. The port has

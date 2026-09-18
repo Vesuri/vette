@@ -1363,12 +1363,42 @@ static bool unpackPackBitsRow(const uint8_t* packed, uint32_t packedSize,
         if (header >= 0) {
             uint16_t count = (uint16_t)header + 1;
             if (source + count > packedSize || destination + count > rowBytes) return false;
-            for (uint16_t i = 0; i < count; ++i) unpacked[destination++] = packed[source++];
+            const uint8_t* literal = packed + source;
+            uint8_t* output = unpacked + destination;
+            uint16_t left = count;
+            if ((((uint32_t)literal ^ (uint32_t)output) & 1) == 0) {
+                if ((uint32_t)literal & 1) {
+                    *output++ = *literal++;
+                    --left;
+                }
+                while (left >= 2) {
+                    *(uint16_t*)output = *(const uint16_t*)literal;
+                    output += 2;
+                    literal += 2;
+                    left -= 2;
+                }
+            }
+            while (left--) *output++ = *literal++;
+            source += count;
+            destination = (uint16_t)(destination + count);
         } else if (header != -128) {
             uint16_t count = (uint16_t)(1 - header);
             if (source >= packedSize || destination + count > rowBytes) return false;
             uint8_t value = packed[source++];
-            for (uint16_t i = 0; i < count; ++i) unpacked[destination++] = value;
+            uint8_t* output = unpacked + destination;
+            uint16_t left = count;
+            if ((uint32_t)output & 1) {
+                *output++ = value;
+                --left;
+            }
+            uint16_t pair = (uint16_t)((value << 8) | value);
+            while (left >= 2) {
+                *(uint16_t*)output = pair;
+                output += 2;
+                left -= 2;
+            }
+            if (left) *output = value;
+            destination = (uint16_t)(destination + count);
         }
     }
     return destination == rowBytes && source == packedSize;
@@ -1589,13 +1619,23 @@ static bool drawIndexedPictureBits(const uint8_t* picture, uint32_t size, uint32
                     + multiplyUnsigned16((uint16_t)(sourceY - sourceTop), rowBytes)
                     + (uint16_t)(packedSourceLeft - sourceLeft);
                 uint8_t* destination = destinationPixels
-                    + multiplyUnsigned16((uint16_t)(y - mapTop), destinationRowBytes);
-                for (int16_t x = packedLeft; x < packedRight; ++x) {
-                    uint8_t value = colorMap[*source++];
-                    uint16_t column = (uint16_t)(x - mapLeft);
-                    uint8_t& byte = destination[column >> 1];
-                    if (column & 1) byte = (uint8_t)((byte & 0xf0) | value);
-                    else byte = (uint8_t)((byte & 0x0f) | (value << 4));
+                    + multiplyUnsigned16((uint16_t)(y - mapTop), destinationRowBytes)
+                    + (uint16_t)(packedLeft - mapLeft) / 2;
+                uint16_t pixelsLeft = (uint16_t)(packedRight - packedLeft);
+                if ((packedLeft - mapLeft) & 1) {
+                    *destination = (uint8_t)((*destination & 0xf0) | colorMap[*source++]);
+                    ++destination;
+                    --pixelsLeft;
+                }
+                while (pixelsLeft >= 2) {
+                    uint8_t high = colorMap[*source++];
+                    uint8_t low = colorMap[*source++];
+                    *destination++ = (uint8_t)((high << 4) | low);
+                    pixelsLeft -= 2;
+                }
+                if (pixelsLeft) {
+                    *destination = (uint8_t)((*destination & 0x0f)
+                                           | (colorMap[*source] << 4));
                 }
             }
             usedPackedRows = true;
