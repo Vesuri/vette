@@ -379,15 +379,23 @@ validated against its shipped opcode, then rewritten at the same width to an A5-
 
 | Mac global | Macintosh address | shadow | first consumer |
 |---|---:|---:|---|
+| `Ticks` | `$016A` | `0(A5)` | `Main+$1EEC` |
 | `RndSeed` | `$0156` | `4(A5)` | `Main+$0570` |
 | `WMgrPort` | `$09DE` | `8(A5)` | `Main+$08A6` |
 | `GrayRgn` | `$09EE` | `12(A5)` | `Initialize+$08C4` |
+| `KeyMap` | `$0174` | `16(A5)` | `Main+$2B54` |
 
 Sixteen encoded instructions (ten reachable in the current control-flow inventory) read `GrayRgn`,
 using both `MOVEA.L abs.w` and `MOVE.L abs.w,-(SP)`. They are all redirected to the same `12(A5)`
 shadow by an exact-count scan.
 The stack form was not covered by the first three explicit relocations and was only exposed once
 `PaintBehind` became reachable.
+
+All 87 direct `Ticks` reads use the same absolute-word encoding and are redirected to `0(A5)`.
+The driving code contains three exact `LEA $0174,A1` sites: two VBL callbacks poll selected bytes
+and `Main+$2D26` snapshots all 16 bytes. They therefore share a complete 16-byte KeyMap shadow at
+`16(A5)`, immediately below the jump table at `32(A5)`. Amiga raw-key transitions update this
+shadow independently of whether the Event Manager accepts a corresponding key event.
 
 This preserves the original code flow without touching Amiga low memory. More shadows are added
 only when execution reaches them; the inventory shows that most remaining references are `Ticks`,
@@ -409,6 +417,12 @@ records. The callback cannot be invoked directly from Amiga's supervisor-mode VE
 trap made there has a different exception/USP context from the user-mode frame expected by the
 bridge. Delivery therefore belongs at a later user-mode scheduling point, not inside the hardware
 interrupt.
+
+The scheduler ages every installed task before selecting a callback, then rotates its selection
+point after delivering at most one callback at the next user-mode trap return. The earlier
+return-on-first-due loop let the one-tick sound task permanently starve the three-tick driving task.
+`amiga/driving_keymap.gdb` stops after the driving callback sees held keypad 8 and verifies that it
+increments the original steering/throttle global through the user-mode trampoline.
 
 ## Window and palette state
 
@@ -548,10 +562,9 @@ The verified run reaches implemented depth 94 and continues through the 30-secon
 without another loud stop. The call is at `Initialize+$18FA`, not FRED, and is followed by
 `FlushEvents`, register restoration and `RTS` back to the event loop.
 
-The 30-second chunky capture is the completed driving setup canvas. The lower portion contains the
-game-drawn cockpit, dashboard and steering wheel, while approximately the upper 198 displayed rows
-remain white. The live dirty rectangle is the complete `(0,0)-(342,512)` Macintosh port and the
-interrupt lands in the event-loop compatibility service, with depth still 94.
+The first 30-second chunky capture appeared to be the completed driving setup canvas: the lower
+portion contained the game-drawn cockpit, while approximately the upper 198 rows remained white.
+That was an intermediate frame, not a stable waiting state.
 
 `amiga/driving_gworld_capture.gdb` establishes that this is waiting for driving input rather than
 missing assets. Five live GWorlds are 512×512 with the game's measured 260-byte stride. A sixth is
@@ -559,11 +572,17 @@ a deliberate 3904×144 surface with 1956-byte rows and contains the complete rep
 roadside panorama. The stride-aware `tools/render_amiga_chunky.py` renders all six without stripping
 their row padding. The next deterministic input is keypad `8`, the game's acceleration control.
 
-For `GARAGE_CLICK=1`, `GetNextEvent` now emits a Macintosh keypad-8 key-down only after
+For `GARAGE_CLICK=1`, `GetNextEvent` emits a Macintosh keypad-8 key-down only after
 `ShowCursor` has raised depth to 94, holds it for 60 Macintosh ticks, and then emits key-up.
 `amiga/driving_input_capture.gdb` verifies phase 12, so both ordinary `EventRecord`s were consumed.
-The upper viewport nevertheless remains white and no loud stop occurs. The next boundary is the
-post-Initialize VBL/callback handoff, not more synthetic UI or another guessed drawing primitive.
+The game also polls KeyMap directly from its driving VBL callback, so the synthetic and physical
+key paths update the independent KeyMap shadow as well as producing ordinary EventRecords.
+
+With all VBL records aged fairly, the driving callback runs instead of remaining frozen behind the
+sound task. A bounded `driving_input_capture.gdb` run now catches the game copying road data into
+the upper chunky surface and captures the first entirely game-drawn driving frame: skyline,
+roadside panorama, traffic, rear-view mirror and cockpit are all present. No new trap was needed to
+produce it; the blocker was callback scheduling, not an unimplemented drawing primitive.
 
 The trap-address table is stateful. The observed `GetTrapAddress`/`SetTrapAddress` pair now records
 the game's replacement for `$A9F4 ExitToShell`; routing a later invocation through that replacement

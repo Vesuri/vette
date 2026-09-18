@@ -156,6 +156,7 @@ static void markDirty(const uint8_t* rectangle)
 // would give Line-A traps the wrong exception/USP context.
 static uint8_t* s_vblTasks[8];
 static uint16_t s_vblTaskCount;
+static uint16_t s_vblNextTask;
 static uint32_t s_vblLastTick;
 
 struct IntroSample {
@@ -428,7 +429,7 @@ static bool redirectLowMemoryGlobals(uint8_t* a5)
 
     // Ticks ($016A) is read directly at 87 instruction sites.  Every measured
     // encoding uses absolute-word source EA $38; d16(A5) is the same width, so
-    // redirect all of them to the next reserved application-parameter slot.
+    // redirect all of them to the first reserved application-parameter slot.
     uint16_t tickReferences = 0;
     for (uint16_t segment = 1; segment <= 10; ++segment) {
         uint8_t* code = s_segments[segment].begin;
@@ -437,17 +438,36 @@ static bool redirectLowMemoryGlobals(uint8_t* a5)
             uint16_t opcode = read16(code + offset - 2);
             if (read16(code + offset) == 0x016a && (opcode & 0x003f) == 0x0038) {
                 write16(code + offset - 2, (uint16_t)((opcode & 0xffc0) | 0x002d));
-                write16(code + offset, 16);
+                write16(code + offset, 0);
                 ++tickReferences;
             }
         }
     }
     if (tickReferences != 87) return false;
+
+    // The main driving loop snapshots the complete 16-byte KeyMap at $0174;
+    // its VBL callbacks load the same base before polling individual bytes.
+    // Redirect all three exact LEA encodings to the final 16 bytes of the
+    // application-parameter area, without touching Amiga Page 0.
+    uint16_t keyMapReferences = 0;
+    for (uint16_t segment = 1; segment <= 10; ++segment) {
+        uint8_t* code = s_segments[segment].begin;
+        uint32_t size = (uint32_t)(s_segments[segment].end - code);
+        for (uint32_t offset = 2; offset + 1 < size; offset += 2) {
+            if (read16(code + offset - 2) == 0x43f8 && read16(code + offset) == 0x0174) {
+                write16(code + offset - 2, 0x43ed); // LEA 16(A5),A1
+                write16(code + offset, 16);
+                ++keyMapReferences;
+            }
+        }
+    }
+    if (keyMapReferences != 3) return false;
     write32(a5 + 4, 1);
     write32(a5 + 8, 0);
     write32(a5 + 12, 0);
-    write32(a5 + 16, g_macTicks);
-    g_macTicksAddress = (volatile uint32_t*)(a5 + 16);
+    write32(a5 + 0, g_macTicks);
+    for (uint16_t i = 0; i < 16; ++i) a5[16 + i] = 0;
+    g_macTicksAddress = (volatile uint32_t*)(a5 + 0);
     return true;
 }
 
@@ -3553,20 +3573,33 @@ static void scheduleVBLTask()
     if (!s_vblTaskCount || g_macVBLCallbackEntry) return;
     uint32_t now = g_macTicks;
     uint32_t elapsed = now - s_vblLastTick;
-    if (!elapsed) return;
-    s_vblLastTick = now;
-    for (uint16_t i = 0; i < s_vblTaskCount; ++i) {
-        uint8_t* task = s_vblTasks[i];
-        int32_t count = (int16_t)read16(task + 10);
-        count -= (int32_t)elapsed;
-        if (count > 0) {
-            write16(task + 10, (uint16_t)count);
-            continue;
+    if (elapsed) {
+        s_vblLastTick = now;
+        // A Macintosh VBL pass ages every queue entry before invoking the due
+        // callbacks.  Returning as soon as task 0 became due left every later
+        // record frozen forever when task 0 rearmed itself for one tick.
+        for (uint16_t i = 0; i < s_vblTaskCount; ++i) {
+            uint8_t* task = s_vblTasks[i];
+            int32_t count = (int16_t)read16(task + 10);
+            if (count > 0) {
+                count -= (int32_t)elapsed;
+                write16(task + 10, (uint16_t)(count > 0 ? count : 0));
+            }
         }
+    }
+    // Deliver at most one callback at this user-mode safe point, but rotate
+    // the search so a one-tick task cannot starve the three-tick driving task.
+    for (uint16_t step = 0; step < s_vblTaskCount; ++step) {
+        uint16_t i = (uint16_t)(s_vblNextTask + step);
+        if (i >= s_vblTaskCount) i -= s_vblTaskCount;
+        uint8_t* task = s_vblTasks[i];
+        if ((int16_t)read16(task + 10) > 0) continue;
         // MacEntry.s substitutes a user-mode trampoline for the normal trap
         // return PC.  The pending flag is cleared before the callback executes,
         // so any Line-A traps made by the driver nest normally.
         write16(task + 10, 0);
+        s_vblNextTask = (uint16_t)(i + 1);
+        if (s_vblNextTask >= s_vblTaskCount) s_vblNextTask = 0;
         g_macVBLCallbackTask = (uint32_t)task;
         g_macVBLCallbackA5 = (uint32_t)s_currentA5;
         g_macVBLCallbackEntry = read32(task + 6);
@@ -3617,6 +3650,16 @@ struct KeyTranslation {
     uint8_t shiftedCharacter;
 };
 
+static void setDrivingKeyState(uint8_t virtualKey, bool down)
+{
+    if (!s_currentA5 || virtualKey > 0x7f) return;
+    uint8_t byteOffset = (uint8_t)(virtualKey >> 3);
+    uint8_t mask = (uint8_t)(1u << (7 - (virtualKey & 7)));
+    uint8_t* keyMap = s_currentA5 + 16;
+    if (down) keyMap[byteOffset] |= mask;
+    else keyMap[byteOffset] &= (uint8_t)~mask;
+}
+
 static bool translateAmigaKey(uint8_t raw, KeyTranslation& key)
 {
     // Amiga raw keys are physical positions, just like Macintosh ADB virtual
@@ -3654,6 +3697,21 @@ static bool translateAmigaKey(uint8_t raw, KeyTranslation& key)
         key.character = (uint8_t)('0' + digit);
         key.shiftedCharacter = digitShift[digit];
         return true;
+    }
+
+    static const uint8_t keypadRaw[] = {
+        0x0f, 0x1d, 0x1e, 0x1f, 0x2d, 0x2e, 0x2f, 0x3d, 0x3e, 0x3f
+    };
+    static const uint8_t keypadMac[] = {
+        0x52, 0x53, 0x54, 0x55, 0x56, 0x57, 0x58, 0x59, 0x5b, 0x5c
+    };
+    for (uint16_t i = 0; i < 10; ++i) {
+        if (raw == keypadRaw[i]) {
+            key.virtualKey = keypadMac[i];
+            key.character = (uint8_t)('0' + i);
+            key.shiftedCharacter = key.character;
+            return true;
+        }
     }
 
     switch (raw) {
@@ -3764,7 +3822,9 @@ static bool nextEvent(uint16_t mask, uint8_t* event)
     while (!transition && vetteInputPopKey(rawKey, keyDown, keyModifiers)) {
         KeyTranslation key;
         uint16_t keyWhat = keyDown ? 3 : 4;
-        if (!(mask & (1u << keyWhat)) || !translateAmigaKey(rawKey, key)) continue;
+        if (!translateAmigaKey(rawKey, key)) continue;
+        setDrivingKeyState(key.virtualKey, keyDown);
+        if (!(mask & (1u << keyWhat))) continue;
         what = keyWhat;
         modifiers = (uint16_t)(keyModifiers | (buttonDown ? 0 : 0x0080));
         uint8_t character = (keyModifiers & 0x0200) ? key.shiftedCharacter : key.character;
@@ -3784,6 +3844,7 @@ static bool nextEvent(uint16_t mask, uint8_t* event)
         if (mask & (1u << keyWhat)) {
             what = keyWhat;
             message = (0x5bUL << 8) | '8';  // Macintosh keypad 8
+            setDrivingKeyState(0x5b, keyWhat == 3);
             transition = true;
             if (s_garageClickPhase == 10) s_driveKeyReleaseTick = g_macTicks + 60;
             ++s_garageClickPhase;

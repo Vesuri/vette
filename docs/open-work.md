@@ -7,11 +7,14 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — current loud stop
 
-⭐ **HEAD OF QUEUE: trace the driving renderer's callback handoff after `Initialize+$18FA`.** The
-deterministic path now delivers keypad `8` through ordinary `GetNextEvent` records, holds it for 60
-Macintosh ticks, and releases it; phase 12 proves both events were consumed. The framebuffer remains
-the blank-upper-viewport setup canvas and no trap fires. Inspect the live VBL task records and
-callback entry/return state at depth 94 to determine why FRED's first road frame is not scheduled.
+⭐ **HEAD OF QUEUE: drive the game-produced road loop to its next loud stop.** The blank upper
+viewport was an intermediate frame. The live VBL queue contained a one-tick sound task and a
+three-tick driving task; returning after the first due record starved the latter forever. The
+scheduler now ages every record and selects callbacks round-robin, and the three direct `$0174`
+readers share a complete A5-relative KeyMap shadow. The first game-drawn road frame now contains
+skyline, traffic, mirror and cockpit without another trap. Keep keypad 8 asserted through the
+direct KeyMap path, capture a short sequence to prove motion, and let the loud stop identify the
+next missing compatibility operation.
 
 The MAME A-trap log remains a measured reference-run inventory → `docs/trap-log.md`,
 but Stage C has proved that it is **not an exact standalone-port first-use script**. The port has
