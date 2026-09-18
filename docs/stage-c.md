@@ -422,6 +422,46 @@ reads its embedded `BitMap` bounds directly when centering windows.
 window, and `ActivatePalette` copies its 16 `RGBColor` entries into the active color table with a
 fresh seed. Cursor resources likewise remain Handles until the game dereferences and installs one.
 
+The vehicle selector exposed several Palette Manager details hidden by the intro. `SetPalette`
+activates a palette immediately when its window is frontmost, and `SelectWindow` likewise activates
+the selected window's palette. A new color window also acquires the `pltt` resource matching its
+`WIND` ID automatically; this is how selector window 160 receives palette 160. On a 4-bit device
+white and black retain physical entries 0 and 15;
+the other tolerant colors occupy entries 1 through 14 in request order. This must be decided from
+the colors, not assumed from their resource positions: palettes 128--150 put black second, whereas
+palette 160 puts it last. Finally, indexed 4-bit PICT pixels are mapped through their embedded color
+table just like 8-bit PICT pixels. A packed-byte lookup keeps the unscaled path fast while replacing
+the former identity copy that made the selector use the intro's green/yellow color assignments.
+
+`NewGWorld` with null color-table and device arguments owns a creation-time snapshot of the current
+device CLUT; it does not keep sharing the mutable active-window table. The rotating-car worlds are
+created while the game's blue-shaded color environment is active, after which the window palette
+changes. Sharing that later table made the same stored indices appear pink. Each GWorld now retains
+its snapshot, PICT rendering targets its destination PixMap's table, and `srcCopy` uses a packed
+color-map lookup whenever the source and destination PixMaps differ.
+
+Distinct ColorTable handles with the same `ctSeed` describe the same color environment and copy
+indices directly. This preserves the selector's initial full-surface copy. Once activation changes
+the device seed, later rotating-car copies translate from the GWorld snapshot into the new device
+table. Comparing table addresses instead remapped both phases and turned the F40 thumbnail brown.
+
+Color matching follows the main GDevice's four-bit inverse-table resolution, comparing the high
+nibble of each RGB component and retaining the first palette entry on a tie. Comparing full 16-bit
+components looked more accurate but incorrectly made the selector's red-orange F40 closer to its
+brown pen; Color QuickDraw's actual quantized comparison ties those candidates and selects red.
+
+Vette also passes its offscreen GWorld ports to `SetPalette` and `ActivatePalette`. The measured
+selector transition loads palettes 130, 140, then 131 and associates each with the main window and
+the live worlds. These ports are not Window Manager records. GWorld slots retain the association
+and realize it into their private ColorTables. The first world is shared by palette-realized selector
+artwork and a 3D renderer that writes direct indices in car-specific color environments. The blue
+Porsche uses the creation-time palette 130 mapping; the F40 uses the retained palette 140 mapping;
+the common palette remains available for the other selector drawing. The renderer's logical grid
+pen 11 is realized as physical green pen 10 before presentation. Treating all of those indices as
+one color environment gives a brown F40, pink Porsche, or brown/white grid. The resulting captures
+now show both the blue Porsche and red-shaded F40 against the reference's green grid, and the palette
+remains correct through the in-game dashboard.
+
 `GetNewDialog` now builds the `DialogRecord` from the shipped `DLOG`/`DITL` pair and `DrawDialog`
 validates the item stream, selects the dialog port, and paints its background. `GetDItem` walks that
 stream and materializes movable text handles for static-text items; `SetIText` resizes and fills them.

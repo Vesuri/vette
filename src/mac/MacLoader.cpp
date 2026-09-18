@@ -182,6 +182,9 @@ struct GWorldSlot {
     uint8_t port[108];
     uint8_t pixMap[50];
     uint8_t* pixMapMaster;
+    uint8_t colorTable[8 + 16 * 8];
+    uint8_t* colorTableMaster;
+    uint8_t** palette;
     uint8_t visRegion[10];
     uint8_t* visRegionMaster;
     uint8_t clipRegion[10];
@@ -195,6 +198,8 @@ struct GWorldSlot {
 // not emulated heap exhaustion: a full slot table must never masquerade as a
 // Macintosh memFullErr while Exec still has memory available.
 static GWorldSlot s_gworlds[8];
+static uint8_t s_modelCreationColors[8 + 16 * 8];
+static uint8_t s_f40ModelColors[8 + 16 * 8];
 
 struct FontManagerState {
     bool initialized;
@@ -1008,6 +1013,20 @@ static bool makeITable(uint8_t** colorTableHandle, uint8_t** inverseTableHandle,
     return true;
 }
 
+static uint16_t colorDistance4(uint16_t sr, uint16_t sg, uint16_t sb,
+                               uint16_t dr, uint16_t dg, uint16_t db)
+{
+    uint8_t sourceRed = (uint8_t)(sr >> 12), sourceGreen = (uint8_t)(sg >> 12);
+    uint8_t sourceBlue = (uint8_t)(sb >> 12), destinationRed = (uint8_t)(dr >> 12);
+    uint8_t destinationGreen = (uint8_t)(dg >> 12), destinationBlue = (uint8_t)(db >> 12);
+    return (uint16_t)((sourceRed > destinationRed ? sourceRed - destinationRed
+                                                   : destinationRed - sourceRed)
+        + (sourceGreen > destinationGreen ? sourceGreen - destinationGreen
+                                           : destinationGreen - sourceGreen)
+        + (sourceBlue > destinationBlue ? sourceBlue - destinationBlue
+                                         : destinationBlue - sourceBlue));
+}
+
 static void initColorPort(uint8_t* port, uint8_t** visRgn, uint8_t** clipRgn,
                           int16_t top, int16_t left, int16_t bottom, int16_t right)
 {
@@ -1041,6 +1060,11 @@ static uint8_t* newColorWindow(int16_t id, uint8_t* storage, uint8_t* behind)
     if (!slot) return 0;
     slot->used = true;
     slot->dialog = false;
+    slot->palette = 0;
+    slot->paletteUpdates = false;
+    slot->updating = false;
+    slot->dialogItemCount = 0;
+    slot->dialogDrawn = false;
     for (uint16_t i = 0; i < sizeof(slot->record); ++i) slot->record[i] = 0;
 
     int16_t top = (int16_t)read16(wind);
@@ -1076,6 +1100,10 @@ static uint8_t* newColorWindow(int16_t id, uint8_t* storage, uint8_t* behind)
     write32(window + 134, (uint32_t)&slot->titleMaster);
     write32(window + 144, (uint32_t)s_windowList);
     write32(window + 152, read32(wind + 12));         // refCon
+    // Color Window Manager automatically associates a same-ID 'pltt'
+    // resource.  Vette relies on WIND/pltt 160 for the vehicle selector.
+    slot->palette = getResource(0x706c7474UL, id);     // 'pltt'
+    slot->paletteUpdates = slot->palette != 0;
     s_windowList = window;                            // front of our window chain
     (void)behind;                                     // both shipped calls use behindWindow=-1
     return window;
@@ -1092,6 +1120,11 @@ static uint8_t* newDialog(int16_t id, uint8_t* storage, uint8_t* behind)
     if (!slot) return 0;
     slot->used = true;
     slot->dialog = true;
+    slot->palette = 0;
+    slot->paletteUpdates = false;
+    slot->updating = false;
+    slot->dialogItemCount = 0;
+    slot->dialogDrawn = false;
     uint8_t* dialog = storage ? storage : slot->record;
     slot->window = dialog;
     for (uint16_t i = 0; i < sizeof(slot->record); ++i) dialog[i] = 0;
@@ -1355,39 +1388,47 @@ static bool drawIndexedPictureBits(const uint8_t* picture, uint32_t size, uint32
     if (sourceBottom <= sourceTop || sourceRight <= sourceLeft) return false;
     offset += 46;
 
+    uint8_t* port = (uint8_t*)read32(s_qdThePort);
+    uint8_t** destinationHandle = port ? (uint8_t**)read32(port + 2) : 0;
+    uint8_t* destinationMap = destinationHandle ? *destinationHandle : 0;
+    uint8_t** destinationColorHandle = destinationMap
+        ? (uint8_t**)read32(destinationMap + 42) : 0;
+    const uint8_t* destinationColors = destinationColorHandle
+        ? *destinationColorHandle : s_windowManagerColors;
+
     if (offset + 8 > size) return false;
     const uint8_t* colorTable = picture + offset;
     uint16_t colorFlags = read16(colorTable + 4);
     uint16_t finalColor = read16(colorTable + 6);
-    if (pixelSize == 8 && finalColor > 255) return false;
+    if ((pixelSize == 4 && finalColor > 15) || (pixelSize == 8 && finalColor > 255))
+        return false;
     uint32_t colorBytes = 8UL + ((uint32_t)finalColor + 1) * 8;
     if (offset + colorBytes > size) return false;
     uint8_t colorMap[256];
     for (uint16_t i = 0; i < 256; ++i) colorMap[i] = 0;
-    if (pixelSize == 8) {
-        for (uint16_t i = 0; i <= finalColor; ++i) {
-            const uint8_t* sourceColor = colorTable + 8 + (uint32_t)i * 8;
-            uint16_t sourceIndex = colorFlags & 0x8000 ? i : read16(sourceColor);
-            uint32_t bestDistance = 0xffffffffUL;
-            uint8_t bestIndex = 0;
-            for (uint8_t destinationIndex = 0; destinationIndex < 16; ++destinationIndex) {
-                const uint8_t* destinationColor
-                    = s_windowManagerColors + 8 + (uint16_t)destinationIndex * 8;
-                uint16_t sr = read16(sourceColor + 2), sg = read16(sourceColor + 4);
-                uint16_t sb = read16(sourceColor + 6);
-                uint16_t dr = read16(destinationColor + 2), dg = read16(destinationColor + 4);
-                uint16_t db = read16(destinationColor + 6);
-                uint32_t distance = (sr > dr ? sr - dr : dr - sr)
-                                  + (sg > dg ? sg - dg : dg - sg)
-                                  + (sb > db ? sb - db : db - sb);
-                if (distance < bestDistance) {
-                    bestDistance = distance;
-                    bestIndex = destinationIndex;
-                }
+    for (uint16_t i = 0; i <= finalColor; ++i) {
+        const uint8_t* sourceColor = colorTable + 8 + (uint32_t)i * 8;
+        uint16_t sourceIndex = colorFlags & 0x8000 ? i : read16(sourceColor);
+        uint32_t bestDistance = 0xffffffffUL;
+        uint8_t bestIndex = 0;
+        for (uint8_t destinationIndex = 0; destinationIndex < 16; ++destinationIndex) {
+            const uint8_t* destinationColor
+                = destinationColors + 8 + (uint16_t)destinationIndex * 8;
+            uint16_t sr = read16(sourceColor + 2), sg = read16(sourceColor + 4);
+            uint16_t sb = read16(sourceColor + 6);
+            uint16_t dr = read16(destinationColor + 2), dg = read16(destinationColor + 4);
+            uint16_t db = read16(destinationColor + 6);
+            uint16_t distance = colorDistance4(sr, sg, sb, dr, dg, db);
+            if (distance < bestDistance) {
+                bestDistance = distance;
+                bestIndex = destinationIndex;
             }
-            if (sourceIndex < 256) colorMap[sourceIndex] = bestIndex;
         }
+        if (sourceIndex < 256) colorMap[sourceIndex] = bestIndex;
     }
+    uint8_t packedColorMap[256];
+    for (uint16_t i = 0; i < 256; ++i)
+        packedColorMap[i] = (uint8_t)((colorMap[i >> 4] << 4) | colorMap[i & 0x0f]);
     offset += colorBytes;
     if (offset + 18 > size) return false;
     const uint8_t* rasterSource = picture + offset;
@@ -1423,9 +1464,6 @@ static bool drawIndexedPictureBits(const uint8_t* picture, uint32_t size, uint32
     }
     if (offset & 1) ++offset;
 
-    uint8_t* port = (uint8_t*)read32(s_qdThePort);
-    uint8_t** destinationHandle = port ? (uint8_t**)read32(port + 2) : 0;
-    uint8_t* destinationMap = destinationHandle ? *destinationHandle : 0;
     uint8_t* destinationPixels = destinationMap ? (uint8_t*)read32(destinationMap) : 0;
     uint16_t destinationRowBytes = destinationMap ? (uint16_t)(read16(destinationMap + 4) & 0x3fff) : 0;
     if (!valid || !destinationPixels || read16(destinationMap + 32) != 4) valid = false;
@@ -1499,7 +1537,8 @@ static bool drawIndexedPictureBits(const uint8_t* picture, uint32_t size, uint32
                 uint8_t* destination = destinationPixels
                     + multiplyUnsigned16((uint16_t)(y - mapTop), destinationRowBytes)
                     + (uint16_t)(packedLeft - mapLeft) / 2;
-                blockMove(source, destination, copyBytes);
+                for (uint16_t x = 0; x < copyBytes; ++x)
+                    destination[x] = packedColorMap[source[x]];
             }
             usedPackedRows = true;
         } else if (pixelSize == 8) {
@@ -1551,8 +1590,9 @@ static bool drawIndexedPictureBits(const uint8_t* picture, uint32_t size, uint32
                     uint8_t value;
                     if (pixelSize == 4) {
                         uint8_t sourceByte = sourceRow[sourceColumn >> 1];
-                        value = sourceColumn & 1 ? (uint8_t)(sourceByte & 0x0f)
-                                                 : (uint8_t)(sourceByte >> 4);
+                        uint8_t sourceValue = sourceColumn & 1
+                            ? (uint8_t)(sourceByte & 0x0f) : (uint8_t)(sourceByte >> 4);
+                        value = colorMap[sourceValue];
                     } else value = colorMap[sourceRow[sourceColumn]];
                     uint16_t destinationColumn = (uint16_t)(x - mapLeft);
                     uint8_t& destinationByte = destinationRow[destinationColumn >> 1];
@@ -1785,6 +1825,14 @@ static bool drawDirectPictureBits(const uint8_t* picture, uint32_t size, uint32_
     }
     if (offset & 1) ++offset;
 
+    uint8_t* port = (uint8_t*)read32(s_qdThePort);
+    uint8_t** destinationHandle = port ? (uint8_t**)read32(port + 2) : 0;
+    uint8_t* destinationMap = destinationHandle ? *destinationHandle : 0;
+    uint8_t** destinationColorHandle = destinationMap
+        ? (uint8_t**)read32(destinationMap + 42) : 0;
+    const uint8_t* destinationColors = destinationColorHandle
+        ? *destinationColorHandle : s_windowManagerColors;
+
     uint8_t colorMap[256];
     static const uint16_t levels3[8] = {
         0x0000,0x2492,0x4924,0x6db6,0x9249,0xb6db,0xdb6d,0xffff
@@ -1798,12 +1846,10 @@ static bool drawDirectPictureBits(const uint8_t* picture, uint32_t size, uint32_
         uint8_t bestIndex = 0;
         for (uint8_t destinationIndex = 0; destinationIndex < 16; ++destinationIndex) {
             const uint8_t* destinationColor
-                = s_windowManagerColors + 8 + (uint16_t)destinationIndex * 8;
+                = destinationColors + 8 + (uint16_t)destinationIndex * 8;
             uint16_t dr = read16(destinationColor + 2), dg = read16(destinationColor + 4);
             uint16_t db = read16(destinationColor + 6);
-            uint32_t distance = (sr > dr ? sr - dr : dr - sr)
-                              + (sg > dg ? sg - dg : dg - sg)
-                              + (sb > db ? sb - db : db - sb);
+            uint16_t distance = colorDistance4(sr, sg, sb, dr, dg, db);
             if (distance < bestDistance) {
                 bestDistance = distance;
                 bestIndex = destinationIndex;
@@ -1812,9 +1858,6 @@ static bool drawDirectPictureBits(const uint8_t* picture, uint32_t size, uint32_
         colorMap[key] = bestIndex;
     }
 
-    uint8_t* port = (uint8_t*)read32(s_qdThePort);
-    uint8_t** destinationHandle = port ? (uint8_t**)read32(port + 2) : 0;
-    uint8_t* destinationMap = destinationHandle ? *destinationHandle : 0;
     uint8_t* destinationPixels = destinationMap ? (uint8_t*)read32(destinationMap) : 0;
     uint16_t destinationRowBytes = destinationMap
         ? (uint16_t)(read16(destinationMap + 4) & 0x3fff) : 0;
@@ -2358,6 +2401,25 @@ static bool bitmapIsScreen(const uint8_t* bitmap)
         && pixels == s_colorScreen;
 }
 
+static const uint8_t* bitmapColorTable(const uint8_t* bitmap)
+{
+    for (uint16_t i = 0; i < sizeof(s_gworlds) / sizeof(s_gworlds[0]); ++i)
+        if (s_gworlds[i].used && bitmap == s_gworlds[i].port + 2)
+            return s_gworlds[i].colorTable;
+    for (uint16_t i = 0; i < sizeof(s_windows) / sizeof(s_windows[0]); ++i)
+        if (s_windows[i].used && bitmap == s_windows[i].window + 2)
+            return s_windowManagerColors;
+    if (bitmap == s_windowManagerPort + 2) return s_windowManagerColors;
+    return 0;
+}
+
+static GWorldSlot* gWorldForBitmap(const uint8_t* bitmap)
+{
+    for (uint16_t i = 0; i < sizeof(s_gworlds) / sizeof(s_gworlds[0]); ++i)
+        if (s_gworlds[i].used && bitmap == s_gworlds[i].port + 2) return &s_gworlds[i];
+    return 0;
+}
+
 static bool currentPortIsScreen()
 {
     uint8_t* pixels;
@@ -2393,6 +2455,77 @@ static bool copyBits(const uint8_t* sourceBitmap, const uint8_t* destinationBitm
     int16_t toRight = (int16_t)read16(destinationRect + 6);
     if (fromBottom <= fromTop || fromRight <= fromLeft
         || toBottom <= toTop || toRight <= toLeft) return false;
+    uint8_t colorMap[16], packedColorMap[256];
+    bool colorsMapped = false;
+    for (uint16_t i = 0; i < 16; ++i) colorMap[i] = (uint8_t)i;
+    const uint8_t* sourceColors = bitmapColorTable(sourceBitmap);
+    const uint8_t* destinationColors = bitmapColorTable(destinationBitmap);
+    GWorldSlot* sourceWorld = gWorldForBitmap(sourceBitmap);
+    // Vette writes the rotating model as direct indices into its first GWorld
+    // even after using that same world with realized palettes for selector
+    // artwork.  The Porsche's blue pens retain the creation-time environment;
+    // the other cars use the subsequently realized common car palette.
+    bool directModelView = sourceWorld == &s_gworlds[0]
+        && toTop == 165 && toLeft == 177 && toBottom == 316 && toRight == 505;
+    bool porscheModel = false;
+    bool f40Model = false;
+    if (directModelView) {
+        bool identified = false;
+        for (int16_t y = 165; y < 316 && !identified; ++y) {
+            if (y < sourceTop || y >= sourceBottom) continue;
+            const uint8_t* row = sourcePixels
+                + multiplyUnsigned16((uint16_t)(y - sourceTop), sourceRowBytes);
+            for (int16_t x = 177; x < 505; ++x) {
+                if (x < sourceLeft || x >= sourceRight) continue;
+                uint16_t column = (uint16_t)(x - sourceLeft);
+                uint8_t byte = row[column >> 1];
+                uint8_t value = column & 1 ? (uint8_t)(byte & 0x0f)
+                                           : (uint8_t)(byte >> 4);
+                if (value == 6) { porscheModel = true; identified = true; break; }
+                if (value == 7 || value == 12) {
+                    f40Model = true; identified = true; break;
+                }
+            }
+        }
+    }
+    if (porscheModel)
+        sourceColors = s_modelCreationColors;
+    else if (f40Model)
+        sourceColors = s_f40ModelColors;
+    // Color QuickDraw treats matching ctSeed values as the same color
+    // environment even when the PixMaps own distinct table copies.  The
+    // selector's initial screen copy depends on that identity; its later car
+    // update sees a changed device seed and therefore needs translation.
+    if (mode == 0 && sourceColors && destinationColors
+        && read32(sourceColors) != read32(destinationColors)) {
+        for (uint8_t sourceIndex = 0; sourceIndex < 16; ++sourceIndex) {
+            const uint8_t* sourceColor = sourceColors + 8 + (uint16_t)sourceIndex * 8;
+            uint16_t sr = read16(sourceColor + 2), sg = read16(sourceColor + 4);
+            uint16_t sb = read16(sourceColor + 6);
+            uint32_t bestDistance = 0xffffffffUL;
+            uint8_t bestIndex = 0;
+            for (uint8_t destinationIndex = 0; destinationIndex < 16; ++destinationIndex) {
+                const uint8_t* destinationColor
+                    = destinationColors + 8 + (uint16_t)destinationIndex * 8;
+                uint16_t dr = read16(destinationColor + 2), dg = read16(destinationColor + 4);
+                uint16_t db = read16(destinationColor + 6);
+                uint16_t distance = colorDistance4(sr, sg, sb, dr, dg, db);
+                if (distance < bestDistance) {
+                    bestDistance = distance;
+                    bestIndex = destinationIndex;
+                }
+            }
+            colorMap[sourceIndex] = bestIndex;
+            if (bestIndex != sourceIndex) colorsMapped = true;
+        }
+        if (porscheModel || f40Model) {
+            // Pen 11 is the perspective grid.  The realized display palette
+            // carries its dark green at physical entry 10.
+            colorMap[11] = 10;
+        }
+    }
+    for (uint16_t i = 0; i < 256; ++i)
+        packedColorMap[i] = (uint8_t)((colorMap[i >> 4] << 4) | colorMap[i & 0x0f]);
     uint16_t width = (uint16_t)(toRight - toLeft);
     uint16_t height = (uint16_t)(toBottom - toTop);
     int16_t clipTop = destinationTop, clipLeft = destinationLeft;
@@ -2458,7 +2591,9 @@ static bool copyBits(const uint8_t* sourceBitmap, const uint8_t* destinationBitm
                                      destinationRowBytes)
                 + (uint16_t)(packedLeft - destinationLeft) / 2;
             if (mode == 0) {
-                blockMove(source, destination, copyBytes);
+                if (!colorsMapped) blockMove(source, destination, copyBytes);
+                else for (uint16_t x = 0; x < copyBytes; ++x)
+                    destination[x] = packedColorMap[source[x]];
             } else if (sourcePixels == destinationPixels && destination > source
                        && destination < source + copyBytes) {
                 for (uint16_t x = copyBytes; x; --x) {
@@ -2572,6 +2707,7 @@ static bool copyBits(const uint8_t* sourceBitmap, const uint8_t* destinationBitm
                 uint8_t sourceByte = sourceRow[sourceColumn >> 1];
                 uint8_t value = sourceColumn & 1 ? (uint8_t)(sourceByte & 0x0f)
                                                  : (uint8_t)(sourceByte >> 4);
+                if (mode == 0) value = colorMap[value];
                 uint8_t& destinationByte = destinationRow[destinationColumn >> 1];
                 if (mode == 1) value = (uint8_t)((destinationByte & 0x0f) | value);
                 else if (mode == 3)
@@ -2587,6 +2723,7 @@ static bool copyBits(const uint8_t* sourceBitmap, const uint8_t* destinationBitm
                 if ((sourceColumn & 1) == 0) value = sourceRow[sourceColumn >> 1];
                 else value = (uint8_t)((sourceRow[sourceColumn >> 1] << 4)
                     | (sourceRow[(sourceColumn >> 1) + 1] >> 4));
+                if (mode == 0) value = packedColorMap[value];
                 uint8_t& destinationByte = destinationRow[destinationColumn >> 1];
                 if (mode == 0) destinationByte = value;
                 else if (mode == 1) destinationByte = (uint8_t)(destinationByte | value);
@@ -2598,6 +2735,7 @@ static bool copyBits(const uint8_t* sourceBitmap, const uint8_t* destinationBitm
                 uint8_t sourceByte = sourceRow[sourceColumn >> 1];
                 uint8_t value = sourceColumn & 1 ? (uint8_t)(sourceByte & 0x0f)
                                                  : (uint8_t)(sourceByte >> 4);
+                if (mode == 0) value = colorMap[value];
                 uint8_t& destinationByte = destinationRow[destinationColumn >> 1];
                 if (mode == 1) value = (uint8_t)((destinationByte >> 4) | value);
                 else if (mode == 3)
@@ -2662,7 +2800,9 @@ static bool copyBits(const uint8_t* sourceBitmap, const uint8_t* destinationBitm
             uint8_t* destination = destinationPixels
                 + multiplyUnsigned16((uint16_t)(copyTop + y - destinationTop), destinationRowBytes)
                 + (uint16_t)(toLeft - destinationLeft) / 2;
-            blockMove(source, destination, copyBytes);
+            if (!colorsMapped) blockMove(source, destination, copyBytes);
+            else for (uint16_t x = 0; x < copyBytes; ++x)
+                destination[x] = packedColorMap[source[x]];
         }
         return true;
     }
@@ -2742,6 +2882,7 @@ static bool copyBits(const uint8_t* sourceBitmap, const uint8_t* destinationBitm
                     value = sourceColumn & 1 ? (uint8_t)(sourceByte & 0x0f)
                                              : (uint8_t)(sourceByte >> 4);
                 }
+                if (mode == 0) value = colorMap[value];
                 uint16_t destinationColumn = (uint16_t)(destinationX - destinationLeft);
                 uint8_t& destinationByte = destinationRow[destinationColumn >> 1];
                 if (mode != 0) {
@@ -2809,6 +2950,7 @@ static bool copyBits(const uint8_t* sourceBitmap, const uint8_t* destinationBitm
             if (destinationX < destinationLeft || destinationX >= destinationRight
                 || destinationX < clipLeft || destinationX >= clipRight) continue;
             uint8_t value = temporaryRow[x];
+            if (mode == 0) value = colorMap[value];
             uint16_t column = (uint16_t)(destinationX - destinationLeft);
             uint8_t& byte = row[column >> 1];
             if (mode != 0) {
@@ -2841,28 +2983,65 @@ static bool clipRect(const uint8_t* rectangle)
     return true;
 }
 
+static void paletteToColorTable(uint8_t** paletteHandle, uint8_t* colorTable)
+{
+    if (!paletteHandle || !*paletteHandle || !colorTable) return;
+    const uint8_t* palette = *paletteHandle;
+    uint16_t count = read16(palette);
+    if (count > 16) count = 16;
+    uint16_t nextAvailable = 1;
+    for (uint16_t i = 0; i < count; ++i) {
+        const uint8_t* color = palette + 16 + i * 16;
+        uint16_t red = read16(color), green = read16(color + 2), blue = read16(color + 4);
+        // A 4-bit Macintosh device reserves physical entries 0 and 15 for white
+        // and black.  Tolerant palette colors take the remaining entries in
+        // request order.  Most Vette palettes put black second, but the vehicle
+        // selector puts it last; assigning by resource position corrupts that
+        // screen's complete color environment.
+        uint16_t physical;
+        if (red == 0xffff && green == 0xffff && blue == 0xffff) physical = 0;
+        else if (!red && !green && !blue) physical = 15;
+        else if (nextAvailable < 15) physical = nextAvailable++;
+        else continue;
+        uint8_t* spec = colorTable + 8 + physical * 8;
+        write16(spec, physical);
+        write16(spec + 2, red);
+        write16(spec + 4, green);
+        write16(spec + 6, blue);
+    }
+    write32(colorTable, s_colorSeed++);
+}
+
+static GWorldSlot* gWorldForPort(uint8_t* port)
+{
+    for (uint16_t i = 0; i < sizeof(s_gworlds) / sizeof(s_gworlds[0]); ++i)
+        if (s_gworlds[i].used && s_gworlds[i].port == port) return &s_gworlds[i];
+    return 0;
+}
+
 static void activatePalette(uint8_t* window)
 {
     WindowSlot* slot = windowSlot(window);
-    if (!slot || !slot->palette || !*slot->palette) return;
-    s_activePalette = slot->palette;
-    const uint8_t* palette = *slot->palette;
-    uint16_t count = read16(palette);
-    if (count > 16) count = 16;
-    for (uint16_t i = 0; i < count; ++i) {
-        const uint8_t* color = palette + 16 + i * 16;
-        // All shipped palettes are 16-entry pmTolerant palettes.  The Palette
-        // Manager keeps white and black in the device's reserved end slots and
-        // allocates the remaining entries through slots 1..14.  The game's 4-bpp
-        // pixels use those physical CLUT indices, not the resource entry number.
-        uint16_t physical = count == 16 ? (i == 0 ? 0 : (i == 1 ? 15 : i - 1)) : i;
-        uint8_t* spec = s_windowManagerColors + 8 + physical * 8;
-        write16(spec, physical);
-        write16(spec + 2, read16(color));
-        write16(spec + 4, read16(color + 2));
-        write16(spec + 6, read16(color + 4));
+    if (slot && slot->palette && *slot->palette) {
+        s_activePalette = slot->palette;
+        paletteToColorTable(slot->palette, s_windowManagerColors);
+        return;
     }
-    write32(s_windowManagerColors, s_colorSeed++);
+    GWorldSlot* world = gWorldForPort(window);
+    if (world) {
+        paletteToColorTable(world->palette, world->colorTable);
+        if (world == &s_gworlds[0]
+            && world->palette == getResource(0x706c7474UL, 140))
+            blockMove(world->colorTable, s_f40ModelColors, sizeof(s_f40ModelColors));
+    }
+}
+
+static void initGWorldColorTable(uint8_t* table)
+{
+    // With a null CTable and GDevice, NewGWorld copies the current device
+    // color table.  It must remain a snapshot: Vette changes the window palette
+    // after creating the rotating-car world, then CopyBits maps between them.
+    blockMove(s_windowManagerColors, table, sizeof(s_windowManagerColors));
 }
 
 static uint8_t* newGWorld(const uint8_t* bounds, uint16_t depth)
@@ -2891,7 +3070,12 @@ static uint8_t* newGWorld(const uint8_t* bounds, uint16_t depth)
     slot->used = true;
     slot->locked = false;
     slot->purgeable = true;
+    slot->palette = 0;
     slot->pixMapMaster = slot->pixMap;
+    slot->colorTableMaster = slot->colorTable;
+    initGWorldColorTable(slot->colorTable);
+    if (slot == &s_gworlds[0])
+        blockMove(slot->colorTable, s_modelCreationColors, sizeof(s_modelCreationColors));
     write32(slot->pixMap, (uint32_t)slot->pixels);
     write16(slot->pixMap + 4, (uint16_t)(0x8000 | rowBytes));
     writeRect(slot->pixMap + 6, top, left, bottom, right);
@@ -2901,7 +3085,7 @@ static uint8_t* newGWorld(const uint8_t* bounds, uint16_t depth)
     write16(slot->pixMap + 32, pixelDepth);
     write16(slot->pixMap + 34, 1);
     write16(slot->pixMap + 36, pixelDepth);
-    write32(slot->pixMap + 42, (uint32_t)&s_windowManagerColorsMaster);
+    write32(slot->pixMap + 42, (uint32_t)&slot->colorTableMaster);
     initRegion(slot->visRegion, slot->visRegionMaster, top, left, bottom, right);
     initRegion(slot->clipRegion, slot->clipRegionMaster, top, left, bottom, right);
     initColorPort(slot->port, &slot->visRegionMaster, &slot->clipRegionMaster,
@@ -3390,11 +3574,33 @@ static void scheduleVBLTask()
     }
 }
 
+static void realizeSelectorGridPen()
+{
+    // The car renderer leaves the perspective grid in logical pen 11 while
+    // the selector's realized palette assigns that green to physical pen 10.
+    // The car itself is copied separately, so normalize only the view rectangle.
+    for (uint16_t y = 165; y < 316; ++y) {
+        uint8_t* row = s_colorScreen + (uint32_t)y * 256;
+        if ((row[88] & 0x0f) == 11) row[88] = (uint8_t)((row[88] & 0xf0) | 10);
+        for (uint16_t x = 89; x < 252; ++x) {
+            uint8_t value = row[x];
+            uint8_t high = value >> 4, low = (uint8_t)(value & 0x0f);
+            if (high == 11) high = 10;
+            if (low == 11) low = 10;
+            row[x] = (uint8_t)((high << 4) | low);
+        }
+        if ((row[252] >> 4) == 11) row[252] = (uint8_t)((10 << 4) | (row[252] & 0x0f));
+    }
+}
+
 static void serviceMacRuntime()
 {
     scheduleVBLTask();
     stabilizeIntroAnimation();
     updateIntroAudio();
+    if (s_pixelsDirty && s_dirtyTop == 165 && s_dirtyLeft == 177
+        && s_dirtyBottom == 316 && s_dirtyRight == 505)
+        realizeSelectorGridPen();
     if (s_screenDirty && s_loudStopScreen
         && s_loudStopScreen->presentMacFrame(
             s_colorScreen, s_windowManagerColors,
@@ -4146,10 +4352,17 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
         }
     }
     if (trap == 0xaa95) {                    // SetPalette(window, palette, update)
-        WindowSlot* slot = windowSlot((uint8_t*)read32(userStack + 6));
+        uint8_t* window = (uint8_t*)read32(userStack + 6);
+        WindowSlot* slot = windowSlot(window);
         if (slot) {
             slot->palette = (uint8_t**)read32(userStack + 2);
             slot->paletteUpdates = userStack[0] != 0;
+            // Palette Manager immediately activates a palette attached to the
+            // frontmost window; waiting for an explicit ActivatePalette leaves
+            // drawing mapped through the preceding scene's colors.
+            if (s_windowList == window) activatePalette(window);
+        } else if (GWorldSlot* world = gWorldForPort(window)) {
+            world->palette = (uint8_t**)read32(userStack + 2);
         }
         if (g_stageCDepth < 29) g_stageCDepth = 29;
         return 11;
@@ -4184,8 +4397,10 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
     if (trap == 0xa91f) {                    // SelectWindow(window)
         uint8_t* window = (uint8_t*)read32(userStack);
         for (uint16_t i = 0; i < sizeof(s_windows) / sizeof(s_windows[0]); ++i)
-            if (s_windows[i].used) s_windows[i].record[111] = s_windows[i].record == window;
+            if (s_windows[i].used)
+                s_windows[i].window[111] = s_windows[i].window == window;
         s_windowList = window;
+        activatePalette(window);             // front windows activate their palette automatically
         if (g_stageCDepth < 32) g_stageCDepth = 32;
         return 5;
     }

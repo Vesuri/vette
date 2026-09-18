@@ -6,7 +6,7 @@ set confirm off
 
 # The first measured selector presentation is earlier than its next event-loop
 # dispatch, but the handler's static control table is already initialized.
-break MacLoader.cpp:3016 if s_dirtyTop == 165 && s_dirtyLeft == 177 && s_dirtyBottom == 316 && s_dirtyRight == 505
+break MacLoader.cpp:3609 if s_dirtyTop == 165 && s_dirtyLeft == 177 && s_dirtyBottom == 316 && s_dirtyRight == 505
 commands
   silent
   printf "\n===== VEHICLE SELECTOR =====\n"

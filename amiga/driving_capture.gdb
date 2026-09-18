@@ -4,7 +4,8 @@
 set pagination off
 set confirm off
 
-break MacLoader.cpp:3016 if s_dirtyTop == 165 && s_dirtyLeft == 177 && s_dirtyBottom == 316 && s_dirtyRight == 505
+# Stop after presentMacFrame has converted the active CLUT into its OCS words.
+break MacLoader.cpp:3609 if s_dirtyTop == 165 && s_dirtyLeft == 177 && s_dirtyBottom == 316 && s_dirtyRight == 505
 commands
   silent
   dump binary memory ../tmp/amiga_driving.raw s_colorScreen s_colorScreen+81920
