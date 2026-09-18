@@ -654,6 +654,15 @@ palette cache reached 177/303. Hoisting source-color reads out of the nearest-co
 returned exactly 183/302 because the compiler already performs that invariant motion. These are
 not viable next levers; further work belongs at the PICT-call/resource level.
 
+`amiga/driving_pict_progress.gdb` counts raster opcodes without printing every call. Over 308
+ticks, first-frame setup processes 55 4-bit opcodes / 149,312 decoded bytes and 46 8-bit opcodes /
+552,936 decoded bytes. The heavy-call trace identifies 38 of the latter as 512×24 strips, each
+expanding to 12,288 bytes, tiled across a 3,392-pixel-wide by 144-pixel roadside panorama; the
+first strip of several rows repeats at the far edge for wrapping. A specialized decoder that
+packed those rows directly from 8-bit PackBits into mapped 4-bit temporary storage regressed to
+153 callbacks over 380 ticks and was removed. The resource-level repetition, not another nibble
+loop variant, is now the measured optimization seam.
+
 The trap-address table is stateful. The observed `GetTrapAddress`/`SetTrapAddress` pair now records
 the game's replacement for `$A9F4 ExitToShell`; routing a later invocation through that replacement
 remains part of completing the trap bridge.
