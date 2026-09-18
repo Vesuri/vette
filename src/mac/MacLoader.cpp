@@ -347,7 +347,7 @@ static const TrapName s_trapNames[] = {
     {0xa935,"MENU MANAGER","INSERTMENU"},
     {0xa9bf,"MENU MANAGER","GETMENU"},
     {0xa937,"MENU MANAGER","DRAWMENUBAR"}, {0xa970,"EVENT MANAGER","GETNEXTEVENT"},
-    {0xa972,"EVENT MANAGER","GETMOUSE"},
+    {0xa972,"EVENT MANAGER","GETMOUSE"}, {0xa973,"EVENT MANAGER","STILLDOWN"},
     {0xa9b4,"EVENT MANAGER","SYSTEMTASK"}, {0xaa94,"PALETTE MANAGER","ACTIVATEPALETTE"},
     {0xa874,"QUICKDRAW","GETPORT"}, {0xa871,"QUICKDRAW","GLOBALTOLOCAL"}
 };
@@ -2930,6 +2930,11 @@ static bool nextEvent(uint16_t mask, uint8_t* event)
             what = buttonDown ? 1 : 2;
             transition = (mask & (1u << what)) != 0;
             s_mouseButtonDown = buttonDown;
+#ifdef VETTE_GARAGE_CLICK
+            // The synthetic press becomes a real hardware-up observation here;
+            // count it as the scripted release so it is not emitted twice.
+            if (!buttonDown && s_garageClickPhase == 1) s_garageClickPhase = 2;
+#endif
         }
     }
 
@@ -3462,6 +3467,11 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
         }
         if (g_stageCDepth < 86) g_stageCDepth = 86;
         return 5;
+    }
+    if (trap == 0xa973) {                    // StillDown() -> Boolean
+        write16(userStack, AmigaHardware::isLeftMouseButtonPressed() ? 1 : 0);
+        if (g_stageCDepth < 87) g_stageCDepth = 87;
+        return 1;
     }
     if (trap == 0xa8a4) {                    // InvertRect(Rect*)
         const uint8_t* rectangle = (const uint8_t*)read32(userStack);

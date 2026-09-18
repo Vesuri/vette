@@ -245,6 +245,13 @@ already-captured global point.
 The next loud stop is `$A973` (`StillDown`) at `Main+$0A60`, after the game retests the current
 point against the same ACCEPT rectangle and restores the pressed visual state.
 
+87. `StillDown` (live CIA left-button state; the scripted press observes the real released state)
+
+After `StillDown` returns false, the garage control tracker completes and the game returns to its
+`GetNextEvent` loop. A 20-second skip-intro/scripted-click run produced no further loud stop and
+ended at depth 87. The next check is a framebuffer/state capture: absence of a trap establishes
+control-flow health, but does not by itself identify which front-end state ACCEPT selected.
+
 `amiga/stage_c.gdb` breaks on `VetteScreen::showLoudStop`, after the report is complete, and prints
 the depth, trap identity, selector, runtime `(segment, offset)`, absolute PC, USP and its first
 words, all data/address registers, and nearby instructions. It then exits, so `diag_run.sh` stops
