@@ -646,6 +646,14 @@ surface as completion. The optimized build still does not reach that boundary du
 120-second warp run. Replacing the translated-row byte copy with aligned word transfers produced
 inconsistent cadence and a lower repeatable control result, so that experiment was removed.
 
+Four further local PICT shortcuts were measured and rejected against the repeatable 183-callback /
+302-tick fused-buffer control. Decompressing eligible rows directly into their final surface fell
+to 141 callbacks over 353 ticks; testing for an identity packed palette reached 177/306; unrolling
+mapped PackBits literals repeated exactly at 180/304; and an exact byte-compared single-entry
+palette cache reached 177/303. Hoisting source-color reads out of the nearest-color inner loop
+returned exactly 183/302 because the compiler already performs that invariant motion. These are
+not viable next levers; further work belongs at the PICT-call/resource level.
+
 The trap-address table is stateful. The observed `GetTrapAddress`/`SetTrapAddress` pair now records
 the game's replacement for `$A9F4 ExitToShell`; routing a later invocation through that replacement
 remains part of completing the trap bridge.
