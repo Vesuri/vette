@@ -312,6 +312,12 @@ for every touched pixel, even though both mappings were one-to-one. A guarded pa
 copies byte-aligned, unscaled 4-bit rows directly. The build audits pass, the picture completes in
 the next short A1200 run, and the loud stop advances to a mode-6 `CopyBits` at `Main+$199A`.
 
+That transfer is the Boolean QuickDraw `notSrcXor` operation: each destination bit is XORed with
+the inverse of its source bit. `CopyBits` now applies it in the aligned packed-byte path and in
+the clipped, odd-nibble, overlap-safe, and scaled fallbacks. Both standing audits pass. The next
+short A1200 run clears the drawing call and stops at `EnableItem(menu, 7)` (`$A939`,
+`Main+$13BE`), immediately before the game's existing `DisableItem(menu, 5)` call.
+
 `amiga/stage_c.gdb` breaks on `VetteScreen::showLoudStop`, after the report is complete, and prints
 the depth, trap identity, selector, runtime `(segment, offset)`, absolute PC, USP and its first
 words, all data/address registers, and nearby instructions. It then exits, so `diag_run.sh` stops

@@ -2004,7 +2004,8 @@ static bool copyBits(const uint8_t* sourceBitmap, const uint8_t* destinationBitm
                      const uint8_t* sourceRect, const uint8_t* destinationRect,
                      uint16_t mode, const uint8_t* maskRegion)
 {
-    if (!sourceRect || !destinationRect || (mode != 0 && mode != 1 && mode != 3)
+    if (!sourceRect || !destinationRect
+        || (mode != 0 && mode != 1 && mode != 3 && mode != 6)
         || maskRegion) return false;
     uint8_t *sourcePixels, *destinationPixels;
     uint16_t sourceRowBytes, destinationRowBytes;
@@ -2097,16 +2098,21 @@ static bool copyBits(const uint8_t* sourceBitmap, const uint8_t* destinationBitm
                     uint16_t i = (uint16_t)(x - 1);
                     if (mode == 1)
                         destination[i] = (uint8_t)(destination[i] | source[i]);
-                    else
+                    else if (mode == 3)
                         destination[i] = (uint8_t)(destination[i]
                             & (uint8_t)~source[i]);
+                    else
+                        destination[i] = (uint8_t)(destination[i] ^ source[i] ^ 0xff);
                 }
             } else if (mode == 1) {
                 for (uint16_t x = 0; x < copyBytes; ++x)
                     destination[x] = (uint8_t)(destination[x] | source[x]);
-            } else {
+            } else if (mode == 3) {
                 for (uint16_t x = 0; x < copyBytes; ++x)
                     destination[x] = (uint8_t)(destination[x] & (uint8_t)~source[x]);
+            } else {
+                for (uint16_t x = 0; x < copyBytes; ++x)
+                    destination[x] = (uint8_t)(destination[x] ^ source[x] ^ 0xff);
             }
         }
         return true;
@@ -2203,6 +2209,8 @@ static bool copyBits(const uint8_t* sourceBitmap, const uint8_t* destinationBitm
                 if (mode == 1) value = (uint8_t)((destinationByte & 0x0f) | value);
                 else if (mode == 3)
                     value = (uint8_t)((destinationByte & 0x0f) & (uint8_t)~value);
+                else if (mode == 6)
+                    value = (uint8_t)((destinationByte & 0x0f) ^ value ^ 0x0f);
                 destinationByte = (uint8_t)((destinationByte & 0xf0) | value);
                 ++x; ++sourceColumn; ++destinationColumn;
             }
@@ -2215,7 +2223,9 @@ static bool copyBits(const uint8_t* sourceBitmap, const uint8_t* destinationBitm
                 uint8_t& destinationByte = destinationRow[destinationColumn >> 1];
                 if (mode == 0) destinationByte = value;
                 else if (mode == 1) destinationByte = (uint8_t)(destinationByte | value);
-                else destinationByte = (uint8_t)(destinationByte & (uint8_t)~value);
+                else if (mode == 3)
+                    destinationByte = (uint8_t)(destinationByte & (uint8_t)~value);
+                else destinationByte = (uint8_t)(destinationByte ^ value ^ 0xff);
             }
             if (x < packedRight) {
                 uint8_t sourceByte = sourceRow[sourceColumn >> 1];
@@ -2225,6 +2235,8 @@ static bool copyBits(const uint8_t* sourceBitmap, const uint8_t* destinationBitm
                 if (mode == 1) value = (uint8_t)((destinationByte >> 4) | value);
                 else if (mode == 3)
                     value = (uint8_t)((destinationByte >> 4) & (uint8_t)~value);
+                else if (mode == 6)
+                    value = (uint8_t)((destinationByte >> 4) ^ value ^ 0x0f);
                 destinationByte = (uint8_t)((destinationByte & 0x0f) | (value << 4));
             }
         }
@@ -2250,7 +2262,7 @@ static bool copyBits(const uint8_t* sourceBitmap, const uint8_t* destinationBitm
     bool rectanglesOverlap = sourcePixels == destinationPixels
         && fromLeft < toRight && fromRight > toLeft
         && fromTop < toBottom && fromBottom > toTop;
-    bool packedBooleanPath = unscaled && (mode == 1 || mode == 3)
+    bool packedBooleanPath = unscaled && (mode == 1 || mode == 3 || mode == 6)
         && ((fromLeft - sourceLeft) & 1) == 0
         && ((toLeft - destinationLeft) & 1) == 0 && (width & 1) == 0
         && fromTop >= sourceTop && fromBottom <= sourceBottom
@@ -2299,9 +2311,12 @@ static bool copyBits(const uint8_t* sourceBitmap, const uint8_t* destinationBitm
             if (mode == 1) {
                 for (uint16_t x = 0; x < copyBytes; ++x)
                     destination[x] = (uint8_t)(destination[x] | source[x]);
-            } else {
+            } else if (mode == 3) {
                 for (uint16_t x = 0; x < copyBytes; ++x)
                     destination[x] = (uint8_t)(destination[x] & (uint8_t)~source[x]);
+            } else {
+                for (uint16_t x = 0; x < copyBytes; ++x)
+                    destination[x] = (uint8_t)(destination[x] ^ source[x] ^ 0xff);
             }
         }
         return true;
@@ -2367,7 +2382,9 @@ static bool copyBits(const uint8_t* sourceBitmap, const uint8_t* destinationBitm
                         ? (uint8_t)(destinationByte & 0x0f)
                         : (uint8_t)(destinationByte >> 4);
                     if (mode == 1) value = (uint8_t)(destinationValue | value);
-                    else value = (uint8_t)(destinationValue & (uint8_t)(~value & 0x0f));
+                    else if (mode == 3)
+                        value = (uint8_t)(destinationValue & (uint8_t)(~value & 0x0f));
+                    else value = (uint8_t)(destinationValue ^ value ^ 0x0f);
                 }
                 if (destinationColumn & 1)
                     destinationByte = (uint8_t)((destinationByte & 0xf0) | value);
@@ -2432,8 +2449,10 @@ static bool copyBits(const uint8_t* sourceBitmap, const uint8_t* destinationBitm
                                                        : (uint8_t)(byte >> 4);
                 if (mode == 1)               // srcOr: destination OR source
                     value = (uint8_t)(destinationValue | value);
-                else                         // srcBic: destination AND NOT source
+                else if (mode == 3)          // srcBic: destination AND NOT source
                     value = (uint8_t)(destinationValue & (uint8_t)(~value & 0x0f));
+                else                         // notSrcXor: destination XOR NOT source
+                    value = (uint8_t)(destinationValue ^ value ^ 0x0f);
             }
             if (column & 1) byte = (uint8_t)((byte & 0xf0) | value);
             else byte = (uint8_t)((byte & 0x0f) | (value << 4));

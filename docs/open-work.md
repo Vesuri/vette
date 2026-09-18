@@ -7,13 +7,12 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — current loud stop
 
-⭐ **HEAD OF QUEUE: implement the measured `notSrcXor` driving transfer.** The first driving PICT
-is 63,940 bytes and consists of unscaled, byte-aligned 4-bit strips; the first measured opcode
-copies `(0,0)-(20,512)` to the identical destination within a 512×323 picture. Direct packed-row
-copies now replace two divisions per pixel, so the PICT completes inside the same short A1200 run.
-The next loud stop is the existing `CopyBits` trap at `Main+199A`, with a null mask and transfer
-mode 6 (`notSrcXor`). Implement that real drawing mode; do not add dialog/UI traps to conceal an
-upstream failure.
+⭐ **HEAD OF QUEUE: account for the driving-state menu transition.** `CopyBits` mode 6
+(`notSrcXor`) is implemented and the measured call at `Main+$199A` now completes. The next loud
+stop is `$A939` (`EnableItem`) at `Main+$13BE`, called as `EnableItem(menu, 7)` and immediately
+followed by the already implemented `DisableItem(menu, 5)`. Establish whether this is the normal
+garage-to-driving state transition and, if so, mirror `DisableItem`'s menu-state bookkeeping. Do
+not implement visible or modal UI merely to conceal an upstream failure.
 
 The MAME A-trap log remains a measured reference-run inventory → `docs/trap-log.md`,
 but Stage C has proved that it is **not an exact standalone-port first-use script**. The port has
