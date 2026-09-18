@@ -6,7 +6,7 @@
 #   make PROBES=1        + the timing probes (diag_run.sh needs this)
 #   make FPSCOUNT=1      the HONEST framerate build: one counter, no probe instrumentation
 #   make SKIP_INTRO=1    report one synthetic first mouse press to skip the proven intro
-#   make GARAGE_CLICK=1  click ACCEPT once through the real Event Manager path
+#   make GARAGE_CLICK=1  script the garage and vehicle selectors through real mouse events
 #   ./run.sh             boot in FS-UAE (CTRL + left mouse button quits)
 #   ./debug.sh           source-level debug via the FS-UAE GDB stub
 #   ./diag_run.sh [secs] headless probe run (needs PROBES=1)

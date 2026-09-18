@@ -3141,16 +3141,18 @@ static bool nextEvent(uint16_t mask, uint8_t* event)
     }
 
 #ifdef VETTE_GARAGE_CLICK
-    // Leave the garage through its two real control modes: ACCEPT in the
-    // six-control car chooser, then the top plate in the three-control plate
-    // chooser.  The visible 512x320 crop begins at Macintosh global (64,91),
-    // so keep the live state local while emitting ordinary mouse events.
-    if (!transition && s_garageClickPhase < 4) {
-        bool plateClick = s_garageClickPhase >= 2;
+    // Leave the garage and vehicle selector through their real controls:
+    // ACCEPT, top plate, Corvette ZR-1, then ACCEPT.  The visible 512x320 crop
+    // begins at Macintosh global (64,91), so keep the live state local while
+    // emitting ordinary mouse events.
+    if (!transition && s_garageClickPhase < 8) {
+        static const int16_t clickX[4] = { 293, 413, 444, 212 };
+        static const int16_t clickY[4] = { 161,  69, 156, 154 };
+        uint16_t click = (uint16_t)(s_garageClickPhase >> 1);
         uint16_t clickWhat = (s_garageClickPhase & 1) ? 2 : 1;
         if (mask & (1u << clickWhat)) {
-            s_mouseX = plateClick ? 413 : 293;
-            s_mouseY = plateClick ? 69 : 161;
+            s_mouseX = clickX[click];
+            s_mouseY = clickY[click];
             buttonDown = (s_garageClickPhase & 1) == 0;
             s_mouseButtonDown = buttonDown;
             what = clickWhat;

@@ -335,6 +335,14 @@ the corresponding buffer. `amiga/driving_capture.gdb` captures the first measure
 the rendered chunky surface shows a coherent Porsche model and identifies the state as the vehicle
 selector, not yet the road-driving loop.
 
+The selector's five measured local rectangles are Porsche `(71,291)-(81,350)`, Lamborghini
+`(71,409)-(81,482)`, Testarossa `(151,285)-(161,356)`, Corvette ZR-1
+`(151,429)-(161,460)`, and ACCEPT `(148,184)-(161,241)`. `GARAGE_CLICK=1` now adds a Corvette
+click/release and ACCEPT click/release after the two existing garage selections; normal builds are
+unchanged. A bounded run verifies that the Corvette selection is dispatched and reaches the next
+loud stop, an existing `DrawPicture` call at `Main+$1728` whose PICT resource is not yet accepted by
+the decoder.
+
 `amiga/stage_c.gdb` breaks on `VetteScreen::showLoudStop`, after the report is complete, and prints
 the depth, trap identity, selector, runtime `(segment, offset)`, absolute PC, USP and its first
 words, all data/address registers, and nearby instructions. It then exits, so `diag_run.sh` stops

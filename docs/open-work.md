@@ -7,13 +7,13 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — current loud stop
 
-⭐ **HEAD OF QUEUE: advance through the vehicle selector.** The first post-garage capture is the
-vehicle/performance selector, with a correctly rendered rotating Porsche and ACCEPT control—not
-the road loop. The cyclic 3D corruption was the known Color VETTE! `NewGWorld` stride dependency;
-the port now supplies the original 32-bit-rounded row plus four-byte slop. Measure the selector's
-control rectangles and extend only the development `GARAGE_CLICK=1` input sequence through the
-chosen vehicle and ACCEPT, then resume the loud-stop loop. Do not implement visible or modal UI
-merely to conceal an upstream failure.
+⭐ **HEAD OF QUEUE: decode the Corvette selector PICT.** The five vehicle-selector rectangles are
+measured, and only `GARAGE_CLICK=1` now selects the Corvette ZR-1 and then ACCEPT through ordinary
+mouse transitions. The Corvette selection reaches `DrawPicture` at `Main+$1728`, where the current
+PICT decoder rejects the resource and produces the next loud stop before ACCEPT can be delivered.
+Use `amiga/pict_failure.gdb` to identify the resource and first unsupported opcode, implement only
+that measured drawing operation, and resume the scripted selector path. Do not implement visible
+or modal UI merely to conceal an upstream failure.
 
 The MAME A-trap log remains a measured reference-run inventory → `docs/trap-log.md`,
 but Stage C has proved that it is **not an exact standalone-port first-use script**. The port has
