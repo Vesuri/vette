@@ -33,7 +33,9 @@ the dominant workload: 38 large 8-bit, 512×24 PackBits strips build the 3,392-p
 roadside panorama. An in-decoder 8→4-bit fusion was slower. Host-predecoded archive sidecars were
 also rejected: caching all eligible rasters fell to 123/322, while a 215,040-byte packed cache of
 only the 35 unique panorama strips fell to 108/315, versus the 183/302 control. Preserve the
-decoder's fresh-working-memory locality and look above the per-resource decode loop next.
+decoder's fresh-working-memory locality. Copying the three already-rendered wrap duplicates also
+lost at 177/395 because per-call validation outweighed the saved decodes. The next optimization
+must amortize setup across the whole panorama rather than add another per-picture cache.
 
 The MAME A-trap log remains a measured reference-run inventory → `docs/trap-log.md`,
 but Stage C has proved that it is **not an exact standalone-port first-use script**. The port has

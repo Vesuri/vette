@@ -673,6 +673,13 @@ was not the cause. The measurements do not isolate archive-memory locality from 
 loop, but they do reject embedded decoded rasters as a combined strategy. The sidecar implementation
 was removed; future resource-level work must preserve the control's fresh-working-memory behavior.
 
+A target-side call cache for the three repeated wrap strips was also rejected. It remembered the
+first palette-mapped draw of application PICTs 500–535 and copied a later disjoint 512×24 draw
+within the same PixMap. The extra resource, destination, and palette validation on every picture
+call outweighed only three avoided decodes: cadence fell to 177 callbacks over 395 ticks. That code
+was removed as well. Any call-level optimization must amortize its dispatch cost across the whole
+panorama rather than special-case its few repeated edge strips.
+
 The trap-address table is stateful. The observed `GetTrapAddress`/`SetTrapAddress` pair now records
 the game's replacement for `$A9F4 ExitToShell`; routing a later invocation through that replacement
 remains part of completing the trap bridge.
