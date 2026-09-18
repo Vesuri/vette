@@ -228,6 +228,12 @@ an error dialog.
 The game then enters its garage control hit-test loop and stops at `$A8AD` (`PtInRect`) in
 `Main+$0A1C`.
 
+84. `PtInRect` (signed QuickDraw coordinates with exclusive bottom/right edges)
+
+The ACCEPT point is inside its control rectangle. The next loud stop is `$A8A4` (`InvertRect`) at
+`Main+$0A2E`; the following shipped instruction sequence calls `StillDown`, identifying this as
+pressed-button feedback rather than unrelated screen decoration.
+
 `amiga/stage_c.gdb` breaks on `VetteScreen::showLoudStop`, after the report is complete, and prints
 the depth, trap identity, selector, runtime `(segment, offset)`, absolute PC, USP and its first
 words, all data/address registers, and nearby instructions. It then exits, so `diag_run.sh` stops

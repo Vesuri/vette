@@ -335,6 +335,7 @@ static const TrapName s_trapNames[] = {
     {0xa8f6,"QUICKDRAW","DRAWPICTURE"}, {0xa89b,"QUICKDRAW","PENSIZE"},
     {0xa89c,"QUICKDRAW","PENMODE"}, {0xa8a1,"QUICKDRAW","FRAMERECT"},
     {0xa8a9,"QUICKDRAW","INSETRECT"}, {0xa8b0,"QUICKDRAW","FRAMEROUNDRECT"},
+    {0xa8ad,"QUICKDRAW","PTINRECT"},
     {0xa8ec,"QUICKDRAW","COPYBITS"}, {0xa8a3,"QUICKDRAW","ERASERECT"},
     {0xa87b,"QUICKDRAW","CLIPRECT"}, {0xa974,"EVENT MANAGER","BUTTON"},
     {0xa98d,"DIALOG MANAGER","GETDITEM"}, {0xa98f,"DIALOG MANAGER","SETITEXT"},
@@ -3401,6 +3402,19 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
         }
         if (g_stageCDepth < 83) g_stageCDepth = 83;
         return 5;
+    }
+    if (trap == 0xa8ad) {                    // PtInRect(Point, Rect*) -> Boolean
+        const uint8_t* rectangle = (const uint8_t*)read32(userStack);
+        int16_t vertical = (int16_t)read16(userStack + 4);
+        int16_t horizontal = (int16_t)read16(userStack + 6);
+        bool inside = rectangle
+            && vertical >= (int16_t)read16(rectangle)
+            && horizontal >= (int16_t)read16(rectangle + 2)
+            && vertical < (int16_t)read16(rectangle + 4)
+            && horizontal < (int16_t)read16(rectangle + 6);
+        userStack[8] = inside ? 1 : 0;
+        if (g_stageCDepth < 84) g_stageCDepth = 84;
+        return 9;
     }
     if (trap == 0xaa92) {                    // GetNewPalette(id) -> PaletteHandle
         write32(userStack + 2,
