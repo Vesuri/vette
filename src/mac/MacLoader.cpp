@@ -87,6 +87,9 @@ static bool s_mouseInitialized;
 static uint8_t s_mouseCounterX, s_mouseCounterY;
 static int16_t s_mouseX = 256, s_mouseY = 160;
 static bool s_mouseButtonDown;
+#ifdef VETTE_GARAGE_CLICK
+static uint8_t s_garageClickPhase;
+#endif
 
 struct WindowSlot {
     uint8_t record[170];                    // WindowRecord plus DialogRecord tail
@@ -2891,6 +2894,25 @@ static bool nextEvent(uint16_t mask, uint8_t* event)
         }
     }
 
+#ifdef VETTE_GARAGE_CLICK
+    // MAME's deterministic reference run clicks ACCEPT at the Macintosh global
+    // point (357,252).  Our visible 512x320 crop begins at (64,91), so keep the
+    // live local mouse state in crop coordinates while delivering a normal
+    // mouseDown/mouseUp pair through the Event Manager below.
+    if (!transition && s_garageClickPhase < 2) {
+        uint16_t clickWhat = s_garageClickPhase ? 2 : 1;
+        if (mask & (1u << clickWhat)) {
+            s_mouseX = 293;
+            s_mouseY = 161;
+            buttonDown = s_garageClickPhase == 0;
+            s_mouseButtonDown = buttonDown;
+            what = clickWhat;
+            transition = true;
+            ++s_garageClickPhase;
+        }
+    }
+#endif
+
     uint32_t message = 0;
     uint16_t modifiers = (uint16_t)(vetteInputModifiers() | (buttonDown ? 0 : 0x0080));
     uint8_t rawKey;
@@ -2910,8 +2932,10 @@ static bool nextEvent(uint16_t mask, uint8_t* event)
     write16(event + 0, transition ? what : 0);
     write32(event + 2, message);
     write32(event + 6, g_macTicks);
-    write16(event + 10, (uint16_t)s_mouseY);
-    write16(event + 12, (uint16_t)s_mouseX);
+    // EventRecord.where is in Macintosh global coordinates, not coordinates
+    // relative to the cropped game surface shown by the Amiga display.
+    write16(event + 10, (uint16_t)(s_mouseY + 91));
+    write16(event + 12, (uint16_t)(s_mouseX + 64));
     write16(event + 14, modifiers);
     return transition;
 }

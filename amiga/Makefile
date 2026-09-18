@@ -6,6 +6,7 @@
 #   make PROBES=1        + the timing probes (diag_run.sh needs this)
 #   make FPSCOUNT=1      the HONEST framerate build: one counter, no probe instrumentation
 #   make SKIP_INTRO=1    report one synthetic first mouse press to skip the proven intro
+#   make GARAGE_CLICK=1  click ACCEPT once through the real Event Manager path
 #   ./run.sh             boot in FS-UAE (CTRL + left mouse button quits)
 #   ./debug.sh           source-level debug via the FS-UAE GDB stub
 #   ./diag_run.sh [secs] headless probe run (needs PROBES=1)
@@ -116,6 +117,13 @@ endif
 # retains the complete intro path and its acceptance behavior.
 ifeq ($(SKIP_INTRO),1)
 EXTRA_DEFINES += -DVETTE_SKIP_INTRO
+endif
+
+# Deterministic Stage-C stepping only.  GetNextEvent emits one mouse-down/up pair
+# at the reference garage screen's ACCEPT button.  Production builds always use
+# the live Amiga mouse and never define this.
+ifeq ($(GARAGE_CLICK),1)
+EXTRA_DEFINES += -DVETTE_GARAGE_CLICK
 endif
 
 # ⭐⭐ `make PROBEFIELDS=N PROBES=1` — BOUND THE MEASUREMENT IN EMULATED TIME, not host time.

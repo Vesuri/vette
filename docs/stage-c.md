@@ -210,6 +210,14 @@ key-up respect the requested event mask. A 20-second skip-intro run reached the 
 loop with the keyboard vector installed and no loud stop. The next test is a real garage
 interaction rather than another idle soak.
 
+`make SKIP_INTRO=1 GARAGE_CLICK=1` provides that repeatable interaction without changing a
+production build. It emits one ordinary mouse-down/up pair at the reference run's Macintosh global
+point `(357,252)`, the garage screen's ACCEPT button. Live Amiga coordinates are relative to the
+displayed crop, whose Macintosh origin is `(64,91)`; `EventRecord.where` now adds that origin and
+therefore reports the global coordinates the original Window Manager expects. The first scripted
+click stops at `$A924` (`FrontWindow`) in `Main+$0C9E`, with depth still 81 because that trap is not
+yet implemented.
+
 `amiga/stage_c.gdb` breaks on `VetteScreen::showLoudStop`, after the report is complete, and prints
 the depth, trap identity, selector, runtime `(segment, offset)`, absolute PC, USP and its first
 words, all data/address registers, and nearby instructions. It then exits, so `diag_run.sh` stops

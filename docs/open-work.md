@@ -7,10 +7,10 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — current loud stop
 
-⭐ **HEAD OF QUEUE: first garage interaction.** `GetNextEvent` now reports translated Amiga mouse
-and keyboard events, including the Macintosh virtual-key byte, character byte, and edge-time
-modifier state. Run the first real interaction, follow the game's resulting code path, and stop at
-the next genuinely missing trap. Do not add dialog/UI traps to conceal an upstream failure.
+⭐ **HEAD OF QUEUE: `FrontWindow` (`$A924`) at `Main+$0C9E`.** A deterministic click on the garage
+screen's ACCEPT button passes through the real `GetNextEvent` path and reaches the game's window
+ownership check. Implement the existing front-window state query; do not add dialog/UI traps to
+conceal an upstream failure.
 
 The MAME A-trap log remains a measured reference-run inventory → `docs/trap-log.md`,
 but Stage C has proved that it is **not an exact standalone-port first-use script**. The port has
