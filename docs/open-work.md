@@ -7,13 +7,13 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — current loud stop
 
-⭐ **HEAD OF QUEUE: decode the Corvette selector PICT.** The five vehicle-selector rectangles are
-measured, and only `GARAGE_CLICK=1` now selects the Corvette ZR-1 and then ACCEPT through ordinary
-mouse transitions. The Corvette selection reaches `DrawPicture` at `Main+$1728`, where the current
-PICT decoder rejects the resource and produces the next loud stop before ACCEPT can be delivered.
-Use `amiga/pict_failure.gdb` to identify the resource and first unsupported opcode, implement only
-that measured drawing operation, and resume the scripted selector path. Do not implement visible
-or modal UI merely to conceal an upstream failure.
+⭐ **HEAD OF QUEUE: render the course-description PICT.** The Corvette redraw uses application-fork
+`PICT 6398` (2,120 bytes) at `(10,300)-(110,493)`. Version-1 long comment `$A1` is now decoded, and
+the next honest failure is `$09` (`PenPat`) at byte `$29`. Complete enumeration shows this resource
+uses pen pattern/size, short lines, rounded rectangles, and three text records; it is the visible
+course-description panel, not disposable metadata. Implement that measured version-1 vector/text
+subset and resume the scripted selector path. Do not implement modal UI merely to conceal an
+upstream failure.
 
 The MAME A-trap log remains a measured reference-run inventory → `docs/trap-log.md`,
 but Stage C has proved that it is **not an exact standalone-port first-use script**. The port has

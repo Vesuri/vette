@@ -123,6 +123,8 @@ static uint8_t** s_activePalette;
 static bool s_screenDirty = true;
 static bool s_pixelsDirty = false;
 static int16_t s_dirtyTop, s_dirtyLeft, s_dirtyBottom, s_dirtyRight;
+static volatile uint8_t s_unsupportedPictureOpcode;
+static volatile uint32_t s_unsupportedPictureOffset;
 static uint16_t read16(const uint8_t* p);
 
 static void markDirty(const uint8_t* rectangle)
@@ -1788,6 +1790,13 @@ static bool drawVersionOnePicture(const uint8_t* picture, uint32_t size,
         if (opcode == 0xff) return drewPixels;
         if (opcode == 0x00) continue;
         if (opcode == 0xa0) { if (offset + 2 > size) return false; offset += 2; continue; }
+        if (opcode == 0xa1) {
+            if (offset + 4 > size) return false;
+            uint16_t bytes = read16(picture + offset + 2);
+            if (offset + 4UL + bytes > size) return false;
+            offset += 4UL + bytes;
+            continue;
+        }
         if (opcode == 0x01) {
             if (offset + 2 > size) return false;
             uint16_t bytes = read16(picture + offset);
@@ -1800,6 +1809,8 @@ static bool drawVersionOnePicture(const uint8_t* picture, uint32_t size,
                 return false;
             drewPixels = true; continue;
         }
+        s_unsupportedPictureOpcode = opcode;
+        s_unsupportedPictureOffset = offset - 1;
         return false;
     }
     return false;

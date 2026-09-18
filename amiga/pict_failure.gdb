@@ -15,6 +15,7 @@ set $data = s_resourceArchive.m_bytes + $dataOffset
 printf "handle=$%08X resource[%u] fork=%u type='%.4s' id=%d size=%u data=$%08X\n", $handle, $index, *(unsigned short*)$entry, $entry+4, *(short*)($entry+2), $dataSize, $data
 set $rect = *(unsigned int*)g_trapUserStack
 printf "destination=(%d,%d)-(%d,%d)\n", *(short*)($rect+2), *(short*)$rect, *(short*)($rect+6), *(short*)($rect+4)
+printf "unsupported opcode=$%02X at offset=$%X\n", s_unsupportedPictureOpcode, s_unsupportedPictureOffset
 x/32bx $data
 dump binary memory ../tmp/failing.pict $data $data+$dataSize
 printf "========================\n"

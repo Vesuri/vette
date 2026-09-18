@@ -343,6 +343,14 @@ unchanged. A bounded run verifies that the Corvette selection is dispatched and 
 loud stop, an existing `DrawPicture` call at `Main+$1728` whose PICT resource is not yet accepted by
 the decoder.
 
+`amiga/pict_failure.gdb` identifies that resource as application-fork `PICT 6398`, 2,120 bytes,
+drawn at `(10,300)-(110,493)`. It begins with version-1 long picture comments (`$A1`); the
+version-2 decoder already understood their kind/length/payload framing, but the version-1 decoder
+did not. Version 1 now skips the measured comments with bounds checks, and the failure probe records
+the exact unsupported opcode and byte offset. The next boundary is `$09` (`PenPat`) at byte `$29`.
+Enumerating the resource shows it is the visible course-description panel: pen pattern/size, short
+lines, rounded rectangles, and three text records rather than another packed bitmap.
+
 `amiga/stage_c.gdb` breaks on `VetteScreen::showLoudStop`, after the report is complete, and prints
 the depth, trap identity, selector, runtime `(segment, offset)`, absolute PC, USP and its first
 words, all data/address registers, and nearby instructions. It then exits, so `diag_run.sh` stops
