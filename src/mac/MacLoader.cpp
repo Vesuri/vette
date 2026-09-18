@@ -1503,8 +1503,9 @@ static bool drawIndexedPictureBits(const uint8_t* picture, uint32_t size, uint32
         if (sourceIndex < 256) colorMap[sourceIndex] = bestIndex;
     }
     uint8_t packedColorMap[256];
-    for (uint16_t i = 0; i < 256; ++i)
-        packedColorMap[i] = (uint8_t)((colorMap[i >> 4] << 4) | colorMap[i & 0x0f]);
+    if (pixelSize == 4)
+        for (uint16_t i = 0; i < 256; ++i)
+            packedColorMap[i] = (uint8_t)((colorMap[i >> 4] << 4) | colorMap[i & 0x0f]);
     offset += colorBytes;
     if (offset + 18 > size) return false;
     const uint8_t* rasterSource = picture + offset;

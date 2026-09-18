@@ -680,6 +680,12 @@ call outweighed only three avoided decodes: cadence fell to 177 callbacks over 3
 was removed as well. Any call-level optimization must amortize its dispatch cost across the whole
 panorama rather than special-case its few repeated edge strips.
 
+The indexed decoder formerly built its 256-entry packed-nibble palette map for every raster even
+though only 4-bit PICTs can consume it. Restricting that construction to 4-bit sources removes
+11,776 unused table entries from the measured 46-opcode 8-bit workload. The bounded cadence remains
+183 callbacks and tightens from 302 to 301 ticks; the exact intro differential still passes all
+163,840 pixels, both planar buffers, and the copper palette.
+
 The trap-address table is stateful. The observed `GetTrapAddress`/`SetTrapAddress` pair now records
 the game's replacement for `$A9F4 ExitToShell`; routing a later invocation through that replacement
 remains part of completing the trap bridge.

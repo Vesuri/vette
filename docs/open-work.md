@@ -35,7 +35,8 @@ also rejected: caching all eligible rasters fell to 123/322, while a 215,040-byt
 only the 35 unique panorama strips fell to 108/315, versus the 183/302 control. Preserve the
 decoder's fresh-working-memory locality. Copying the three already-rendered wrap duplicates also
 lost at 177/395 because per-call validation outweighed the saved decodes. The next optimization
-must amortize setup across the whole panorama rather than add another per-picture cache.
+must amortize setup across the whole panorama rather than add another per-picture cache. Skipping
+the packed-nibble map that 8-bit PICTs cannot use is retained but essentially neutral at 183/301.
 
 The MAME A-trap log remains a measured reference-run inventory → `docs/trap-log.md`,
 but Stage C has proved that it is **not an exact standalone-port first-use script**. The port has
