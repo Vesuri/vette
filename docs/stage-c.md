@@ -476,6 +476,11 @@ uncompressed indexed `BitsRect` (`$0090`). The interpreter now shares PixMap, co
 rectangle mapping, scaling, and destination logic between `$0090` raw rows and `$0098` PackBits
 rows. The icon completes and execution begins decoding a larger packed road asset.
 
+The indexed-raster fast path now accepts equal-size target rectangles translated away from the
+PICT frame origin. It translates each raster destination rectangle once, clips it, and copies
+aligned packed rows directly. This completes the 384×48 `PICT 29556`; the next measured hotspot is
+512×24 `PICT 506`, which still takes the general coordinate-mapping path pending rectangle probes.
+
 The trap-address table is stateful. The observed `GetTrapAddress`/`SetTrapAddress` pair now records
 the game's replacement for `$A9F4 ExitToShell`; routing a later invocation through that replacement
 remains part of completing the trap bridge.

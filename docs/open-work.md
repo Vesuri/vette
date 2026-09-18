@@ -7,11 +7,11 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — current loud stop
 
-⭐ **HEAD OF QUEUE: capture the first road-setup frame or next loud stop.** The `DrawPicture` at
-segment 1 + `$2328` is application-fork `PICT 146`, a 12×13 icon using uncompressed 4-bit indexed
-`BitsRect` (`$0090`). It now renders through the shared indexed-raster path. A bounded run advances
-into a much larger packed road asset without another stop; snapshot that state or extend only far
-enough to identify its next unsupported operation.
+⭐ **HEAD OF QUEUE: measure why road-strip `PICT 506` misses the packed-row fast path.** The
+translated but unscaled 384×48 `PICT 29556` now uses direct packed row copies and completes within
+the existing bound. Execution reaches application-fork `PICT 506` (512×24) but processes it through
+the per-pixel mapper. Capture its frame, target, source, raster destination and clip rectangles;
+optimize only if the mapping is provably unscaled.
 
 The MAME A-trap log remains a measured reference-run inventory → `docs/trap-log.md`,
 but Stage C has proved that it is **not an exact standalone-port first-use script**. The port has
