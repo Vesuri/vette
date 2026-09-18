@@ -484,6 +484,13 @@ the coordinate scaler for every pixel. This completes both the 384×48 `PICT 295
 512×24 application-fork `PICT 506`. A 24-second Stage C run advances into subsequent resource
 loading without reaching a loud stop; implemented trap depth remains 92.
 
+The resource converter emits 572 directory entries sorted by `(fork,type,id)`, but exact
+`GetResource` calls were still walking and decoding the directory from the beginning for each fork
+in the search chain. Archive opening now verifies that ordering, and exact ID lookups use a binary
+lower-bound search while preserving the current-fork-first semantics and the resource's original
+master-pointer slot. The next 20-second run clears the resource scan and reaches the following
+monochrome PICT raster mapper without a loud stop.
+
 The trap-address table is stateful. The observed `GetTrapAddress`/`SetTrapAddress` pair now records
 the game's replacement for `$A9F4 ExitToShell`; routing a later invocation through that replacement
 remains part of completing the trap bridge.

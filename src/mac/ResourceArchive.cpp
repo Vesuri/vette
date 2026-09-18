@@ -23,12 +23,18 @@ bool ResourceArchive::open(const uint8_t* bytes, uint32_t size)
         return false;
     m_bytes = bytes; m_size = size; m_directory = directory;
     m_count = count; m_forks = forks;
-    Item check;
-    for (uint32_t i = 0; i < count; ++i)
-        if (!item(i, check) || check.fork >= forks) {
+    Item check, previous = {};
+    for (uint32_t i = 0; i < count; ++i) {
+        if (!item(i, check) || check.fork >= forks
+            || (i && (check.fork < previous.fork
+                || (check.fork == previous.fork && check.type < previous.type)
+                || (check.fork == previous.fork && check.type == previous.type
+                    && check.id < previous.id)))) {
             m_bytes = 0; m_count = 0; m_forks = 0;
             return false;
         }
+        previous = check;
+    }
     return true;
 }
 
@@ -54,15 +60,22 @@ bool ResourceArchive::item(uint32_t index, Item& out) const
     return true;
 }
 
-bool ResourceArchive::find(uint16_t fork, uint32_t type, int16_t id, Item& out) const
+bool ResourceArchive::find(uint16_t fork, uint32_t type, int16_t id, Item& out,
+                           uint32_t* index) const
 {
-    for (uint32_t i = 0; i < m_count; ++i) {
+    uint32_t first = 0, last = m_count;
+    while (first < last) {
+        uint32_t i = first + ((last - first) >> 1);
         Item candidate;
         if (!item(i, candidate)) return false;
-        if (candidate.fork == fork && candidate.type == type && candidate.id == id) {
-            out = candidate;
-            return true;
-        }
+        if (candidate.fork < fork
+            || (candidate.fork == fork && candidate.type < type)
+            || (candidate.fork == fork && candidate.type == type && candidate.id < id))
+            first = i + 1;
+        else last = i;
     }
-    return false;
+    if (!item(first, out) || out.fork != fork || out.type != type || out.id != id)
+        return false;
+    if (index) *index = first;
+    return true;
 }

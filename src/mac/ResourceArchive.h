@@ -19,7 +19,8 @@ public:
     uint16_t forkCount() const { return m_forks; }
     uint32_t resourceCount() const { return m_count; }
     bool item(uint32_t index, Item& out) const;
-    bool find(uint16_t fork, uint32_t type, int16_t id, Item& out) const;
+    bool find(uint16_t fork, uint32_t type, int16_t id, Item& out,
+              uint32_t* index = 0) const;
 
 private:
     const uint8_t* m_bytes = 0;

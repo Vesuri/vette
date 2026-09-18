@@ -536,13 +536,11 @@ static uint8_t** getResource(uint32_t type, int16_t id)
     for (uint16_t pass = 0; pass < s_resourceArchive.forkCount(); ++pass) {
         uint16_t fork = (uint16_t)(s_currentResourceFork + pass);
         if (fork >= s_resourceArchive.forkCount()) fork -= s_resourceArchive.forkCount();
-        for (uint32_t i = 0; i < s_resourceArchive.resourceCount(); ++i) {
-            ResourceArchive::Item item;
-            if (!s_resourceArchive.item(i, item)) return 0;
-            if (item.fork == fork && item.type == type && item.id == id) {
-                s_resourceMasters[i] = (uint8_t*)item.data;
-                return &s_resourceMasters[i];
-            }
+        ResourceArchive::Item item;
+        uint32_t index;
+        if (s_resourceArchive.find(fork, type, id, item, &index)) {
+            s_resourceMasters[index] = (uint8_t*)item.data;
+            return &s_resourceMasters[index];
         }
     }
     return 0;

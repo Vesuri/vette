@@ -7,12 +7,11 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — current loud stop
 
-⭐ **HEAD OF QUEUE: identify the next bounded road-screen execution boundary.** Application-fork
-`PICT 506` is an unscaled 512×24, 8-bit indexed raster. It now bypasses the coordinate scaler and
-maps each source byte directly into the destination's packed 4-bit pixels. The same 24-second run
-now completes that draw and advances into subsequent resource loading without a loud stop. Capture
-the resulting screen and locate the next real wait, hotspot, or unimplemented trap without extending
-the normal diagnostic bound.
+⭐ **HEAD OF QUEUE: characterize the monochrome road-screen PICT mapping.** Exact resource lookups
+no longer linearly reparse the 572-entry archive; the packer's validated `(fork,type,id)` ordering
+now supports binary search. With that scan removed, the same bounded run advances into
+`drawPackedMonochromePictureBits`. Probe its frame, target, source and raster rectangles, then add a
+packed conversion only if the mapping is provably unscaled.
 
 The MAME A-trap log remains a measured reference-run inventory → `docs/trap-log.md`,
 but Stage C has proved that it is **not an exact standalone-port first-use script**. The port has
