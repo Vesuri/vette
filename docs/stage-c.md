@@ -602,18 +602,19 @@ at every handled Line-A safe point, while `VetteScreen`'s pending-frame guard li
 what the VBI can consume. At the second callback the motion probe measures 34 setup frames queued
 and all 34 presented; the direct-store check below is what covers subsequent road pixels.
 
-Most 3D pixels are written by direct 68k stores rather than `_BlockMove`. Once both driving VBL
-tasks exist, the bridge therefore compares the 81,920-byte chunky surface against a fast-RAM shadow
-at the driving task's three-tick cadence. Changed packed bytes update the shadow and produce exact
-top/bottom plus conservative left/right bounds, merged with trap-derived dirt. An unchanged surface
-does not request C2P.
+Most 3D pixels are written by direct 68k stores rather than `_BlockMove`, but a changed byte is not
+a frame-complete signal: captures show the renderer incrementally constructing its next image.
+`amiga/driving_cadence.gdb` takes two stops 300 requested Macintosh ticks apart. Without speculative
+direct-store presentation, the first A1200 measurement spans 303 ticks, completes the one frame
+already pending at the start, queues no new one, and advances the throttle callback to 162.
 
-`amiga/driving_cadence.gdb` takes two stops exactly 300 requested Macintosh ticks apart. The first
-A1200 measurement spans 336 ticks and sees two new frames queued and both presented: about 0.30 fps.
-The display path is no longer stale or dropping completed frames; the original 3D renderer itself
-only finishes two distinct chunky updates in 6.72 emulated seconds.
+A full 81,920-byte shadow comparison at the driving task's three-tick cadence was measured and
+rejected. It queued two partial updates over 336 ticks but reduced throttle progress to 48; a VBI
+stack sample caught execution inside the comparison itself. Besides being expensive, it exposed
+in-progress rendering as if it were complete. The correct next boundary is the original renderer's
+frame-completion path, not polling the chunky surface.
 
-A subsequent 180-second A1200 sustained-driving run reaches no loud stop and remains in the
+A 180-second A1200 sustained-driving run reaches no loud stop and remains in the
 original 3D transform/raster routines at implemented depth 93. The next boundary is performance
 measurement of that trap-free renderer, not another speculative manager implementation.
 

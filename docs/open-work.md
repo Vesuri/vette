@@ -15,12 +15,12 @@ readers share a complete A5-relative KeyMap shadow. The first game-drawn road fr
 skyline, traffic, mirror and cockpit without another trap. Keypad 8 is held through the direct
 KeyMap path at the Course One transition; consecutive driving-task captures differ and the original
 throttle global advances from 3 to 21 over 30 ticks. Direct `_BlockMove` writes now mark bounded
-dirty regions; direct 68k stores are found by a three-tick packed-screen shadow comparison and
-turned into measured bounds. The 300-tick cadence probe queues two new frames and presents both
-over 336 ticks—about 0.30 fps—so C2P is not dropping completed frames. A 180-second sustained
-A1200 run reaches no loud stop and remains in original 3D transform/raster code at depth 93. Use a
-bounded PC/hotspot profile to identify which original routines dominate those 6.72 seconds before
-choosing a native replacement or other measured optimization.
+dirty regions. Most raster pixels are direct 68k stores, but a three-tick full-surface comparison
+was rejected: it presented partial construction and cut callback progress from 162 to 48. The
+baseline 303-tick cadence queues no new completed frame. A 180-second sustained A1200 run reaches no
+loud stop and remains in original 3D transform/raster code at depth 93. Locate the original
+frame-completion path and take a bounded PC/hotspot profile before choosing a native replacement or
+other measured optimization; do not poll the 81,920-byte surface again.
 
 The MAME A-trap log remains a measured reference-run inventory → `docs/trap-log.md`,
 but Stage C has proved that it is **not an exact standalone-port first-use script**. The port has

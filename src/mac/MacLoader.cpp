@@ -124,8 +124,6 @@ static uint8_t** s_activePalette;
 static bool s_screenDirty = true;
 static bool s_pixelsDirty = false;
 static int16_t s_dirtyTop, s_dirtyLeft, s_dirtyBottom, s_dirtyRight;
-static uint8_t s_colorScreenShadow[sizeof(s_colorScreen)];
-static uint32_t s_directScreenScanTick;
 static volatile uint8_t s_unsupportedPictureOpcode;
 static volatile uint32_t s_unsupportedPictureOffset;
 static uint16_t read16(const uint8_t* p);
@@ -3649,31 +3647,8 @@ static void realizeSelectorGridPen()
     }
 }
 
-static void detectDirectScreenChanges()
-{
-    // The 3D renderer writes packed pixels directly, outside every QuickDraw
-    // trap.  Once its two VBL tasks exist, compare at their three-tick cadence
-    // and derive the same simple bounding rectangle used by trapped drawing.
-    if (s_vblTaskCount < 2 || g_macTicks - s_directScreenScanTick < 3) return;
-    s_directScreenScanTick = g_macTicks;
-    int16_t top = 320, left = 512, bottom = 0, right = 0;
-    for (uint32_t offset = 0; offset < sizeof(s_colorScreen); ++offset) {
-        uint8_t value = s_colorScreen[offset];
-        if (value == s_colorScreenShadow[offset]) continue;
-        s_colorScreenShadow[offset] = value;
-        int16_t y = (int16_t)(offset / 256);
-        int16_t x = (int16_t)((offset & 255) * 2);
-        if (y < top) top = y;
-        if (y + 1 > bottom) bottom = (int16_t)(y + 1);
-        if (x < left) left = x;
-        if (x + 2 > right) right = (int16_t)(x + 2);
-    }
-    markDirtyBounds(top, left, bottom, right);
-}
-
 static void presentMacRuntime()
 {
-    detectDirectScreenChanges();
     if (s_pixelsDirty && s_dirtyTop == 165 && s_dirtyLeft == 177
         && s_dirtyBottom == 316 && s_dirtyRight == 505)
         realizeSelectorGridPen();
