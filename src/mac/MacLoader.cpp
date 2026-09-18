@@ -2011,6 +2011,75 @@ static bool copyBits(const uint8_t* sourceBitmap, const uint8_t* destinationBitm
         }
         return true;
     }
+    if (unscaled && sourcePixels == destinationPixels && (mode == 1 || mode == 3)
+        && packedTop < packedBottom && packedLeft < packedRight) {
+        // The garage plate transition composites a 290x84 source at an odd
+        // horizontal destination inside the same PixMap.  Its one-nibble
+        // shift used to miss the aligned path and perform bounds checks plus
+        // read/modify/write for every pixel.  Assemble each destination byte
+        // directly, retaining memmove order when the moving image overlaps
+        // its source later in the animation.
+        uint16_t pixelCount = (uint16_t)(packedRight - packedLeft);
+        uint16_t sourceFirstColumn = (uint16_t)(packedSourceLeft - sourceLeft);
+        uint16_t destinationFirstColumn = (uint16_t)(packedLeft - destinationLeft);
+        int16_t firstY = packedTop, lastY = packedBottom, stepY = 1;
+        if (packedTop > packedSourceTop) {
+            firstY = (int16_t)(packedBottom - 1);
+            lastY = (int16_t)(packedTop - 1);
+            stepY = -1;
+        }
+        for (int16_t destinationY = firstY; destinationY != lastY;
+             destinationY = (int16_t)(destinationY + stepY)) {
+            int16_t sourceY = (int16_t)(packedSourceTop + destinationY - packedTop);
+            uint8_t* sourceRow = sourcePixels
+                + multiplyUnsigned16((uint16_t)(sourceY - sourceTop), sourceRowBytes);
+            uint8_t* destinationRow = destinationPixels
+                + multiplyUnsigned16((uint16_t)(destinationY - destinationTop),
+                                     destinationRowBytes);
+            int16_t firstByte = (int16_t)(destinationFirstColumn >> 1);
+            int16_t lastByte = (int16_t)((destinationFirstColumn + pixelCount - 1) >> 1);
+            int16_t stepByte = 1;
+            uint16_t sourceLastColumn = (uint16_t)(sourceFirstColumn + pixelCount);
+            uint16_t destinationLastColumn = (uint16_t)(destinationFirstColumn + pixelCount);
+            if (sourceRow == destinationRow
+                && destinationFirstColumn < sourceLastColumn
+                && destinationLastColumn > sourceFirstColumn
+                && destinationFirstColumn > sourceFirstColumn) {
+                int16_t swap = firstByte; firstByte = lastByte; lastByte = swap;
+                stepByte = -1;
+            }
+            int16_t finalByte = (int16_t)(lastByte + stepByte);
+            for (int16_t destinationByteIndex = firstByte;
+                 destinationByteIndex != finalByte;
+                 destinationByteIndex = (int16_t)(destinationByteIndex + stepByte)) {
+                uint16_t destinationColumn = (uint16_t)(destinationByteIndex << 1);
+                uint8_t sourceValue = 0;
+                if (destinationColumn >= destinationFirstColumn
+                    && destinationColumn < destinationLastColumn) {
+                    uint16_t sourceColumn = (uint16_t)(sourceFirstColumn
+                        + destinationColumn - destinationFirstColumn);
+                    uint8_t sourceByte = sourceRow[sourceColumn >> 1];
+                    sourceValue = sourceColumn & 1
+                        ? (uint8_t)((sourceByte & 0x0f) << 4)
+                        : (uint8_t)(sourceByte & 0xf0);
+                }
+                ++destinationColumn;
+                if (destinationColumn >= destinationFirstColumn
+                    && destinationColumn < destinationLastColumn) {
+                    uint16_t sourceColumn = (uint16_t)(sourceFirstColumn
+                        + destinationColumn - destinationFirstColumn);
+                    uint8_t sourceByte = sourceRow[sourceColumn >> 1];
+                    sourceValue |= sourceColumn & 1
+                        ? (uint8_t)(sourceByte & 0x0f)
+                        : (uint8_t)(sourceByte >> 4);
+                }
+                uint8_t& destinationByte = destinationRow[destinationByteIndex];
+                if (mode == 1) destinationByte = (uint8_t)(destinationByte | sourceValue);
+                else destinationByte = (uint8_t)(destinationByte & (uint8_t)~sourceValue);
+            }
+        }
+        return true;
+    }
     if (unscaled && sourcePixels != destinationPixels
         && packedTop < packedBottom && packedLeft < packedRight) {
         // Cross-GWorld sprite/logo transfers frequently have an odd source or

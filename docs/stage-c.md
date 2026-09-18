@@ -273,6 +273,17 @@ the top plate. The original tracker returns index 0 and enters the common post-g
 20-second warped `stage_c.gdb` run produced no loud stop after this transition and remained at
 depth 87, so the next diagnostic is a code-boundary progress probe rather than a longer blind run.
 
+`amiga/garage_transition.gdb` now marks one-shot boundaries through that branch. It proves the
+handler enters its plate animation at `Main+$10AA`; the delay is composition, not a parked event
+loop. The moving image uses a 512×84 background source, a 290×84 plate and a 290×84 mask, with the
+plate destination initially at `(252,105)-(336,395)`. Because source x=0 and destination x=105
+have opposite nibble alignment, both same-PixMap `srcOr` and `srcBic` missed the aligned packed
+path and performed 48,720 pixel operations per frame. `CopyBits` now assembles those shifted
+sources one packed destination byte at a time and chooses horizontal and vertical memmove order
+when the moving destination overlaps its source. The build audits pass. The animation itself
+still intentionally polls `Button`, giving deterministic bring-up a faithful, bounded way to skip
+it after proving this path.
+
 `amiga/stage_c.gdb` breaks on `VetteScreen::showLoudStop`, after the report is complete, and prints
 the depth, trap identity, selector, runtime `(segment, offset)`, absolute PC, USP and its first
 words, all data/address registers, and nearby instructions. It then exits, so `diag_run.sh` stops

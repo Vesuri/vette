@@ -7,11 +7,12 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — current loud stop
 
-⭐ **HEAD OF QUEUE: trace the post-garage transition without lengthening blind runs.** The
-development path now selects ACCEPT and then the top license plate through the real event and
-control-tracking code. The second tracker returns index 0 and enters `Main+$0FC8`; a 20-second
-warped run reaches no loud stop. Add a code-boundary probe to locate progress through that shipped
-transition, then continue to the first unimplemented trap. Do not add dialog/UI traps to conceal
+⭐ **HEAD OF QUEUE: use the post-garage animation's real Button skip to reach the next trap.** The
+development path selects ACCEPT and the top license plate, then enters the shipped plate animation
+at `Main+$10AA`. Its odd-aligned same-PixMap `srcOr`/`srcBic` copies now have a packed-byte path,
+but startup plus the unskipped animation still consumes the short diagnostic window. Emit one
+development-only Button press after the plate selection—the animation explicitly polls Button for
+this purpose—then continue to the first unimplemented trap. Do not add dialog/UI traps to conceal
 an upstream failure.
 
 The MAME A-trap log remains a measured reference-run inventory → `docs/trap-log.md`,
