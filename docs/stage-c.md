@@ -446,6 +446,12 @@ chooses the already-active Course One by sending an ordinary press/release pair 
 buttons, and the decoded course-description panel. Road setup then reaches File Manager trap
 `$A007` from segment 1 + `$6074`.
 
+That synchronous `GetVolInfo` caller reads only `ioVCrDate` at parameter-block offset 30. The
+bridge returns `$D51CFD76`, measured directly from the master directory block of the shipped
+`VETTE!` HFS image, and `ioResult = noErr`; it does not fabricate the unused volume fields. This
+preserves the game's derivation of its `DATE` resource key. Execution then reaches QuickDraw
+`Random` (`$A861`) in road setup.
+
 The trap-address table is stateful. The observed `GetTrapAddress`/`SetTrapAddress` pair now records
 the game's replacement for `$A9F4 ExitToShell`; routing a later invocation through that replacement
 remains part of completing the trap bridge.

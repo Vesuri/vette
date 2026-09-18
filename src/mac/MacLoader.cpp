@@ -297,6 +297,7 @@ static void copyString(char* out, const char* in)
 
 struct TrapName { uint16_t word; const char* manager; const char* routine; };
 static const TrapName s_trapNames[] = {
+    {0xa007,"FILE MANAGER","GETVOLINFO"},
     {0xa02e,"MEMORY MANAGER","BLOCKMOVE"}, {0xa9f1,"SEGMENT MANAGER","UNLOADSEG"},
     {0xa86e,"QUICKDRAW","INITGRAF"},
     {0xa8fe,"FONT MANAGER","INITFONTS"}, {0xa912,"WINDOW MANAGER","INITWINDOWS"},
@@ -2158,6 +2159,17 @@ static bool paintRect(const uint8_t* rectangle)
     return top >= bottom || left >= right;
 }
 
+static bool getVolumeInfo(uint8_t* parameterBlock)
+{
+    if (!parameterBlock) return false;
+    write16(parameterBlock + 16, 0);          // ioResult = noErr
+    // Creation date from the shipped VETTE! HFS master directory block.  The
+    // first caller reads only ioVCrDate and uses it to derive its DATE resource
+    // key; leave the rest of the unrequested volume record untouched.
+    write32(parameterBlock + 30, 0xd51cfd76UL);
+    return true;
+}
+
 static bool invertRect(const uint8_t* rectangle)
 {
     uint8_t* pixels;
@@ -3470,6 +3482,13 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
         blockMove((uint8_t*)regs[8], (uint8_t*)regs[9], regs[0]);
         ++g_blockMoveCount;
         return 1;
+    }
+    if (trap == 0xa007) {                    // PBGetVInfoSync(parameter block in A0)
+        if (getVolumeInfo((uint8_t*)regs[8])) {
+            regs[0] = 0;                    // noErr
+            if (g_stageCDepth < 89) g_stageCDepth = 89;
+            return 1;
+        }
     }
     if (trap == 0xa9f1) {                    // _UnLoadSeg(Ptr), deliberately kept resident
         if (g_stageCDepth < 2) g_stageCDepth = 2;

@@ -7,12 +7,12 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — current loud stop
 
-⭐ **HEAD OF QUEUE: implement the measured File Manager `$A007` (`GetVolInfo`) call.** The scripted
-path now accepts the already-selected Course One on the game-rendered Bay Area course screen. Road
-setup immediately loud-stops at segment 1 + `$6074`, where a shared wrapper selects `$A007` or its
-hierarchical `$A407` variant. Decode the live parameter block and provide only the volume fields
-the game consumes. Do not invent filesystem UI or implement modal UI to conceal an upstream
-failure.
+⭐ **HEAD OF QUEUE: implement QuickDraw `$A861` (`Random`).** The measured synchronous
+`GetVolInfo` now returns the shipped HFS volume creation date—the only volume field its caller
+reads—and road setup advances to segment 1 + `$06A0`. There it repeatedly calls `Random` until
+the signed result lies in its requested range. Implement the classic `RndSeed` sequence through
+the existing Page-0 shadow; do not substitute host randomness. Do not implement modal UI to
+conceal an upstream failure.
 
 The MAME A-trap log remains a measured reference-run inventory → `docs/trap-log.md`,
 but Stage C has proved that it is **not an exact standalone-port first-use script**. The port has
