@@ -68,6 +68,8 @@ static uint8_t s_windowManagerPixMap[50];
 static uint8_t* s_windowManagerPixMapMaster;
 static uint8_t s_mainDevice[62];
 static uint8_t* s_mainDeviceMaster;
+static uint8_t s_mainDeviceITable[6 + 4096];
+static uint8_t* s_mainDeviceITableMaster;
 static uint8_t s_windowManagerColors[8 + 16 * 8];
 static uint8_t* s_windowManagerColorsMaster;
 static uint8_t s_windowManagerVisRgn[10];
@@ -323,7 +325,8 @@ static const TrapName s_trapNames[] = {
     {0xaa46,"WINDOW MANAGER","GETNEWCWINDOW"}, {0xa91b,"WINDOW MANAGER","MOVEWINDOW"},
     {0xa915,"WINDOW MANAGER","SHOWWINDOW"}, {0xa924,"WINDOW MANAGER","FRONTWINDOW"},
     {0xaa92,"PALETTE MANAGER","GETNEWPALETTE"}, {0xa873,"QUICKDRAW","SETPORT"},
-    {0xaa28,"COLOR MANAGER","GETCTSEED"}, {0xa91f,"WINDOW MANAGER","SELECTWINDOW"},
+    {0xaa28,"COLOR MANAGER","GETCTSEED"}, {0xaa39,"COLOR MANAGER","MAKEITABLE"},
+    {0xa91f,"WINDOW MANAGER","SELECTWINDOW"},
     {0xa922,"WINDOW MANAGER","BEGINUPDATE"}, {0xa923,"WINDOW MANAGER","ENDUPDATE"},
     {0xa889,"QUICKDRAW","TEXTMODE"}, {0xa9b9,"QUICKDRAW","GETCURSOR"},
     {0xa851,"QUICKDRAW","SETCURSOR"},
@@ -887,7 +890,12 @@ static void initWindowManagerPort()
     // One active screen GDevice is sufficient for the shipped single-monitor game.
     // gdPMap is at +22 in a classic GDevice record and is itself a Handle.
     s_mainDeviceMaster = s_mainDevice;
+    s_mainDeviceITableMaster = s_mainDeviceITable;
+    write32(s_mainDeviceITable, read32(s_windowManagerColors));
+    write16(s_mainDeviceITable + 4, 4);
     write16(s_mainDevice + 4, 0);           // clutType
+    write32(s_mainDevice + 6, (uint32_t)&s_mainDeviceITableMaster); // gdITable
+    write16(s_mainDevice + 10, 4);          // gdResPref
     write16(s_mainDevice + 20, 1);          // screenDevice
     write32(s_mainDevice + 22, (uint32_t)&s_windowManagerPixMapMaster);
     writeRect(s_mainDevice + 34, 0, 0, 320, 512);
@@ -925,6 +933,49 @@ static void initWindowManagerPort()
     write32(s_qdThePort, (uint32_t)s_windowManagerPort);
     write32(s_currentA5 + 8, (uint32_t)s_windowManagerPort);
     write32(s_currentA5 + 12, (uint32_t)&s_grayRgnMaster);
+}
+
+static bool makeITable(uint8_t** colorTableHandle, uint8_t** inverseTableHandle,
+                       uint16_t resolution)
+{
+    if (!colorTableHandle) colorTableHandle = &s_windowManagerColorsMaster;
+    if (!inverseTableHandle) inverseTableHandle = &s_mainDeviceITableMaster;
+    if (!resolution) resolution = read16(s_mainDevice + 10);
+    if (colorTableHandle != &s_windowManagerColorsMaster
+        || inverseTableHandle != &s_mainDeviceITableMaster
+        || !*colorTableHandle || !*inverseTableHandle || resolution != 4)
+        return false;
+
+    const uint8_t* colorTable = *colorTableHandle;
+    uint8_t* inverseTable = *inverseTableHandle;
+    uint16_t finalIndex = read16(colorTable + 6);
+    if (finalIndex > 255) finalIndex = 255;
+    write32(inverseTable, read32(colorTable));
+    write16(inverseTable + 4, resolution);
+    for (uint16_t key = 0; key < 4096; ++key) {
+        uint16_t r = (uint16_t)((key >> 8) & 15);
+        uint16_t g = (uint16_t)((key >> 4) & 15);
+        uint16_t b = (uint16_t)(key & 15);
+        r = (uint16_t)((r << 12) | (r << 8) | (r << 4) | r);
+        g = (uint16_t)((g << 12) | (g << 8) | (g << 4) | g);
+        b = (uint16_t)((b << 12) | (b << 8) | (b << 4) | b);
+        uint32_t bestDistance = 0xffffffffUL;
+        uint8_t bestValue = 0;
+        for (uint16_t i = 0; i <= finalIndex; ++i) {
+            const uint8_t* color = colorTable + 8 + i * 8;
+            uint16_t cr = read16(color + 2), cg = read16(color + 4);
+            uint16_t cb = read16(color + 6);
+            uint32_t distance = (r > cr ? r - cr : cr - r)
+                              + (g > cg ? g - cg : cg - g)
+                              + (b > cb ? b - cb : cb - b);
+            if (distance < bestDistance) {
+                bestDistance = distance;
+                bestValue = (uint8_t)read16(color);
+            }
+        }
+        inverseTable[6 + key] = bestValue;
+    }
+    return true;
 }
 
 static void initColorPort(uint8_t* port, uint8_t** visRgn, uint8_t** clipRgn,
@@ -3081,7 +3132,8 @@ static bool isPermanentHandle(uint8_t** handle)
     // The screen device and its PixMap are permanent system-style handles.  They
     // cannot move, but HLock on either is still a successful operation.
     return resourceHandleIndex(handle) >= 0 || handleAllocation(handle) || gWorldForPixMap(handle)
-        || handle == &s_mainDeviceMaster || handle == &s_windowManagerPixMapMaster;
+        || handle == &s_mainDeviceMaster || handle == &s_windowManagerPixMapMaster
+        || handle == &s_mainDeviceITableMaster;
 }
 
 static bool validatePermanentHandle(uint8_t** handle)
@@ -3562,6 +3614,13 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
         write32(userStack, s_colorSeed++);
         if (g_stageCDepth < 28) g_stageCDepth = 28;
         return 1;
+    }
+    if (trap == 0xaa39) {                    // MakeITable(cTab, iTab, resolution)
+        if (makeITable((uint8_t**)read32(userStack + 6),
+                       (uint8_t**)read32(userStack + 2), read16(userStack))) {
+            if (g_stageCDepth < 88) g_stageCDepth = 88;
+            return 11;
+        }
     }
     if (trap == 0xaa95) {                    // SetPalette(window, palette, update)
         WindowSlot* slot = windowSlot((uint8_t*)read32(userStack + 6));

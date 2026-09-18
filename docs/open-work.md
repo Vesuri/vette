@@ -7,11 +7,12 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — current loud stop
 
-⭐ **HEAD OF QUEUE: identify and implement `$AA39` at `Main+$132C`.** The deterministic path now
-uses the post-garage plate animation's own Button skip and immediately reaches this loud stop.
-The caller reserves two long results plus a word argument before the trap; establish the exact
-Toolbox routine and ABI from an authoritative trap table and the surrounding code, then implement
-only that operation. Do not add dialog/UI traps to conceal an upstream failure.
+⭐ **HEAD OF QUEUE: bound the first driving-picture decode.** `$AA39` is implemented as the
+measured `MakeITable(NIL,NIL,0)` call and depth advances to 88. The rest of the 20-second run is
+inside `drawPackedPictureBits`, decoding a 58,484-byte PICT (observed at byte 25,010) rather than
+at a trap. Add a one-shot boundary after this shipped `DrawPicture` call and measure whether it
+completes; if not, profile the decoder's actual hot opcode/path before optimizing it. Do not make
+blind runs longer and do not add dialog/UI traps to conceal an upstream failure.
 
 The MAME A-trap log remains a measured reference-run inventory → `docs/trap-log.md`,
 but Stage C has proved that it is **not an exact standalone-port first-use script**. The port has

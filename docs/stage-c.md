@@ -291,6 +291,15 @@ exits immediately through the loud-stop breakpoint at `$AA39`, `Main+$132C`, sti
 depth 87. Its caller has reserved two long result slots and pushed a zero word before the trap;
 the operation and ABI are the next measured implementation task.
 
+The classic trap table identifies `$AA39` as Color Manager `MakeITable`, whose signature is
+`MakeITable(CTabHandle, ITabHandle, short)`. The caller's stack is exactly
+`(cTabH=NIL, iTabH=NIL, resolution=0)`: use the current graphics device's CLUT and inverse table at
+its preferred resolution. The emulated screen GDevice now owns a permanent 4-bit inverse-table
+handle, advertises `gdResPref=4`, and `MakeITable` fills its 4096 byte RGB cube with the closest
+live CLUT index while copying the CLUT seed. The build audits pass and the next A1200 run reaches
+depth 88. It does not reach another trap within 20 seconds; the interrupt lands in
+`drawPackedPictureBits` while decoding byte 25,010 of a 58,484-byte PICT for the driving setup.
+
 `amiga/stage_c.gdb` breaks on `VetteScreen::showLoudStop`, after the report is complete, and prints
 the depth, trap identity, selector, runtime `(segment, offset)`, absolute PC, USP and its first
 words, all data/address registers, and nearby instructions. It then exits, so `diag_run.sh` stops
