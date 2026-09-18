@@ -465,7 +465,7 @@ static bool disableCopyProtection()
     return true;
 }
 
-static void blockMove(uint8_t* source, uint8_t* destination, uint32_t count)
+static void blockMove(const uint8_t* source, uint8_t* destination, uint32_t count)
 {
     if (destination > source && destination < source + count) {
         source += count;
@@ -1338,8 +1338,9 @@ static uint32_t multiplyDivide(uint16_t value, uint16_t multiplier, uint16_t div
     return quotient & 0xffff;
 }
 
-static bool drawPackedPictureBits(const uint8_t* picture, uint32_t size, uint32_t& offset,
-                                  const uint8_t* pictureFrame, const uint8_t* targetRect)
+static bool drawIndexedPictureBits(const uint8_t* picture, uint32_t size, uint32_t& offset,
+                                   const uint8_t* pictureFrame, const uint8_t* targetRect,
+                                   bool packed)
 {
     if (offset + 46 > size) return false;
     const uint8_t* pixMap = picture + offset;
@@ -1400,17 +1401,25 @@ static bool drawPackedPictureBits(const uint8_t* picture, uint32_t size, uint32_
     uint8_t* pixels = (uint8_t*)AllocMem(pixelBytes, 0);
     if (!pixels) return false;
     bool valid = true;
-    for (uint16_t row = 0; row < height && valid; ++row) {
-        if (offset + (rowBytes > 250 ? 2 : 1) > size) { valid = false; break; }
-        uint16_t packedSize;
-        if (rowBytes > 250) { packedSize = read16(picture + offset); offset += 2; }
-        else packedSize = picture[offset++];
-        if (offset + packedSize > size
-            || !unpackPackBitsRow(picture + offset, packedSize,
-                                  pixels + multiplyUnsigned16(row, rowBytes), rowBytes)) {
-            valid = false; break;
+    if (!packed) {
+        if (offset + pixelBytes > size) valid = false;
+        else {
+            blockMove(picture + offset, pixels, pixelBytes);
+            offset += pixelBytes;
         }
-        offset += packedSize;
+    } else {
+        for (uint16_t row = 0; row < height && valid; ++row) {
+            if (offset + (rowBytes > 250 ? 2 : 1) > size) { valid = false; break; }
+            uint16_t packedSize;
+            if (rowBytes > 250) { packedSize = read16(picture + offset); offset += 2; }
+            else packedSize = picture[offset++];
+            if (offset + packedSize > size
+                || !unpackPackBitsRow(picture + offset, packedSize,
+                                      pixels + multiplyUnsigned16(row, rowBytes), rowBytes)) {
+                valid = false; break;
+            }
+            offset += packedSize;
+        }
     }
     if (offset & 1) ++offset;
 
@@ -2055,14 +2064,17 @@ static bool drawPicture(uint8_t** pictureHandle, const uint8_t* targetRect)
             if (offset + 4UL + bytes > size) return false;
             offset += 4UL + bytes; if (offset & 1) ++offset; continue;
         }
-        if (opcode == 0x0098) {
-            if (!drawPackedPictureBits(picture, size, offset, frame, targetRect)) return false;
+        if (opcode == 0x0090 || opcode == 0x0098) {
+            if (!drawIndexedPictureBits(picture, size, offset, frame, targetRect,
+                                        opcode == 0x0098)) return false;
             drewPixels = true; continue;
         }
         if (opcode == 0x009a) {
             if (!drawDirectPictureBits(picture, size, offset, frame, targetRect)) return false;
             drewPixels = true; continue;
         }
+        s_unsupportedPictureOpcode = opcode;
+        s_unsupportedPictureOffset = offset - 2;
         return false;                        // retain the loud stop for every unseen opcode
     }
     return false;

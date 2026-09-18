@@ -2,6 +2,10 @@
 set pagination off
 set confirm off
 
+break VetteScreen::showLoudStop
+commands
+  silent
+end
 continue
 
 printf "\n===== PICT FAILURE =====\n"
