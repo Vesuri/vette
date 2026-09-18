@@ -197,8 +197,10 @@ loop starts.
 81. `GetNextEvent` (complete `nullEvent` record for the measured empty-queue poll)
 
 After this call there is no next loud stop in a 45-second event-driven run: the game remains in its
-main loop polling the empty queue. Mouse coordinates, button transitions, and keyboard events are
-the next input-layer feature rather than fabricated data in this checkpoint.
+main loop polling the empty queue. `GetNextEvent` now samples `JOY0DAT` as wrapping signed deltas,
+accumulates and clamps them to the 512×320 Macintosh surface, returns the live point and `btnState`
+in every record, and emits masked `mouseDown`/`mouseUp` transitions. Keyboard events remain the next
+input-layer feature.
 
 `amiga/stage_c.gdb` breaks on `VetteScreen::showLoudStop`, after the report is complete, and prints
 the depth, trap identity, selector, runtime `(segment, offset)`, absolute PC, USP and its first

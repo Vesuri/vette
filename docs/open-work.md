@@ -7,10 +7,10 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — current loud stop
 
-⭐ **HEAD OF QUEUE: real main-loop input.** The empty queue now returns a completely initialized
-`nullEvent` with the current Mac tick, and a 45-second event-driven run remains in the main loop
-without another loud stop. Add measured Amiga mouse coordinates/button transitions and keyboard
-events so the garage can be operated. Do not add dialog/UI traps to conceal an upstream failure.
+⭐ **HEAD OF QUEUE: keyboard input and garage interaction.** `GetNextEvent` now accumulates the
+Amiga's wrapping mouse-counter deltas into a clamped 512×320 Macintosh point and reports masked
+left-button transitions. Add keyboard events and verify the first garage interaction. Do not add
+dialog/UI traps to conceal an upstream failure.
 
 The MAME A-trap log remains a measured reference-run inventory → `docs/trap-log.md`,
 but Stage C has proved that it is **not an exact standalone-port first-use script**. The port has

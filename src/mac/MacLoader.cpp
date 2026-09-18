@@ -82,6 +82,10 @@ static uint8_t* s_trapAddresses[4096];
 static uint8_t* s_qdThePort;
 static uint8_t* s_currentA5;
 static uint16_t s_currentResourceFork = 0;  // application resource file at process launch
+static bool s_mouseInitialized;
+static uint8_t s_mouseCounterX, s_mouseCounterY;
+static int16_t s_mouseX = 256, s_mouseY = 160;
+static bool s_mouseButtonDown;
 
 struct WindowSlot {
     uint8_t record[170];                    // WindowRecord plus DialogRecord tail
@@ -2769,6 +2773,44 @@ static void serviceMacRuntime()
     }
 }
 
+static bool nextEvent(uint16_t mask, uint8_t* event)
+{
+    if (!event) return false;
+    uint16_t counters = *joy0datPointer;
+    uint8_t counterX = (uint8_t)counters;
+    uint8_t counterY = (uint8_t)(counters >> 8);
+    bool buttonDown = AmigaHardware::isLeftMouseButtonPressed();
+    bool transition = false;
+    uint16_t what = 0;
+    if (!s_mouseInitialized) {
+        s_mouseCounterX = counterX;
+        s_mouseCounterY = counterY;
+        s_mouseButtonDown = buttonDown;
+        s_mouseInitialized = true;
+    } else {
+        s_mouseX = (int16_t)(s_mouseX + (int8_t)(counterX - s_mouseCounterX));
+        s_mouseY = (int16_t)(s_mouseY + (int8_t)(counterY - s_mouseCounterY));
+        if (s_mouseX < 0) s_mouseX = 0;
+        if (s_mouseX > 511) s_mouseX = 511;
+        if (s_mouseY < 0) s_mouseY = 0;
+        if (s_mouseY > 319) s_mouseY = 319;
+        s_mouseCounterX = counterX;
+        s_mouseCounterY = counterY;
+        if (buttonDown != s_mouseButtonDown) {
+            what = buttonDown ? 1 : 2;
+            transition = (mask & (1u << what)) != 0;
+            s_mouseButtonDown = buttonDown;
+        }
+    }
+    write16(event + 0, transition ? what : 0);
+    write32(event + 2, 0);
+    write32(event + 6, g_macTicks);
+    write16(event + 10, (uint16_t)s_mouseY);
+    write16(event + 12, (uint16_t)s_mouseX);
+    write16(event + 14, buttonDown ? 0 : 0x0080);
+    return transition;
+}
+
 static int32_t resourceHandleIndex(uint8_t** handle)
 {
     uint32_t address = (uint32_t)handle;
@@ -2841,17 +2883,7 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
     if (trap == 0xa970) {                    // GetNextEvent(mask, event) -> Boolean
         uint8_t* event = (uint8_t*)read32(userStack);
         if (event) {
-            // The queue is empty on the measured first main-loop poll.  Return
-            // a complete nullEvent record rather than leaving caller storage
-            // stale. Mouse coordinates and keyboard production remain gated
-            // on the input layer that supplies them.
-            write16(event + 0, 0);           // nullEvent
-            write32(event + 2, 0);           // message
-            write32(event + 6, g_macTicks);  // when
-            write16(event + 10, 0);          // where.v
-            write16(event + 12, 0);          // where.h
-            write16(event + 14, 0);          // modifiers
-            write16(userStack + 6, 0);
+            write16(userStack + 6, nextEvent(read16(userStack + 4), event) ? 1 : 0);
             if (g_stageCDepth < 81) g_stageCDepth = 81;
             return 7;
         }
