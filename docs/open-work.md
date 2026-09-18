@@ -7,10 +7,11 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — current loud stop
 
-⭐ **HEAD OF QUEUE: implement `$A853 ShowCursor` at `FRED+$18FA`.** The matching parameterless
-`HideCursor` transition now clears the existing cursor visibility state without drawing UI. The
-next bounded run reaches depth 93 and loud-stops at `ShowCursor`, immediately before the caller's
-existing `FlushEvents` call. Restore only the tracked visibility state.
+⭐ **HEAD OF QUEUE: capture and classify the first live driving-loop state.** The matching
+parameterless `ShowCursor` transition restores the tracked cursor visibility state without drawing
+UI. The verified run reaches implemented depth 94 and continues through the 30-second ceiling with
+no loud stop. Capture the screen, PC and dirty bounds at that boundary; determine whether the game
+is driving, waiting for input, or spending time in another renderer path.
 
 The MAME A-trap log remains a measured reference-run inventory → `docs/trap-log.md`,
 but Stage C has proved that it is **not an exact standalone-port first-use script**. The port has

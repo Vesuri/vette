@@ -503,6 +503,10 @@ display still does not synthesize a software cursor. The verified run reaches im
 and next stops at the matching parameterless `$A853 ShowCursor`, `FRED+$18FA`, immediately before
 that caller invokes the already implemented `FlushEvents`.
 
+`ShowCursor` restores the same tracked visibility flag, again without synthesizing cursor pixels.
+The verified run reaches implemented depth 94 and continues through the 30-second safety ceiling
+without another loud stop. The next task is to capture and classify that live driving-loop state.
+
 The trap-address table is stateful. The observed `GetTrapAddress`/`SetTrapAddress` pair now records
 the game's replacement for `$A9F4 ExitToShell`; routing a later invocation through that replacement
 remains part of completing the trap bridge.
