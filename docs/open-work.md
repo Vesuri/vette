@@ -7,11 +7,11 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — current loud stop
 
-⭐ **HEAD OF QUEUE: advance the deterministic path with keypad `8` acceleration.** The depth-94
-screen is the completed driving setup canvas, not a failed road frame. `ShowCursor` returns from
-`Initialize+$18FA` to the event loop; five 512×512 atlases and the 3904×144 skyline strip are loaded
-correctly in live GWorlds. After depth 94, emit one ordinary Macintosh keypad-8 key-down/up pair
-through `GetNextEvent`, leaving production input unchanged, and follow the next loud stop.
+⭐ **HEAD OF QUEUE: trace the driving renderer's callback handoff after `Initialize+$18FA`.** The
+deterministic path now delivers keypad `8` through ordinary `GetNextEvent` records, holds it for 60
+Macintosh ticks, and releases it; phase 12 proves both events were consumed. The framebuffer remains
+the blank-upper-viewport setup canvas and no trap fires. Inspect the live VBL task records and
+callback entry/return state at depth 94 to determine why FRED's first road frame is not scheduled.
 
 The MAME A-trap log remains a measured reference-run inventory → `docs/trap-log.md`,
 but Stage C has proved that it is **not an exact standalone-port first-use script**. The port has

@@ -500,7 +500,7 @@ both images and loud-stops at `$A852 HideCursor`, `Main+$268A`; implemented dept
 
 `HideCursor` now clears the compatibility layer's existing cursor visibility state; the Amiga
 display still does not synthesize a software cursor. The verified run reaches implemented depth 93
-and next stops at the matching parameterless `$A853 ShowCursor`, `FRED+$18FA`, immediately before
+and next stops at the matching parameterless `$A853 ShowCursor`, `Initialize+$18FA`, immediately before
 that caller invokes the already implemented `FlushEvents`.
 
 `ShowCursor` restores the same tracked visibility flag, again without synthesizing cursor pixels.
@@ -518,6 +518,12 @@ missing assets. Five live GWorlds are 512×512 with the game's measured 260-byte
 a deliberate 3904×144 surface with 1956-byte rows and contains the complete repeating skyline and
 roadside panorama. The stride-aware `tools/render_amiga_chunky.py` renders all six without stripping
 their row padding. The next deterministic input is keypad `8`, the game's acceleration control.
+
+For `GARAGE_CLICK=1`, `GetNextEvent` now emits a Macintosh keypad-8 key-down only after
+`ShowCursor` has raised depth to 94, holds it for 60 Macintosh ticks, and then emits key-up.
+`amiga/driving_input_capture.gdb` verifies phase 12, so both ordinary `EventRecord`s were consumed.
+The upper viewport nevertheless remains white and no loud stop occurs. The next boundary is the
+post-Initialize VBL/callback handoff, not more synthetic UI or another guessed drawing primitive.
 
 The trap-address table is stateful. The observed `GetTrapAddress`/`SetTrapAddress` pair now records
 the game's replacement for `$A9F4 ExitToShell`; routing a later invocation through that replacement

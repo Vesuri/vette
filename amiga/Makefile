@@ -119,10 +119,11 @@ ifeq ($(SKIP_INTRO),1)
 EXTRA_DEFINES += -DVETTE_SKIP_INTRO
 endif
 
-# Deterministic Stage-C stepping only.  GetNextEvent selects ACCEPT and then the
-# top license plate through two normal mouse-down/up pairs; Button then skips
-# the plate animation through its shipped input branch.  Production builds
-# always use the live Amiga mouse and never define this.
+# Deterministic Stage-C stepping only.  GetNextEvent traverses the garage,
+# vehicle and course selectors with normal mouse events; Button skips the plate
+# animation through its shipped input branch.  After driving setup returns, one
+# keypad-8 down/up pair exercises the game's acceleration control.  Production
+# builds always use live Amiga input and never define this.
 ifeq ($(GARAGE_CLICK),1)
 EXTRA_DEFINES += -DVETTE_GARAGE_CLICK
 endif

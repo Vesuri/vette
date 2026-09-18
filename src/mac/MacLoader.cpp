@@ -92,6 +92,7 @@ static bool s_mouseButtonDown;
 #ifdef VETTE_GARAGE_CLICK
 static uint8_t s_garageClickPhase;
 static bool s_garageTransitionSkipped;
+static uint32_t s_driveKeyReleaseTick;
 #endif
 
 struct WindowSlot {
@@ -3564,6 +3565,25 @@ static bool nextEvent(uint16_t mask, uint8_t* event)
         message = ((uint32_t)key.virtualKey << 8) | character;
         transition = true;
     }
+#ifdef VETTE_GARAGE_CLICK
+    // Once driving setup has returned to its event loop, press and release
+    // Macintosh keypad 8 through the ordinary EventRecord path.  This is the
+    // game's acceleration control; gating it on the measured ShowCursor depth
+    // prevents the course selector or setup code from consuming it early.
+    if (!transition && s_garageClickPhase >= 10 && s_garageClickPhase < 12
+        && g_stageCDepth >= 94
+        && (s_garageClickPhase == 10
+            || (int32_t)(g_macTicks - s_driveKeyReleaseTick) >= 0)) {
+        uint16_t keyWhat = (s_garageClickPhase & 1) ? 4 : 3;
+        if (mask & (1u << keyWhat)) {
+            what = keyWhat;
+            message = (0x5bUL << 8) | '8';  // Macintosh keypad 8
+            transition = true;
+            if (s_garageClickPhase == 10) s_driveKeyReleaseTick = g_macTicks + 60;
+            ++s_garageClickPhase;
+        }
+    }
+#endif
 
     write16(event + 0, transition ? what : 0);
     write32(event + 2, message);
