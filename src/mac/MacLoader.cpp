@@ -1455,7 +1455,7 @@ static bool drawIndexedPictureBits(const uint8_t* picture, uint32_t size, uint32
         || copyBottom <= copyTop || copyRight <= copyLeft) valid = false;
 
     bool usedPackedRows = false;
-    bool unscaledPacked = valid && pixelSize == 4
+    bool unscaledPacked = valid
         && frameBottom - frameTop == targetBottom - targetTop
         && frameRight - frameLeft == targetRight - targetLeft
         && rasterBottom - rasterTop == copyBottom - copyTop
@@ -1487,7 +1487,7 @@ static bool drawIndexedPictureBits(const uint8_t* picture, uint32_t size, uint32
             = (int16_t)(copyLeft + packedLeft - translatedRasterLeft);
         if (packedTop >= packedBottom || packedLeft >= packedRight) {
             usedPackedRows = true;
-        } else if (((packedSourceLeft - sourceLeft) & 1) == 0
+        } else if (pixelSize == 4 && ((packedSourceLeft - sourceLeft) & 1) == 0
                    && ((packedLeft - mapLeft) & 1) == 0
                    && ((packedRight - packedLeft) & 1) == 0) {
             uint16_t copyBytes = (uint16_t)(packedRight - packedLeft) >> 1;
@@ -1500,6 +1500,23 @@ static bool drawIndexedPictureBits(const uint8_t* picture, uint32_t size, uint32
                     + multiplyUnsigned16((uint16_t)(y - mapTop), destinationRowBytes)
                     + (uint16_t)(packedLeft - mapLeft) / 2;
                 blockMove(source, destination, copyBytes);
+            }
+            usedPackedRows = true;
+        } else if (pixelSize == 8) {
+            for (int16_t y = packedTop; y < packedBottom; ++y) {
+                int16_t sourceY = (int16_t)(copyTop + y - translatedRasterTop);
+                const uint8_t* source = pixels
+                    + multiplyUnsigned16((uint16_t)(sourceY - sourceTop), rowBytes)
+                    + (uint16_t)(packedSourceLeft - sourceLeft);
+                uint8_t* destination = destinationPixels
+                    + multiplyUnsigned16((uint16_t)(y - mapTop), destinationRowBytes);
+                for (int16_t x = packedLeft; x < packedRight; ++x) {
+                    uint8_t value = colorMap[*source++];
+                    uint16_t column = (uint16_t)(x - mapLeft);
+                    uint8_t& byte = destination[column >> 1];
+                    if (column & 1) byte = (uint8_t)((byte & 0xf0) | value);
+                    else byte = (uint8_t)((byte & 0x0f) | (value << 4));
+                }
             }
             usedPackedRows = true;
         }

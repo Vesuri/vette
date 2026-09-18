@@ -478,8 +478,11 @@ rows. The icon completes and execution begins decoding a larger packed road asse
 
 The indexed-raster fast path now accepts equal-size target rectangles translated away from the
 PICT frame origin. It translates each raster destination rectangle once, clips it, and copies
-aligned packed rows directly. This completes the 384×48 `PICT 29556`; the next measured hotspot is
-512×24 `PICT 506`, which still takes the general coordinate-mapping path pending rectangle probes.
+aligned 4-bit packed rows directly. The same geometry test also covers 8-bit indexed sources:
+their bytes are palette-mapped straight into the destination's packed 4-bit pixels without running
+the coordinate scaler for every pixel. This completes both the 384×48 `PICT 29556` and the unscaled
+512×24 application-fork `PICT 506`. A 24-second Stage C run advances into subsequent resource
+loading without reaching a loud stop; implemented trap depth remains 92.
 
 The trap-address table is stateful. The observed `GetTrapAddress`/`SetTrapAddress` pair now records
 the game's replacement for `$A9F4 ExitToShell`; routing a later invocation through that replacement
