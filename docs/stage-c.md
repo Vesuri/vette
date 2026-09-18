@@ -440,6 +440,12 @@ outside the current 512×512 port. Classic QuickDraw clips that to an empty oper
 does the same, but deliberately leaves non-empty `PaintRect` drawing unimplemented so a later
 real use still raises the loud stop.
 
+The deterministic `GARAGE_CLICK=1` bring-up path now continues through the course selector. It
+chooses the already-active Course One by sending an ordinary press/release pair to the visible
+`ACCEPT` control. The resulting screen is entirely game-rendered: Bay Area map, route, four course
+buttons, and the decoded course-description panel. Road setup then reaches File Manager trap
+`$A007` from segment 1 + `$6074`.
+
 The trap-address table is stateful. The observed `GetTrapAddress`/`SetTrapAddress` pair now records
 the game's replacement for `$A9F4 ExitToShell`; routing a later invocation through that replacement
 remains part of completing the trap bridge.

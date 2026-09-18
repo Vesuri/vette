@@ -7,13 +7,12 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — current loud stop
 
-⭐ **HEAD OF QUEUE: identify the first road-loop boundary after the vehicle selector.**
-Application-fork `PICT 6398` renders the course description, the Corvette selection is accepted,
-and the immediately following `$A8A2` (`PaintRect`) at `Main+$173A` is now known to be an empty
-clipped operation: the shipped code passes its adjacent PICT-ID table (`6398, 5383, ...`) as the
-rectangle, wholly outside the 512×512 port. A bounded run proceeds without another loud stop.
-Capture the post-accept screen/state or extend the bound just enough to reach the next trap; do
-not implement modal UI merely to conceal an upstream failure.
+⭐ **HEAD OF QUEUE: implement the measured File Manager `$A007` (`GetVolInfo`) call.** The scripted
+path now accepts the already-selected Course One on the game-rendered Bay Area course screen. Road
+setup immediately loud-stops at segment 1 + `$6074`, where a shared wrapper selects `$A007` or its
+hierarchical `$A407` variant. Decode the live parameter block and provide only the volume fields
+the game consumes. Do not invent filesystem UI or implement modal UI to conceal an upstream
+failure.
 
 The MAME A-trap log remains a measured reference-run inventory → `docs/trap-log.md`,
 but Stage C has proved that it is **not an exact standalone-port first-use script**. The port has
