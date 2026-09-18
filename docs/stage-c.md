@@ -434,6 +434,12 @@ through the active 16-color table. `CopyBits` supports the measured `srcCopy` an
 including scaling, overlap safety, and the current rectangular clip; unsupported opcodes and modes
 still fall through to the loud stop.
 
+The first `PaintRect` after the course-description PICT is not a visible fill. At `Main+$173A`
+the game passes the adjacent PICT-ID table (`6398, 5383, ...`) as a rectangle; all of it lies
+outside the current 512×512 port. Classic QuickDraw clips that to an empty operation. The bridge
+does the same, but deliberately leaves non-empty `PaintRect` drawing unimplemented so a later
+real use still raises the loud stop.
+
 The trap-address table is stateful. The observed `GetTrapAddress`/`SetTrapAddress` pair now records
 the game's replacement for `$A9F4 ExitToShell`; routing a later invocation through that replacement
 remains part of completing the trap bridge.

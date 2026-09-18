@@ -7,12 +7,13 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — current loud stop
 
-⭐ **HEAD OF QUEUE: implement the measured `PaintRect`.** Application-fork `PICT 6398` now renders
-through its end using the measured version-1 pen-pattern/size, short-line, rounded-rectangle and
-text subset. The next loud stop moves to the immediately following `$A8A2` (`PaintRect`) at
-`Main+$173A`. Implement the normal QuickDraw patterned rectangle against the current port and its
-clip, then resume the scripted selector path. Do not implement modal UI merely to conceal an
-upstream failure.
+⭐ **HEAD OF QUEUE: identify the first road-loop boundary after the vehicle selector.**
+Application-fork `PICT 6398` renders the course description, the Corvette selection is accepted,
+and the immediately following `$A8A2` (`PaintRect`) at `Main+$173A` is now known to be an empty
+clipped operation: the shipped code passes its adjacent PICT-ID table (`6398, 5383, ...`) as the
+rectangle, wholly outside the 512×512 port. A bounded run proceeds without another loud stop.
+Capture the post-accept screen/state or extend the bound just enough to reach the next trap; do
+not implement modal UI merely to conceal an upstream failure.
 
 The MAME A-trap log remains a measured reference-run inventory → `docs/trap-log.md`,
 but Stage C has proved that it is **not an exact standalone-port first-use script**. The port has

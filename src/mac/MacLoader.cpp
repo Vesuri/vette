@@ -340,6 +340,7 @@ static const TrapName s_trapNames[] = {
     {0xa850,"QUICKDRAW","INITCURSOR"}, {0xa9bc,"QUICKDRAW","GETPICTURE"},
     {0xa8f6,"QUICKDRAW","DRAWPICTURE"}, {0xa89b,"QUICKDRAW","PENSIZE"},
     {0xa89c,"QUICKDRAW","PENMODE"}, {0xa8a1,"QUICKDRAW","FRAMERECT"},
+    {0xa8a2,"QUICKDRAW","PAINTRECT"},
     {0xa8a4,"QUICKDRAW","INVERTRECT"},
     {0xa8a9,"QUICKDRAW","INSETRECT"}, {0xa8b0,"QUICKDRAW","FRAMEROUNDRECT"},
     {0xa8ad,"QUICKDRAW","PTINRECT"},
@@ -2122,6 +2123,39 @@ static bool eraseRect(const uint8_t* rectangle)
         if (keepLowNibble) row[lastByte] &= 0x0f;
     }
     return true;
+}
+
+static bool paintRect(const uint8_t* rectangle)
+{
+    uint8_t* port = (uint8_t*)read32(s_qdThePort);
+    uint8_t* pixels;
+    uint16_t rowBytes;
+    int16_t mapTop, mapLeft, mapBottom, mapRight;
+    if (!port || !rectangle
+        || !currentPortPixels(pixels, rowBytes, mapTop, mapLeft, mapBottom, mapRight)) return false;
+    int16_t top = (int16_t)read16(rectangle);
+    int16_t left = (int16_t)read16(rectangle + 2);
+    int16_t bottom = (int16_t)read16(rectangle + 4);
+    int16_t right = (int16_t)read16(rectangle + 6);
+    if (top >= bottom || left >= right) return false;
+    uint8_t** clipHandle = (uint8_t**)read32(port + 28);
+    uint8_t* clip = clipHandle ? *clipHandle : 0;
+    if (top < mapTop) top = mapTop;
+    if (left < mapLeft) left = mapLeft;
+    if (bottom > mapBottom) bottom = mapBottom;
+    if (right > mapRight) right = mapRight;
+    if (clip && read16(clip) >= 10) {
+        if (top < (int16_t)read16(clip + 2)) top = (int16_t)read16(clip + 2);
+        if (left < (int16_t)read16(clip + 4)) left = (int16_t)read16(clip + 4);
+        if (bottom > (int16_t)read16(clip + 6)) bottom = (int16_t)read16(clip + 6);
+        if (right > (int16_t)read16(clip + 8)) right = (int16_t)read16(clip + 8);
+    }
+    // VETTE passes its adjacent PICT-ID table (6398, 5383, ...) to PaintRect
+    // once after drawing the course description.  The resulting rectangle is
+    // wholly outside the port; QuickDraw clips it to an empty operation before
+    // the pen transfer mode matters.  Keep that behavior without silently
+    // accepting an unimplemented on-screen mode.
+    return top >= bottom || left >= right;
 }
 
 static bool invertRect(const uint8_t* rectangle)
@@ -4012,6 +4046,13 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
         if (frameRect(rectangle)) {
             if (currentPortIsScreen()) markDirty(rectangle);
             if (g_stageCDepth < 60) g_stageCDepth = 60;
+            return 5;
+        }
+    }
+    if (trap == 0xa8a2) {                    // PaintRect(rectangle)
+        const uint8_t* rectangle = (const uint8_t*)read32(userStack);
+        if (paintRect(rectangle)) {
+            if (currentPortIsScreen()) markDirty(rectangle);
             return 5;
         }
     }
