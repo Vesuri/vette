@@ -498,6 +498,11 @@ clipped unscaled path now expands each source bit directly into the destination 
 `srcCopy` or `srcOr` without four coordinate divisions per pixel. The next bounded run completes
 both images and loud-stops at `$A852 HideCursor`, `Main+$268A`; implemented depth remains 92.
 
+`HideCursor` now clears the compatibility layer's existing cursor visibility state; the Amiga
+display still does not synthesize a software cursor. The verified run reaches implemented depth 93
+and next stops at the matching parameterless `$A853 ShowCursor`, `FRED+$18FA`, immediately before
+that caller invokes the already implemented `FlushEvents`.
+
 The trap-address table is stateful. The observed `GetTrapAddress`/`SetTrapAddress` pair now records
 the game's replacement for `$A9F4 ExitToShell`; routing a later invocation through that replacement
 remains part of completing the trap bridge.

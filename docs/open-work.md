@@ -7,10 +7,10 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — current loud stop
 
-⭐ **HEAD OF QUEUE: implement `$A852 HideCursor` at `Main+$268A`.** The two measured monochrome
-road-screen masks now use their proven unscaled mappings and the next bounded run stops immediately
-after them at this parameterless QuickDraw cursor-state call. Track visibility in the existing
-cursor state; do not synthesize cursor drawing or unrelated UI.
+⭐ **HEAD OF QUEUE: implement `$A853 ShowCursor` at `FRED+$18FA`.** The matching parameterless
+`HideCursor` transition now clears the existing cursor visibility state without drawing UI. The
+next bounded run reaches depth 93 and loud-stops at `ShowCursor`, immediately before the caller's
+existing `FlushEvents` call. Restore only the tracked visibility state.
 
 The MAME A-trap log remains a measured reference-run inventory → `docs/trap-log.md`,
 but Stage C has proved that it is **not an exact standalone-port first-use script**. The port has

@@ -333,7 +333,7 @@ static const TrapName s_trapNames[] = {
     {0xa91f,"WINDOW MANAGER","SELECTWINDOW"},
     {0xa922,"WINDOW MANAGER","BEGINUPDATE"}, {0xa923,"WINDOW MANAGER","ENDUPDATE"},
     {0xa889,"QUICKDRAW","TEXTMODE"}, {0xa9b9,"QUICKDRAW","GETCURSOR"},
-    {0xa851,"QUICKDRAW","SETCURSOR"},
+    {0xa851,"QUICKDRAW","SETCURSOR"}, {0xa852,"QUICKDRAW","HIDECURSOR"},
     {0xa97c,"DIALOG MANAGER","GETNEWDIALOG"}, {0xa981,"DIALOG MANAGER","DRAWDIALOG"},
     {0xab1d,"QUICKDRAW","QDEXTENSIONS"},
     {0xaa95,"PALETTE MANAGER","SETPALETTE"}, {0xa146,"TRAP MANAGER","GETTRAPADDRESS"},
@@ -3779,6 +3779,11 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
     if (trap == 0xa850) {                    // InitCursor()
         initCursor();
         if (g_stageCDepth < 10) g_stageCDepth = 10;
+        return 1;
+    }
+    if (trap == 0xa852) {                    // HideCursor()
+        s_cursor.visible = false;
+        if (g_stageCDepth < 93) g_stageCDepth = 93;
         return 1;
     }
     if (trap == 0xa746) {                    // GetToolTrapAddress(D0) -> A0
