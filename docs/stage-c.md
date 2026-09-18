@@ -419,8 +419,11 @@ bridge. Delivery therefore belongs at a later user-mode scheduling point, not in
 interrupt.
 
 The scheduler ages every installed task before selecting a callback, then rotates its selection
-point after delivering at most one callback at the next user-mode trap return. The earlier
-return-on-first-due loop let the one-tick sound task permanently starve the three-tick driving task.
+point after delivering at most one callback at the next user-mode trap return. Every handled
+Line-A return is a safe point, not only `SystemTask`: the road renderer can spend a long interval
+making only QuickDraw and `BlockMove` calls. An explicit active-callback flag prevents a trap nested
+inside a callback from scheduling another callback recursively. The earlier return-on-first-due
+loop let the one-tick sound task permanently starve the three-tick driving task.
 `amiga/driving_keymap.gdb` stops after the driving callback sees held keypad 8 and verifies that it
 increments the original steering/throttle global through the user-mode trampoline.
 
@@ -572,17 +575,23 @@ a deliberate 3904×144 surface with 1956-byte rows and contains the complete rep
 roadside panorama. The stride-aware `tools/render_amiga_chunky.py` renders all six without stripping
 their row padding. The next deterministic input is keypad `8`, the game's acceleration control.
 
-For `GARAGE_CLICK=1`, `GetNextEvent` emits a Macintosh keypad-8 key-down only after
-`ShowCursor` has raised depth to 94, holds it for 60 Macintosh ticks, and then emits key-up.
-`amiga/driving_input_capture.gdb` verifies phase 12, so both ordinary `EventRecord`s were consumed.
-The game also polls KeyMap directly from its driving VBL callback, so the synthetic and physical
-key paths update the independent KeyMap shadow as well as producing ordinary EventRecords.
+For `GARAGE_CLICK=1`, accepting Course One advances the deterministic UI path to phase 9 and
+immediately enters road setup; there is no guaranteed subsequent UI event poll before driving.
+The harness therefore holds Macintosh keypad 8 in the independent KeyMap shadow at that measured
+transition. Physical keys still update both KeyMap and ordinary EventRecords. This also corrects
+the earlier assumption that `ShowCursor` at depth 94 was the start-of-driving boundary: the
+game-produced road renderer is already active at depth 93.
 
 With all VBL records aged fairly, the driving callback runs instead of remaining frozen behind the
 sound task. A bounded `driving_input_capture.gdb` run now catches the game copying road data into
 the upper chunky surface and captures the first entirely game-drawn driving frame: skyline,
 roadside panorama, traffic, rear-view mirror and cockpit are all present. No new trap was needed to
 produce it; the blocker was callback scheduling, not an unimplemented drawing primitive.
+
+`amiga/driving_motion.gdb` captures the chunky surface at two consecutive driving-task returns.
+On the A1200 acceptance configuration the held KeyMap word is `$0010`, the original throttle global
+advances from 3 to 6, and the two 81,920-byte surfaces differ (`f9eb1e3e…` versus `8e540ac2…`). This
+is a measured moving road renderer, not two samples of the same setup canvas.
 
 The trap-address table is stateful. The observed `GetTrapAddress`/`SetTrapAddress` pair now records
 the game's replacement for `$A9F4 ExitToShell`; routing a later invocation through that replacement

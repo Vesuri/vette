@@ -48,7 +48,9 @@ vette_user_vbl_trampoline:
 	clr.l g_macVBLCallbackEntry
 	move.l g_macVBLCallbackTask,a0
 	move.l g_macVBLCallbackA5,a5
+	move.w #1,g_macVBLCallbackActive
 	jsr (a1)
+	clr.w g_macVBLCallbackActive
 	movem.l (sp)+,d0-d7/a0-a6
 	move.l g_macVBLCallbackReturn,-(sp)
 	rts

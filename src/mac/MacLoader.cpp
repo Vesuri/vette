@@ -43,6 +43,7 @@ volatile uint32_t g_macVBLCallbackEntry = 0;
 volatile uint32_t g_macVBLCallbackTask = 0;
 volatile uint32_t g_macVBLCallbackA5 = 0;
 volatile uint32_t g_macVBLCallbackReturn = 0;
+volatile uint16_t g_macVBLCallbackActive = 0;
 volatile uint16_t g_introAudioState = 0;
 volatile uint32_t g_introAudioBytes = 0;
 volatile uint16_t g_introAudioPeriod = 0;
@@ -92,7 +93,6 @@ static bool s_mouseButtonDown;
 #ifdef VETTE_GARAGE_CLICK
 static uint8_t s_garageClickPhase;
 static bool s_garageTransitionSkipped;
-static uint32_t s_driveKeyReleaseTick;
 #endif
 
 struct WindowSlot {
@@ -3570,7 +3570,7 @@ static int16_t installVBLTask(uint8_t* task)
 
 static void scheduleVBLTask()
 {
-    if (!s_vblTaskCount || g_macVBLCallbackEntry) return;
+    if (!s_vblTaskCount || g_macVBLCallbackEntry || g_macVBLCallbackActive) return;
     uint32_t now = g_macTicks;
     uint32_t elapsed = now - s_vblLastTick;
     if (elapsed) {
@@ -3810,6 +3810,11 @@ static bool nextEvent(uint16_t mask, uint8_t* event)
             what = clickWhat;
             transition = true;
             ++s_garageClickPhase;
+            // The Course One press (phase 9) immediately enters road setup;
+            // no further UI event poll is guaranteed before the driving VBL
+            // callback begins reading KeyMap.  Hold accelerator state here,
+            // independently of the mouse EventRecord that selected the course.
+            if (s_garageClickPhase == 9) setDrivingKeyState(0x5b, true);
         }
     }
 #endif
@@ -3831,27 +3836,6 @@ static bool nextEvent(uint16_t mask, uint8_t* event)
         message = ((uint32_t)key.virtualKey << 8) | character;
         transition = true;
     }
-#ifdef VETTE_GARAGE_CLICK
-    // Once driving setup has returned to its event loop, press and release
-    // Macintosh keypad 8 through the ordinary EventRecord path.  This is the
-    // game's acceleration control; gating it on the measured ShowCursor depth
-    // prevents the course selector or setup code from consuming it early.
-    if (!transition && s_garageClickPhase >= 10 && s_garageClickPhase < 12
-        && g_stageCDepth >= 94
-        && (s_garageClickPhase == 10
-            || (int32_t)(g_macTicks - s_driveKeyReleaseTick) >= 0)) {
-        uint16_t keyWhat = (s_garageClickPhase & 1) ? 4 : 3;
-        if (mask & (1u << keyWhat)) {
-            what = keyWhat;
-            message = (0x5bUL << 8) | '8';  // Macintosh keypad 8
-            setDrivingKeyState(0x5b, keyWhat == 3);
-            transition = true;
-            if (s_garageClickPhase == 10) s_driveKeyReleaseTick = g_macTicks + 60;
-            ++s_garageClickPhase;
-        }
-    }
-#endif
-
     write16(event + 0, transition ? what : 0);
     write32(event + 2, message);
     write32(event + 6, g_macTicks);
@@ -3907,6 +3891,10 @@ static bool validatePermanentHandle(uint8_t** handle)
 // a six-byte frame on the supervisor stack.  This differs from the supervisor-mode Mac II.
 extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* userStack)
 {
+    // Every handled trap return is a user-mode-safe opportunity to deliver
+    // due VBL work.  Restricting this to SystemTask left callbacks frozen while
+    // the road renderer made only QuickDraw/BlockMove calls.
+    scheduleVBLTask();
     uint32_t pc = read32(frame + 2);
     uint16_t trap = read16((const uint8_t*)pc);
     if (trap == 0xa02e) {                    // _BlockMove: A0, A1, D0; registers preserved

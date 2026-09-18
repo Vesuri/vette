@@ -12,9 +12,10 @@ viewport was an intermediate frame. The live VBL queue contained a one-tick soun
 three-tick driving task; returning after the first due record starved the latter forever. The
 scheduler now ages every record and selects callbacks round-robin, and the three direct `$0174`
 readers share a complete A5-relative KeyMap shadow. The first game-drawn road frame now contains
-skyline, traffic, mirror and cockpit without another trap. Keep keypad 8 asserted through the
-direct KeyMap path, capture a short sequence to prove motion, and let the loud stop identify the
-next missing compatibility operation.
+skyline, traffic, mirror and cockpit without another trap. Keypad 8 is held through the direct
+KeyMap path at the Course One transition; consecutive driving-task captures differ and the original
+throttle global advances from 3 to 6. Let the loud stop now identify the next missing compatibility
+operation during sustained driving.
 
 The MAME A-trap log remains a measured reference-run inventory → `docs/trap-log.md`,
 but Stage C has proved that it is **not an exact standalone-port first-use script**. The port has
