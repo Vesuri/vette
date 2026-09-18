@@ -5,16 +5,6 @@ that session touched). ⚠⚠ **This is a QUEUE, not a log:** an entry is **DELE
 closes it, and what the work taught goes in the doc that was wrong. `make todo` prints this file
 plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
-## Selector GWorld realization
-
-The System 6 oracle now supplies exact physical slot layouts for palettes 130, 140, and 131, and
-the rotating F40 consequently uses the correct red body, pale-blue glass, and dark-green grid
-without car detection or pixel rewriting. The static selector artwork still diverges after the
-palette-131 transition: its pixels originate in a palette-130 GWorld, and the remaining work is to
-identify which measured `CopyBits`/GWorld activation in the port fails to preserve the original
-physical indices. Do not compensate by remapping the framebuffer; both original and port GWorld
-tables have matching seeds at the final model copy, so capture the earlier composition boundary.
-
 ## Blocking — current loud stop
 
 ⭐ **HEAD OF QUEUE: finish the first driving frame and identify its completion boundary.** The blank upper

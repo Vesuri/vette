@@ -1469,6 +1469,14 @@ static bool drawIndexedPictureBits(const uint8_t* picture, uint32_t size, uint32
         ? (uint8_t**)read32(destinationMap + 42) : 0;
     const uint8_t* destinationColors = destinationColorHandle
         ? *destinationColorHandle : s_windowManagerColors;
+    // An offscreen GWorld may retain a creation-time RGB snapshot while
+    // Palette Manager synchronizes its ctSeed to the active device.  Color
+    // QuickDraw then maps through that device environment; consulting the
+    // stale private RGB entries turns the selector's intended physical pens
+    // into unrelated colors.
+    if (destinationColors != s_windowManagerColors
+        && read32(destinationColors) == read32(s_windowManagerColors))
+        destinationColors = s_windowManagerColors;
 
     if (offset + 8 > size) return false;
     const uint8_t* colorTable = picture + offset;
@@ -1923,6 +1931,9 @@ static bool drawDirectPictureBits(const uint8_t* picture, uint32_t size, uint32_
         ? (uint8_t**)read32(destinationMap + 42) : 0;
     const uint8_t* destinationColors = destinationColorHandle
         ? *destinationColorHandle : s_windowManagerColors;
+    if (destinationColors != s_windowManagerColors
+        && read32(destinationColors) == read32(s_windowManagerColors))
+        destinationColors = s_windowManagerColors;
 
     uint8_t colorMap[256];
     static const uint16_t levels3[8] = {

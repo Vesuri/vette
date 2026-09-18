@@ -1,7 +1,7 @@
 set pagination off
 set confirm off
 
-break MacLoader.cpp:3640 if s_garageClickPhase >= 6 && s_dirtyTop == 165 && s_dirtyLeft == 177 && s_dirtyBottom == 316 && s_dirtyRight == 505
+break MacLoader.cpp:3690 if s_garageClickPhase >= 6 && s_dirtyTop == 165 && s_dirtyLeft == 177 && s_dirtyBottom == 316 && s_dirtyRight == 505
 commands
   silent
   dump binary memory ../tmp/f40_screen.raw s_colorScreen s_colorScreen+81920

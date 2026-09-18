@@ -490,8 +490,12 @@ selector transition loads palettes 130, 140, then 131 and associates each with t
 the live worlds. These ports are not Window Manager records. Palette Manager treats tolerant colors
 on an offscreen GWorld as courteous: the original System 6 run retains the GWorld's RGB entries but
 synchronizes its `ctSeed` to the active device environment. Consequently `CopyBits` preserves the
-renderer-authored physical indices. Reproducing that behavior removed the former car-specific
-source-table selection and grid-pixel rewrite.
+renderer-authored physical indices. The same rule applies while drawing: when an offscreen table's
+seed matches the screen table, indexed and direct PICT colors are realized through the active device
+environment, not through the GWorld's stale RGB snapshot. This reproduces the original selector
+PICT's exact logical-to-physical pen map and keeps the wood, thumbnails, green grid, and red F40
+correct together. Reproducing that behavior removed the former car-specific source-table selection
+and grid-pixel rewrite.
 
 `GetNewDialog` now builds the `DialogRecord` from the shipped `DLOG`/`DITL` pair and `DrawDialog`
 validates the item stream, selects the dialog port, and paints its background. `GetDItem` walks that
