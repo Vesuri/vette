@@ -949,28 +949,30 @@ static bool makeITable(uint8_t** colorTableHandle, uint8_t** inverseTableHandle,
     const uint8_t* colorTable = *colorTableHandle;
     uint8_t* inverseTable = *inverseTableHandle;
     uint16_t finalIndex = read16(colorTable + 6);
-    if (finalIndex > 255) finalIndex = 255;
+    if (finalIndex > 15) return false;
     write32(inverseTable, read32(colorTable));
     write16(inverseTable + 4, resolution);
+    uint8_t red[16], green[16], blue[16], value[16];
+    for (uint16_t i = 0; i <= finalIndex; ++i) {
+        const uint8_t* color = colorTable + 8 + i * 8;
+        value[i] = (uint8_t)read16(color);
+        red[i] = (uint8_t)(read16(color + 2) >> 12);
+        green[i] = (uint8_t)(read16(color + 4) >> 12);
+        blue[i] = (uint8_t)(read16(color + 6) >> 12);
+    }
     for (uint16_t key = 0; key < 4096; ++key) {
-        uint16_t r = (uint16_t)((key >> 8) & 15);
-        uint16_t g = (uint16_t)((key >> 4) & 15);
-        uint16_t b = (uint16_t)(key & 15);
-        r = (uint16_t)((r << 12) | (r << 8) | (r << 4) | r);
-        g = (uint16_t)((g << 12) | (g << 8) | (g << 4) | g);
-        b = (uint16_t)((b << 12) | (b << 8) | (b << 4) | b);
-        uint32_t bestDistance = 0xffffffffUL;
+        uint8_t r = (uint8_t)((key >> 8) & 15);
+        uint8_t g = (uint8_t)((key >> 4) & 15);
+        uint8_t b = (uint8_t)(key & 15);
+        uint16_t bestDistance = 0xffff;
         uint8_t bestValue = 0;
         for (uint16_t i = 0; i <= finalIndex; ++i) {
-            const uint8_t* color = colorTable + 8 + i * 8;
-            uint16_t cr = read16(color + 2), cg = read16(color + 4);
-            uint16_t cb = read16(color + 6);
-            uint32_t distance = (r > cr ? r - cr : cr - r)
-                              + (g > cg ? g - cg : cg - g)
-                              + (b > cb ? b - cb : cb - b);
+            uint16_t distance = (uint16_t)((r > red[i] ? r - red[i] : red[i] - r)
+                              + (g > green[i] ? g - green[i] : green[i] - g)
+                              + (b > blue[i] ? b - blue[i] : blue[i] - b));
             if (distance < bestDistance) {
                 bestDistance = distance;
-                bestValue = (uint8_t)read16(color);
+                bestValue = value[i];
             }
         }
         inverseTable[6 + key] = bestValue;
