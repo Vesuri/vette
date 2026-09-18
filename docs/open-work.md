@@ -7,9 +7,9 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — current loud stop
 
-⭐ **HEAD OF QUEUE: `GetMouse` (`$A871`) at `Main+$0CB4`.** The garage ACCEPT click passes the
-front-window ownership check, selects that window's port, and asks for the pointer in local
-coordinates. Implement that input query; do not add dialog/UI traps to conceal an upstream failure.
+⭐ **HEAD OF QUEUE: `PtInRect` (`$A8AD`) at `Main+$0A1C`.** The garage ACCEPT click now reaches the
+game's hit-test loop with the local mouse point. Implement the QuickDraw rectangle containment
+primitive; do not add dialog/UI traps to conceal an upstream failure.
 
 The MAME A-trap log remains a measured reference-run inventory → `docs/trap-log.md`,
 but Stage C has proved that it is **not an exact standalone-port first-use script**. The port has

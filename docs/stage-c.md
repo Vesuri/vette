@@ -223,6 +223,11 @@ The next loud stop is `$A871` (`GetMouse`) at `Main+$0CB4`, immediately after th
 front window's port. That ordering confirms this is the normal click hit-testing path rather than
 an error dialog.
 
+83. `GetMouse` (current crop-relative point, matching the active full-window content port)
+
+The game then enters its garage control hit-test loop and stops at `$A8AD` (`PtInRect`) in
+`Main+$0A1C`.
+
 `amiga/stage_c.gdb` breaks on `VetteScreen::showLoudStop`, after the report is complete, and prints
 the depth, trap identity, selector, runtime `(segment, offset)`, absolute PC, USP and its first
 words, all data/address registers, and nearby instructions. It then exits, so `diag_run.sh` stops
