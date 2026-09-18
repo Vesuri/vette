@@ -507,6 +507,13 @@ that caller invokes the already implemented `FlushEvents`.
 The verified run reaches implemented depth 94 and continues through the 30-second safety ceiling
 without another loud stop. The next task is to capture and classify that live driving-loop state.
 
+The 30-second chunky capture is the first genuine road-screen output. The lower portion contains
+the game-drawn cockpit, dashboard and steering wheel, while approximately the upper 198 displayed
+rows remain white. The live dirty rectangle is the complete `(0,0)-(342,512)` Macintosh port and
+the interrupt lands in `serviceMacRuntime`, with depth still 94. This is therefore an active game
+loop rather than a loud stop; a later-frame capture must distinguish unfinished setup from a missing
+upper-viewport renderer or conversion path.
+
 The trap-address table is stateful. The observed `GetTrapAddress`/`SetTrapAddress` pair now records
 the game's replacement for `$A9F4 ExitToShell`; routing a later invocation through that replacement
 remains part of completing the trap bridge.
