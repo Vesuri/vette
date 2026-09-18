@@ -442,6 +442,27 @@ static bool redirectLowMemoryGlobals(uint8_t* a5)
     return true;
 }
 
+static bool disableCopyProtection()
+{
+    // Main+$05FE is the entry to the manual challenge.  The successful-answer
+    // path leaves these two globals in exactly this state before returning.
+    // Patch only the original, byte-verified prologue so the requester never
+    // appears; unrelated Dialog Manager calls remain loud-stop boundaries.
+    static const uint16_t original[6] = {
+        0x4a6d, 0xa702, 0x6600, 0x0284, 0x4eba, 0x590a
+    };
+    static const uint16_t replacement[6] = {
+        0x3b7c, 0xffff, 0xa702,             // MOVE.W #-1,-22782(A5): passed
+        0x426d, 0xa6fe,                     // CLR.W -22786(A5): no retry
+        0x4e75                              // RTS
+    };
+    for (uint16_t i = 0; i < 6; ++i)
+        if (read16(vette_code_1 + 0x05fe + i * 2) != original[i]) return false;
+    for (uint16_t i = 0; i < 6; ++i)
+        write16(vette_code_1 + 0x05fe + i * 2, replacement[i]);
+    return true;
+}
+
 static void blockMove(uint8_t* source, uint8_t* destination, uint32_t count)
 {
     if (destination > source && destination < source + count) {
@@ -4226,7 +4247,7 @@ bool MacLoader::run(VetteScreen* screen)
     uint8_t* a5;
     if (!buildA5World(a5)) return false;
     s_currentA5 = a5;
-    if (!redirectLowMemoryGlobals(a5)) return false;
+    if (!redirectLowMemoryGlobals(a5) || !disableCopyProtection()) return false;
 
     Disable();
     *(void (**)())0x28 = vette_line_a_handler;

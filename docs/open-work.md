@@ -7,12 +7,11 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — current loud stop
 
-⭐ **HEAD OF QUEUE: resolve the now-relevant copy-protection state without implementing its UI.**
-The classic deterministic `$A861` (`Random`) sequence now runs through the existing `RndSeed`
-shadow. Road setup then reaches `$A98D GetDItem`, item 2, in segment 1 + `$06EC`: the deferred
-copy-protection dialog has finally become relevant. Inspect the shipped manual and the surrounding
-registration/`DATE` resource logic, then reproduce the registered state at the data boundary.
-Leave the dialog UI unimplemented so a bad registration state continues to stop loudly.
+⭐ **HEAD OF QUEUE: implement the measured `$A916 HideWindow` state transition.** The manual
+challenge is now removed by a byte-guarded patch at `Main+$05FE` that writes the exact two A5
+globals left by the correct-answer branch and returns before allocating its requester. Unrelated
+dialog UI remains unsupported. Road setup now reaches `HideWindow` at segment 1 + `$2150`; update
+only the window visibility/current-port state required to retire the selector before driving.
 
 The MAME A-trap log remains a measured reference-run inventory → `docs/trap-log.md`,
 but Stage C has proved that it is **not an exact standalone-port first-use script**. The port has
@@ -23,10 +22,11 @@ the game patches exactly one trap (`_ExitToShell`), `%A5Init` calls exactly one 
 `QDExtensions` is dispatched by `D0` with Target 1 needing selectors 0 (`NewGWorld`) and
 1 (`LockPixels`).
 
-1. ▶ **The copy-protection password is now relevant.** It first fires after Course One is accepted,
-   at `$A98D GetDItem` for item 2. The answers are in `tmp/unpacked/…/scans/Manual.pdf`. Preserve
-   the loud stop for this unnecessary dialog and reproduce the legitimate registered `DATE`
-   resource state at the data boundary instead. ⚠ Ground truth runs the **unpatched** original.
+1. ✅ **The copy-protection requester is removed in the port.** It first fired after Course One was
+   accepted. `Main+$05FE` is now replaced only after verifying the exact shipped 12-byte prologue;
+   the replacement sets `protection passed = -1`, clears the retry flag, and returns. This is the
+   state left by the correct-answer path, without implementing `GetDItem`, text editing, modal
+   events, or persistent writable resources. ⚠ Ground truth still runs the **unpatched** original.
 
 2. ⚠ **The trap log stops at the MENU, so re-run it for DRIVING.** `FRED` (242 of the 509
    jump-table entries) and `Communication` were never observed resident, so any trap they call is

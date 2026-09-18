@@ -457,6 +457,12 @@ signed low word with `$8000` mapped to zero, and updates the Page-0 `RndSeed` sh
 entropy enters the sequence. The next call is `GetDItem` for item 2 of the copy-protection dialog;
 that UI intentionally remains unsupported while the registered `DATE` resource state is resolved.
 
+The port deliberately removes that manual challenge at its application-code boundary. After an
+exact check of the six original words at `Main+$05FE`, the loader substitutes the success state
+(`-22782(A5) = -1`, `-22786(A5) = 0`) and returns. Those are the same globals left by a correct
+answer. The requester is never allocated, while all unrelated dialog traps remain loud-stop
+boundaries. Execution proceeds to `$A916 HideWindow` at segment 1 + `$2150`.
+
 The trap-address table is stateful. The observed `GetTrapAddress`/`SetTrapAddress` pair now records
 the game's replacement for `$A9F4 ExitToShell`; routing a later invocation through that replacement
 remains part of completing the trap bridge.
