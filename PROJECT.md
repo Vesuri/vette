@@ -265,8 +265,11 @@ and the live full-window copy preserves indices; captured-table rendering also r
 sky, road, dashboard, and mirror color roles. The synchronized Corvette/held-accelerator capture
 then matches 174,330 of 175,104 live pixels exactly. All 774 differences are confined to a
 164×8 strip in the moving rear-view scene; the forward 3D world, terrain, road, cockpit, and
-dashboard are exact. The remaining differential is mirror callback timing/state rather than
-palette realization or forward rendering. → `docs/open-work.md` §Blocking.
+dashboard are exact. The remaining differential is mirror raster state rather than palette
+realization or forward rendering. Four consecutive captures prove that the
+774-pixel mirror signature is static, not callback skew; a Macintosh write tap attributes its edge
+to the original `Traffic+$6790/$68B4` buffer/raster path. The next differential compares that
+routine's register and A5 inputs on both machines. → `docs/open-work.md` §Blocking.
 
 ⭐⭐ **Stage A is done and measured: the Amiga display path works.** The port takes the machine
 over, brings up 512×320 in 4 bitplanes hires interlaced and displays Target 1's captured Macintosh

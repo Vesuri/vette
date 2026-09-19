@@ -37,9 +37,14 @@ are confined to `(346,1)-(510,9)`, inside the moving rear-view scene; the comple
 world, road, terrain, cockpit, and dashboard match index for index. Source RGB tables match entry
 for entry, as do destination/device tables; each machine gives source and destination the same
 `ctSeed`; and both copies preserve indices. The old pink-road/salmon-car frame is not produced by
-the current build. Determine whether the remaining mirror strip is a one-callback capture skew or
-a real scheduling difference, then either synchronize the named capture one callback further or
-fix the scheduling cause. Do not return to straight-line accelerator soaking or palette work.
+the current build. Four consecutive copies prove the mirror pattern is static rather than a
+one-callback capture skew: normal road/traffic pixels change between frames, while the same
+774-pixel signature persists. A Macintosh byte write tap attributes the edge to the original
+Traffic raster path: `Traffic+$6790` selects/fills the target buffer and the routine entered at
+`Traffic+$68B4` writes the missing low nibble. On the port that byte remains at its initial `$FF`.
+Next compare the renderer inputs and A5 state at `Traffic+$6850/$68B4`; fix the cause in shared
+state or trap semantics, not with a mirror-coordinate patch. Do not return to straight-line
+accelerator soaking or palette work.
 
 The key chart labels Escape “Menu Options,” which exposed a real input gap: the driving loop does
 not call `GetNextEvent`, so each CIA keyboard edge updates the corresponding bit in the full

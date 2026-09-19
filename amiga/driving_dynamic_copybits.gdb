@@ -50,6 +50,28 @@ commands 2
       set $i = $i+1
     end
   end
+  if $calls <= 4
+    set $i = 0
+    while $i < 8
+      if s_gworlds[$i].used && sourceBitmap == &s_gworlds[$i].port[2]
+        set $sourceRows = *(short*)(&s_gworlds[$i].pixMap[10])-*(short*)(&s_gworlds[$i].pixMap[6])
+        set $sourceStride = *(unsigned short*)(&s_gworlds[$i].pixMap[4])&0x3fff
+        if $calls == 1
+          dump binary memory ../tmp/driving-copy-source-1.raw s_gworlds[$i].pixels s_gworlds[$i].pixels+$sourceRows*$sourceStride
+        end
+        if $calls == 2
+          dump binary memory ../tmp/driving-copy-source-2.raw s_gworlds[$i].pixels s_gworlds[$i].pixels+$sourceRows*$sourceStride
+        end
+        if $calls == 3
+          dump binary memory ../tmp/driving-copy-source-3.raw s_gworlds[$i].pixels s_gworlds[$i].pixels+$sourceRows*$sourceStride
+        end
+        if $calls == 4
+          dump binary memory ../tmp/driving-copy-source-4.raw s_gworlds[$i].pixels s_gworlds[$i].pixels+$sourceRows*$sourceStride
+        end
+      end
+      set $i = $i+1
+    end
+  end
   if $calls >= 12
     detach
     quit

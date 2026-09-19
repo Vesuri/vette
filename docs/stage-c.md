@@ -874,6 +874,15 @@ and dashboard—matches the Macintosh index for index. `tools/compare_mac_chunky
 packed-pixel proof repeatable. The remaining question is mirror callback timing/state, not palette
 realization, bitplane order, or the forward renderer.
 
+Four consecutive full-window captures reject callback skew as the explanation. Corresponding
+frames retain the same 774-pixel mirror signature while road and traffic pixels change normally.
+At the first differing packed byte the port leaves the initial `$FF` untouched. An aligned MAME
+write tap shows the Macintosh first filling the row and then writing the missing low nibble through
+the original Traffic raster path: `Traffic+$6790` selects the backing buffer and the routine entered
+at `Traffic+$68B4` performs the byte raster operation. The next comparison is therefore the
+register/A5 input state at `Traffic+$6850/$68B4`, not QuickDraw, C2P, or a guessed coordinate fix.
+`VETTE_MIRROR_WRITER=1` enables that otherwise noisy reference write trace.
+
 Resolving the remaining resident-code samples shows that they are not compatibility overhead:
 `Main+$5208/$5246/$5266` are perspective division and clipping, `Main+$5A34/$5A92/$5D6A` are
 line/polygon construction, and `Traffic+$68B4..$68BA` enters an original byte raster loop while

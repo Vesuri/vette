@@ -20,10 +20,12 @@ local inverse_seeds = {}
 local pending_selector_pixmap = 0
 local protection_prompt = false
 local driving_ports = {}
-local driving_copy_captured = false
+local driving_copy_captures = 0
 local driving_capture_armed = false
 local palette_for_window = {}
 local last_activate_window = 0
+local mirror_write_armed = false
+local trace_mirror_writer = os.getenv("VETTE_MIRROR_WRITER") == "1"
 
 local function a24(v) return v & 0x00FFFFFF end
 local function u16(a) return prog:read_u16(a24(a)) end
@@ -80,6 +82,26 @@ local function dump_pixmap(label, pixmap)
 	dump_ctab(label, pixmap)
 end
 
+local function arm_mirror_writer(pixmap)
+	if not trace_mirror_writer or mirror_write_armed or pixmap == 0
+		or (u16(pixmap + 4) & 0x8000) == 0 or u16(pixmap + 32) ~= 4 then return end
+	local top, left, bottom, right = rect(pixmap + 6)
+	if top ~= 0 or left ~= 0 or bottom ~= 512 or right ~= 512 then return end
+	local byte = a24(u32(pixmap)) + 433
+	local aligned = byte & ~3
+	mirror_write_armed = true
+	keep[#keep + 1] = prog:install_write_tap(aligned, aligned + 3,
+		"driving_mirror_writer", function(_, data, mask)
+			if driving_capture_armed then
+				print(string.format(
+					"VP MIRROR WRITE frame=%u pc=%06X byte=%06X data=%08X mask=%08X old=%02X",
+					mac.frames(), a24(cpu.state["PC"].value), byte, data, mask,
+					prog:read_u8(byte)))
+			end
+		end)
+	print(string.format("VP armed mirror writer byte=%06X frame=%u", byte, mac.frames()))
+end
+
 local function main_device_pixmap()
 	local device_handle = a24(u32(0x08A4)) -- MainDevice low-memory global
 	local device = device_handle ~= 0 and a24(u32(device_handle)) or 0
@@ -134,21 +156,27 @@ local function on_copybits(pb)
 	local source_base = a24(u32(source))
 	local source_stride = u16(source + 4) & 0x3FFF
 	local viewport_sample = prog:read_u8(source_base + source_stride * 10)
-	if driving_capture_armed and not driving_copy_captured
+	if driving_capture_armed and driving_copy_captures < 4
 		and st == 0 and sl == 0 and sb == 342 and sr == 512
 		and top == 0 and left == 0 and bottom == 342 and right == 512
 		and viewport_sample ~= 0x00 and viewport_sample ~= 0xFF then
-		driving_copy_captured = true
-		print(string.format("VP DRIVING COPY frame=%u mode=%u", mac.frames(), u16(pb + 4)))
-		dump_pixmap("DRIVING-SRC", source)
-		dump_pixmap("DRIVING-DST", destination)
+		driving_copy_captures = driving_copy_captures + 1
+		print(string.format("VP DRIVING COPY #%u frame=%u mode=%u",
+			driving_copy_captures, mac.frames(), u16(pb + 4)))
 		local source_top, _, source_bottom, _ = rect(source + 6)
-		dump_bytes("ref/mame/driving-copy-source.raw", a24(u32(source)),
+		dump_bytes(string.format("ref/mame/driving-copy-source-%u.raw", driving_copy_captures),
+			a24(u32(source)),
 			(u16(source + 4) & 0x3FFF) * (source_bottom - source_top))
-		local source_table = ctab_address(source)
-		local destination_table = ctab_address(destination)
-		if source_table ~= 0 then dump_bytes("ref/mame/driving-copy-source.ctab", source_table, 136) end
-		if destination_table ~= 0 then dump_bytes("ref/mame/driving-copy-destination.ctab", destination_table, 136) end
+		if driving_copy_captures == 1 then
+			dump_pixmap("DRIVING-SRC", source)
+			dump_pixmap("DRIVING-DST", destination)
+			dump_bytes("ref/mame/driving-copy-source.raw", a24(u32(source)),
+				(u16(source + 4) & 0x3FFF) * (source_bottom - source_top))
+			local source_table = ctab_address(source)
+			local destination_table = ctab_address(destination)
+			if source_table ~= 0 then dump_bytes("ref/mame/driving-copy-source.ctab", source_table, 136) end
+			if destination_table ~= 0 then dump_bytes("ref/mame/driving-copy-destination.ctab", destination_table, 136) end
+		end
 	end
 	if top ~= 165 or left ~= 177 or bottom ~= 316 or right ~= 505 then return end
 
@@ -216,6 +244,7 @@ local function on_trap()
 			local pixmap = pixmap_handle ~= 0 and a24(u32(pixmap_handle)) or 0
 			if pixmap ~= 0 then
 				dump_pixmap("DRAWPICTURE-DST", pixmap)
+				arm_mirror_writer(pixmap)
 				pending_selector_pixmap = pixmap
 			end
 		end
@@ -236,12 +265,13 @@ local function on_trap()
 	elseif trap == 0xAA94 then
 		palette_calls = palette_calls + 1
 		local window = a24(u32(pb))
+		local pixmap_handle = window ~= 0 and a24(u32(window + 2)) or 0
+		local pixmap = pixmap_handle ~= 0 and a24(u32(pixmap_handle)) or 0
 		last_activate_window = window
 		print(string.format("VP ActivatePalette #%u frame=%u stage=%s window=%06X",
 			palette_calls, mac.frames(), stage, window))
+		arm_mirror_writer(pixmap)
 		if stage == "driving" and not driving_ports[window] then
-			local pixmap_handle = window ~= 0 and a24(u32(window + 2)) or 0
-			local pixmap = pixmap_handle ~= 0 and a24(u32(pixmap_handle)) or 0
 			if pixmap ~= 0 and (u16(pixmap + 4) & 0x8000) ~= 0 and u16(pixmap + 32) == 4 then
 				driving_ports[window] = true
 				dump_pixmap(string.format("DRIVING-PORT-%06X", window), pixmap)
