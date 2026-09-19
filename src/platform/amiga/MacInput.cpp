@@ -87,6 +87,15 @@ bool vetteInputPopKey(uint8_t& rawKey, bool& down, uint16_t& modifiers)
     return true;
 }
 
+bool vetteInputKeyDown(uint8_t rawKey)
+{
+    if (rawKey >= 128) return false;
+#ifdef VETTE_INPUT_PROBE_RAW_KEY
+    if (rawKey == VETTE_INPUT_PROBE_RAW_KEY) return true;
+#endif
+    return s_keyDown[rawKey] != 0;
+}
+
 uint16_t vetteInputModifiers()
 {
     return currentModifiers();

@@ -4009,6 +4009,23 @@ static bool translateAmigaKey(uint8_t raw, KeyTranslation& key)
     }
 }
 
+static void refreshDrivingKeyMap()
+{
+    uint8_t* keyMap = s_currentA5 + 16;
+    for (uint16_t i = 0; i < 16; ++i) keyMap[i] = 0;
+    for (uint16_t raw = 0; raw < 128; ++raw) {
+        KeyTranslation key;
+        if (!vetteInputKeyDown((uint8_t)raw) || !translateAmigaKey((uint8_t)raw, key)) continue;
+        uint8_t byteOffset = (uint8_t)(key.virtualKey >> 3);
+        keyMap[byteOffset] |= (uint8_t)(1u << (7 - (key.virtualKey & 7)));
+    }
+#ifdef VETTE_GARAGE_CLICK
+    // Keep the deterministic accelerator held after the scripted Course One
+    // selection; physical keys are ORed into this development-only state.
+    if (s_garageClickPhase >= 9) keyMap[0x5b >> 3] |= 1u << (7 - (0x5b & 7));
+#endif
+}
+
 static bool nextEvent(uint16_t mask, uint8_t* event)
 {
     if (!event) return false;
@@ -4152,6 +4169,7 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
     // Emulate Main+$1FD2's original TST.W -21316(A5) / BEQ.W $29DA pair.
     // The handler adds two to the saved PC, hence each stored target is -2.
     if (drivingBoundary) {
+        refreshDrivingKeyMap();
         bool driving = read16(s_currentA5 - 21316) != 0;
         if (driving) {
             if (s_drivingFrameStarted) {

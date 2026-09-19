@@ -117,6 +117,12 @@ ifdef PROBES
 EXTRA_DEFINES += -DVETTE_PROBE
 endif
 
+# Diagnostic only: report one Amiga raw key as held without consuming or
+# fabricating an EventRecord.  Normal and playable builds leave this undefined.
+ifdef INPUT_PROBE_RAW_KEY
+EXTRA_DEFINES += -DVETTE_INPUT_PROBE_RAW_KEY=$(INPUT_PROBE_RAW_KEY)
+endif
+
 # `make FPSCOUNT=1` — the honest framerate build: one increment per painted frame and the
 # headless auto-run, no instrumentation.  docs/perf-method.md Rule 1.
 ifdef FPSCOUNT

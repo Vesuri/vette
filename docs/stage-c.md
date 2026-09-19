@@ -394,8 +394,17 @@ The stack form was not covered by the first three explicit relocations and was o
 All 87 direct `Ticks` reads use the same absolute-word encoding and are redirected to `0(A5)`.
 The driving code contains three exact `LEA $0174,A1` sites: two VBL callbacks poll selected bytes
 and `Main+$2D26` snapshots all 16 bytes. They therefore share a complete 16-byte KeyMap shadow at
-`16(A5)`, immediately below the jump table at `32(A5)`. Amiga raw-key transitions update this
-shadow independently of whether the Event Manager accepts a corresponding key event.
+`16(A5)`, immediately below the jump table at `32(A5)`. The CIA interrupt maintains a separate
+non-consuming 128-key raw-state snapshot as well as its edge queue. At each exact driving-frame
+boundary, the port translates that snapshot into all 16 KeyMap bytes without consuming the queued
+EventRecords. A probe-only held Amiga Escape (`$45`) appears as `$04` in Macintosh KeyMap byte 6;
+the normal deterministic accelerator build still completes consecutive frames 41 ticks apart and
+advances the original throttle global to 3.
+
+Holding Escape through that direct KeyMap path for 6,436 ticks does not leave driving or reach a
+new trap (144/144 frames, depth 93). Despite the key chart's “Menu Options” label, this path is not
+a level-sensitive driving exit. Coverage must next test the queued key edge/EventRecord semantics
+or another documented transition rather than treating the KeyMap bit alone as an exit command.
 
 This preserves the original code flow without touching Amiga low memory. More shadows are added
 only when execution reaches them; the inventory shows that most remaining references are `Ticks`,

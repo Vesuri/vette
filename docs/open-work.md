@@ -27,6 +27,14 @@ same held-accelerator soak. Use the shipped key chart/manual to choose a deliber
 state transition, feed that through the existing physical KeyMap/EventRecord path, and let the
 loud-stop probe inventory the newly reached code.
 
+The key chart labels Escape “Menu Options,” which exposed and closed a real input gap: the driving
+loop does not call `GetNextEvent`, so the CIA interrupt's non-consuming raw-key state is now
+translated into the full Macintosh KeyMap at every exact frame boundary while its edge queue is
+preserved. The probe confirms raw Escape becomes KeyMap byte 6 bit `$04`, and the ordinary
+accelerator regression remains live. However, holding that bit for 6,436 ticks leaves driving armed
+for all 144 presented frames and reaches no trap. Next test the Escape **edge/EventRecord** path or
+another documented transition; do not mistake a level-sensitive KeyMap state for the menu action.
+
 The MAME A-trap log remains a measured reference-run inventory → `docs/trap-log.md`,
 but Stage C has proved that it is **not an exact standalone-port first-use script**. The port has
 already executed initialization calls absent from, or much later in, that 51-row ordering. Treat
