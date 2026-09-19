@@ -7,8 +7,7 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — current compatibility boundary
 
-⭐ **HEAD OF QUEUE: take the next deliberate gameplay transition beyond the closed driving
-control slice.**
+⭐ **HEAD OF QUEUE: exercise the first deterministic collision or course transition.**
 Complete frames are presented at the exact original `Main+$1FD2` loop boundary;
 sustained driving covers 6,422 Macintosh ticks and 143/143 frames at implemented depth 93 without
 a loud stop. Corrected Escape takes the shipped Menu Options exit at tick 1,864 after 32/32 frames.
@@ -29,7 +28,12 @@ at offsets `$021C`/`$024C`, and remains in active driving through 50/50 frames a
 a loud stop. A then closes the planned transmission-state slice: Mac virtual `$00` dispatches to
 `Main+$31AA`, changes the current car's automatic-shift field from 1 to 0, advances the game's
 transmission gate from 0 to 1, and remains at depth 93 through 50/50 frames without a loud stop.
-The deliberate control matrix has reached no new compatibility boundary. The extended Macintosh
+D “Damage Indicator” is now measured too: raw Amiga `$22` becomes Macintosh virtual `$02` and
+dispatches to `Main+$37B4`. Original code changes its A5-relative flag from 0 to 1, sets an expiry
+exactly 6,000 ticks ahead, and stays in active driving at depth 93. At the frame-matched 40th
+presentation it changes 4,637 packed bytes in the lower-right dashboard region with no palette
+change or new trap. This is a game-owned HUD transition, not a port-authored dialog. The deliberate
+control matrix has reached no new compatibility boundary. The extended Macintosh
 run now reaches driving, raises the measured trap floor from 51 to 63, and reads a 512×320 front
 window above the separate 512×342 surface. The synchronized driving differential selects Corvette
 ZR-1 on both machines, holds keypad 8 before the first driving iteration, and captures the first

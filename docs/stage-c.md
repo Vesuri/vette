@@ -455,6 +455,14 @@ Driving continues through 50/50 frames at depth 93 without a loud stop.
 `amiga/driving_a_key_dispatch.gdb` and `amiga/driving_a_state.gdb` preserve both sides of the
 transition.
 
+The key chart's D command reaches the original Damage Indicator rather than a Toolbox dialog. Raw
+Amiga `$22` becomes Macintosh virtual `$02` and resolves to `Main+$37B4`. The handler changes the
+A5-relative indicator flag from 0 to 1 and stores `Ticks + 6000` as its expiry. It remains in active
+driving at depth 93 with no loud stop. At the matched 40th presentation, the result differs from
+the no-key baseline in 4,637 of 81,920 packed bytes, bounded to byte columns 153–255 and rows
+214–319; the palette is unchanged. `amiga/driving_d_key_dispatch.gdb`, `driving_d_state.gdb`, and
+`driving_d_capture.gdb` retain the dispatch, state, and pixel evidence.
+
 This preserves the original code flow without touching Amiga low memory. More shadows are added
 only when execution reaches them; the inventory shows that most remaining references are `Ticks`,
 mouse/key state, and repeated `GrayRgn` reads.
