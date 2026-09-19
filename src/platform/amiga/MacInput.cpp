@@ -7,6 +7,7 @@
 
 #include "MacInput.h"
 #include "framework/AmigaHardware.h"
+#include "mac/MacLoader.h"
 
 static struct Library* s_ciaaBase;
 static struct Interrupt s_keyboardInterrupt;
@@ -32,6 +33,7 @@ static uint16_t currentModifiers()
 static void recordKey(uint8_t raw, bool down)
 {
     s_keyDown[raw] = down ? 1 : 0;
+    vetteMacRawKeyChanged(raw, down);
     uint8_t next = (uint8_t)((s_head + 1) & 31);
     if (next != s_tail) {
         s_events[s_head].rawAndUp = (uint8_t)(raw | (down ? 0 : 0x80));

@@ -10,4 +10,9 @@ public:
     bool run(VetteScreen* screen);
 };
 
+// Classic Mac OS updates the low-memory KeyMap asynchronously from its
+// keyboard interrupt.  The Amiga CIA edge path calls this bridge so original
+// code that waits without making a Toolbox call still sees transitions.
+extern "C" void vetteMacRawKeyChanged(uint8_t rawKey, bool down);
+
 #endif

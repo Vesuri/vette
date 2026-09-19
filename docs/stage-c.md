@@ -428,6 +428,16 @@ baseline in 31,214 packed bytes; the game removes the cockpit/dashboard overlay 
 forward road and mirror. This closes a second materially different renderer state by pixels rather
 than merely by survival.
 
+Raw Amiga P (`$19`, Macintosh virtual `$23`) resolves through the game's live 128-key table to
+`Initialize+$1862`. It takes the original pause/options transition, stops new presentations at a
+complete-frame boundary, blanks the upper viewport while retaining the dashboard, and settles at
+depth 94 without a loud stop. This path exposed a stricter Page-0 requirement than ordinary driving:
+after the transition, original code waits on KeyMap without making another Toolbox call. A classic
+Mac keyboard interrupt updates those 16 bytes asynchronously. The port now translates each Amiga
+CIA keyboard edge directly into the A5-relative KeyMap shadow, while the same queued down/up edge
+remains available to `GetNextEvent`. `amiga/driving_p_key_dispatch.gdb` resolves the shipped key
+table and handler; there is no P-specific runtime behavior.
+
 This preserves the original code flow without touching Amiga low memory. More shadows are added
 only when execution reaches them; the inventory shows that most remaining references are `Ticks`,
 mouse/key state, and repeated `GrayRgn` reads.

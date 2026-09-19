@@ -4008,7 +4008,14 @@ static bool translateAmigaKey(uint8_t raw, KeyTranslation& key)
     }
 }
 
-static void refreshDrivingKeyMap()
+extern "C" void vetteMacRawKeyChanged(uint8_t rawKey, bool down)
+{
+    KeyTranslation key;
+    if (!s_currentA5 || !translateAmigaKey(rawKey, key)) return;
+    setDrivingKeyState(key.virtualKey, down);
+}
+
+static void updateDrivingInputProbe()
 {
 #ifdef VETTE_INPUT_PROBE_EVENT_RAW_KEY
     // Diagnostic-only physical edge: press before the first driven iteration,
@@ -4029,6 +4036,11 @@ static void refreshDrivingKeyMap()
         probeEventPhase = 2;
     }
 #endif
+}
+
+static void refreshDrivingKeyMap()
+{
+    if (!s_currentA5) return;
     uint8_t* keyMap = s_currentA5 + 16;
     for (uint16_t i = 0; i < 16; ++i) keyMap[i] = 0;
     for (uint16_t raw = 0; raw < 128; ++raw) {
@@ -4187,6 +4199,7 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
     // Emulate Main+$1FD2's original TST.W -21316(A5) / BEQ.W $29DA pair.
     // The handler adds two to the saved PC, hence each stored target is -2.
     if (drivingBoundary) {
+        updateDrivingInputProbe();
         refreshDrivingKeyMap();
         bool driving = read16(s_currentA5 - 21316) != 0;
         if (driving) {

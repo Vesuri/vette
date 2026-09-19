@@ -19,13 +19,18 @@ presents 65/65 frames without a loud stop, and its 40th presented surface differ
 frame-matched baseline in 53,940 of 81,920 packed bytes. The view branch therefore executed; this
 is not merely proof that a key was queued. F5 “Front Dash” is measured too: it remains at depth 93
 through 70/70 frames and changes 31,214 packed bytes at the matched 40th presentation, removing the
-cockpit/dashboard overlay while retaining the forward road and mirror. Continue with the remaining
-materially different controls—pause, sound and transmission state—until one reaches new code or the
-next loud stop. Do not return to straight-line accelerator soaking or exhausted PICT/palette work.
+cockpit/dashboard overlay while retaining the forward road and mirror. P is now measured as well:
+Mac virtual `$23` dispatches through the game's live key table to `Initialize+$1862`, stops frame
+production at a complete-frame boundary, blanks the upper viewport while retaining the dashboard,
+and settles at depth 94 without a loud stop. Continue with the remaining materially different
+controls—sound and transmission state—until one reaches new code or the next loud stop. Do not
+return to straight-line accelerator soaking or exhausted PICT/palette work.
 
 The key chart labels Escape “Menu Options,” which exposed a real input gap: the driving loop does
-not call `GetNextEvent`, so the CIA interrupt's non-consuming raw-key state is translated into the
-full Macintosh KeyMap at every exact frame boundary while its edge queue is preserved. The first
+not call `GetNextEvent`, so each CIA keyboard edge updates the corresponding bit in the full
+Macintosh KeyMap while also remaining in the event queue. That timing matters beyond driving
+frames: P enters an original wait that reads Page-0 KeyMap directly without making another Toolbox
+call. Refreshing only at the frame boundary made the released key permanent there. The first
 probe also exposed a byte-local bit-order bug: the port wrote virtual Escape `$35` as byte 6 bit
 `$04`, but the game's scanner at `Main+$2DD2` consumes each byte LSB first, making that virtual key
 `$32`. Correct Escape is byte 6 bit `$20`, and keypad 8 `$5B` is byte 11 bit `$08`. The dedicated
