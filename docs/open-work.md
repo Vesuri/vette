@@ -7,11 +7,10 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — current compatibility boundary
 
-⭐ **HEAD OF QUEUE: port the standing target checks named by the inherited Amiga lessons.**
-Add the missing counters and debugger probes that turn display timing/fill invariants into
-repeatable failures, beginning with `g_beamPresentsLate`, `beam_watch.gdb`, and `fill_catch.gdb`.
-Re-derive each address or boundary against this port's 512×384 interlaced display and current
-frame pump; the prior projects supply the invariant, not this program's constants.
+⭐ **HEAD OF QUEUE: close the inherited bitmap silent no-op.** `BitmapAssembler.s` has two
+unimplemented non-interleaved arms. Prove at `Bitmap` construction that this port cannot select
+them and fail loudly if it tries, or implement them. Do not leave a supported-looking path that
+quietly does nothing. → `src/platform/amiga/framework/UPSTREAM.md`.
 
 ## ⭐⭐ TARGET 1 — the complete intro, run by the game's own code — COMPLETE
 
@@ -60,48 +59,45 @@ closed and deleted, so a `#N` written in another doc goes quietly wrong — thre
 
 ## Phase 0 — scaffolding (see `docs/phases.md`)
 
-4. **Port the standing checks.** `docs/amiga-lessons.md` prescribes counters that "must read 0"
-   (`g_beamPresentsLate`) and probe scripts (`beam_watch.gdb`, `fill_catch.gdb`) that **do not exist
-   in this repo**. A rule that names a counter is an instruction to build it.
-5. **Close the inherited silent no-op.** `BitmapAssembler.s`'s two non-interleaved arms are
+1. **Close the inherited silent no-op.** `BitmapAssembler.s`'s two non-interleaved arms are
    unimplemented and retagged `[ASSUMED]`; either assert at `Bitmap` construction that nothing builds
    a non-interleaved one, or implement them. → `src/platform/amiga/framework/UPSTREAM.md`.
-6. **One dormant link trap left in the vendored framework.** `Bitmap::patternWithMask()` pulls in
+2. **One dormant link trap left in the vendored framework.** `Bitmap::patternWithMask()` pulls in
     `__mulsi3`, so it fails the mandatory `muldiv-audit` — with a message that names `__mulsi3`
     rather than the caller. Fix it when something needs it, not speculatively. →
     `src/platform/amiga/framework/UPSTREAM.md` §Two latent link traps.
 
 ## Phase 1+ — carried forward, not yet actionable
 
-7. **Write `ghidra_scripts/DumpTraps.java`.** The trap map is the abstraction boundary and there is
+3. **Write `ghidra_scripts/DumpTraps.java`.** The trap map is the abstraction boundary and there is
     no inherited script for it (Revs's `DumpHwAccesses.java` hardcodes BBC I/O ranges and was not
     carried over). → `docs/toolchain.md`.
-8. **Fill `ghidra_scripts/entrypoints.csv` from `CODE 0`.** The jump table makes the postmortem's
+4. **Fill `ghidra_scripts/entrypoints.csv` from `CODE 0`.** The jump table makes the postmortem's
     §1.1 sweep *enumerable* rather than a search — take the win.
-9. **Read the manual / the extras before the binary.** RoF's `docs/manual.md` earned its place.
+5. **Read the manual / the extras before the binary.** RoF's `docs/manual.md` earned its place.
     Present and unread: `scans/Manual.pdf` (5.2 MB), `Map.jpg`, `MapInfo_1/2.jpg`, `KeyChart.jpg`,
     `Package.pdf`, `web_docs/cheats.txt`. ⭐ `KeyChart.jpg` is the input map and `cheats.txt` may
     name states worth reaching in the reference loop.
-10. **Decode the `VETTE!.Data` record formats.** The *inventory* is done
+6. **Decode the `VETTE!.Data` record formats.** The *inventory* is done
     (`docs/source-inventory.md`); the formats are not. ⭐ Start with **`PERF`** — eight records of
     exactly 110 bytes with meaningful names (`Stock`, `ZR1`, `F40`, …), which is the cheapest
     possible place to calibrate a decode. Then `OBJS` (160 models, recurring exact sizes, and
     `QUAD`'s `Quad Discripter Data` says the renderer is quad-based) and `MAPS`. ⚠ Do this against
     the `load` segment's disassembly, not by pattern-guessing — RoF's postmortem §1.2 is about
     exactly this.
-11. **Confirm or kill the `OBJS` two-level-of-detail reading.** The `C`/`S` name pairs
+7. **Confirm or kill the `OBJS` two-level-of-detail reading.** The `C`/`S` name pairs
     (`F40C`/`F40S1`, `GenericC`/`GenericS`, `Taxi`/`TaxiS`, …) `[INFERRED]` a near/far pair per
     object. It is load-bearing for the Amiga frame budget, so it should be confirmed early rather
     than discovered during optimisation. → `docs/source-inventory.md` §OBJS.
-12. **Explain the `Communication` segment and `COMM` 0.** 9.1 KB of code in *both* builds plus a
+8. **Explain the `Communication` segment and `COMM` 0.** 9.1 KB of code in *both* builds plus a
     2 490 B resource, in a single-player driving game. Modem head-to-head is a guess. It matters
     because 9 KB of code that the port may not need at all is 10% of the whole job.
-13. **Explain `FRED`** — 6.5 KB in both builds, name says nothing. ⭐ New evidence, and it is a
+9. **Explain `FRED`** — 6.5 KB in both builds, name says nothing. ⭐ New evidence, and it is a
     strong hint: `FRED` exports **242 of the 509 jump-table entries** — 6 508 bytes across 242
     externally-callable routines is **~27 bytes each**, so `[INFERRED]` it is a library of small leaf
     routines (maths/trig/fixed-point being the obvious candidates, which would fit the table-driven
     trig already found in the data). Cheap to settle: disassemble a dozen of its entries.
-14. ⭐ **The remaining display question is the OCS / 68000 fallback** — crop, squeeze, or none.
+10. ⭐ **The remaining display question is the OCS / 68000 fallback** — crop, squeeze, or none.
     The primary mode is locked at four-bitplane hires interlaced, and the reference run now proves
     the live driving front window is 512×320 above a separate 512×342 surface. The driving
     `CopyBits` probe also proves the game rasterises into its indexed GWorld, so chunky→planar is

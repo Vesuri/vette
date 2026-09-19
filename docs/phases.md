@@ -38,7 +38,13 @@ Build infrastructure only; no game code. **Exit criteria:**
       to paint per frame yet, so the equivalent evidence is the field parity and the checksum.
       ⭐ The one part a probe cannot cover — the picture on the glass — is **also done**, and it
       found two defects no probe could see (`docs/amiga-arch.md` §The picture on the glass).
-- [ ] The standing checks from `docs/amiga-lessons.md` exist as counters and `.gdb` scripts.
+- [x] The standing checks from `docs/amiga-lessons.md` exist as counters and `.gdb` scripts.
+      On the target A1200, `beam_watch.gdb` observed 32 publications at raster line 0 with
+      `g_beamPresentsLate=0`; the `FILLWATCH=1` rolling audit decoded all 320 rows / 163,840 pixels
+      from the planar back buffer with zero mismatches. Vette's fill invariant is the complete
+      chunky-to-planar seam, not Revs's game-specific horizon fill.
+- [ ] The inherited framework exposes no supported-looking silent no-op: resolve the two
+      non-interleaved `BitmapAssembler.s` arms named in `docs/open-work.md`.
 
 ⭐ Do not skip the last two. Revs's Phase 0 is the reason its Amiga side was never in doubt while
 harder questions were being settled.

@@ -6,10 +6,12 @@
 > (`RevsScreen`, the band cycle, `tick_wheel_spin`, …) — read them as evidence, not as references
 > to anything in this tree.
 >
-> ⚠ The standing checks these lessons prescribe are named after the prior ports' probe scripts
-> (`amiga/beam_watch.gdb` / `g_beamPresentsLate`, `amiga/fill_catch.gdb`).  **Nothing in
-> `amiga/*.gdb` exists in this repo yet** — porting the standing checks is Phase 0 work, and a rule
-> here that says "this counter must read 0" is an instruction to build the counter.
+> ⭐ The standing checks are now local rather than promises copied from the prior ports.
+> `amiga/beam_watch.gdb` measures publication against Vette's actual 76..267 display window;
+> `amiga/fill_catch.gdb` requires `FILLWATCH=1` and independently decodes eight planar rows per
+> frame until it has audited the complete 512×320 Macintosh surface. On the target A1200 the first
+> measured runs found 32 publications at line 0, zero late, and 163,840 decoded pixels with zero
+> mismatches. The rolling audit is deliberately absent from production and timing builds.
 >
 > Read this before writing or changing a copper list, a sprite, or anything in the VBI.
 
@@ -99,6 +101,17 @@ The working shape: the main thread paints the off-screen buffer, publishes it, r
 `volatile swapPending` flag, then busy-waits; the VERTB ISR rewrites the `BPLxPT` words at
 vblank START — before the beam reaches the region's `WAIT` — and clears the flag.  The busy-wait
 doubles as the frame sync.
+
+**Vette standing proof:** `g_beamPresentsLate` is updated immediately before the live copper-list
+pointer/palette publication in `VetteScreen::vbiUpdate()`. `amiga/beam_watch.gdb` fails on the first
+write inside lines 76..267. The target-A1200 check observed 32 publications, all at line 0.
+
+The matching content proof is Vette-specific. Revs's `fill_catch.gdb` checked a horizon producer
+that Vette does not have; copying that address would create a decorative counter. Vette instead
+checks its real representation seam: under `FILLWATCH=1`, `VetteScreen` independently decodes the
+planar back buffer and compares it with the original 4-bit chunky surface. Eight complete rows per
+frame keep the diagnostic affordable; 40 frames cover all 320 rows. The first full audit found
+zero bad frames and zero bad pixels.
 
 ⚠ **DEAD END:** deferring the poke to *after* the VBI wait is NOT enough — it still races the
 copper's own fetch and desyncs which buffer is displayed.

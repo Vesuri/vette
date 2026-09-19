@@ -203,8 +203,9 @@ amiga/                  Amiga build infrastructure: Makefile, env.sh, run.sh, de
 - [ ] **Phase 0 — Scaffolding.** The platform abstraction, Amiga build, display takeover, VERTB
       handler, copper list and
       frame pump are proven on the target, and every link runs the multiplication/division and probe
-      audits. The phase remains open because several prescribed standing counters/debugger probes
-      do not yet exist. → `docs/open-work.md`.
+      audits. The beam-publication and complete chunky-to-planar standing checks now pass on the
+      target A1200. The phase remains open only on the inherited framework's two silent
+      non-interleaved bitmap arms. → `docs/open-work.md`.
 - [x] **Phase 1 — The Macintosh reference loop.** ⭐ It **drives**: MAME boots the reference volume
       and launches `Color VETTE!` unattended, completion read from the Mac's own low memory, and the
       game runs through its front end into live driving. Framebuffer + CLUT capture and host-side

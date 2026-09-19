@@ -16,6 +16,30 @@
 extern "C" {
 volatile uint16_t g_macFramesQueued = 0;
 volatile uint16_t g_macFramesPresented = 0;
+volatile uint16_t g_beamPresentLine = 0;
+volatile uint16_t g_beamPresentMin = 0xffff;
+volatile uint16_t g_beamPresentMax = 0;
+volatile uint32_t g_beamPresents = 0;
+volatile uint32_t g_beamPresentsLate = 0;
+#ifdef VETTE_FILLWATCH
+volatile uint32_t g_fillWatchFrames = 0;
+volatile uint32_t g_fillWatchRows = 0;
+volatile uint32_t g_fillBadFrames = 0;
+volatile uint32_t g_fillBadPixels = 0;
+volatile uint16_t g_fillBadX = 0;
+volatile uint16_t g_fillBadY = 0;
+volatile uint16_t g_fillBadExpected = 0;
+volatile uint16_t g_fillBadActual = 0;
+#endif
+}
+
+static uint16_t beamLine()
+{
+    // Read VPOSR first: the pair is not atomic, and taking V8 after V0..V7
+    // could straddle the line-256 transition.
+    uint16_t high = *vposrPointer;
+    uint16_t low = *vhposrPointer;
+    return (uint16_t)(((high & 1u) << 8) | (low >> 8));
 }
 
 // Four Macintosh chunky bytes describe eight pixels.  Each table entry places
@@ -214,6 +238,15 @@ void VetteScreen::vbiUpdate()
     if (!m_copper || !m_chip) return;   // the ISR must never see a half-built screen
 
     if (m_framePending) {
+        // Measure before touching the live list. A publication inside the
+        // 76..267 display window has raced the beam and must never occur.
+        uint16_t line = beamLine();
+        g_beamPresentLine = line;
+        if (line < g_beamPresentMin) g_beamPresentMin = line;
+        if (line > g_beamPresentMax) g_beamPresentMax = line;
+        ++g_beamPresents;
+        if (line >= VS_VSTART && line < VS_VSTOP) ++g_beamPresentsLate;
+
         uint8_t* oldFront = m_chip;
         m_chip = m_back;
         m_back = oldFront;
@@ -248,6 +281,45 @@ void VetteScreen::vbiUpdate()
         m_copper[m_ptrIndex + k * 2 + 1] = copperMove(bpl1ptl + k * 4, (uint16_t)p);
     }
 }
+
+#ifdef VETTE_FILLWATCH
+static void validateConvertedFrame(const uint8_t* chunky, const uint8_t* planar)
+{
+    static uint16_t nextRow = 0;
+    bool bad = false;
+    // Decode eight complete rows per frame.  Forty successive frames therefore
+    // audit every one of the 163,840 pixels without turning the diagnostic into
+    // the dominant workload on a 68020.
+    for (uint16_t checked = 0; checked < 8; ++checked) {
+        uint16_t y = nextRow++;
+        if (nextRow == VetteScreen::kMacHeight) nextRow = 0;
+        const uint8_t* source = chunky + (uint32_t)y * (VetteScreen::kWidth / 2);
+        const uint8_t* row = planar
+            + (uint32_t)(y + VetteScreen::kMacTop) * VetteScreen::kRowStride;
+        for (uint16_t x = 0; x < VetteScreen::kWidth; ++x) {
+            uint8_t packed = source[x >> 1];
+            uint8_t expected = (x & 1) ? (packed & 15) : (packed >> 4);
+            uint8_t mask = (uint8_t)(0x80u >> (x & 7));
+            uint8_t actual = 0;
+            for (uint16_t plane = 0; plane < VetteScreen::kPlanes; ++plane)
+                if (row[(uint32_t)plane * VetteScreen::kBytesPerRow + (x >> 3)] & mask)
+                    actual |= (uint8_t)(1u << plane);
+            if (actual == expected) continue;
+            if (!bad) {
+                g_fillBadX = x;
+                g_fillBadY = y;
+                g_fillBadExpected = expected;
+                g_fillBadActual = actual;
+            }
+            bad = true;
+            ++g_fillBadPixels;
+        }
+        ++g_fillWatchRows;
+    }
+    ++g_fillWatchFrames;
+    if (bad) ++g_fillBadFrames;
+}
+#endif
 
 static uint8_t gammaToOcs(uint16_t component)
 {
@@ -334,6 +406,12 @@ bool VetteScreen::presentMacFrame(const uint8_t* chunky, const uint8_t* colorTab
         uint8_t blue = gammaToOcs((uint16_t)(spec[6] << 8 | spec[7]));
         m_nextPalette[index] = (uint16_t)(red << 8 | green << 4 | blue);
     }
+#ifdef VETTE_FILLWATCH
+    // Rolling validation is intentionally diagnostic: it proves that dirty
+    // synchronization plus the converted rectangle leave the back buffer an
+    // exact planar encoding of the game's complete 4-bit chunky surface.
+    validateConvertedFrame(chunky, m_back);
+#endif
     ++g_macFramesQueued;
     m_framePending = true;
     return true;

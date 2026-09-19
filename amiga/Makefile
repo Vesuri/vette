@@ -8,6 +8,7 @@
 #   make SKIP_INTRO=1    report one synthetic first mouse press to skip the proven intro
 #   make GARAGE_CLICK=1  script the garage and vehicle selectors through real mouse events
 #   make QUIT_PROBE=1    request the Control+LMB exit at the first safe event-pump trap
+#   make FILLWATCH=1     rolling audit of the planar back buffer against the chunky Mac surface
 #   ./run.sh             boot in FS-UAE (CTRL + left mouse button quits)
 #   ./debug.sh           source-level debug via the FS-UAE GDB stub
 #   ./diag_run.sh [secs] headless probe run (needs PROBES=1)
@@ -161,6 +162,12 @@ ifeq ($(QUIT_PROBE),1)
 EXTRA_DEFINES += -DVETTE_QUIT_PROBE
 endif
 
+# Diagnostic only: full 512x320 chunky-vs-planar validation after every
+# successful dirty conversion. Never use this build for performance numbers.
+ifeq ($(FILLWATCH),1)
+EXTRA_DEFINES += -DVETTE_FILLWATCH
+endif
+
 # ⭐⭐ `make PROBEFIELDS=N PROBES=1` — BOUND THE MEASUREMENT IN EMULATED TIME, not host time.
 # diag_run.sh's window is `sleep <wall seconds>`, and under warp the host's throughput depends on
 # what else the machine is doing, so two arms of one A/B can cover very different amounts of GAME
@@ -249,6 +256,8 @@ PROBE_SYMS = g_vbiCount g_planeChecksum g_screenReady g_laceFields g_longFields 
 PROBE_SYMS += g_stageCDepth
 PROBE_SYMS += g_macTicks
 PROBE_SYMS += g_macFramesQueued g_macFramesPresented
+PROBE_SYMS += g_beamPresentLine g_beamPresentMin g_beamPresentMax \
+              g_beamPresents g_beamPresentsLate
 PROBE_SYMS += g_macVBLCallbackEntry g_macVBLCallbackTask g_macVBLCallbackA5 g_macVBLCallbackReturn
 PROBE_SYMS += g_introAudioState g_introAudioBytes g_introAudioPeriod
 ifneq ($(MAPPED_COPY_C),1)
@@ -265,6 +274,10 @@ PROBE_SYMS += g_probePicture140TrapPC g_probePicture140Return \
 endif
 ifdef FPSCOUNT
 PROBE_SYMS +=
+endif
+ifeq ($(FILLWATCH),1)
+PROBE_SYMS += g_fillWatchFrames g_fillWatchRows g_fillBadFrames g_fillBadPixels \
+              g_fillBadX g_fillBadY g_fillBadExpected g_fillBadActual
 endif
 
 COMMA := ,
