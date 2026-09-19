@@ -46,6 +46,10 @@ translated maps regressed to 153/373 and was removed. Reusing one 12,288-byte de
 across the 38 panorama strips is retained: an A/B/A measurement repeated the allocator control at
 171/304 on both sides and reached 183/312 with the workspace, about 4.3 percent more callbacks per
 tick. Larger pictures still use fresh allocations.
+`driving_frame_phases.gdb` now divides the wait at original-code boundaries: the first 33 pictures
+finish after 177 ticks, all 38 after 384, and the dynamic-renderer gate at `Main+$286A` is reached
+after 773 ticks without completing the frame. Do not keep treating PICT as the entire bottleneck;
+profile the 389-tick post-picture setup and the dynamic renderer separately.
 
 The MAME A-trap log remains a measured reference-run inventory → `docs/trap-log.md`,
 but Stage C has proved that it is **not an exact standalone-port first-use script**. The port has

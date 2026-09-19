@@ -728,6 +728,14 @@ ticks, improving callback progress per tick from 0.563 to 0.587 (about 4.3 perce
 than one panorama strip keep the ordinary allocation path, avoiding the poor locality of the
 rejected megabyte-scale decoded-resource caches.
 
+`amiga/driving_frame_phases.gdb` timestamps the original frame's control-flow milestones instead
+of attributing the entire wait to whichever routine an asynchronous sample happens to catch. In
+the first bounded run, the 33-picture batch finishes 177 ticks after `Main+$1FEA`, all 38 pictures
+finish at 384 ticks, and execution reaches the dynamic-renderer gate at `Main+$286A` only after 773
+ticks. The frame does not complete within that run. PICT expansion is therefore no longer the
+whole pre-render bottleneck: the post-picture setup from `Main+$256C` to `Main+$286A` costs another
+389 ticks, before the still-unfinished dynamic renderer begins.
+
 The trap-address table is stateful. The observed `GetTrapAddress`/`SetTrapAddress` pair now records
 the game's replacement for `$A9F4 ExitToShell`; routing a later invocation through that replacement
 remains part of completing the trap bridge.
