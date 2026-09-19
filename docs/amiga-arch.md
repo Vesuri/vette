@@ -2,9 +2,9 @@
 
 > ⚑ Carried over from the *Rescue on Fractalus!* and *Revs* ports, where each of these was chosen
 > with a measurement behind it.  The rationale is kept because it is what stops the decision being
-> re-litigated.  ⚠ **Nothing here is implemented in this repo yet** — `src/platform/amiga/` holds
-> only the vendored framework and the GCC runtime shim.  Read this as the shape `PlatformAmiga.cpp`
-> should take when Phase 0 writes it.
+> re-litigated. The takeover is implemented in `src/platform/amiga/PlatformAmiga.cpp`; the
+> sections below retain the measured rationale and call out any remaining fallback or framework
+> work explicitly.
 
 ## Display: takeover, not OS-friendly
 

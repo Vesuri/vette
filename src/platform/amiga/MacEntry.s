@@ -5,8 +5,29 @@ vette_call_mac_code:
 	move.l 4(sp),a0
 	move.l 8(sp),a1
 	movem.l d2-d7/a2-a6,-(sp)
+	move.l sp,g_macHostReturnSP
 	move.l a1,a5
 	jsr (a0)
+	clr.l g_macHostReturnSP
+	movem.l (sp)+,d2-d7/a2-a6
+	rts
+
+| Enter the Macintosh ExitToShell trap from a normal user-mode trap return.
+| The game's installed patch runs first, restores the old trap address, then
+| invokes this trap again to reach vette_user_exit_trampoline below.
+	.globl vette_user_exit_request
+vette_user_exit_request:
+	.word 0xa9f4
+1:	bra.s 1b
+
+| ExitToShell never returns to its Macintosh caller.  Restore the user stack
+| saved immediately before the application entry JSR, then execute the matching
+| vette_call_mac_code epilogue so C++ regains control with its callee-saved
+| registers intact.
+	.globl vette_user_exit_trampoline
+vette_user_exit_trampoline:
+	move.l g_macHostReturnSP,sp
+	clr.l g_macHostReturnSP
 	movem.l (sp)+,d2-d7/a2-a6
 	rts
 

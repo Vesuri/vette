@@ -7,6 +7,7 @@
 #   make FPSCOUNT=1      the HONEST framerate build: one counter, no probe instrumentation
 #   make SKIP_INTRO=1    report one synthetic first mouse press to skip the proven intro
 #   make GARAGE_CLICK=1  script the garage and vehicle selectors through real mouse events
+#   make QUIT_PROBE=1    request the Control+LMB exit at the first safe event-pump trap
 #   ./run.sh             boot in FS-UAE (CTRL + left mouse button quits)
 #   ./debug.sh           source-level debug via the FS-UAE GDB stub
 #   ./diag_run.sh [secs] headless probe run (needs PROBES=1)
@@ -154,6 +155,12 @@ ifeq ($(GARAGE_CLICK),1)
 EXTRA_DEFINES += -DVETTE_GARAGE_CLICK
 endif
 
+# Diagnostic only: take the same deferred exit path as Control+left-mouse at
+# its first safe trap boundary, without requiring headless hardware input.
+ifeq ($(QUIT_PROBE),1)
+EXTRA_DEFINES += -DVETTE_QUIT_PROBE
+endif
+
 # ⭐⭐ `make PROBEFIELDS=N PROBES=1` — BOUND THE MEASUREMENT IN EMULATED TIME, not host time.
 # diag_run.sh's window is `sleep <wall seconds>`, and under warp the host's throughput depends on
 # what else the machine is doing, so two arms of one A/B can cover very different amounts of GAME
@@ -253,7 +260,8 @@ endif
 endif
 ifdef PROBES
 PROBE_SYMS += g_probePicture140TrapPC g_probePicture140Return \
-              g_probePicture140Ticks g_probePicture140Frames g_probeIntroGeometry
+              g_probePicture140Ticks g_probePicture140Frames g_probeIntroGeometry \
+              g_macExitState g_macHostReturnSP
 endif
 ifdef FPSCOUNT
 PROBE_SYMS +=

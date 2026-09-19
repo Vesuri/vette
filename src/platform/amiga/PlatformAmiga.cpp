@@ -198,16 +198,6 @@ bool PlatformAmiga::run()
     static MacLoader loader;
     if (ok) ok = loader.run(&screen);
 
-    // Reached only if loader setup failed or a future completed game returns.
-    // ⚠ QUIT IS THE BARE LEFT MOUSE BUTTON FOR NOW, not the CTRL+LMB chord amiga/run.sh
-    // documents.  Reading CTRL needs the keyboard layer, which Stage A does not have; the
-    // chord must arrive BEFORE anything binds the bare button (the Mac original is a
-    // one-button machine, so the game will bind it).  docs/open-work.md carries the item.
-    while (!AmigaHardware::isLeftMouseButtonPressed()) {
-        uint16_t f = g_vbiCount;
-        while (g_vbiCount == f) { }     // wait for the next field
-    }
-
     Permit();
 
     vetteInputShutdown();

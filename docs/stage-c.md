@@ -976,9 +976,25 @@ tick 8,773. This closes the first deterministic collision/transition target.
 probe-only capture avoids a conditional debugger breakpoint on every Toolbox trap, which slowed
 the game enough to miss the event at the previous wall-time ceiling.
 
-The trap-address table is stateful. The observed `GetTrapAddress`/`SetTrapAddress` pair now records
-the game's replacement for `$A9F4 ExitToShell`; routing a later invocation through that replacement
-remains part of completing the trap bridge.
+The trap-address table is now active as well as stateful. Control+left-mouse is sampled only after
+an original event-pump, `Button`, `StillDown`, or driving-boundary trap has completed; ordinary
+mouse clicks retain their one-button Macintosh meaning. The safe return is redirected through a
+user-mode `$A9F4 ExitToShell` request. The trap bridge routes that invocation to the address the
+game installed with `SetTrapAddress`, preserving registers and USP.
+
+The installed handler is the original cleanup at `Main+$2A5C`. It removes VBL work, closes the
+built-in serial driver references `-6/-7`, shuts down the copied sound helper and disposes its
+pointer, restores the old `$A9F4` address, then invokes `_ExitToShell` again. The port implements
+those reached `Close` and `DisposePtr` operations rather than bypassing the handler. The second
+trap enters a user-mode unwind trampoline at the stack saved immediately before the application
+entry JSR, returning to `PlatformAmiga`, which restores input, interrupts, DMA, the OS view, and
+the graphics library in the established reverse order.
+
+`make PROBES=1 QUIT_PROBE=1` plus `amiga/quit_path.gdb` exercises the same deferred request without
+headless input. On the target A1200 configuration it prints state 3 at the original trap with a
+nonzero saved host stack, then state 4 in `vetteInputShutdown` with that stack cleared. This proves
+the whole game-cleanup-to-Amiga-restoration chain; the old unreachable bare-left-button wait has
+been removed.
 
 ## Correction to the MAME log
 

@@ -24,6 +24,8 @@ extern uint8_t vette_resources[], vette_resources_end[];
 
 void vette_line_a_handler();
 void vette_call_mac_code(void* entry, void* a5);
+void vette_user_exit_request();
+void vette_user_exit_trampoline();
 extern volatile uint16_t g_macFramesPresented;
 #ifdef VETTE_MAPPED_COPY_ASM
 void vetteMappedCopyRowsAsm(const uint8_t* source, uint8_t* destination,
@@ -50,6 +52,8 @@ volatile uint32_t g_macVBLCallbackTask = 0;
 volatile uint32_t g_macVBLCallbackA5 = 0;
 volatile uint32_t g_macVBLCallbackReturn = 0;
 volatile uint16_t g_macVBLCallbackActive = 0;
+volatile uint32_t g_macHostReturnSP = 0;
+volatile uint16_t g_macExitState = 0;
 volatile uint16_t g_introAudioState = 0;
 volatile uint32_t g_introAudioBytes = 0;
 volatile uint16_t g_introAudioPeriod = 0;
@@ -346,6 +350,7 @@ static void copyString(char* out, const char* in)
 
 struct TrapName { uint16_t word; const char* manager; const char* routine; };
 static const TrapName s_trapNames[] = {
+    {0xa001,"FILE MANAGER","CLOSE"},
     {0xa007,"FILE MANAGER","GETVOLINFO"}, {0xa861,"QUICKDRAW","RANDOM"},
     {0xa02e,"MEMORY MANAGER","BLOCKMOVE"}, {0xa9f1,"SEGMENT MANAGER","UNLOADSEG"},
     {0xa86e,"QUICKDRAW","INITGRAF"},
@@ -355,6 +360,7 @@ static const TrapName s_trapNames[] = {
     {0xa997,"RESOURCE MANAGER","OPENRESFILE"},
     {0xa9a1,"RESOURCE MANAGER","GETNAMEDRESOURCE"}, {0xa9a3,"RESOURCE MANAGER","RELEASERESOURCE"},
     {0xa063,"MEMORY MANAGER","MAXAPPLZONE"}, {0xa01c,"MEMORY MANAGER","FREEMEM"},
+    {0xa01f,"MEMORY MANAGER","DISPOSEPTR"},
     {0xa090,"TOOLBOX UTILITIES","SYSENVIRONS"},
     {0xa746,"TRAP MANAGER","GETTOOLTRAPADDRESS"},
     {0xa31e,"MEMORY MANAGER","NEWPTRCLEAR"}, {0xaa32,"QUICKDRAW","GETGDEVICE"},
@@ -3736,6 +3742,41 @@ static void setTrapAddress(uint16_t trap, uint8_t* address)
     s_trapAddresses[trap & 0x0fff] = address;
 }
 
+static bool routePatchedTrap(uint16_t trap, uint8_t* frame)
+{
+    uint16_t index = trap & 0x0fff;
+    uint8_t* address = s_trapAddresses[index];
+    if (!address || address == &s_trapTokens[index]) return false;
+    // MacEntry.s advances every handled trap return PC by two.  Bias the
+    // replacement here so RTE lands on the exact address installed by the
+    // application.  Registers and USP retain the original trap calling state.
+    write32(frame + 2, (uint32_t)address - 2);
+    if (trap == 0xa9f4) g_macExitState = 2;
+    return true;
+}
+
+static void requestExitAfterTrap(uint8_t* frame)
+{
+    write32(frame + 2, (uint32_t)vette_user_exit_request - 2);
+    g_macVBLCallbackEntry = 0;
+    g_macVBLCallbackTask = 0;
+    g_macVBLCallbackA5 = 0;
+    g_macExitState = 1;
+}
+
+static bool exitChordPressed()
+{
+#ifdef VETTE_QUIT_PROBE
+    static bool requested;
+    if (!requested) {
+        requested = true;
+        return true;
+    }
+#endif
+    return AmigaHardware::isLeftMouseButtonPressed()
+        && (vetteInputModifiers() & 0x1000) != 0;
+}
+
 static uint8_t* newPointer(uint32_t size, bool clear)
 {
     uint8_t* pointer = (uint8_t*)AllocMem(size ? size : 1, clear ? MEMF_CLEAR : 0);
@@ -3776,6 +3817,25 @@ static uint8_t** recoverHandle(uint8_t* pointer)
         }
     }
     return 0;
+}
+
+static int16_t disposePointer(uint8_t* pointer)
+{
+    uint32_t recorded = s_memoryManager.allocationCount;
+    if (recorded > sizeof(s_pointerAllocations) / sizeof(s_pointerAllocations[0]))
+        recorded = sizeof(s_pointerAllocations) / sizeof(s_pointerAllocations[0]);
+    for (uint32_t i = 0; i < recorded; ++i) {
+        PointerAllocation& allocation = s_pointerAllocations[i];
+        if (allocation.pointer != pointer || !allocation.master) continue;
+        FreeMem(allocation.master, allocation.size ? allocation.size : 1);
+        allocation.pointer = 0;
+        allocation.master = 0;
+        allocation.size = 0;
+        s_memoryManager.error = 0;
+        return 0;
+    }
+    s_memoryManager.error = -109;            // nilHandleErr / foreign pointer
+    return s_memoryManager.error;
 }
 
 static uint8_t** newHandle(uint32_t size, bool clear)
@@ -4313,11 +4373,36 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
     // and convert only at the proven loop boundary above.  Other scenes keep
     // the ordinary trap-return presentation cadence.
     if (!s_drivingFrameStarted || drivingFrameComplete) presentMacRuntime();
-    if (drivingBoundary) return 1;
+    if (drivingBoundary) {
+        if (exitChordPressed()) requestExitAfterTrap(frame);
+        return 1;
+    }
+    if (routePatchedTrap(trap, frame)) return 1;
+    if (trap == 0xa9f4) {                    // original ExitToShell after patch cleanup
+        g_macVBLCallbackEntry = 0;
+        g_macVBLCallbackTask = 0;
+        g_macVBLCallbackA5 = 0;
+        g_macExitState = 3;
+        write32(frame + 2, (uint32_t)vette_user_exit_trampoline - 2);
+        return 1;
+    }
     if (trap == 0xa02e) {                    // _BlockMove: A0, A1, D0; registers preserved
         blockMove((uint8_t*)regs[8], (uint8_t*)regs[9], regs[0]);
         ++g_blockMoveCount;
         return 1;
+    }
+    if (trap == 0xa001) {                    // _Close: IOParam in A0, result in D0
+        uint8_t* parameterBlock = (uint8_t*)regs[8];
+        if (parameterBlock) {
+            int16_t reference = (int16_t)read16(parameterBlock + 24);
+            // Communication shutdown closes the Macintosh built-in serial
+            // input/output drivers (-6 and -7).  The standalone port owns no
+            // corresponding Mac driver instances, so both are already idle.
+            if (reference == -6 || reference == -7) {
+                regs[0] = 0;                 // noErr
+                return 1;
+            }
+        }
     }
     if (trap == 0xa007) {                    // PBGetVInfoSync(parameter block in A0)
         if (getVolumeInfo((uint8_t*)regs[8])) {
@@ -4347,6 +4432,7 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
         // port.  This cooperative-loop call is the natural point to run the
         // Mac compatibility callbacks and present accumulated dirty pixels.
         serviceMacRuntime();
+        if (exitChordPressed()) requestExitAfterTrap(frame);
         if (g_stageCDepth < 80) g_stageCDepth = 80;
         return 1;
     }
@@ -4354,6 +4440,7 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
         uint8_t* event = (uint8_t*)read32(userStack);
         if (event) {
             write16(userStack + 6, nextEvent(read16(userStack + 4), event) ? 1 : 0);
+            if (exitChordPressed()) requestExitAfterTrap(frame);
             if (g_stageCDepth < 81) g_stageCDepth = 81;
             return 7;
         }
@@ -4520,6 +4607,10 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
     if (trap == 0xa01c) {                    // FreeMem() -> D0
         regs[0] = AvailMem(MEMF_PUBLIC);
         if (g_stageCDepth < 15) g_stageCDepth = 15;
+        return 1;
+    }
+    if (trap == 0xa01f) {                    // DisposePtr(A0) -> D0 MemError
+        regs[0] = (uint32_t)(int32_t)disposePointer((uint8_t*)regs[8]);
         return 1;
     }
     if (trap == 0xa04d) {                    // PurgeMem(D0 requested contiguous bytes)
@@ -4793,6 +4884,7 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
     }
     if (trap == 0xa973) {                    // StillDown() -> Boolean
         write16(userStack, AmigaHardware::isLeftMouseButtonPressed() ? 1 : 0);
+        if (exitChordPressed()) requestExitAfterTrap(frame);
         if (g_stageCDepth < 87) g_stageCDepth = 87;
         return 1;
     }
@@ -4952,6 +5044,7 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
         }
 #endif
         write16(userStack, pressed ? 1 : 0);
+        if (exitChordPressed()) requestExitAfterTrap(frame);
         if (g_stageCDepth < 64) g_stageCDepth = 64;
         return 1;
     }
@@ -5182,5 +5275,6 @@ bool MacLoader::run(VetteScreen* screen)
     // Main+1EDA is the application entry stub.  Its first JSR is through the final
     // jump-table entry to %A5Init; invoking %A5Init here as well would initialise twice.
     vette_call_mac_code((void*)read32(firstJump + 4), a5);
+    g_macExitState = 4;
     return true;
 }

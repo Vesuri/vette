@@ -201,6 +201,13 @@ One call, and it is the game's only trap patch. ⭐ This closes the gate on Stag
 **not** need general trap patching. It needs `SetTrapAddress($A9F4)` honoured — or, equivalently,
 the game's own quit handler installed where our `ExitToShell` would go.
 
+The live port now exercises that patch rather than merely recording it. A deferred
+Control+left-mouse request enters the installed jump-table address, whose target is the cleanup at
+`Main+$2A5C`. The routine eventually restores the saved old address at `Main+$2A92` and executes
+`$A9F4` at `Main+$2A9C`. Its previously unmeasured exit-only surface adds synchronous `_Close`
+`$A001` for built-in serial references `-6/-7` and `_DisposePtr` `$A01F` in the copied sound
+helper. After both are serviced, the restored original trap returns cleanly to Amiga teardown.
+
 ⚠ The other 15 `SetTrapAddress` calls in the window are all from `$7B1EF2` at frame 908, **before
 the game is loaded** — some extension patching `SystemTask`, `InitGraf`, `StdLine`, `Line`,
 `InverRect`, `PaintRect`, `InverRgn`, `CopyBits`, `HiliteWindow`, `SetPort`, `SetPBits`,
