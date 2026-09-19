@@ -733,8 +733,17 @@ of attributing the entire wait to whichever routine an asynchronous sample happe
 the first bounded run, the 33-picture batch finishes 177 ticks after `Main+$1FEA`, all 38 pictures
 finish at 384 ticks, and execution reaches the dynamic-renderer gate at `Main+$286A` only after 773
 ticks. The frame does not complete within that run. PICT expansion is therefore no longer the
-whole pre-render bottleneck: the post-picture setup from `Main+$256C` to `Main+$286A` costs another
-389 ticks, before the still-unfinished dynamic renderer begins.
+whole straight-line setup cost: progress from `Main+$256C` to `Main+$286A` takes another 389 ticks,
+before the still-unfinished dynamic renderer begins.
+
+`amiga/driving_post_picture_samples.gdb` explains that apparent 389-tick gap. Sixteen of 19 samples
+are still in `drawIndexedPictureBits` or its PackBits expansion, two are in complete-frame
+chunky-to-planar conversion, and one is in `memset`. Since the main routine has already returned
+from its last initial `DrawPicture`, this work is being performed by due VBL callbacks delivered at
+subsequent trap returns. Slow compatibility drawing advances emulated time, which makes more
+three-tick callbacks due; their drawing then delays the straight-line setup further. The next
+measurement must identify the callback's repeated PICT geometry and optimize that actual scaled
+path, rather than the already-completed initial panorama batch.
 
 The trap-address table is stateful. The observed `GetTrapAddress`/`SetTrapAddress` pair now records
 the game's replacement for `$A9F4 ExitToShell`; routing a later invocation through that replacement
