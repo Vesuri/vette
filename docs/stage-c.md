@@ -883,6 +883,14 @@ at `Traffic+$68B4` performs the byte raster operation. The next comparison is th
 register/A5 input state at `Traffic+$6850/$68B4`, not QuickDraw, C2P, or a guessed coordinate fix.
 `VETTE_MIRROR_WRITER=1` enables that otherwise noisy reference write trace.
 
+The broader Traffic helper inventory finds the first differing input. The reference write carries
+`d1=78`, `d2=256`, `d3=0`, `d4=0`, and replicated pen 4; the corresponding port call to the
+original full-row fill has `d1=80`, with the same 256-byte width, origin, and pen. Subsequent
+geometry overwrites those two extra rows in the forward scene, leaving only the mirror's narrow
+edge as evidence. The next trace belongs at the caller that computes the fill height, not in the
+raster loop. `amiga/driving_traffic_base.gdb` and `driving_traffic_rasters.gdb` retain the measured
+call inventories.
+
 Resolving the remaining resident-code samples shows that they are not compatibility overhead:
 `Main+$5208/$5246/$5266` are perspective division and clipping, `Main+$5A34/$5A92/$5D6A` are
 line/polygon construction, and `Traffic+$68B4..$68BA` enters an original byte raster loop while

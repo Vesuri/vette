@@ -268,8 +268,10 @@ then matches 174,330 of 175,104 live pixels exactly. All 774 differences are con
 dashboard are exact. The remaining differential is mirror raster state rather than palette
 realization or forward rendering. Four consecutive captures prove that the
 774-pixel mirror signature is static, not callback skew; a Macintosh write tap attributes its edge
-to the original `Traffic+$6790/$68B4` buffer/raster path. The next differential compares that
-routine's register and A5 inputs on both machines. → `docs/open-work.md` §Blocking.
+to the original `Traffic+$6790/$68B4` buffer/raster path. The first upstream mismatch is now
+measured: the reference fills 78 rows with pen 4 while the port fills 80 with otherwise identical
+width and origin. The next differential traces the caller/state that computes that height. →
+`docs/open-work.md` §Blocking.
 
 ⭐⭐ **Stage A is done and measured: the Amiga display path works.** The port takes the machine
 over, brings up 512×320 in 4 bitplanes hires interlaced and displays Target 1's captured Macintosh

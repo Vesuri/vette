@@ -26,6 +26,7 @@ local palette_for_window = {}
 local last_activate_window = 0
 local mirror_write_armed = false
 local trace_mirror_writer = os.getenv("VETTE_MIRROR_WRITER") == "1"
+local mirror_write_count = 0
 
 local function a24(v) return v & 0x00FFFFFF end
 local function u16(a) return prog:read_u16(a24(a)) end
@@ -93,10 +94,18 @@ local function arm_mirror_writer(pixmap)
 	keep[#keep + 1] = prog:install_write_tap(aligned, aligned + 3,
 		"driving_mirror_writer", function(_, data, mask)
 			if driving_capture_armed then
+				mirror_write_count = mirror_write_count + 1
+				local a5 = a24(cpu.state["A5"].value)
+				local car = a24(u32(a5 - 13944))
 				print(string.format(
-					"VP MIRROR WRITE frame=%u pc=%06X byte=%06X data=%08X mask=%08X old=%02X",
-					mac.frames(), a24(cpu.state["PC"].value), byte, data, mask,
-					prog:read_u8(byte)))
+					"VP MIRROR WRITE #%u frame=%u pc=%06X byte=%06X data=%08X mask=%08X old=%02X d1=%08X d2=%08X d3=%08X d4=%08X a0=%06X a1=%06X stride=%08X skew=%04X car=%06X car26=%04X buffers=%06X/%06X/%06X",
+					mirror_write_count, mac.frames(), a24(cpu.state["PC"].value), byte,
+					data, mask, prog:read_u8(byte), cpu.state["D1"].value,
+					cpu.state["D2"].value, cpu.state["D3"].value,
+					cpu.state["D4"].value, a24(cpu.state["A0"].value),
+					a24(cpu.state["A1"].value), u32(a5 - 960), u16(a5 - 13310),
+					car, car ~= 0 and u16(car + 26) or 0, a24(u32(a5 - 20450)),
+					a24(u32(a5 - 20446)), a24(u32(a5 - 20442))))
 			end
 		end)
 	print(string.format("VP armed mirror writer byte=%06X frame=%u", byte, mac.frames()))

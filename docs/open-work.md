@@ -42,9 +42,11 @@ one-callback capture skew: normal road/traffic pixels change between frames, whi
 774-pixel signature persists. A Macintosh byte write tap attributes the edge to the original
 Traffic raster path: `Traffic+$6790` selects/fills the target buffer and the routine entered at
 `Traffic+$68B4` writes the missing low nibble. On the port that byte remains at its initial `$FF`.
-Next compare the renderer inputs and A5 state at `Traffic+$6850/$68B4`; fix the cause in shared
-state or trap semantics, not with a mirror-coordinate patch. Do not return to straight-line
-accelerator soaking or palette work.
+The corresponding full-row fills expose the first upstream mismatch: both use a 256-byte row and
+color index 4, but System 6 fills 78 rows while the port fills 80. Later geometry overwrites that
+two-row difference everywhere except the mirror edge. Next trace the caller/state that computes
+this height and explain 78 versus 80; fix that cause, not the mirror pixels. Do not return to
+straight-line accelerator soaking or palette work.
 
 The key chart labels Escape “Menu Options,” which exposed a real input gap: the driving loop does
 not call `GetNextEvent`, so each CIA keyboard edge updates the corresponding bit in the full
