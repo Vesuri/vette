@@ -68,6 +68,7 @@ static const uint32_t kAboveA5 = 4104;
 static const uint32_t kJumpOffset = 32;
 static const uint32_t kJumpBytes = 4072;
 static const uint16_t kJumpCount = 509;
+static const uint16_t kDrivingBoundaryTrap = 0xafff;
 static uint8_t s_a5World[kBelowA5 + kAboveA5] __attribute__((aligned(4)));
 static VetteScreen* s_loudStopScreen;
 static ResourceArchive s_resourceArchive;
@@ -510,6 +511,20 @@ static bool disableCopyProtection()
         if (read16(vette_code_1 + 0x05fe + i * 2) != original[i]) return false;
     for (uint16_t i = 0; i < 6; ++i)
         write16(vette_code_1 + 0x05fe + i * 2, replacement[i]);
+    return true;
+}
+
+static bool installDrivingBoundaryTrap()
+{
+    // Main+$1FD2 is the top of the driving loop.  Its TST/BEQ pair either
+    // starts the next complete frame or leaves the loop.  No Macintosh trap
+    // is common to that edge, so replace the first word with a private Line-A
+    // hook and emulate the verified eight-byte pair in the dispatcher.
+    static const uint16_t original[4] = { 0x4a6d, 0xacbc, 0x6700, 0x0a02 };
+    uint8_t* boundary = s_segments[1].begin + 0x1fd2;
+    for (uint16_t i = 0; i < 4; ++i)
+        if (read16(boundary + i * 2) != original[i]) return false;
+    write16(boundary, kDrivingBoundaryTrap);
     return true;
 }
 
@@ -4132,17 +4147,23 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
     uint32_t pc = read32(frame + 2);
     uint16_t trap = read16((const uint8_t*)pc);
     bool drivingFrameComplete = false;
-    // Main+$29C6 returns directly to Main+$1FD2 while driving remains active.
-    // MaxMem at +$1FEA is the first trap in that loop: its first occurrence
-    // begins frame 1 and every later occurrence proves that the preceding
-    // frame is complete.  Direct 68k stores bypass the QuickDraw dirty calls,
-    // so expose the complete surface here rather than polling it mid-frame.
-    if (trap == 0xa04d && pc == (uint32_t)(s_segments[1].begin + 0x1fea)) {
-        if (s_drivingFrameStarted) {
-            markDirtyBounds(0, 0, 320, 512);
-            drivingFrameComplete = true;
+    bool drivingBoundary = trap == kDrivingBoundaryTrap
+        && pc == (uint32_t)(s_segments[1].begin + 0x1fd2);
+    // Emulate Main+$1FD2's original TST.W -21316(A5) / BEQ.W $29DA pair.
+    // The handler adds two to the saved PC, hence each stored target is -2.
+    if (drivingBoundary) {
+        bool driving = read16(s_currentA5 - 21316) != 0;
+        if (driving) {
+            if (s_drivingFrameStarted) {
+                markDirtyBounds(0, 0, 320, 512);
+                drivingFrameComplete = true;
+            }
+            else s_drivingFrameStarted = true;
+            write32(frame + 2, (uint32_t)(s_segments[1].begin + 0x1fd8));
+        } else {
+            s_drivingFrameStarted = false;
+            write32(frame + 2, (uint32_t)(s_segments[1].begin + 0x29d8));
         }
-        else s_drivingFrameStarted = true;
     } else if (trap == 0xa9b4 && pc == (uint32_t)(s_segments[1].begin + 0x29e6))
         s_drivingFrameStarted = false;
     // Every handled trap return is a user-mode-safe opportunity to deliver
@@ -4154,6 +4175,7 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
     // and convert only at the proven loop boundary above.  Other scenes keep
     // the ordinary trap-return presentation cadence.
     if (!s_drivingFrameStarted || drivingFrameComplete) presentMacRuntime();
+    if (drivingBoundary) return 1;
     if (trap == 0xa02e) {                    // _BlockMove: A0, A1, D0; registers preserved
         blockMove((uint8_t*)regs[8], (uint8_t*)regs[9], regs[0]);
         ++g_blockMoveCount;
@@ -4921,7 +4943,8 @@ bool MacLoader::run(VetteScreen* screen)
     uint8_t* a5;
     if (!buildA5World(a5)) return false;
     s_currentA5 = a5;
-    if (!redirectLowMemoryGlobals(a5) || !disableCopyProtection()) return false;
+    if (!redirectLowMemoryGlobals(a5) || !disableCopyProtection()
+        || !installDrivingBoundaryTrap()) return false;
 
     Disable();
     *(void (**)())0x28 = vette_line_a_handler;

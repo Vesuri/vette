@@ -658,22 +658,22 @@ a plain byte copy instead of a second palette walk. The cadence probe advances 1
 intro regression still matches all 163,840 displayed Macintosh pixels and both planar buffers and
 copper colors exactly.
 
-Static tracing corrects the original completion-boundary hypothesis. While driving is active,
-`Main+$29C6` branches directly back to the loop entry at `Main+$1FD2`; the `SystemTask` at
-`Main+$29E6` is reached only after that driving loop exits. The first `MaxMem` at `Main+$1FEA`
-therefore begins frame 1, and every subsequent hit begins a new frame only after the preceding
-iteration has completed. `amiga/driving_setup_boundary.gdb` now measures between those consecutive
-hits. This is a genuine complete-frame boundary, unlike a queued conversion of an intermediate
-surface. Replacing the translated-row byte copy with aligned word transfers produced inconsistent
-cadence and a lower repeatable control result, so that experiment was removed.
+Static tracing locates the completion edge: while driving is active, `Main+$29C6` branches directly
+back to the loop entry at `Main+$1FD2`; `SystemTask` at `Main+$29E6` is reached only after that loop
+exits. The earlier claim that `MaxMem` at `$1FEA` occurred on every pass was false: the branch at
+`$1FE0` commonly skips it. Repeated debugger stops there also leaked trace state through Line-A
+dispatch and eventually surfaced as a spurious `SIGTRAP` at the ordinary `Traffic+$3DC4`
+instruction. Neither event was a game fault or a frame boundary.
 
-The trap bridge now uses that control-flow boundary rather than guessing from pixel activity. The
-first `MaxMem` at `Main+$1FEA` arms driving presentation; later hits mark the completed 512x320
-surface dirty before normal presentation runs, covering the renderer's direct 68k stores as well
-as QuickDraw calls. `SystemTask` at `Main+$29E6` disarms it on exit so a later driving session again
-treats its first loop entry as frame start. No surface scan or intermediate-frame presentation is
-used to infer completion. The established intro differential remains exact across all 163,840
-pixels, both planar buffers, and the copper palette.
+No original Macintosh trap is common to the real edge, so the port byte-verifies the eight-byte
+`TST.W -21316(A5)` / `BEQ.W $29DA` pair at `Main+$1FD2`, replaces its first word with private
+Line-A `$AFFF`, and emulates both branches by changing only the saved return PC. The branch targets
+immediately overwrite condition codes, so the removed `TST` flags have no downstream consumer.
+The first active pass arms presentation; every later pass marks the completed 512×320 surface dirty
+and presents it, covering direct 68k stores as well as QuickDraw calls. No surface scan or partial
+dirty rectangle is used to infer completion. `SystemTask` still disarms the state on exit. The
+established intro differential remains exact across all 163,840 pixels, both planar buffers, and
+the copper palette.
 
 Four further local PICT shortcuts were measured and rejected against the repeatable 183-callback /
 302-tick fused-buffer control. Decompressing eligible rows directly into their final surface fell
@@ -730,8 +730,8 @@ rejected megabyte-scale decoded-resource caches.
 
 `amiga/driving_frame_phases.gdb` timestamps the original frame's control-flow milestones instead
 of attributing the entire wait to whichever routine an asynchronous sample happens to catch. In
-the first bounded run, the 33-picture batch finishes 177 ticks after `Main+$1FEA`, all 38 pictures
-finish at 384 ticks, and execution reaches the dynamic-renderer gate at `Main+$286A` only after 773
+the first bounded run, the 33-picture batch finishes 177 ticks after the former `$1FEA` marker, all
+38 pictures finish at 384 ticks, and execution reaches the dynamic-renderer gate at `Main+$286A` after 773
 ticks. The frame does not complete within that run. PICT expansion is therefore no longer the
 whole straight-line setup cost: progress from `Main+$256C` to `Main+$286A` takes another 389 ticks,
 before the still-unfinished dynamic renderer begins.
@@ -761,7 +761,7 @@ phase. Before presentation was gated, 14 of 24 samples were in `VetteScreen::pre
 were in `CopyBits`, and only one was in resident game code. QuickDraw traps were therefore causing
 dirty rectangles from an incomplete driving iteration to be converted at ordinary trap returns,
 despite the newly proven frame boundary. Driving now accumulates those bounds without presenting
-and performs one full conversion only at the next `Main+$1FEA` loop entry. Non-driving scenes keep
+and performs one full conversion only at the exact `Main+$1FD2` loop entry. Non-driving scenes keep
 their existing trap-return cadence. The milestone times improve again, from 155/346/503 to
 112/301/428 ticks, while the exact intro differential remains unchanged. A repeat of the dynamic
 sampler contains no presentation samples: most stops are now in `CopyBits`, with the rest in the
@@ -795,9 +795,10 @@ and assembly into the same destination for every eligible real `CopyBits`, prese
 byte-compares it after assembly, and accumulates Macintosh ticks for both arms. The event-driven
 target-A1200 run compared 245,760 bytes over three calls with zero failures and measured 20 ticks
 for C versus 15 for assembly, a 25 percent reduction in the isolated translation cost. The normal
-build still passes the complete 163,840-pixel intro differential. Its first-frame milestones also
-improve from 112/301/428 to 107/298/420 ticks; the second loop-entry boundary remains unreached
-inside the same 60-second host ceiling.
+build still passes the complete 163,840-pixel intro differential. The corrected hardware-watchpoint
+probe measures the first active loop from its true entry: picture milestones at 106/297 ticks,
+dynamic rendering at 420, and a completed presentation at 459. The next completed frame arrives
+40 ticks later, with both queued and presented counts advancing by one.
 
 The trap-address table is stateful. The observed `GetTrapAddress`/`SetTrapAddress` pair now records
 the game's replacement for `$A9F4 ExitToShell`; routing a later invocation through that replacement

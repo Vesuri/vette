@@ -7,75 +7,19 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — current loud stop
 
-⭐ **HEAD OF QUEUE: finish the first driving frame and identify its completion boundary.** The blank upper
-viewport was an intermediate frame. The live VBL queue contained a one-tick sound task and a
-three-tick driving task; returning after the first due record starved the latter forever. The
-scheduler now ages every record and selects callbacks round-robin, and the three direct `$0174`
-readers share a complete A5-relative KeyMap shadow. The first game-drawn road frame now contains
-skyline, traffic, mirror and cockpit without another trap. Keypad 8 is held through the direct
-KeyMap path at the Course One transition; consecutive driving-task captures differ and the original
-throttle global advances from 3 to 21 over 30 ticks. Direct `_BlockMove` writes now mark bounded
-dirty regions. Most raster pixels are direct 68k stores, but a three-tick full-surface comparison
-was rejected: it presented partial construction and cut callback progress from 162 to 48. The
-baseline 303-tick cadence queues no new completed frame. A spaced exception-PC sampler disproves
-the earlier attribution to the game's 3D code: 10 of 16 samples are in the compatibility PICT
-decoder and two are in chunky-to-planar conversion while the initial road artwork is still being
-built. Packing pairs of mapped 8-bit pixels, expanding PackBits in words, and translating packed
-4-bit pixels while decompressing raise measured callback progress from 0.535 to 0.606 per tick,
-about 13 percent, but the first frame still does not complete in the bounded run. Continue
-profiling the PICT path; do not poll the 81,920-byte surface again or present partially constructed
-frames. The original completion signal is now identified: while driving, `Main+$29C6` branches
-back to the loop entry at `Main+$1FD2`, so consecutive hits on the first trap at `Main+$1FEA`
-delimit complete frames. `SystemTask` at `Main+$29E6` belongs to the exit/event-loop path and was
-the wrong target. The bridge now marks the full 512x320 surface at that corrected boundary and
-disarms the marker on the exit path; `driving_setup_boundary.gdb` measures consecutive frames.
-The next bounded run must reach the second hit and validate the first complete presentation.
-Per-row direct decode, identity-palette detection, literal-loop unrolling, and
-single-entry palette caching are measured regressions; profile and optimize at the PICT-call or
-resource level rather than retrying those local variants. `driving_pict_progress.gdb` now shows
-the dominant workload: 38 large 8-bit, 512×24 PackBits strips build the 3,392-pixel wrapping
-roadside panorama. An in-decoder 8→4-bit fusion was slower. Host-predecoded archive sidecars were
-also rejected: caching all eligible rasters fell to 123/322, while a 215,040-byte packed cache of
-only the 35 unique panorama strips fell to 108/315, versus the 183/302 control. Preserve the
-decoder's fresh-working-memory locality. Copying the three already-rendered wrap duplicates also
-lost at 177/395 because per-call validation outweighed the saved decodes. The next optimization
-must amortize setup across the whole panorama rather than add another per-picture cache. Skipping
-the packed-nibble map that 8-bit PICTs cannot use is retained but essentially neutral at 183/301.
-The panorama's two shared source color tables do not provide a shortcut either: caching their
-translated maps regressed to 153/373 and was removed. Reusing one 12,288-byte decode workspace
-across the 38 panorama strips is retained: an A/B/A measurement repeated the allocator control at
-171/304 on both sides and reached 183/312 with the workspace, about 4.3 percent more callbacks per
-tick. Larger pictures still use fresh allocations.
-`driving_frame_phases.gdb` now divides the wait at original-code boundaries: the first 33 pictures
-finish after 177 ticks, all 38 after 384, and the dynamic-renderer gate at `Main+$286A` is reached
-after 773 ticks without completing the frame. Do not keep treating PICT as the entire bottleneck;
-the 389-tick gap after the initial pictures is mostly further compatibility drawing inside later
-main-path routines, not the already-returned straight-line picture batch.
-`driving_post_picture_samples.gdb` finds 16 of 19 samples back inside the indexed PICT decoder, two
-in complete-frame conversion, and one in clearing. A repeat with explicit state shows all 19 have
-`g_macVBLCallbackActive == 0`: these are later synchronous main-path PICTs, not callback work.
-`driving_post_picture_picts.gdb` identifies the costly case as 512-pixel 4-bit strips whose
-horizontal mapping is 1:1 while their enclosing frame scales vertically from 157 to 156 rows. A
-retained horizontal packed-row path preserves the vertical mapping and improves the milestone
-times from 177/384/773 to 155/346/503 ticks. The exact intro differential remains pixel-perfect.
-The next bounded run should now profile the dynamic renderer and try to reach the second loop-entry
-hit that presents the first complete frame.
-`driving_dynamic_samples.gdb` initially found 14 of 24 samples in partial-frame C2P, nine in
-`CopyBits`, and one in game code. Driving presentation is now suppressed during construction and
-performed only at the proven next-loop boundary; milestone times improve again from 155/346/503 to
-112/301/428 ticks. The repeat contains no C2P samples and is dominated by `CopyBits`, followed by
-resident Main/Traffic code. Measure the dynamic `CopyBits` geometry next.
-`driving_dynamic_copybits.gdb` finds repeated non-identity `srcCopy` operations between the same
-two PixMaps over the complete `(0,0)-(342,512)` rectangle. Widening overlap-safe `blockMove` to
-longwords and mapping equal-stride full rows as one contiguous span reduces the same twelve calls
-from 138 to 126 ticks, about nine percent. The remaining palette translation now uses a row-aware
-68000 helper with independent source and destination modulos. Its in-process differential compares
-245,760 bytes over three real calls with zero failures and measures 20 C ticks versus 15 assembly
-ticks on the target A1200 configuration. The complete intro differential remains exact, and the
-first-frame milestones improve from 112/301/428 to 107/298/420 ticks. The sampled Main/Traffic PCs
-are genuine shipped projection, clipping, polygon, transform and traffic-raster code rather than
-port-side seams. Return to that genuine share and the still-unreached second frame-boundary hit;
-do not retry local palette-loop variants.
+⭐ **HEAD OF QUEUE: drive beyond the now-proven first frame and discover the next compatibility
+boundary.** The game has an exact completion edge at `Main+$1FD2`, but no Macintosh trap occurs on
+every pass. The port therefore byte-verifies the original eight-byte `TST.W`/`BEQ.W` pair, replaces
+its first word with private Line-A `$AFFF`, and emulates both original branches in the dispatcher.
+The first pass arms presentation; every later pass marks and presents exactly one complete 512×320
+surface. `driving_frame_phases.gdb` now reaches the first completion at 459 ticks after loop entry
+(picture milestones 106/297, dynamic renderer 420), and `driving_setup_boundary.gdb` measures the
+next completed frame 40 ticks later with queued and presented counts both advancing by one. The
+normal full-intro differential remains exact at 163,840/163,840 pixels. The old `$1FEA MaxMem`
+marker was wrong because the loop often branches around it; do not restore it or infer completion
+from partial dirty pixels. Next, run sustained controlled driving until the next loud stop or game
+transition, capturing the stop/event rather than returning to already-exhausted local PICT and
+palette-loop variants.
 
 The MAME A-trap log remains a measured reference-run inventory → `docs/trap-log.md`,
 but Stage C has proved that it is **not an exact standalone-port first-use script**. The port has
