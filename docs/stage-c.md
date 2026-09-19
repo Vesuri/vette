@@ -891,6 +891,12 @@ edge as evidence. The next trace belongs at the caller that computes the fill he
 raster loop. `amiga/driving_traffic_base.gdb` and `driving_traffic_rasters.gdb` retain the measured
 call inventories.
 
+The port's fill return address maps to segment 7 `FRED+$0130`; disassembly identifies the call at
+`FRED+$012C` and the complete height calculation at `FRED+$00FC`. It loads `A5-$3A7A`, conditionally
+subtracts 20 when `A5-$03C4` is set, then clamps the result against `A5-$0350`. The 78-versus-80
+difference is therefore upstream original game state. The next probe compares those words and
+attributes the first differing store to `A5-$3A7A`.
+
 Resolving the remaining resident-code samples shows that they are not compatibility overhead:
 `Main+$5208/$5246/$5266` are perspective division and clipping, `Main+$5A34/$5A92/$5D6A` are
 line/polygon construction, and `Traffic+$68B4..$68BA` enters an original byte raster loop while

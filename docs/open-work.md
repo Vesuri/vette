@@ -48,6 +48,11 @@ two-row difference everywhere except the mirror edge. Next trace the caller/stat
 this height and explain 78 versus 80; fix that cause, not the mirror pixels. Do not return to
 straight-line accelerator soaking or palette work.
 
+The caller is now identified as segment 7 `FRED+$00FC..$0130`. It loads the height from
+`A5-$3A7A`, subtracts 20 only when `A5-$03C4` is nonzero, clamps against the viewport bottom at
+`A5-$0350`, and calls the Traffic fill at `FRED+$012C`. Next compare those three words at the first
+frame on both machines and trace the first differing assignment to `A5-$3A7A`.
+
 The key chart labels Escape “Menu Options,” which exposed a real input gap: the driving loop does
 not call `GetNextEvent`, so each CIA keyboard edge updates the corresponding bit in the full
 Macintosh KeyMap while also remaining in the event queue. That timing matters beyond driving

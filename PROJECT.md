@@ -273,6 +273,10 @@ measured: the reference fills 78 rows with pen 4 while the port fills 80 with ot
 width and origin. The next differential traces the caller/state that computes that height. →
 `docs/open-work.md` §Blocking.
 
+That caller is `FRED+$00FC..$0130`: the height comes from `A5-$3A7A`, is optionally reduced by 20
+under `A5-$03C4`, and is clamped to the viewport bottom at `A5-$0350`. The next measurement compares
+those three original game-state words and traces the first differing write to `A5-$3A7A`.
+
 ⭐⭐ **Stage A is done and measured: the Amiga display path works.** The port takes the machine
 over, brings up 512×320 in 4 bitplanes hires interlaced and displays Target 1's captured Macintosh
 frame out of chip RAM; the chip-RAM checksum matches the host-computed one byte for byte, the
