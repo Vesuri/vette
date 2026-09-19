@@ -97,8 +97,8 @@ come from the Mac's own structures while `Color VETTE!` is on screen, read by
 | Screen | **640 × 480**, **4 bpp**, `pixelType` 0 = **chunky / CLUT-indexed** | `MainDevice` ($8A4) → `GDevice` → `gdPMap` |
 | Screen `rowBytes` | **320** — i.e. **2 pixels per byte**, no padding | same PixMap |
 | Screen base | `$F9000A00`, agreeing with `ScrnBase` ($824) — the NuBus **slot 9** card's framebuffer, not RAM | PixMap `baseAddr` |
-| **The game's window** | **512 × 320** of content, at screen `(64,92)`–`(575,411)` | front `WindowRecord`'s `portRect`, **and** independently the bounding box of non-desktop pixels in the framebuffer dump |
-| Second window | 512 × 342 (the compact-Mac screen size), behind it | `WindowList` ($9D6) chain |
+| **The game's window** | **512 × 320** of content, at screen `(64,92)`–`(575,411)` | front `WindowRecord`'s `portRect`, independently the bounding box of non-desktop pixels, and re-measured as the front window during live driving |
+| Second window | 512 × 342 (the compact-Mac screen size), behind it during live driving | `WindowList` ($9D6) chain |
 | Offscreen surface | **512 × 512, 4 bpp, `rowBytes` 260** (256 bytes of pixels + 4 of padding) | `CurrentA5` → QD globals → `thePort` (a CGrafPort) |
 | Palette | **16 entries**, reloaded per scene (the intro's CLUT and the garage's differ) | PixMap `pmTable` |
 | Sound | mono, active through the ~20 s intro, **silent on the garage screen** | `-wavwrite` capture |

@@ -51,6 +51,7 @@ local segcount = {}   -- segment name -> {n, sites}, attributed LIVE at hit time
 local regframes = {}  -- 64 KB region -> {first frame, last frame} of any trap from it
 local game_order = {}  -- trap keys in order of first call BY THE GAME
 local keep = {}   -- ⚠⚠ see note 4: this is not bookkeeping, it is the tap's owner
+local protection_prompt = false
 
 -- ⭐⭐ ARGUMENT CAPTURE.
 --
@@ -108,6 +109,7 @@ local function on_trap()
 	local pc = prog:read_u32(sp + 2)
 	local w  = prog:read_u16(pc)
 	if (w & 0xF000) ~= 0xA000 then return end
+	if w == 0xA97C then protection_prompt = true end -- GetNewDialog
 	local rom = pc >= ROM_LO and pc <= ROM_HI
 	if rom then n_rom = n_rom + 1 else n_ram = n_ram + 1 end
 	local key = string.format("%04X", w)
@@ -156,6 +158,22 @@ local function on_trap()
 	if not rom and not c.ram_first then
 		c.ram_first = { frame = mac.frames(), pc = pc, phase = phase }
 		seen[#seen + 1] = key
+	end
+end
+
+local function click(h, v, wait)
+	mac.mouse_to(h, v); mac.click(1); mac.wait(wait or 180)
+end
+
+local function report_windows(label)
+	local w = u32(0x09D6) & 0x00FFFFFF -- WindowList: front window first
+	print("VP ---- " .. label .. " WindowList ----")
+	while w ~= 0 do
+		local t, l, b, r = s16(u16(w + 16)), s16(u16(w + 18)),
+			s16(u16(w + 20)), s16(u16(w + 22))
+		print(string.format("VP window @%06X portRect=(%d,%d)-(%d,%d) -> %d x %d visible=%d",
+			w, l, t, r, b, r - l, b - t, prog:read_u8(w + 0x6C)))
+		w = u32(w + 0x90) & 0x00FFFFFF
 	end
 end
 
@@ -577,7 +595,7 @@ end
 
 mac.run(function()
 	phase = "boot"
-	mac.launch()
+	if not mac.launch() then return end
 	-- ⚠⚠ Do NOT clear the accumulators here.  An earlier version did, to drop
 	-- ~56 k dispatches of System + Finder noise -- but attribution is by
 	-- SEGMENT now, so that noise is already excluded, and %A5Init runs BEFORE
@@ -586,15 +604,26 @@ mac.run(function()
 	print(string.format("VP launch at frame %d, %d dispatches so far (KEPT)", mac.frames(), n_hits))
 	phase = "launched"
 	launch_frame = mac.frames()
-	for i = 1, 12 do
-		mac.wait(240)
-		phase = "t+" .. (i * 4) .. "s"
-		print(string.format("VP %-8s frame=%-6d hits=%-8d ram=%-7d distinct=%d",
-			phase, mac.frames(), n_hits, n_ram, #seen))
-		-- ⚠ Is the intro really over at the DisposeWindow from Intro+0ADA
-		-- (frame ~3558)?  Shoot either side of it and look, rather than assume.
-		mac.shot(); print("VP SHOT " .. i .. " at frame " .. mac.frames())
+	mac.wait(90)
+	click(560, 400, 360)     -- first Button poll: leave the intro
+	phase = "garage"
+	mac.step("trap run: garage"); mac.shot()
+	click(357, 252, 240)     -- garage ACCEPT
+	phase = "vehicle"
+	click(477, 160, 180)     -- upper vehicle plate
+	click(276, 245, 360)     -- vehicle selector ACCEPT
+	phase = "course"
+	click(509, 399, 180)     -- Course One ACCEPT
+	if protection_prompt then
+		phase = "protection"
+		click(276, 284, 30)  -- focus the password edit field
+		mac.type("16")       -- manual's Chinatown entry
+		click(451, 284, 180) -- protection OK
 	end
+	phase = "driving"
+	mac.wait(1200)
+	mac.step("trap run: driving"); mac.shot()
+	report_windows("driving")
 	mac.shot()
 	map_segments()
 	local n = 0

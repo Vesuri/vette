@@ -42,7 +42,7 @@ centre of gravity**, and it is the thing to size before anything else.
 | **Port strategy** | ⭐⭐ **Option A: keep the original 68000 instructions, port the seams.** The segments are near-model, so there is nothing to relocate; the cost lands entirely in the trap layer. `docs/faithfulness-seam.md` §The rule |
 | **The build** | ⭐ **`Color VETTE!`.** Not the B&W one. See below — 16 colours maps onto 4 Amiga bitplanes, so the colour build is not the expensive choice it would be at 8bpp |
 | **Reference emulator** | ⭐ **MAME 0.289, driver `mac2fdhd`** (Mac II FDHD, `-nb9 mdc48`, `-ramsize 8M`). Chosen on the capability list, not reputation — it has watchpoints, a Lua API *and* an m68k gdb stub. `docs/mac-reference-loop.md` |
-| **Amiga screen mode** | ⭐⭐ **4 bitplanes, hires INTERLACED** (user decision). 16 colours at 512 px wide with 342 lines available. ⚠ Free of bitplane-DMA penalty only on **AGA**; an OCS/68000 fallback is open decision #2 |
+| **Amiga screen mode** | ⭐⭐ **4 bitplanes, hires INTERLACED** (user decision). 16 colours at 512 px wide; the measured live driving front window is 512×320. ⚠ Free of bitplane-DMA penalty only on **AGA**; an OCS/68000 fallback remains open |
 | **Copy protection** | ⭐ **Patched out, not reproduced.** The one deliberate, named departure from 1:1 — see `docs/faithfulness-seam.md` §The copy protection |
 
 ## Open decisions
@@ -60,24 +60,20 @@ how much else depends on them.
    - **lores + a 2:1 horizontal squeeze** folded into the chunky→planar merge. Nearly free there,
      but it is a resample and has to be judged against the reference loop.
    - **no OCS support.** Honest, and the one to pick if the frame rate is unusable anyway.
-   ⚠ **Do not settle this before the in-game surface size is measured** (#2) — a 512 × 342 driving
-   view makes every crop worse than the garage screen's 512 × 320 suggests.
-2. ⚠⚠ **Is the in-game surface 512 × 320 or 512 × 342?** The garage screen paints **512 × 320**
-   `[MEASURED]`, but a **512 × 342** window — the compact-Mac screen size — already exists behind it
-   and the driving view is the likely occupant. One reference-loop probe of the front `portRect`
-   past the garage screen settles it, and #1 depends on the answer.
-   ⭐⭐ **The depth question is CLOSED and no longer an assumption:** `[MEASURED]` 4 bpp, chunky,
+   ⭐ The size gate is now closed: the live driving `WindowList` puts a **512×320 front window**
+   above the separate 512×342 window. Judge the fallback against 512×320.
+   ⭐⭐ **The depth question is also CLOSED and no longer an assumption:** `[MEASURED]` 4 bpp, chunky,
    `pixelType` 0, two palette indices per byte, **high nibble = left pixel**, 16-entry CLUT.
    ⚠ And the CLUT is not what the player saw — a **gamma table** sits between it and the DAC, so the
    Amiga palette is derived from the *displayed* colour. → `docs/mac-hardware.md` §The display surface.
-3. **Machine target.** RoF needed 1 MB and did not fit a bare 512 KB A500. Unknown here and not
+2. **Machine target.** RoF needed 1 MB and did not fit a bare 512 KB A500. Unknown here and not
    guessable: it depends on whether the original segments stay resident and on how the display is
    arranged. **Decide when the first real measurement exists, not before.**
-4. **Performance target.** Deliberately not set. → `docs/perf-method.md` §The target. ⭐ Unlike both
+3. **Performance target.** Deliberately not set. → `docs/perf-method.md` §The target. ⭐ Unlike both
    prior ports there is a real reference: the Mac Plus's 7.83 MHz 68000 is within 12% of the A500's
    7.09 MHz, so the original's own framerate under the reference loop is a meaningful yardstick.
    Set the target from that plus a Phase 4 profile.
-5. **Host build: does it exist, and what for?** RoF had an SDL backend and its approximation cost
+4. **Host build: does it exist, and what for?** RoF had an SDL backend and its approximation cost
    real time; Revs deliberately had **no renderer** and used the host only for differentials.
    ⚠ This port's differentials are different again (there is no transliteration oracle), so the
    question is open rather than answered by either precedent.
@@ -210,14 +206,15 @@ amiga/                  Amiga build infrastructure: Makefile, env.sh, run.sh, de
       prescribed standing counters/debugger probes do not yet exist. → `docs/open-work.md`.
 - [x] **Phase 1 — The Macintosh reference loop.** ⭐ It **drives**: MAME boots the reference volume
       and launches `Color VETTE!` unattended, completion read from the Mac's own low memory, and the
-      game runs to its garage screen. Framebuffer + CLUT capture and host-side re-render are proven
-      against MAME's own screenshots. ⭐⭐ **The A-trap log is done** → `docs/trap-log.md`: **51
+      game runs through its front end into live driving. Framebuffer + CLUT capture and host-side
+      re-render are proven against MAME's own screenshots. ⭐⭐ **The A-trap log is done** →
+      `docs/trap-log.md`: **63
       traps** called by the game's own `CODE` segments, first-use ordered, every caller resolved to
       `(segment, offset)` live at the moment of the call, segment bases pinned by matching each
       extracted resource's own bytes in memory *and* by requiring its resident jump-table exports to
       fall inside the pinned span. Arguments are read at the call site, so `SetTrapAddress`'s target,
       `%A5Init`'s trap set and the `QDExtensions` selectors are measured too. ⚠ It is a **FLOOR**:
-      the window ends at the menu, so `FRED` and `Communication` never ran.
+      only one bounded driving path ran, and `FRED` and `Communication` still never became resident.
 - [ ] **Phase 2 — Complete static map.** All 11 `CODE` resources are resident, the 509-entry jump
       table and A5 world run in place, and the low-memory access audit protects the unmapped first
       32 KiB. The exhaustive static map, entry-point CSV, naming pass and coverage accounting remain.
@@ -239,7 +236,7 @@ See `docs/phases.md` for exit criteria and the gating between phases.
 
 ## Immediate next step
 
-### ⭐⭐ Drive a deliberate state transition and discover the next compatibility boundary
+### ⭐⭐ Build the driving reference differential
 
 The complete game-owned intro passes its 163,840-pixel differential, the scripted garage path
 enters driving, and a sustained A1200 run presents 143 complete moving frames over 6,422 Macintosh
@@ -259,9 +256,11 @@ original `Main+$3134` sound toggle, changes the shipped sound flag from 1 to 0, 
 sound segment, and remains trap-free through 50/50 driving frames. A reaches `Main+$31AA`, changes
 the current car's automatic-shift field from 1 to 0, advances the transmission gate from 0 to 1,
 and likewise remains trap-free through 50/50 frames. The planned control slice is complete without
-finding a new compatibility boundary. Next extend the Macintosh trap/reference run through the
-garage and into driving; use that same run to measure the driving front window's `portRect` and
-settle the 512×320-versus-512×342 question. → `docs/open-work.md` §Blocking.
+finding a new compatibility boundary. The Macintosh reference harness now reaches live driving,
+expands the measured trap floor from 51 to 63, and proves the front window is 512×320 above a
+separate 512×342 window. Next capture a named, reproducible driving state from both machines and
+compare the chunky indices and active ColorTable before comparing displayed RGB. That separates
+simulation/render differences from palette realization. → `docs/open-work.md` §Blocking.
 
 ⭐⭐ **Stage A is done and measured: the Amiga display path works.** The port takes the machine
 over, brings up 512×320 in 4 bitplanes hires interlaced and displays Target 1's captured Macintosh
@@ -278,7 +277,7 @@ palette that ran is not the one derived here.**
 ⭐ Every gate that stood in front of it is gone — the trap log is measured, arguments included
 (`docs/trap-log.md`):
 
-- **36 of the 51 traps** stand between launch and a painted intro screen. The art is up at frame
+- **36 of the 63 currently measured traps** stand between launch and a painted intro screen. The art is up at frame
   1758; the last new traps before it are `CopyBits` and `EraseRect` at 1698–1699.
   ⚠⚠ **This is double the "18" previously recorded here**, and the 18 were blind rather than wrong:
   the earlier tracer cleared its accumulators when the app became frontmost, discarding the game's

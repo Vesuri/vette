@@ -5,13 +5,14 @@ game's own 68000 code runs, so the set of `$Axxx` traps it executes *is* the sur
 supply, and the order it first needs them in is the order to build them.
 
 Produced by `tools/mac_traps.lua` (+ `tools/gen_trap_names.py`) against the unpatched original under
-MAME, launch → title → intro → menu. Re-run it with the headless recipe in `CLAUDE.md`; it writes
+MAME, launch → title → intro → garage → vehicle/course selectors → driving. Re-run it with
+the headless recipe in `CLAUDE.md`; it writes
 `ref/mame/traps.txt`.
 
 ⚠⚠ **Stage C correction:** this table accurately describes the captured MAME run, but it is not a
 complete first-use script for the standalone port. The live Amiga loud-stop loop executes several
 setup traps absent from, or later in, this ordering (`InitGraf`, `TEInit`, `InitDialogs`,
-`OpenResFile`, `SysEnvirons`, and others). Its 51 total and 36-before-intro counts are therefore
+`OpenResFile`, `SysEnvirons`, and others). Its 63 total and 36-before-intro counts are therefore
 **floors for implementation**, not exact totals. See `docs/stage-c.md`; the tracer omission still
 needs explanation.
 
@@ -49,7 +50,7 @@ more sit in front of them.
 everywhere: `vers` 1 and `VETT` 0 in **both** builds read *"VETTE! version 1.02 / © 1991 Sphere,
 Inc."*. The 1989 the docs used to carry was unsourced — see `docs/mac-reference-loop.md`.
 
-## 51 traps in the window, and how the callers split
+## Two measured windows: 51 through the menu, 63 through driving
 
 **243 056 dispatches** through the Line-A vector; **234 682** decoded to an `$Axxx` word;
 **103 674 from ROM** and **131 008 from RAM**. ⚠⚠ *"From RAM" is not "from the game"*:
@@ -79,10 +80,19 @@ The port implements `DrawPicture` itself, so it never sees the `SetHandleSize` t
 ⭐ `Intro` is 3 442 bytes and accounts for 79% of the game's trap traffic. `load` is the opposite
 shape: 51 calls from 46 distinct sites — straight-line startup code.
 
+The extended deterministic run skips the intro at its first `Button` poll, traverses the garage,
+vehicle and course selectors, answers the unmodified copy-protection requester, and waits 1,200
+frames in driving. It records **145,957 dispatches**, **63 distinct traps called by mapped game
+segments**, and 15,896 game-owned dispatches. The lower traffic is expected because this window
+does not play the full intro; the earlier complete-intro counts above remain the authority for
+Target 1. The extended run adds the twelve rows below and changes none of the first 51 identities.
+
 ## The work list, in measured first-use order
 
 `caller` is resolved to `(segment, offset)` in **`Color VETTE!`**, **at the moment of the call**.
-`from-RAM` / `from-ROM` are call counts over the whole window, by where the *caller* was.
+`from-RAM` / `from-ROM` are call counts over the relevant capture window, by where the *caller* was.
+Rows 1–51 retain the complete-intro/menu capture's counts; rows 52–63 carry the extended
+garage-to-driving capture's counts.
 
 | # | word | name | flags | from-RAM | from-ROM | frame | caller |
 |---|---|---|---|---|---|---|---|
@@ -137,6 +147,18 @@ shape: 51 calls from 46 distinct sites — straight-line startup code.
 | 49 | `A9B4` | SystemTask | | 851 | 0 | 3832 | `Main+29E6` |
 | 50 | `AA94` | ActivatePalette | | 21 | 0 | 3837 | `Initialize+0B30` |
 | 51 | `A874` | GetPort | | 1 656 | 17 759 | 3838 | `Main+05C6` |
+| 52 | `A924` | FrontWindow | | 2 466 | 33 | 2246 | `Initialize+0C9E` |
+| 53 | `A871` | GlobalToLocal | | 60 | 13 | 2246 | `Initialize+0CB4` |
+| 54 | `A8AD` | PtInRect | | 82 | 2 | 2246 | `Initialize+0A1C` |
+| 55 | `A8A4` | InverRect | | 7 | 0 | 2246 | `Initialize+0A2E` |
+| 56 | `A972` | GetMouse | | 59 | 14 148 | 2247 | `Initialize+0A38` |
+| 57 | `A032` | FlushEvents | | 2 | 0 | 2772 | `Initialize+11CC` |
+| 58 | `A02A` | HUnlock | | 1 064 | 190 | 2779 | `Initialize+129C` |
+| 59 | `AA39` | MakeITable | | 1 | 0 | 2884 | `Initialize+132C` |
+| 60 | `A915` | ShowWindow | | 1 | 0 | 2888 | `Initialize+1332` |
+| 61 | `A939` | EnableItem | | 1 | 0 | 2973 | `Initialize+13BE` |
+| 62 | `A92C` | FindWindow | | 806 | 0 | 3189 | `Initialize+0AAA` |
+| 63 | `A925` | DragWindow | | 3 | 0 | 3190 | `Main+1BA8` |
 
 ### ⭐ What Target 1 actually costs
 
@@ -276,15 +298,17 @@ appear in memory **and** every one of that segment's resident jump-table exports
 | 5 | `Score` | `$670D10` | 4 628 | frame 3822 |
 
 `CurrentA5 = $7869C4`. Of the 509 jump-table entries, **338 were resident at frame 1288, 250 by the
-menu** (segments are unloaded as well as loaded). The mapped ranges were checked for overlap: none.
+menu** (segments are unloaded as well as loaded). The extended run reaches driving with the same
+eight segment identities mapped. The mapped ranges were checked for overlap: none.
 
 ⚠ **`%A5Init` and `Initialize` each had 2 candidate bases** matching the 8-byte signature; the
 lowest was taken. For `%A5Init` the choice is not independently confirmed, so its `+00B4` offset is
 `[DERIVED]`, not `[MEASURED]`.
 
-⚠ **`Communication` (3) and `FRED` (7) were never observed resident**, so any trap they call is
-missing from the list above. `FRED` exports 242 of the 509 entries and is presumably the driving
-code, which this window never reaches.
+⚠ **`Communication` (3) and `FRED` (7) were never observed resident**, even though the extended
+window reaches active driving, so any trap on an untested path through either remains missing.
+This kills the earlier inference that `FRED` must be the main driving code: the measured driving
+path runs through the already-mapped segments without it.
 
 ⭐ **Every unattributed caller region was checked.** The regions that called a trap from RAM, with
 the frame range of their calls — ⭐ the frame range is what identifies an owner, because the game's
@@ -343,9 +367,9 @@ so the lookup indexes by trap *number* as well, or `NewPtr`/`NewHandle`/`GetTrap
 
 ## ⛔ What this log is NOT
 
-- **Not the driving surface.** The window ends at the menu. `FRED` and `Communication` never ran.
-  ⚠ Treat the 51 as a **FLOOR**, per `CLAUDE.md` — Revs's inventory looked closed after a static
-  sweep and running it found three more.
+- **Not an exhaustive driving-path inventory.** This window reaches active driving, but only one
+  vehicle/course path and a bounded wait. `FRED` and `Communication` never ran. Treat the 63 as a
+  **FLOOR**, per `CLAUDE.md` — another course, collision, finish or multiplayer path can add calls.
 - **Not fully selector-resolved.** `QDExtensions` now is (`D0`), but `ScriptUtil` (194 calls),
   `SCSIDispatch` and the `Pack` traps are selector-dispatched and unread. All three are
   System-called in this window, so none is on the work list — that could change.

@@ -7,7 +7,7 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — current compatibility boundary
 
-⭐ **HEAD OF QUEUE: extend the Macintosh reference run through the garage and into driving.**
+⭐ **HEAD OF QUEUE: build a driving reference differential at one named game state.**
 Complete frames are presented at the exact original `Main+$1FD2` loop boundary;
 sustained driving covers 6,422 Macintosh ticks and 143/143 frames at implemented depth 93 without
 a loud stop. Corrected Escape takes the shipped Menu Options exit at tick 1,864 after 32/32 frames.
@@ -28,11 +28,12 @@ at offsets `$021C`/`$024C`, and remains in active driving through 50/50 frames a
 a loud stop. A then closes the planned transmission-state slice: Mac virtual `$00` dispatches to
 `Main+$31AA`, changes the current car's automatic-shift field from 1 to 0, advances the game's
 transmission gate from 0 to 1, and remains at depth 93 through 50/50 frames without a loud stop.
-The deliberate control matrix has reached no new compatibility boundary. Next extend
-`tools/mame_mac_input.lua` past the garage, re-run `tools/mac_traps.lua`, and in that same reference
-run measure the driving front window's `portRect`. This updates the trap-inventory floor and settles
-the queued 512×320-versus-512×342 surface question. Do not return to straight-line accelerator
-soaking or exhausted PICT/palette work.
+The deliberate control matrix has reached no new compatibility boundary. The extended Macintosh
+run now reaches driving, raises the measured trap floor from 51 to 63, and reads a 512×320 front
+window above the separate 512×342 surface. Next capture the same named driving state on both
+machines and compare the 4-bit chunky indices plus active ColorTable before displayed RGB. The
+first mismatch then belongs unambiguously to simulation/rendering, color realization, or final
+presentation. Do not return to straight-line accelerator soaking or exhausted PICT/palette work.
 
 The key chart labels Escape “Menu Options,” which exposed a real input gap: the driving loop does
 not call `GetNextEvent`, so each CIA keyboard edge updates the corresponding bit in the full
@@ -49,8 +50,8 @@ at the exact exit boundary. Production builds never define it.
 
 The MAME A-trap log remains a measured reference-run inventory → `docs/trap-log.md`,
 but Stage C has proved that it is **not an exact standalone-port first-use script**. The port has
-already executed initialization calls absent from, or much later in, that 51-row ordering. Treat
-51 and the intro's 36 as floors until the tracer omission is explained. Three earlier questions
+already executed initialization calls absent from, or much later in, that 63-row ordering. Treat
+63 and the intro's 36 as floors until the tracer omission is explained. Three earlier questions
 are nevertheless answered:
 the game patches exactly one trap (`_ExitToShell`), `%A5Init` calls exactly one (`_BlockMove`), and
 `QDExtensions` is dispatched by `D0` with Target 1 needing selectors 0 (`NewGWorld`) and
@@ -62,18 +63,12 @@ the game patches exactly one trap (`_ExitToShell`), `%A5Init` calls exactly one 
    state left by the correct-answer path, without implementing `GetDItem`, text editing, modal
    events, or persistent writable resources. ⚠ Ground truth still runs the **unpatched** original.
 
-2. ⚠ **The trap log stops at the MENU, so re-run it for DRIVING.** `FRED` (242 of the 509
-   jump-table entries) and `Communication` were never observed resident, so any trap they call is
-   missing. ⚠⚠ The 51 are a **FLOOR**. Extend `tools/mame_mac_input.lua` past the garage screen and
-   re-run `tools/mac_traps.lua`. ⛔ Does **not** gate Target 1 — the intro is fully measured.
-
-3. ⚠ **`512×323` vs `512×320` is unreconciled.** The intro's first `DrawPicture` destination rect
+2. ⚠ **`512×323` vs `512×320` is unreconciled.** The intro's first `DrawPicture` destination rect
    is 512 wide by **323** tall `[MEASURED]`; `docs/mac-hardware.md` records the game painting
    **320** rows at (64,92). Three rows are unexplained — clipped, or the recorded 320 is short.
    Settle it before the Stage A viewport geometry is fixed, by capturing the GWorld and the screen
-   at frame 1758 and diffing the row extents. ⭐ Same reference run as **The two display questions
-   that are still open**, part (a) (`PROJECT.md` #2),
-   which asks the same question about the **driving** surface — take both probes at once.
+   at frame 1758 and diffing the row extents. The separate driving-size question is closed and does
+   not answer these three intro rows.
 
 ## ⭐⭐ TARGET 1 — the complete intro, run by the game's own code — COMPLETE
 
@@ -172,18 +167,11 @@ closed and deleted, so a `#N` written in another doc goes quietly wrong — thre
     externally-callable routines is **~27 bytes each**, so `[INFERRED]` it is a library of small leaf
     routines (maths/trig/fixed-point being the obvious candidates, which would fit the table-driven
     trig already found in the data). Cheap to settle: disassemble a dozen of its entries.
-16. ⭐ **The two display questions that are still open** — the mode itself is now locked
-    (4 bitplanes, hires interlaced; `PROJECT.md` §Decisions), so what remains is:
-    **(a)** is the **in-game** surface 512 × 320 or **512 × 342**? One reference-loop probe of the
-    front `WindowRecord`'s `portRect` past the garage screen. ⭐ Cheap, and do it on the next
-    reference run rather than as its own trip.
-    **(b)** is there an **OCS / 68000 fallback**, and which of crop / squeeze / none? ⚠ Gated on
-    (a), because a 512 × 342 driving view makes every crop worse. → `PROJECT.md` §Open decisions.
-    ⚠⚠ **Chunky → planar is a named, unbudgeted cost either way**, and whether it is even on the
-    critical path is unknown: if the driving view is built from QuickDraw primitives, a
-    planar-native trap layer skips it; if the game rasterises into the GWorld itself, it does not.
-    ⛔ **Do not settle that from inference** — **The trap log stops at the MENU** rerun plus a write tap over the live GWorld's
-    pixel range answers it by measurement. → `docs/mac-hardware.md` question 5.
+16. ⭐ **The remaining display question is the OCS / 68000 fallback** — crop, squeeze, or none.
+    The primary mode is locked at four-bitplane hires interlaced, and the reference run now proves
+    the live driving front window is 512×320 above a separate 512×342 surface. The driving
+    `CopyBits` probe also proves the game rasterises into its indexed GWorld, so chunky→planar is
+    a real critical-path cost rather than a hypothetical one. → `PROJECT.md` §Open decisions.
 
 ## ⛔ CLOSED — measured dead ends
 
