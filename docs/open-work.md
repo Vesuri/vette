@@ -7,12 +7,11 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — current compatibility boundary
 
-⭐ **HEAD OF QUEUE: define the shared platform boundary and move `main` off the Amiga backend.**
-The runnable port now has a proven boundary: application startup asks a platform to run the
-resident Macintosh program, while the Amiga implementation owns takeover, input, display, audio,
-and restoration. Express that small boundary in `src/platform/platform.h` plus `Platform.cpp`, and
-leave the backend-specific machinery behind it. Do not import either prior port's 6502 bus or OS
-call interfaces; neither exists here.
+⭐ **HEAD OF QUEUE: port the standing target checks named by the inherited Amiga lessons.**
+Add the missing counters and debugger probes that turn display timing/fill invariants into
+repeatable failures, beginning with `g_beamPresentsLate`, `beam_watch.gdb`, and `fill_catch.gdb`.
+Re-derive each address or boundary against this port's 512×384 interlaced display and current
+frame pump; the prior projects supply the invariant, not this program's constants.
 
 ## ⭐⭐ TARGET 1 — the complete intro, run by the game's own code — COMPLETE
 

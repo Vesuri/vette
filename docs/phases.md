@@ -26,7 +26,9 @@ principle — *decide the mechanical policy before applying it 500 times* — an
 Build infrastructure only; no game code. **Exit criteria:**
 
 - [x] The source archive is unpacked and its contents catalogued → `docs/source-inventory.md`.
-- [ ] `src/platform/platform.h` exists and is written from *this* port's boundary.
+- [x] `src/platform/platform.h` exists and is written from *this* port's boundary: startup asks
+      only for `run()` status; takeover, display, input, audio, the Macintosh bridge, and teardown
+      remain backend-owned. No 6502 bus or OS-call ABI was imported.
 - [x] The Amiga build links: `out/Vette.exe`, with `muldiv-audit` and `probe-audit` clean on every
       link.
 - [x] Display takeover, the VERTB handler, the copper list and the frame pump verified **on the

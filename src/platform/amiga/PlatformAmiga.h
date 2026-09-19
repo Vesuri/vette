@@ -2,7 +2,8 @@
  *
  * What it is: LoadView(NULL), display DMA down, the VERTB vector taken over wholesale,
  * VetteScreen brought up, the A5 loader entered behind the Line-A vector, everything restored
- * if execution returns.  Input, sound, and the Stage C Toolbox implementations do not exist yet.
+ * after the Macintosh ExitToShell path returns. Input, sound, and the Stage C Toolbox bridge are
+ * owned below this backend boundary.
  */
 #ifndef VETTE_PLATFORM_AMIGA_H
 #define VETTE_PLATFORM_AMIGA_H
