@@ -928,22 +928,26 @@ frames with driving still armed, depth still 93, and no loud stop. This closes s
 accelerator soaking as a discovery method; the next coverage step must deliberately take another
 driving control or transition path.
 
-The later deliberate straight-to-Lake-Merced trajectory corrects two misleading dashboard-level
-inferences. Keypad 8 really does move the current car: record words 66/68 rise from 28 at presented
-frame 40 to 54 at frame 80, and the record's other motion fields advance. The visible `000` is not
-proof of zero road speed. Automatic Shift is also already enabled at course start: `car+46` is 1.
-`Main+$31AA` merely toggles that field, and Traffic's gear routine at `$3766` preserves its computed
-gear changes only while the field is nonzero; when it is zero the routine restores the prior gear.
-The A-key diagnostic therefore disables automatic shifting and is not part of the collision route.
+The later deliberate straight-to-Lake-Merced work corrects a misleading record interpretation.
+The first 900-frame run never moved: the current car stayed at `(12608,-6,6112)`, `car+26` speed and
+`car+28` gear stayed zero, while keypad 8 correctly reached `Main+$2F1A` and set only the throttle
+word at `car+32`. Words 66/68 are engine RPM state, not position. `Traffic+$3720` uses word 68 to
+derive the per-frame Bogas engine pitch, caps it at 85,000, and calls `BogasPlay`. The visible `000`
+dashboard speed was therefore accurate.
 
-A clean 900-frame run reaches 11,397 ticks at depth 93 without a loud stop. Words 66/68 remain at
-54 because `Traffic+$3720` uses word 68 to derive the per-frame Bogas engine pitch, capping it at
-85,000 before calling `BogasPlay`; those fields are not a reliable collision detector. No
-post-start `BogasLoad` sampled-effect request occurs inside the same window. The next bounded probe
-is consequently event-driven: continue straight until the first `BogasLoad` or loud stop, retain
-the exact Traffic caller/instrument and framebuffer there, and distinguish a real lake impact from
-mere elapsed driving time. `amiga/driving_car_motion.gdb`, `driving_collision.gdb`,
-`driving_sound_event.gdb`, and the noisier `driving_sound_trace.gdb` preserve the evidence.
+The car begins with Automatic Shift enabled (`car+46 = 1`), but still requires an initial shift
+out of neutral. A remains the wrong command: `Main+$31AA` changes that field to zero, and Traffic's
+gear routine at `$3766` then restores automatically computed gear changes. Top-row `1` is also the
+wrong deterministic command in the active control mode: it reaches `Main+$32CC`, whose mode branch
+treats it as steering. Top-row `+` reaches the shipped upshift handler at `Main+$328E`.
+`Traffic+$51FE` rejects gear changes before start state 3, so the harness waits through BUCKLE UP /
+GET READY, presents `+` to one KeyMap scan, releases it after `car+28` becomes 1, and only then holds
+keypad 8. At presented frame 80 the original record now proves motion: X is 12521 rather than
+12608, speed is 14, gear 1, throttle 1, brake 0, and first-gear ratio 8. The next event-driven probe
+can consequently follow an actually moving car to the first `BogasLoad` or loud stop and retain
+the exact Traffic caller, instrument, and framebuffer. `amiga/driving_accelerator_dispatch.gdb`,
+`driving_gear1_dispatch.gdb`, `driving_drivetrain.gdb`, `driving_sound_event.gdb`, and the noisier
+`driving_sound_trace.gdb` preserve the evidence.
 
 The trap-address table is stateful. The observed `GetTrapAddress`/`SetTrapAddress` pair now records
 the game's replacement for `$A9F4 ExitToShell`; routing a later invocation through that replacement

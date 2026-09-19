@@ -113,6 +113,7 @@ static int16_t s_mouseX = 256, s_mouseY = 160;
 static bool s_mouseButtonDown;
 #ifdef VETTE_GARAGE_CLICK
 static uint8_t s_garageClickPhase;
+static uint8_t s_garageGearPhase;
 static bool s_garageTransitionSkipped;
 #endif
 
@@ -4063,9 +4064,27 @@ static void refreshDrivingKeyMap()
         keyMap[byteOffset] |= (uint8_t)(1u << (key.virtualKey & 7));
     }
 #ifdef VETTE_GARAGE_CLICK
-    // Keep the deterministic accelerator held after the scripted Course One
-    // selection; physical keys are ORed into this development-only state.
-    if (s_garageClickPhase >= 9) keyMap[0x5b >> 3] |= 1u << (0x5b & 7);
+    // The selected car begins in neutral.  Hold top-row + (upshift) in the KeyMap that
+    // the original scanner is about to consume, then release it on the first
+    // subsequent GetKeys after that scanner has changed the car's gear.  VBL
+    // callbacks are not a safe pulse boundary: several can run without the
+    // main-loop keyboard scanner running between them.
+    if (s_garageClickPhase >= 9 && s_garageGearPhase < 2) {
+        uint8_t* car = (uint8_t*)read32(s_currentA5 - 13944);
+        if (s_garageGearPhase && car && read16(car + 28)) {
+            s_garageGearPhase = 2;
+        } else if (s_garageGearPhase || (int16_t)read16(s_currentA5 - 13296) >= 3) {
+            // Traffic+$51FE rejects gear changes before start state 3.  Do not
+            // let the game's key-repeat latch consume the only down edge while
+            // the BUCKLE UP / GET READY countdown is still running.
+            s_garageGearPhase = 1;
+            keyMap[0x18 >> 3] |= 1u << (0x18 & 7); // top-row +: upshift one gear
+        }
+    }
+    // Once Gear 1 is visible in the original record, hold the documented
+    // keypad-8 accelerator.  Physical keys remain ORed into this diagnostic
+    // state above.
+    if (s_garageGearPhase >= 2) keyMap[0x5b >> 3] |= 1u << (0x5b & 7);
 #endif
 }
 
@@ -4127,7 +4146,6 @@ static bool nextEvent(uint16_t mask, uint8_t* event)
             // no further UI event poll is guaranteed before the driving VBL
             // callback begins reading KeyMap.  Hold accelerator state here,
             // independently of the mouse EventRecord that selected the course.
-            if (s_garageClickPhase == 9) setDrivingKeyState(0x5b, true);
         }
     }
 #endif

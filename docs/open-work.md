@@ -53,18 +53,23 @@ the loop counter after two rows, not an input-height difference. Frames two thro
 only 18–68 moving lower-cockpit pixels after the named boundary. Do not return to palette work.
 
 The straight trajectory is now a deliberate Lake Merced collision test, not blind accelerator
-soaking. The current-car record proves the player moves: its paired words at offsets 66/68 rise
-from 28 at presented frame 40 to 54 at frame 80, while additional game-owned motion fields advance.
-The dashboard's `000` therefore was not evidence that the player was stationary. The car begins
-with Automatic Shift already enabled (`car+46 = 1`); raw A dispatches to `Main+$31AA` and changes
-that field to zero, which the Traffic gear routine treats as automatic shifting disabled by
-restoring the old gear. Do not inject A into this trajectory. A 900-frame run reaches 11,397 ticks
-at depth 93 without a loud stop or a post-start `BogasLoad` sampled-effect request. The paired
-66/68 words remain at 54 because Traffic uses them as engine/pitch state; their failure to drop is
-not a collision oracle. `amiga/driving_car_motion.gdb`, `driving_collision.gdb`, and
-`driving_sound_event.gdb` retain the measured boundaries. Continue the clean keypad-8 path until
-the first post-start sampled effect or loud stop, then identify the exact Traffic caller and
-instrument before implementing anything.
+soaking. The previous 900-frame run was stationary: the current-car record stayed at
+`(12608,-6,6112)`, speed and gear stayed zero, and keypad 8's `Main+$2F1A` handler merely set the
+throttle word at `car+32`. Words 66/68 are engine RPM state; `Traffic+$3720` maps word 68 to the
+per-frame `BogasPlay` pitch. They were never position evidence.
+
+The deterministic route now waits until the shipped start state permits gear changes, holds the
+top-row `+` upshift through one original KeyMap scan, releases it as soon as `car+28` becomes 1,
+then holds keypad 8. This timing is required: `Traffic+$51FE` rejects gear changes before start
+state 3, and the original key-repeat latch would otherwise consume the only edge during the
+BUCKLE UP / GET READY countdown. Top-row `1` is not used because the active control-mode branch of
+`Main+$32CC` treats it as a steering command. At presented frame 80 the source record proves real
+motion: X has changed from 12608 to 12521, speed (`car+26`) is 14, gear is 1, throttle is 1, brake
+is 0, and the selected first-gear ratio is 8. Automatic Shift remains enabled (`car+46 = 1`); do
+not inject A. `amiga/driving_gear1_dispatch.gdb`, `driving_drivetrain.gdb`, and
+`driving_sound_event.gdb` retain the measured boundaries. Continue this moving path until the first
+post-start sampled effect or loud stop, then identify the exact Traffic caller and instrument
+before implementing anything.
 
 The key chart labels Escape “Menu Options,” which exposed a real input gap: the driving loop does
 not call `GetNextEvent`, so each CIA keyboard edge updates the corresponding bit in the full
