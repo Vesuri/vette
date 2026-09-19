@@ -129,6 +129,7 @@ static uint8_t** s_activePalette;
 static bool s_screenDirty = true;
 static bool s_pixelsDirty = false;
 static int16_t s_dirtyTop, s_dirtyLeft, s_dirtyBottom, s_dirtyRight;
+static bool s_drivingFrameStarted;
 static volatile uint8_t s_unsupportedPictureOpcode;
 static volatile uint32_t s_unsupportedPictureOffset;
 static uint16_t read16(const uint8_t* p);
@@ -3955,13 +3956,23 @@ static bool validatePermanentHandle(uint8_t** handle)
 // a six-byte frame on the supervisor stack.  This differs from the supervisor-mode Mac II.
 extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* userStack)
 {
+    uint32_t pc = read32(frame + 2);
+    uint16_t trap = read16((const uint8_t*)pc);
+    // Main+$29C6 returns directly to Main+$1FD2 while driving remains active.
+    // MaxMem at +$1FEA is the first trap in that loop: its first occurrence
+    // begins frame 1 and every later occurrence proves that the preceding
+    // frame is complete.  Direct 68k stores bypass the QuickDraw dirty calls,
+    // so expose the complete surface here rather than polling it mid-frame.
+    if (trap == 0xa04d && pc == (uint32_t)(s_segments[1].begin + 0x1fea)) {
+        if (s_drivingFrameStarted) markDirtyBounds(0, 0, 320, 512);
+        else s_drivingFrameStarted = true;
+    } else if (trap == 0xa9b4 && pc == (uint32_t)(s_segments[1].begin + 0x29e6))
+        s_drivingFrameStarted = false;
     // Every handled trap return is a user-mode-safe opportunity to deliver
     // due VBL work.  Restricting this to SystemTask left callbacks frozen while
     // the road renderer made only QuickDraw/BlockMove calls.
     scheduleVBLTask();
     presentMacRuntime();
-    uint32_t pc = read32(frame + 2);
-    uint16_t trap = read16((const uint8_t*)pc);
     if (trap == 0xa02e) {                    // _BlockMove: A0, A1, D0; registers preserved
         blockMove((uint8_t*)regs[8], (uint8_t*)regs[9], regs[0]);
         ++g_blockMoveCount;

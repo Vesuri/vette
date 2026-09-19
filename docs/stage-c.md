@@ -667,6 +667,14 @@ hits. This is a genuine complete-frame boundary, unlike a queued conversion of a
 surface. Replacing the translated-row byte copy with aligned word transfers produced inconsistent
 cadence and a lower repeatable control result, so that experiment was removed.
 
+The trap bridge now uses that control-flow boundary rather than guessing from pixel activity. The
+first `MaxMem` at `Main+$1FEA` arms driving presentation; later hits mark the completed 512x320
+surface dirty before normal presentation runs, covering the renderer's direct 68k stores as well
+as QuickDraw calls. `SystemTask` at `Main+$29E6` disarms it on exit so a later driving session again
+treats its first loop entry as frame start. No surface scan or intermediate-frame presentation is
+used to infer completion. The established intro differential remains exact across all 163,840
+pixels, both planar buffers, and the copper palette.
+
 Four further local PICT shortcuts were measured and rejected against the repeatable 183-callback /
 302-tick fused-buffer control. Decompressing eligible rows directly into their final surface fell
 to 141 callbacks over 353 ticks; testing for an identity packed palette reached 177/306; unrolling

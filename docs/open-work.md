@@ -27,8 +27,10 @@ profiling the PICT path; do not poll the 81,920-byte surface again or present pa
 frames. The original completion signal is now identified: while driving, `Main+$29C6` branches
 back to the loop entry at `Main+$1FD2`, so consecutive hits on the first trap at `Main+$1FEA`
 delimit complete frames. `SystemTask` at `Main+$29E6` belongs to the exit/event-loop path and was
-the wrong target. `driving_setup_boundary.gdb` now measures the corrected boundary. Per-row direct
-decode, identity-palette detection, literal-loop unrolling, and
+the wrong target. The bridge now marks the full 512x320 surface at that corrected boundary and
+disarms the marker on the exit path; `driving_setup_boundary.gdb` measures consecutive frames.
+The next bounded run must reach the second hit and validate the first complete presentation.
+Per-row direct decode, identity-palette detection, literal-loop unrolling, and
 single-entry palette caching are measured regressions; profile and optimize at the PICT-call or
 resource level rather than retrying those local variants. `driving_pict_progress.gdb` now shows
 the dominant workload: 38 large 8-bit, 512×24 PackBits strips build the 3,392-pixel wrapping
