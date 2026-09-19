@@ -64,6 +64,11 @@ static bool s_resourceLocked[572];
 static bool s_resourcePurgeable[572];
 static uint8_t s_quickDrawScreen[(512 / 8) * 320];
 static uint8_t s_colorScreen[(512 / 2) * 320];
+// The first driving frame expands its roadside panorama as 512x24 8-bit
+// strips.  Keep one strip's decode storage resident so all 38 calls share the
+// same small working set instead of entering Exec's allocator for every PICT.
+// Larger pictures retain the existing allocation path.
+static uint8_t s_indexedPictureScratch[512 * 24];
 static uint8_t s_windowManagerPort[108];
 static uint8_t s_windowManagerPixMap[50];
 static uint8_t* s_windowManagerPixMapMaster;
@@ -1522,7 +1527,9 @@ static bool drawIndexedPictureBits(const uint8_t* picture, uint32_t size, uint32
 
     uint16_t height = (uint16_t)(sourceBottom - sourceTop);
     uint32_t pixelBytes = multiplyUnsigned16(rowBytes, height);
-    uint8_t* pixels = (uint8_t*)AllocMem(pixelBytes, 0);
+    bool allocatedPixels = pixelBytes > sizeof(s_indexedPictureScratch);
+    uint8_t* pixels = allocatedPixels
+        ? (uint8_t*)AllocMem(pixelBytes, 0) : s_indexedPictureScratch;
     if (!pixels) return false;
     bool valid = true;
     bool pixelsMapped = packed && pixelSize == 4;
@@ -1702,7 +1709,7 @@ static bool drawIndexedPictureBits(const uint8_t* picture, uint32_t size, uint32
             }
         }
     }
-    FreeMem(pixels, pixelBytes);
+    if (allocatedPixels) FreeMem(pixels, pixelBytes);
     return valid;
 }
 

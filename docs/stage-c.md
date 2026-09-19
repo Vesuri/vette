@@ -709,6 +709,14 @@ other), but caching their translated 256-byte maps by destination table pointer 
 to 153 callbacks over 373 ticks. The resource classification and state path outweighed the avoided
 nearest-color searches, so this cache was removed.
 
+The 38 panorama strips now share one 12,288-byte target-side decode workspace. This retains the
+decoder and resource bytes exactly as shipped, but removes one Exec allocation and free from every
+512x24 PICT call. An A/B/A cadence measurement repeated the ordinary allocator control at 171
+callbacks over 304 ticks on both sides; the resident workspace reached 183 callbacks over 312
+ticks, improving callback progress per tick from 0.563 to 0.587 (about 4.3 percent). Pictures larger
+than one panorama strip keep the ordinary allocation path, avoiding the poor locality of the
+rejected megabyte-scale decoded-resource caches.
+
 The trap-address table is stateful. The observed `GetTrapAddress`/`SetTrapAddress` pair now records
 the game's replacement for `$A9F4 ExitToShell`; routing a later invocation through that replacement
 remains part of completing the trap bridge.

@@ -38,7 +38,10 @@ lost at 177/395 because per-call validation outweighed the saved decodes. The ne
 must amortize setup across the whole panorama rather than add another per-picture cache. Skipping
 the packed-nibble map that 8-bit PICTs cannot use is retained but essentially neutral at 183/301.
 The panorama's two shared source color tables do not provide a shortcut either: caching their
-translated maps regressed to 153/373 and was removed.
+translated maps regressed to 153/373 and was removed. Reusing one 12,288-byte decode workspace
+across the 38 panorama strips is retained: an A/B/A measurement repeated the allocator control at
+171/304 on both sides and reached 183/312 with the workspace, about 4.3 percent more callbacks per
+tick. Larger pictures still use fresh allocations.
 
 The MAME A-trap log remains a measured reference-run inventory → `docs/trap-log.md`,
 but Stage C has proved that it is **not an exact standalone-port first-use script**. The port has
