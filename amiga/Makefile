@@ -99,6 +99,17 @@ FRAMEWORK_ASM_SRCS := \
 # twin — a cross-run comparison changes the workload and measures a different thing.
 # See docs/perf-method.md Rule 2.
 
+# Palette-remapped packed-pixel copy.  The C implementation remains the oracle;
+# the default 68000 twin keeps the 256-byte lookup table in an address register.
+# `make MAPPED_COPY_C=1` selects the oracle, while `make VERIFY=1 PROBES=1`
+# executes both implementations on every eligible CopyBits and compares bytes.
+ifneq ($(MAPPED_COPY_C),1)
+EXTRA_DEFINES += -DVETTE_MAPPED_COPY_ASM
+ifdef VERIFY
+EXTRA_DEFINES += -DVETTE_MAPPED_COPY_VERIFY
+endif
+endif
+
 # `make PROBES=1` — the sub-frame timing accumulators, read via the gdb stub (amiga/diag_run.sh).
 # OFF by default: the probes read chip registers several times per iteration, which is exactly
 # what a framerate build must not do.  ⚠ NEVER quote a framerate from a PROBES build.
@@ -218,6 +229,12 @@ PROBE_SYMS += g_macTicks
 PROBE_SYMS += g_macFramesQueued g_macFramesPresented
 PROBE_SYMS += g_macVBLCallbackEntry g_macVBLCallbackTask g_macVBLCallbackA5 g_macVBLCallbackReturn
 PROBE_SYMS += g_introAudioState g_introAudioBytes g_introAudioPeriod
+ifneq ($(MAPPED_COPY_C),1)
+ifdef VERIFY
+PROBE_SYMS += g_mappedCopyAsmTicks g_mappedCopyCTicks g_mappedCopyVerifyCalls \
+              g_mappedCopyVerifyFailures
+endif
+endif
 ifdef PROBES
 PROBE_SYMS +=
 endif

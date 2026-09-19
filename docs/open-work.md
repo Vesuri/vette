@@ -72,6 +72,15 @@ from 138 to 126 ticks, about nine percent. Samples now land in the contiguous pa
 explicit four-byte unrolling is neutral at 126 ticks and has been removed. Return to the genuine
 Main/Traffic share and the still-unreached second frame-boundary hit rather than retrying loop
 unrolling.
+The sampled Main/Traffic PCs are now resolved as genuine shipped projection, clipping, polygon,
+transform and traffic-raster code, so they are not port-side optimization seams. The contiguous
+mapped copy instead has a clean-C oracle plus an opt-out 68000 twin (`MAPPED_COPY_C=1`). Its
+four-lookup `DBF` loop passes an isolated 87,551-byte maximum-span-minus-one test and the zero-count
+case. Before pricing or treating it as an accepted target optimization, restore FS-UAE and run
+`make clean && make SKIP_INTRO=1 GARAGE_CLICK=1 VERIFY=1 PROBES=1`, followed by
+`EXTRA_ARGS='--warp_mode=1' GDBSCRIPT=mapped_copy_verify.gdb ./diag_run.sh 60`; acceptance is twelve
+calls, zero failures, and an in-process C/asm tick ratio. Then rebuild without `VERIFY` and repeat
+the intro differential plus the first-frame phase probe.
 
 The MAME A-trap log remains a measured reference-run inventory → `docs/trap-log.md`,
 but Stage C has proved that it is **not an exact standalone-port first-use script**. The port has

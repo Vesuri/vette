@@ -24,6 +24,10 @@ extern uint8_t vette_resources[], vette_resources_end[];
 
 void vette_line_a_handler();
 void vette_call_mac_code(void* entry, void* a5);
+#ifdef VETTE_MAPPED_COPY_ASM
+void vetteMappedCopyAsm(const uint8_t* source, uint8_t* destination,
+                        const uint8_t* map, uint32_t count);
+#endif
 
 volatile uint16_t g_stageBState = 0;
 volatile uint16_t g_trapWord = 0;
@@ -47,6 +51,12 @@ volatile uint16_t g_macVBLCallbackActive = 0;
 volatile uint16_t g_introAudioState = 0;
 volatile uint32_t g_introAudioBytes = 0;
 volatile uint16_t g_introAudioPeriod = 0;
+#ifdef VETTE_MAPPED_COPY_VERIFY
+volatile uint32_t g_mappedCopyAsmTicks = 0;
+volatile uint32_t g_mappedCopyCTicks = 0;
+volatile uint32_t g_mappedCopyVerifyCalls = 0;
+volatile uint32_t g_mappedCopyVerifyFailures = 0;
+#endif
 char g_trapManager[24] = "";
 char g_trapRoutine[24] = "";
 }
@@ -69,6 +79,9 @@ static uint8_t s_colorScreen[(512 / 2) * 320];
 // same small working set instead of entering Exec's allocator for every PICT.
 // Larger pictures retain the existing allocation path.
 static uint8_t s_indexedPictureScratch[512 * 24];
+#ifdef VETTE_MAPPED_COPY_VERIFY
+static uint8_t s_mappedCopyVerify[512 * 342 / 2];
+#endif
 static uint8_t s_windowManagerPort[108];
 static uint8_t s_windowManagerPixMap[50];
 static uint8_t* s_windowManagerPixMapMaster;
@@ -558,6 +571,47 @@ static void blockMove(const uint8_t* source, uint8_t* destination, uint32_t coun
         }
         if (count) *destination = *source;
     }
+}
+
+static __attribute__((noinline)) void mappedCopyC(const uint8_t* source,
+                                                   uint8_t* destination,
+                                                   const uint8_t* map,
+                                                   uint32_t count)
+{
+    while (count--) *destination++ = map[*source++];
+}
+
+static void mappedCopy(const uint8_t* source, uint8_t* destination,
+                       const uint8_t* map, uint32_t count)
+{
+#ifdef VETTE_MAPPED_COPY_VERIFY
+    // This helper is reached only for non-overlapping, full-surface srcCopy.
+    // Run the C oracle and asm twin on identical source bytes and the same real
+    // destination in one process.  Preserve the oracle output only for the
+    // comparison; the 68000 has no data cache for that intervening copy to bias.
+    if (count > sizeof(s_mappedCopyVerify)) {
+        ++g_mappedCopyVerifyFailures;
+        mappedCopyC(source, destination, map, count);
+        return;
+    }
+    uint32_t before = g_macTicks;
+    mappedCopyC(source, destination, map, count);
+    g_mappedCopyCTicks += g_macTicks - before;
+    blockMove(destination, s_mappedCopyVerify, count);
+    before = g_macTicks;
+    vetteMappedCopyAsm(source, destination, map, count);
+    g_mappedCopyAsmTicks += g_macTicks - before;
+    ++g_mappedCopyVerifyCalls;
+    for (uint32_t i = 0; i < count; ++i)
+        if (destination[i] != s_mappedCopyVerify[i]) {
+            ++g_mappedCopyVerifyFailures;
+            break;
+        }
+#elif defined(VETTE_MAPPED_COPY_ASM)
+    vetteMappedCopyAsm(source, destination, map, count);
+#else
+    mappedCopyC(source, destination, map, count);
+#endif
 }
 
 static void blockClear(uint8_t* destination, uint32_t count)
@@ -2716,8 +2770,7 @@ static bool copyBits(const uint8_t* sourceBitmap, const uint8_t* destinationBitm
                                      destinationRowBytes);
             uint32_t contiguousBytes = multiplyUnsigned16(copyBytes, copyHeight);
             if (!colorsMapped) blockMove(source, destination, contiguousBytes);
-            else for (uint32_t i = 0; i < contiguousBytes; ++i)
-                destination[i] = packedColorMap[source[i]];
+            else mappedCopy(source, destination, packedColorMap, contiguousBytes);
             return true;
         }
         int16_t firstY = 0, lastY = (int16_t)copyHeight, stepY = 1;
