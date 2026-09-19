@@ -50,8 +50,21 @@ duplicate in the interior. `drawIndexedPictureBits` now uses that measured rule.
 suspected FRED state is identical on both machines: `A5-$3A7A = 100`, `A5-$03C4 = 1`, and
 `A5-$0350 = 196`; both call the Traffic fill with 80 rows. The reference `d1=78` observation was
 the loop counter after two rows, not an input-height difference. Frames two through four differ by
-only 18–68 moving lower-cockpit pixels after the named boundary. Do not return to straight-line
-accelerator soaking or palette work.
+only 18–68 moving lower-cockpit pixels after the named boundary. Do not return to palette work.
+
+The straight trajectory is now a deliberate Lake Merced collision test, not blind accelerator
+soaking. The current-car record proves the player moves: its paired words at offsets 66/68 rise
+from 28 at presented frame 40 to 54 at frame 80, while additional game-owned motion fields advance.
+The dashboard's `000` therefore was not evidence that the player was stationary. The car begins
+with Automatic Shift already enabled (`car+46 = 1`); raw A dispatches to `Main+$31AA` and changes
+that field to zero, which the Traffic gear routine treats as automatic shifting disabled by
+restoring the old gear. Do not inject A into this trajectory. A 900-frame run reaches 11,397 ticks
+at depth 93 without a loud stop or a post-start `BogasLoad` sampled-effect request. The paired
+66/68 words remain at 54 because Traffic uses them as engine/pitch state; their failure to drop is
+not a collision oracle. `amiga/driving_car_motion.gdb`, `driving_collision.gdb`, and
+`driving_sound_event.gdb` retain the measured boundaries. Continue the clean keypad-8 path until
+the first post-start sampled effect or loud stop, then identify the exact Traffic caller and
+instrument before implementing anything.
 
 The key chart labels Escape “Menu Options,” which exposed a real input gap: the driving loop does
 not call `GetNextEvent`, so each CIA keyboard edge updates the corresponding bit in the full

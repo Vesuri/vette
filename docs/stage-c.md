@@ -928,6 +928,23 @@ frames with driving still armed, depth still 93, and no loud stop. This closes s
 accelerator soaking as a discovery method; the next coverage step must deliberately take another
 driving control or transition path.
 
+The later deliberate straight-to-Lake-Merced trajectory corrects two misleading dashboard-level
+inferences. Keypad 8 really does move the current car: record words 66/68 rise from 28 at presented
+frame 40 to 54 at frame 80, and the record's other motion fields advance. The visible `000` is not
+proof of zero road speed. Automatic Shift is also already enabled at course start: `car+46` is 1.
+`Main+$31AA` merely toggles that field, and Traffic's gear routine at `$3766` preserves its computed
+gear changes only while the field is nonzero; when it is zero the routine restores the prior gear.
+The A-key diagnostic therefore disables automatic shifting and is not part of the collision route.
+
+A clean 900-frame run reaches 11,397 ticks at depth 93 without a loud stop. Words 66/68 remain at
+54 because `Traffic+$3720` uses word 68 to derive the per-frame Bogas engine pitch, capping it at
+85,000 before calling `BogasPlay`; those fields are not a reliable collision detector. No
+post-start `BogasLoad` sampled-effect request occurs inside the same window. The next bounded probe
+is consequently event-driven: continue straight until the first `BogasLoad` or loud stop, retain
+the exact Traffic caller/instrument and framebuffer there, and distinguish a real lake impact from
+mere elapsed driving time. `amiga/driving_car_motion.gdb`, `driving_collision.gdb`,
+`driving_sound_event.gdb`, and the noisier `driving_sound_trace.gdb` preserve the evidence.
+
 The trap-address table is stateful. The observed `GetTrapAddress`/`SetTrapAddress` pair now records
 the game's replacement for `$A9F4 ExitToShell`; routing a later invocation through that replacement
 remains part of completing the trap bridge.
