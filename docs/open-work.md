@@ -7,8 +7,8 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — current compatibility boundary
 
-⭐ **HEAD OF QUEUE: continue the documented in-driving coverage matrix after F1 “Helicopter View
-Left.”** Complete frames are presented at the exact original `Main+$1FD2` loop boundary;
+⭐ **HEAD OF QUEUE: extend the Macintosh reference run through the garage and into driving.**
+Complete frames are presented at the exact original `Main+$1FD2` loop boundary;
 sustained driving covers 6,422 Macintosh ticks and 143/143 frames at implemented depth 93 without
 a loud stop. Corrected Escape takes the shipped Menu Options exit at tick 1,864 after 32/32 frames.
 The physical-style queued down/up regression proves both edges are consumed after exit, but the
@@ -25,9 +25,14 @@ production at a complete-frame boundary, blanks the upper viewport while retaini
 and settles at depth 94 without a loud stop. S is now measured too: Mac virtual `$01` dispatches
 to `Main+$3134`, changes the game's own sound flag from 1 to 0, calls the resident `sound` segment
 at offsets `$021C`/`$024C`, and remains in active driving through 50/50 frames at depth 93 without
-a loud stop. Continue with the remaining materially different control—transmission state—until it
-reaches new code or the next loud stop. Do not
-return to straight-line accelerator soaking or exhausted PICT/palette work.
+a loud stop. A then closes the planned transmission-state slice: Mac virtual `$00` dispatches to
+`Main+$31AA`, changes the current car's automatic-shift field from 1 to 0, advances the game's
+transmission gate from 0 to 1, and remains at depth 93 through 50/50 frames without a loud stop.
+The deliberate control matrix has reached no new compatibility boundary. Next extend
+`tools/mame_mac_input.lua` past the garage, re-run `tools/mac_traps.lua`, and in that same reference
+run measure the driving front window's `portRect`. This updates the trap-inventory floor and settles
+the queued 512×320-versus-512×342 surface question. Do not return to straight-line accelerator
+soaking or exhausted PICT/palette work.
 
 The key chart labels Escape “Menu Options,” which exposed a real input gap: the driving loop does
 not call `GetNextEvent`, so each CIA keyboard edge updates the corresponding bit in the full

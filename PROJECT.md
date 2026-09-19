@@ -256,9 +256,12 @@ F5 “Front Dash” changes 31,214 packed bytes and remains trap-free through 70
 the original pause/options transition and settles trap-free at depth 94; updating Page-0 KeyMap
 on CIA keyboard edges makes its no-Toolbox wait observe physical key transitions. S reaches the
 original `Main+$3134` sound toggle, changes the shipped sound flag from 1 to 0, calls the resident
-sound segment, and remains trap-free through 50/50 driving frames. Continue the documented control
-matrix with transmission state, one bounded transition at a time,
-until the next compatibility boundary. → `docs/open-work.md` §Blocking.
+sound segment, and remains trap-free through 50/50 driving frames. A reaches `Main+$31AA`, changes
+the current car's automatic-shift field from 1 to 0, advances the transmission gate from 0 to 1,
+and likewise remains trap-free through 50/50 frames. The planned control slice is complete without
+finding a new compatibility boundary. Next extend the Macintosh trap/reference run through the
+garage and into driving; use that same run to measure the driving front window's `portRect` and
+settle the 512×320-versus-512×342 question. → `docs/open-work.md` §Blocking.
 
 ⭐⭐ **Stage A is done and measured: the Amiga display path works.** The port takes the machine
 over, brings up 512×320 in 4 bitplanes hires interlaced and displays Target 1's captured Macintosh

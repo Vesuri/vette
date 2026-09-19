@@ -447,6 +447,14 @@ and continues active driving through 50 queued and 50 presented frames at depth 
 stop. `amiga/driving_s_key_dispatch.gdb` records the dispatch and service targets;
 `amiga/driving_s_state.gdb` records the settled state.
 
+The key chart's Automatic Shift command is A, not Z: raw Amiga `$20` translates to Macintosh
+virtual `$00` and resolves through the live table to `Main+$31AA`. The handler operates on the
+current car record rather than a port-owned surrogate. Before dispatch, its word at offset 46 is
+1 and the A5-relative transmission gate is 0; after the ordinary down/up pair they are 0 and 1.
+Driving continues through 50/50 frames at depth 93 without a loud stop.
+`amiga/driving_a_key_dispatch.gdb` and `amiga/driving_a_state.gdb` preserve both sides of the
+transition.
+
 This preserves the original code flow without touching Amiga low memory. More shadows are added
 only when execution reaches them; the inventory shows that most remaining references are `Ticks`,
 mouse/key state, and repeated `GrayRgn` reads.
