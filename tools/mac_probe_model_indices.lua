@@ -18,6 +18,11 @@ local stage_captured = {}
 local device_seeds = {}
 local inverse_seeds = {}
 local pending_selector_pixmap = 0
+local protection_prompt = false
+local driving_ports = {}
+local driving_copy_captured = false
+local palette_for_window = {}
+local last_activate_window = 0
 
 local function a24(v) return v & 0x00FFFFFF end
 local function u16(a) return prog:read_u16(a24(a)) end
@@ -60,8 +65,9 @@ local function dump_palette(label, palette_handle)
 		palette, palette_handle, count))
 	for i = 0, count - 1 do
 		local p = palette + 16 + i * 16
-		print(string.format("VP %s[%02u] rgb=%04X/%04X/%04X usage=%04X tolerance=%04X",
-			label, i, u16(p), u16(p + 2), u16(p + 4), u16(p + 6), u16(p + 8)))
+		print(string.format("VP %s[%02u] rgb=%04X/%04X/%04X usage=%04X tolerance=%04X private=%04X/%04X/%04X",
+			label, i, u16(p), u16(p + 2), u16(p + 4), u16(p + 6), u16(p + 8),
+			u16(p + 10), u16(p + 12), u16(p + 14)))
 	end
 end
 
@@ -105,8 +111,6 @@ end
 local function on_copybits(pb)
 	local destination_rect = a24(u32(pb + 6))
 	local top, left, bottom, right = rect(destination_rect)
-	if top ~= 165 or left ~= 177 or bottom ~= 316 or right ~= 505 then return end
-
 	local source_rect = a24(u32(pb + 10))
 	local destination_field = a24(u32(pb + 14))
 	local source_field = a24(u32(pb + 18))
@@ -125,6 +129,26 @@ local function on_copybits(pb)
 	if source == 0 or destination == 0 then return end
 	if (u16(source + 4) & 0x8000) == 0 or (u16(destination + 4) & 0x8000) == 0 then return end
 	if u16(source + 32) ~= 4 or u16(destination + 32) ~= 4 then return end
+	local st, sl, sb, sr = rect(source_rect)
+	if stage == "driving" and not driving_copy_captured
+		and mac.frames() > 5750
+		and st == 0 and sl == 0 and sb == 342 and sr == 512
+		and top == 0 and left == 0 and bottom == 342 and right == 512
+		and prog:read_u8(a24(u32(source)) + (u16(source + 4) & 0x3FFF) * 100) ~= 0xFF then
+		driving_copy_captured = true
+		print(string.format("VP DRIVING COPY frame=%u mode=%u", mac.frames(), u16(pb + 4)))
+		dump_pixmap("DRIVING-SRC", source)
+		dump_pixmap("DRIVING-DST", destination)
+		local source_top, _, source_bottom, _ = rect(source + 6)
+		dump_bytes("ref/mame/driving-copy-source.raw", a24(u32(source)),
+			(u16(source + 4) & 0x3FFF) * (source_bottom - source_top))
+		local source_table = ctab_address(source)
+		local destination_table = ctab_address(destination)
+		if source_table ~= 0 then dump_bytes("ref/mame/driving-copy-source.ctab", source_table, 136) end
+		if destination_table ~= 0 then dump_bytes("ref/mame/driving-copy-destination.ctab", destination_table, 136) end
+	end
+	if top ~= 165 or left ~= 177 or bottom ~= 316 or right ~= 505 then return end
+
 	local st, sl, sb, sr = rect(source_rect)
 	local source_table = ctab_address(source)
 	local destination_table = ctab_address(destination)
@@ -169,6 +193,7 @@ local function on_trap()
 			(u16(pixmap + 4) & 0x3FFF) * (bottom - top))
 	end
 	if trap == 0xA8EC then on_copybits(pb); return end
+	if trap == 0xA97C then protection_prompt = true end -- GetNewDialog
 	if trap == 0xA9BC then
 		print(string.format("VP GetPicture frame=%u stage=%s id=%d",
 			mac.frames(), stage, s16(u16(pb))))
@@ -200,13 +225,29 @@ local function on_trap()
 	elseif trap == 0xAA95 then
 		palette_calls = palette_calls + 1
 		local palette_handle = a24(u32(pb + 2))
+		local window = a24(u32(pb + 6))
+		palette_for_window[window] = palette_handle
 		print(string.format("VP SetPalette #%u frame=%u stage=%s window=%06X update=%u",
-			palette_calls, mac.frames(), stage, a24(u32(pb + 6)), prog:read_u8(pb)))
+			palette_calls, mac.frames(), stage, window, prog:read_u8(pb)))
 		dump_palette("REQUEST", palette_handle)
 	elseif trap == 0xAA94 then
 		palette_calls = palette_calls + 1
+		local window = a24(u32(pb))
+		last_activate_window = window
 		print(string.format("VP ActivatePalette #%u frame=%u stage=%s window=%06X",
-			palette_calls, mac.frames(), stage, a24(u32(pb))))
+			palette_calls, mac.frames(), stage, window))
+		if stage == "driving" and not driving_ports[window] then
+			local pixmap_handle = window ~= 0 and a24(u32(window + 2)) or 0
+			local pixmap = pixmap_handle ~= 0 and a24(u32(pixmap_handle)) or 0
+			if pixmap ~= 0 and (u16(pixmap + 4) & 0x8000) ~= 0 and u16(pixmap + 32) == 4 then
+				driving_ports[window] = true
+				dump_pixmap(string.format("DRIVING-PORT-%06X", window), pixmap)
+				local table = ctab_address(pixmap)
+				if table ~= 0 then
+					dump_bytes(string.format("ref/mame/driving-port-%06X.ctab", window), table, 136)
+				end
+			end
+		end
 	end
 end
 
@@ -230,6 +271,9 @@ emu.register_frame_done(function()
 				mac.frames(), stage, seed))
 			dump_pixmap("DEVICE", pixmap)
 			dump_bytes(string.format("ref/mame/device-%08X.ctab", seed), table, 136)
+			if stage == "driving" and palette_for_window[last_activate_window] then
+				dump_palette("ACTIVE-PALETTE", palette_for_window[last_activate_window])
+			end
 		end
 		local device_handle = a24(u32(0x08A4))
 		local device = device_handle ~= 0 and a24(u32(device_handle)) or 0
@@ -265,6 +309,25 @@ mac.run(function()
 		local top, _, bottom, _ = rect(screen + 6)
 		dump_bus_bytes("ref/mame/selector-f40-screen.raw", u32(screen),
 			(u16(screen + 4) & 0x3FFF) * (bottom - top))
+	end
+	click(276, 245, 360)     -- vehicle selector ACCEPT
+	mac.step("after vehicle accept"); mac.shot()
+	click(509, 399, 180)     -- Course One ACCEPT; first drive opens copy protection
+	stage = "driving"
+	if protection_prompt then
+		click(276, 284, 30)  -- focus the password edit field
+		mac.type("16")       -- manual's copy-protection table: Chinatown has 16 blocks
+		click(451, 284, 180) -- protection OK; the accepted course continues
+	end
+	mac.wait(1200)
+	mac.step("driving"); mac.shot()
+	screen = main_device_pixmap()
+	if screen ~= 0 then
+		local top, _, bottom, _ = rect(screen + 6)
+		local table = ctab_address(screen)
+		dump_bus_bytes("ref/mame/driving-screen.raw", u32(screen),
+			(u16(screen + 4) & 0x3FFF) * (bottom - top))
+		if table ~= 0 then dump_bytes("ref/mame/driving-device.ctab", table, 136) end
 	end
 	print(string.format("VP model CopyBits captures=%u", captures))
 end)

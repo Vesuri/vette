@@ -1,7 +1,10 @@
 set pagination off
 set confirm off
 
-break MacLoader.cpp:3690 if s_garageClickPhase >= 6 && s_dirtyTop == 165 && s_dirtyLeft == 177 && s_dirtyBottom == 316 && s_dirtyRight == 505
+# Stop after presentMacFrame has populated the Amiga palette for the rotating
+# model update.  Keep this breakpoint in the presentation routine rather than
+# on a volatile MacLoader.cpp line number.
+break VetteScreen.cpp:337 if s_garageClickPhase >= 6 && s_dirtyTop == 165 && s_dirtyLeft == 177 && s_dirtyBottom == 316 && s_dirtyRight == 505
 commands
   silent
   dump binary memory ../tmp/f40_screen.raw s_colorScreen s_colorScreen+81920

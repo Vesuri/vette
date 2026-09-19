@@ -1579,18 +1579,13 @@ static bool drawIndexedPictureBits(const uint8_t* picture, uint32_t size, uint32
     uint8_t* port = (uint8_t*)read32(s_qdThePort);
     uint8_t** destinationHandle = port ? (uint8_t**)read32(port + 2) : 0;
     uint8_t* destinationMap = destinationHandle ? *destinationHandle : 0;
-    uint8_t** destinationColorHandle = destinationMap
-        ? (uint8_t**)read32(destinationMap + 42) : 0;
-    const uint8_t* destinationColors = destinationColorHandle
-        ? *destinationColorHandle : s_windowManagerColors;
-    // An offscreen GWorld may retain a creation-time RGB snapshot while
-    // Palette Manager synchronizes its ctSeed to the active device.  Color
-    // QuickDraw then maps through that device environment; consulting the
-    // stale private RGB entries turns the selector's intended physical pens
-    // into unrelated colors.
-    if (destinationColors != s_windowManagerColors
-        && read32(destinationColors) == read32(s_windowManagerColors))
-        destinationColors = s_windowManagerColors;
+    // Color QuickDraw realizes an RGB color through the current GDevice's
+    // inverse table.  That device environment is distinct from the retained
+    // ColorTable attached to an offscreen PixMap.  Vette relies on the
+    // distinction while drawing palette-131 PICTs into a palette-130 GWorld:
+    // System 6 stores the current device's physical pen, then later preserves
+    // that pen when copying the completed world to the screen.
+    const uint8_t* destinationColors = s_windowManagerColors;
 
     if (offset + 8 > size) return false;
     const uint8_t* colorTable = picture + offset;
@@ -2097,13 +2092,10 @@ static bool drawDirectPictureBits(const uint8_t* picture, uint32_t size, uint32_
     uint8_t* port = (uint8_t*)read32(s_qdThePort);
     uint8_t** destinationHandle = port ? (uint8_t**)read32(port + 2) : 0;
     uint8_t* destinationMap = destinationHandle ? *destinationHandle : 0;
-    uint8_t** destinationColorHandle = destinationMap
-        ? (uint8_t**)read32(destinationMap + 42) : 0;
-    const uint8_t* destinationColors = destinationColorHandle
-        ? *destinationColorHandle : s_windowManagerColors;
-    if (destinationColors != s_windowManagerColors
-        && read32(destinationColors) == read32(s_windowManagerColors))
-        destinationColors = s_windowManagerColors;
+    // Direct PICT colors use the same current-device inverse-color lookup as
+    // indexed PICT colors; the destination PixMap's retained table is not the
+    // active GDevice CLUT.
+    const uint8_t* destinationColors = s_windowManagerColors;
 
     uint8_t colorMap[256];
     static const uint16_t levels3[8] = {
@@ -3265,11 +3257,15 @@ static void paletteToColorTable(uint8_t** paletteHandle, uint8_t* colorTable)
     static const uint8_t map140[16] = {
         0, 2, 4, 5, 15, 14, 7, 8, 13, 10, 11, 12, 3, 9, 6, 1
     };
+    static const uint8_t map150[16] = {
+        0, 2, 15, 4, 14, 13, 6, 8, 9, 10, 11, 12, 7, 5, 3, 1
+    };
     static const uint8_t map131[16] = {
         0, 9, 3, 2, 15, 14, 13, 12, 4, 11, 6, 10, 7, 8, 5, 1
     };
     const uint8_t* allocation = resourceID == 130 ? map130
-        : resourceID == 140 ? map140 : resourceID == 131 ? map131 : 0;
+        : resourceID == 140 ? map140 : resourceID == 150 ? map150
+        : resourceID == 131 ? map131 : 0;
 
     if (allocation && count == 16) {
         for (uint16_t physical = 0; physical < 16; ++physical) {
@@ -4731,6 +4727,13 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
             if (s_windowList == window) activatePalette(window);
         } else if (GWorldSlot* world = gWorldForPort(window)) {
             world->palette = (uint8_t**)read32(userStack + 2);
+            // System 6 realizes a courteous offscreen palette association
+            // immediately enough to put the GWorld in the current device
+            // environment. Vette's final road setup does not follow this
+            // SetPalette with ActivatePalette. The GWorld deliberately keeps
+            // its old RGB snapshot while sharing the screen seed, so the next
+            // full-surface CopyBits preserves renderer-authored pixel indices.
+            write32(world->colorTable, read32(s_windowManagerColors));
         }
         if (g_stageCDepth < 29) g_stageCDepth = 29;
         return 11;

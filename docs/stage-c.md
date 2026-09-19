@@ -495,6 +495,7 @@ For each physical pen 0--15, the resulting resource-entry order is:
 |---|---|
 | 130 | 0, 2, 15, 3, 14, 13, 7, 8, 9, 10, 11, 12, 6, 5, 4, 1 |
 | 140 | 0, 2, 4, 5, 15, 14, 7, 8, 13, 10, 11, 12, 3, 9, 6, 1 |
+| 150 | 0, 2, 15, 4, 14, 13, 6, 8, 9, 10, 11, 12, 7, 5, 3, 1 |
 | 131 | 0, 9, 3, 2, 15, 14, 13, 12, 4, 11, 6, 10, 7, 8, 5, 1 |
 
 The port applies these measured layouts in Palette Manager emulation, while every RGB value still
@@ -505,8 +506,8 @@ detection, model-pixel scan, grid-pen rewrite, or screenshot-derived color subst
 device CLUT; it does not keep sharing the mutable active-window table. The rotating-car worlds are
 created while the game's blue-shaded color environment is active, after which the window palette
 changes. Sharing that later table made the same stored indices appear pink. Each GWorld now retains
-its snapshot, PICT rendering targets its destination PixMap's table, and `srcCopy` uses a packed
-color-map lookup whenever the source and destination PixMaps differ.
+its snapshot, while `srcCopy` uses a packed color-map lookup whenever source and destination
+PixMaps describe different color environments.
 
 Distinct ColorTable handles with the same `ctSeed` describe the same color environment and copy
 indices directly. This preserves the selector's initial full-surface copy. Comparing table addresses
@@ -522,12 +523,32 @@ selector transition loads palettes 130, 140, then 131 and associates each with t
 the live worlds. These ports are not Window Manager records. Palette Manager treats tolerant colors
 on an offscreen GWorld as courteous: the original System 6 run retains the GWorld's RGB entries but
 synchronizes its `ctSeed` to the active device environment. Consequently `CopyBits` preserves the
-renderer-authored physical indices. The same rule applies while drawing: when an offscreen table's
-seed matches the screen table, indexed and direct PICT colors are realized through the active device
-environment, not through the GWorld's stale RGB snapshot. This reproduces the original selector
-PICT's exact logical-to-physical pen map and keeps the wood, thumbnails, green grid, and red F40
-correct together. Reproducing that behavior removed the former car-specific source-table selection
-and grid-pixel rewrite.
+renderer-authored physical indices. RGB colors drawn by indexed and direct PICT opcodes are a
+separate operation: Color QuickDraw realizes them through the current GDevice's inverse table, not
+the retained ColorTable of the destination PixMap. This is observable during road construction,
+where a palette-131 PICT is drawn into a GWorld that still contains palette 130 with a different
+seed. Looking up those colors in the private palette-130 table produced every remaining wrong pen;
+the untouched System 6 GWorld instead contains the palette-131 device pens. This is device state,
+not scene-specific color substitution.
+
+The road transition exposed one more stateful allocation. The game realizes `pltt 150` before it
+constructs the driving artwork, then installs `pltt 131` for the completed driving window. A
+System 6.0.8 MAME capture through the original copy-protection requester records palette 150's
+physical order above and the final road device table as the same palette-131 order already measured
+for the selector. Falling back to sequential allocation for palette 150 therefore left the final
+palette apparently correct while the already-authored four-bit indices were wrong: sky and road
+looked exchanged and the middle distance became pink. `tools/mac_probe_model_indices.lua` now
+continues through the vehicle and course controls, answers a fresh reference disk's requester from
+the shipped manual table, and dumps both the driving device table and the activated port tables.
+
+The populated 512×512 source GWorld then isolates the remaining road-color fault. Its retained RGB
+table is palette 130 on both machines, and its pixels already contain the intended physical indices
+(`4` sky, `6` water, `14` road). On System 6 the final `SetPalette` association gives that GWorld the
+same `ctSeed` as the palette-131 screen even though no later `ActivatePalette` follows; the 512×342
+`CopyBits` therefore copies indices unchanged. The port formerly synchronized an offscreen seed
+only in `ActivatePalette`, leaving the source one seed behind and provoking a color translation
+that turned sky gray and road brown. `SetPalette` now performs the measured courteous GWorld seed
+synchronization immediately, while still retaining the GWorld's creation-time RGB snapshot.
 
 `GetNewDialog` now builds the `DialogRecord` from the shipped `DLOG`/`DITL` pair and `DrawDialog`
 validates the item stream, selects the dialog port, and paints its background. `GetDItem` walks that
