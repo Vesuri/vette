@@ -792,9 +792,10 @@ executable exercises 87,551 bytes (the maximum surface span minus one, deliberat
 three-byte tail) plus a zero-length call and traps on any mismatch; it passes under the local
 68000 runner. `VERIFY=1 PROBES=1` additionally runs C and assembly into the same destination for
 every eligible real `CopyBits`, preserves the C result, byte-compares it after assembly, and
-accumulates Macintosh ticks for both arms. `amiga/mapped_copy_verify.gdb` stops after twelve such
-calls. The current workstation no longer has an `fs-uae` executable, so that in-game differential
-and any performance claim remain pending; do not infer a speedup from instruction shape alone.
+accumulates Macintosh ticks for both arms. `amiga/mapped_copy_verify.gdb` stops after three such
+completed calls (262,656 compared bytes); more repeats only lengthen the doubled verifier. The
+in-game differential and any performance claim remain pending until that event-driven stop reports
+zero failures; do not infer a speedup from instruction shape alone.
 
 The trap-address table is stateful. The observed `GetTrapAddress`/`SetTrapAddress` pair now records
 the game's replacement for `$A9F4 ExitToShell`; routing a later invocation through that replacement
