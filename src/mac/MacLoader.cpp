@@ -58,6 +58,7 @@ volatile uint32_t g_probePicture140TrapPC = 0;
 volatile uint32_t g_probePicture140Return = 0;
 volatile uint32_t g_probePicture140Ticks = 0;
 volatile uint32_t g_probePicture140Frames = 0;
+volatile uint32_t g_probeIntroGeometry[46] = {0};
 #endif
 #ifdef VETTE_MAPPED_COPY_VERIFY
 volatile uint32_t g_mappedCopyAsmTicks = 0;
@@ -192,6 +193,15 @@ static uint8_t* s_vblTasks[8];
 static uint16_t s_vblTaskCount;
 static uint16_t s_vblNextTask;
 static uint32_t s_vblLastTick;
+
+#ifdef VETTE_PROBE
+static uint32_t probeNonzeroBytes(const uint8_t* data, uint16_t bytes)
+{
+    uint32_t count = 0;
+    while (bytes--) if (*data++) ++count;
+    return count;
+}
+#endif
 
 struct IntroSample {
     int16_t resourceID;
@@ -4982,6 +4992,28 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
     }
     if (trap == 0xa8f6) {                    // DrawPicture(PicHandle, destination Rect)
         const uint8_t* rectangle = (const uint8_t*)read32(userStack);
+#ifdef VETTE_PROBE
+        if (!g_probeIntroGeometry[0]) {
+            uint8_t** pictureHandle = (uint8_t**)read32(userStack + 4);
+            const uint8_t* picture = pictureHandle ? *pictureHandle : 0;
+            uint8_t* port = (uint8_t*)read32(s_qdThePort);
+            uint8_t** mapHandle = port ? (uint8_t**)read32(port + 2) : 0;
+            uint8_t* map = mapHandle ? *mapHandle : 0;
+            uint8_t** clipHandle = port ? (uint8_t**)read32(port + 28) : 0;
+            uint8_t* clip = clipHandle ? *clipHandle : 0;
+            if (picture && rectangle && port && map && clip) {
+                g_probeIntroGeometry[0] = 1;
+                for (uint16_t i = 0; i < 4; ++i) {
+                    g_probeIntroGeometry[1 + i] = (int16_t)read16(picture + 2 + i * 2);
+                    g_probeIntroGeometry[5 + i] = (int16_t)read16(rectangle + i * 2);
+                    g_probeIntroGeometry[9 + i] = (int16_t)read16(port + 16 + i * 2);
+                    g_probeIntroGeometry[14 + i] = (int16_t)read16(map + 6 + i * 2);
+                    g_probeIntroGeometry[18 + i] = (int16_t)read16(clip + 2 + i * 2);
+                }
+                g_probeIntroGeometry[13] = read16(map + 4) & 0x3fff;
+            }
+        }
+#endif
         if (drawPicture((uint8_t**)read32(userStack + 4),
                         rectangle)) {
             if (currentPortIsScreen()) markDirty(rectangle);
@@ -4991,6 +5023,54 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
     }
     if (trap == 0xa8ec) {                    // CopyBits(src, dst, srcRect, dstRect, mode, mask)
         const uint8_t* destinationRect = (const uint8_t*)read32(userStack + 6);
+#ifdef VETTE_PROBE
+        if (g_probeIntroGeometry[0] && !g_probeIntroGeometry[22]) {
+            const uint8_t* sourceRect = (const uint8_t*)read32(userStack + 10);
+            const uint8_t* destinationMap = (const uint8_t*)read32(userStack + 14);
+            const uint8_t* sourceMap = (const uint8_t*)read32(userStack + 18);
+            if (sourceRect && destinationRect && sourceMap && destinationMap) {
+                g_probeIntroGeometry[22] = 1;
+                for (uint16_t i = 0; i < 4; ++i) {
+                    g_probeIntroGeometry[23 + i] = (int16_t)read16(sourceRect + i * 2);
+                    g_probeIntroGeometry[27 + i] = (int16_t)read16(destinationRect + i * 2);
+                    g_probeIntroGeometry[32 + i] = (int16_t)read16(sourceMap + 6 + i * 2);
+                    g_probeIntroGeometry[36 + i] = (int16_t)read16(destinationMap + 6 + i * 2);
+                }
+                uint8_t* sourceBase = 0;
+                uint8_t* destinationBase = 0;
+                uint16_t sourceRowBytes = 0, destinationRowBytes = 0;
+                int16_t sourceTop, sourceLeft, sourceBottom, sourceRight;
+                int16_t destinationTop, destinationLeft, destinationBottom, destinationRight;
+                bool sourceValid = bitmapPixels(sourceMap, sourceBase, sourceRowBytes,
+                    sourceTop, sourceLeft, sourceBottom, sourceRight);
+                bool destinationValid = bitmapPixels(destinationMap, destinationBase,
+                    destinationRowBytes, destinationTop, destinationLeft,
+                    destinationBottom, destinationRight);
+                if (sourceValid) {
+                    g_probeIntroGeometry[31] = sourceRowBytes;
+                    g_probeIntroGeometry[32] = sourceTop;
+                    g_probeIntroGeometry[33] = sourceLeft;
+                    g_probeIntroGeometry[34] = sourceBottom;
+                    g_probeIntroGeometry[35] = sourceRight;
+                }
+                if (destinationValid) {
+                    g_probeIntroGeometry[36] = destinationTop;
+                    g_probeIntroGeometry[37] = destinationLeft;
+                    g_probeIntroGeometry[38] = destinationBottom;
+                    g_probeIntroGeometry[39] = destinationRight;
+                }
+                if (sourceValid && sourceTop == 0 && sourceBottom >= 323) {
+                    for (uint16_t row = 0; row < 3; ++row)
+                        g_probeIntroGeometry[40 + row]
+                            = probeNonzeroBytes(
+                                sourceBase + (uint32_t)(320 + row) * sourceRowBytes,
+                                sourceRowBytes);
+                    g_probeIntroGeometry[43] = (uint32_t)sourceBase;
+                }
+                g_probeIntroGeometry[44] = read16(userStack + 4);
+            }
+        }
+#endif
         if (copyBits((const uint8_t*)read32(userStack + 18),
                      (const uint8_t*)read32(userStack + 14),
                      (const uint8_t*)read32(userStack + 10),

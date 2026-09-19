@@ -260,9 +260,11 @@ that selector as part of its copied support-code path.
 | 1782 | `Intro+0132` | (150,0)–(217,80) | 80×67 |
 | 2726–2865 | `Intro+0926` ×14 | (150,80)–(228,114) | 34×78 — the animated overlay, 3 alternating PicHandles |
 
-⚠ **512×323, not 512×320.** `docs/mac-hardware.md` records the game painting 512×320 at (64,92);
-the picture the intro draws is 323 rows. Three rows are unaccounted for — clipped, or the recorded
-320 is short. ⛔ Do not build the Amiga viewport geometry on either number until this is settled.
+The 512×323 target is the full title composition in a 512×512 offscreen GWorld; its active port,
+PixMap, and clip region all retain those rows. The next original `_CopyBits` deliberately copies
+only `(0,0)-(320,512)` into the 512×320 window displayed at Macintosh global `(64,91)`. Captured
+offscreen rows 320–322 are nonempty and differ, so they are neither clipped during drawing nor part
+of the visible viewport.
 
 `GetPicture` — 47 calls, all from the one stub at `Traffic+663C`, and ⭐ **every ID it passes is a
 real `PICT` in `Color VETTE!`** (24592, 21981, 25025, 29223, 6482, 16709, 30796, 198, 25396, 3499,

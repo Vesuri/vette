@@ -253,7 +253,7 @@ endif
 endif
 ifdef PROBES
 PROBE_SYMS += g_probePicture140TrapPC g_probePicture140Return \
-              g_probePicture140Ticks g_probePicture140Frames
+              g_probePicture140Ticks g_probePicture140Frames g_probeIntroGeometry
 endif
 ifdef FPSCOUNT
 PROBE_SYMS +=

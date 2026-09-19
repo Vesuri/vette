@@ -45,9 +45,16 @@ colors before and after the next VBI swap. `tools/verify_stage_c_intro.py` prove
 The exact framebuffer match uses Macintosh screen crop `(64,91,512,320)`. The production binary
 no longer embeds the old Stage A framebuffer capture: it starts with a black 512×384 display, and
 the first visible artwork is the game-produced QuickDraw surface centred vertically. That settles
-which source rows contain the game image but
-does not by itself explain the original 323-row destination rectangle; that geometry question
-remains separately queued.
+which source rows contain the game image.
+
+The first intro `_DrawPicture` does request `(0,0)-(323,512)`, but it is not clipped to the visible
+height. `amiga/intro_323_geometry.gdb` measures the current color port, PixMap, and clip region as
+`(0,0)-(512,512)` with 260-byte rows, so all 323 requested rows are written into the offscreen
+GWorld. The immediately following shipped `_CopyBits` uses `(0,0)-(320,512)` for both source and
+destination and writes into the 512×320 window. A capture of offscreen rows 320–322 contains 230,
+227, and 256 nonzero bytes respectively, proving they hold real, differing picture data; they are
+simply outside the rectangle copied to the window. The port therefore correctly displays 320 rows
+without changing or clipping the original 323-row composition surface.
 
 Animation presentation uses a bounds-only dirty rectangle. `DrawPicture`, `CopyBits`, `EraseRect`,
 and `FrameRect` union their destination bounds only when their resolved destination pixels are the

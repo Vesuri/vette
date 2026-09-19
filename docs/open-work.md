@@ -7,12 +7,12 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — current compatibility boundary
 
-⭐ **HEAD OF QUEUE: reconcile the intro's 512×323 DrawPicture rectangle with the 512×320 displayed crop.**
-The first intro DrawPicture destination is measured as 512×323, while the verified screen crop is
-512×320 at Macintosh global (64,91) and matches all 163,840 reference pixels. Capture the source
-GWorld and destination screen at the named intro boundary, identify exactly which three rows are
-clipped or excluded, and record the actual QuickDraw clipping rule. Do not change the established
-512×320 driving/display geometry on inference alone.
+⭐ **HEAD OF QUEUE: make the documented Control+left-mouse quit path reach the game's patched ExitToShell flow.**
+The live Macintosh loop currently never returns to `PlatformAmiga`, so the inherited bare-button
+wait cannot provide its documented quit chord. Keyboard state and the game's stored replacement
+for `_ExitToShell` already exist. Add a deliberate Control+left-mouse request at an event-pump safe
+point, exercise the original shutdown path, and verify teardown without consuming ordinary game
+clicks or bypassing the replacement trap.
 
 ## ⭐⭐ TARGET 1 — the complete intro, run by the game's own code — COMPLETE
 
@@ -32,8 +32,8 @@ frame, the game-produced chunky surface converts into the centred 512×384 displ
 game-derived colors into the copper display. No captured framebuffer is linked into the runtime.
 Reproduce
 with `amiga/stage_c_capture.gdb` followed by `tools/verify_stage_c_intro.py`. The matching source
-crop is `(64,91,512,320)`; the one-row correction is recorded in `docs/stage-c.md` while the
-separate 323-row destination-rectangle question remains queued.
+crop is `(64,91,512,320)`; the offscreen 323-row composition and the following 320-row window copy
+are recorded in `docs/stage-c.md`.
 
 ⭐ **The complete animated intro also passes on the target A1200 configuration** (2 MiB chip,
 8 MiB fast): the tram rings at the summit and parks at `(310,0)-(440,134)`, the Corvette/singer/mic
@@ -75,43 +75,37 @@ closed and deleted, so a `#N` written in another doc goes quietly wrong — thre
     rather than the caller. Fix it when something needs it, not speculatively. →
     `src/platform/amiga/framework/UPSTREAM.md` §Two latent link traps.
 
-8. ⚠ **The documented `CTRL`+LMB quit chord is not wired into the live Mac loop.** Keyboard state
-    now exists, but `MacLoader::run()` does not return, so `PlatformAmiga`'s old bare-button wait is
-    unreachable during normal play. Add a deliberate Control+LMB exit request at the event-pump
-    boundary when teardown/return is implemented; do not consume ordinary Macintosh clicks.
-    → `src/platform/amiga/PlatformAmiga.cpp`.
-
 ## Phase 1+ — carried forward, not yet actionable
 
-9. **Write `ghidra_scripts/DumpTraps.java`.** The trap map is the abstraction boundary and there is
+8. **Write `ghidra_scripts/DumpTraps.java`.** The trap map is the abstraction boundary and there is
     no inherited script for it (Revs's `DumpHwAccesses.java` hardcodes BBC I/O ranges and was not
     carried over). → `docs/toolchain.md`.
-10. **Fill `ghidra_scripts/entrypoints.csv` from `CODE 0`.** The jump table makes the postmortem's
+9. **Fill `ghidra_scripts/entrypoints.csv` from `CODE 0`.** The jump table makes the postmortem's
     §1.1 sweep *enumerable* rather than a search — take the win.
-11. **Read the manual / the extras before the binary.** RoF's `docs/manual.md` earned its place.
+10. **Read the manual / the extras before the binary.** RoF's `docs/manual.md` earned its place.
     Present and unread: `scans/Manual.pdf` (5.2 MB), `Map.jpg`, `MapInfo_1/2.jpg`, `KeyChart.jpg`,
     `Package.pdf`, `web_docs/cheats.txt`. ⭐ `KeyChart.jpg` is the input map and `cheats.txt` may
     name states worth reaching in the reference loop.
-12. **Decode the `VETTE!.Data` record formats.** The *inventory* is done
+11. **Decode the `VETTE!.Data` record formats.** The *inventory* is done
     (`docs/source-inventory.md`); the formats are not. ⭐ Start with **`PERF`** — eight records of
     exactly 110 bytes with meaningful names (`Stock`, `ZR1`, `F40`, …), which is the cheapest
     possible place to calibrate a decode. Then `OBJS` (160 models, recurring exact sizes, and
     `QUAD`'s `Quad Discripter Data` says the renderer is quad-based) and `MAPS`. ⚠ Do this against
     the `load` segment's disassembly, not by pattern-guessing — RoF's postmortem §1.2 is about
     exactly this.
-13. **Confirm or kill the `OBJS` two-level-of-detail reading.** The `C`/`S` name pairs
+12. **Confirm or kill the `OBJS` two-level-of-detail reading.** The `C`/`S` name pairs
     (`F40C`/`F40S1`, `GenericC`/`GenericS`, `Taxi`/`TaxiS`, …) `[INFERRED]` a near/far pair per
     object. It is load-bearing for the Amiga frame budget, so it should be confirmed early rather
     than discovered during optimisation. → `docs/source-inventory.md` §OBJS.
-14. **Explain the `Communication` segment and `COMM` 0.** 9.1 KB of code in *both* builds plus a
+13. **Explain the `Communication` segment and `COMM` 0.** 9.1 KB of code in *both* builds plus a
     2 490 B resource, in a single-player driving game. Modem head-to-head is a guess. It matters
     because 9 KB of code that the port may not need at all is 10% of the whole job.
-15. **Explain `FRED`** — 6.5 KB in both builds, name says nothing. ⭐ New evidence, and it is a
+14. **Explain `FRED`** — 6.5 KB in both builds, name says nothing. ⭐ New evidence, and it is a
     strong hint: `FRED` exports **242 of the 509 jump-table entries** — 6 508 bytes across 242
     externally-callable routines is **~27 bytes each**, so `[INFERRED]` it is a library of small leaf
     routines (maths/trig/fixed-point being the obvious candidates, which would fit the table-driven
     trig already found in the data). Cheap to settle: disassemble a dozen of its entries.
-16. ⭐ **The remaining display question is the OCS / 68000 fallback** — crop, squeeze, or none.
+15. ⭐ **The remaining display question is the OCS / 68000 fallback** — crop, squeeze, or none.
     The primary mode is locked at four-bitplane hires interlaced, and the reference run now proves
     the live driving front window is 512×320 above a separate 512×342 surface. The driving
     `CopyBits` probe also proves the game rasterises into its indexed GWorld, so chunky→planar is
