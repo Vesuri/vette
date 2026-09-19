@@ -102,7 +102,8 @@ The phase with no counterpart in either prior port at this size. **Exit criteria
 
 ## Phase 4 — End-to-end skeleton on the target, then profile, then set a target
 
-- [ ] The game reaches its first real frame on the Amiga.
+- [x] The game reaches its first real frame on the Amiga. The original resident code now repeatedly
+      presents complete moving driving frames on the target A1200 configuration.
 - [ ] A phase-share profile with its accounting check printing ~100% every run.
 - [ ] **Only then**: a performance target, argued from that profile and from the original's own
       framerate under the reference loop.

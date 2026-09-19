@@ -173,14 +173,6 @@ closed and deleted, so a `#N` written in another doc goes quietly wrong — thre
     ⛔ **Do not settle that from inference** — **The trap log stops at the MENU** rerun plus a write tap over the live GWorld's
     pixel range answers it by measurement. → `docs/mac-hardware.md` question 5.
 
-17. ⭐ **Locate the copy-protection check, then patch it out.** Decision locked — patched, not
-    reproduced (`docs/faithfulness-seam.md` §The copy protection; required for a WHDLoad release).
-    Targets: `VETTE!.Data`'s `COPY 1 "Protect"` (1 991 B) for the data side, and the check itself in
-    the code — `Initialize` first, `Main` second. ⚠⚠ **Read the routine before defeating it.** 1 991
-    bytes is far more than a password list, so it may gate more than the prompt; a protection check
-    that also initialises state is a classic, and a stub would give a game that runs and is subtly
-    wrong. The patch is a **named** port-side seam in `disasm/symbols.csv`, not a silent edit, and
-    the reference loop keeps running the *unpatched* original.
 ## ⛔ CLOSED — measured dead ends
 
 *Read this section before proposing a lever, so a negative result is not re-derived.

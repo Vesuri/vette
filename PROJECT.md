@@ -204,9 +204,10 @@ amiga/                  Amiga build infrastructure: Makefile, env.sh, run.sh, de
 
 ## Status
 
-- [ ] **Phase 0 — Scaffolding.** ⚠ Nothing on the **Amiga** side has been built or run: no port
-      code, and the inherited FS-UAE scripts are renamed but unverified. The repo structure, the
-      vendored framework and the inherited docs are in place. `docs/open-work.md` has the exit criteria.
+- [ ] **Phase 0 — Scaffolding.** The Amiga build, display takeover, VERTB handler, copper list and
+      frame pump are proven on the target, and every link runs the multiplication/division and probe
+      audits. The phase remains open because the port-specific platform abstraction and several
+      prescribed standing counters/debugger probes do not yet exist. → `docs/open-work.md`.
 - [x] **Phase 1 — The Macintosh reference loop.** ⭐ It **drives**: MAME boots the reference volume
       and launches `Color VETTE!` unattended, completion read from the Mac's own low memory, and the
       game runs to its garage screen. Framebuffer + CLUT capture and host-side re-render are proven
@@ -217,10 +218,20 @@ amiga/                  Amiga build infrastructure: Makefile, env.sh, run.sh, de
       fall inside the pinned span. Arguments are read at the call site, so `SetTrapAddress`'s target,
       `%A5Init`'s trap set and the `QDExtensions` selectors are measured too. ⚠ It is a **FLOOR**:
       the window ends at the menu, so `FRED` and `Communication` never ran.
-- [ ] Phase 2 — Complete static map (segments, the jump table, the trap map, the A5 world)
-- [ ] Phase 3 — The trap layer
-- [ ] Phase 4 — End-to-end skeleton on the target, then profile, then set a target
-- [ ] Phase 5 — Render + input
+- [ ] **Phase 2 — Complete static map.** All 11 `CODE` resources are resident, the 509-entry jump
+      table and A5 world run in place, and the low-memory access audit protects the unmapped first
+      32 KiB. The exhaustive static map, entry-point CSV, naming pass and coverage accounting remain.
+- [ ] **Phase 3 — The trap layer.** The Line-A bridge is live and unknown calls stop loudly with
+      manager, routine, selector and caller. It now implements the path through the complete intro,
+      garage, vehicle/course selection and sustained driving; the inventory is still a floor and
+      later paths remain deliberately unimplemented.
+- [ ] **Phase 4 — End-to-end skeleton on the target.** The original resident code reaches and
+      repeatedly completes real moving driving frames on the A1200 acceptance configuration. A
+      complete phase-share profile and the evidence-based performance target remain open.
+- [ ] **Phase 5 — Render + input.** Game-produced 4-bit chunky surfaces are presented through the
+      512×384, four-bitplane hires-interlaced display, with dirty conversion and physical keyboard
+      state/event translation. Full control mapping, the driving reference differential and the
+      remaining surface-height measurement are open.
 - [ ] Phase 6 — Optimisation
 - [ ] Phase 7 — Packaging
 
@@ -228,12 +239,19 @@ See `docs/phases.md` for exit criteria and the gating between phases.
 
 ## Immediate next step
 
-### ⭐⭐ Target 1 — the intro screen, and it is scoped by measurement: **36 traps**
+### ⭐⭐ Drive a deliberate state transition and discover the next compatibility boundary
 
-The first target is **the intro screen painted by the game's own code**: the Golden Gate /
-San Francisco title art, matched against the MAME reference capture of frame 1758 under a pixel
-differential. Staged in `docs/open-work.md` #5–#7: Stage B (loader) →
-C (the 36 traps) → D (`DrawPicture`).
+The complete game-owned intro passes its 163,840-pixel differential, the scripted garage path
+enters driving, and a sustained A1200 run presents 143 complete moving frames over 6,422 Macintosh
+ticks without a loud stop. More straight-line accelerator soaking is therefore closed as a
+discovery method.
+
+The shipped key chart labels Escape “Menu Options.” A held physical Escape is correctly reflected
+in the live 16-byte Macintosh `KeyMap`, but 144 completed frames prove that the level alone does not
+leave driving. The next controlled test is a complete Escape press/release through the preserved
+keyboard edge/EventRecord path. Follow the resulting transition until the next loud stop, capture
+its manager/routine/selector and `(segment, offset)` caller, then implement only the behavior the
+executed path requires. → `docs/open-work.md` §Blocking — current loud stop.
 
 ⭐⭐ **Stage A is done and measured: the Amiga display path works.** The port takes the machine
 over, brings up 512×320 in 4 bitplanes hires interlaced and displays Target 1's captured Macintosh
