@@ -423,6 +423,7 @@ accident once before `.gitignore` grew the entries.
 | `tools/mac_set_16colors.lua` | one-time Monitors setup, ending in Special ▸ Shut Down so PRAM and the volume flush |
 | `tools/fb_to_png.py` | re-render a framebuffer dump and diff it against MAME's screenshot |
 | `tools/render_mac_chunky.py` | render packed 4-bit pixels through a captured binary Macintosh ColorTable |
+| `tools/compare_mac_chunky.py` | compare active packed 4-bit pixels while ignoring PixMap row padding |
 
 ### ⭐ Completion is read from the Mac's own low memory, never from a screenshot
 

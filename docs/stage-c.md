@@ -864,6 +864,16 @@ driving-scene difference. `tools/render_mac_chunky.py` makes the binary-ColorTab
 repeatable. The next differential must synchronize vehicle, input, and frame boundary and compare
 the renderer-authored packed indices.
 
+That synchronized differential now selects Corvette ZR-1 in both harnesses, holds keypad 8 before
+the first driving iteration, and captures the first populated full-window copy. A geometry-aware
+comparison ignores the four unused padding bytes in each 260-byte PixMap row and compares all
+175,104 pixels in the live 512×342 rectangle. Exactly 174,330 pixels match. The 774 mismatches
+(0.442%) occupy only `(346,1)-(510,9)`, within the rear-view mirror's changing road image. Every
+pixel outside that narrow strip—including the complete forward 3D world, terrain, road, cockpit,
+and dashboard—matches the Macintosh index for index. `tools/compare_mac_chunky.py` makes that
+packed-pixel proof repeatable. The remaining question is mirror callback timing/state, not palette
+realization, bitplane order, or the forward renderer.
+
 Resolving the remaining resident-code samples shows that they are not compatibility overhead:
 `Main+$5208/$5246/$5266` are perspective division and clipping, `Main+$5A34/$5A92/$5D6A` are
 line/polygon construction, and `Traffic+$68B4..$68BA` enters an original byte raster loop while

@@ -7,7 +7,7 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — current compatibility boundary
 
-⭐ **HEAD OF QUEUE: build a driving reference differential at one named game state.**
+⭐ **HEAD OF QUEUE: resolve the rear-view mirror's narrow state/timing differential.**
 Complete frames are presented at the exact original `Main+$1FD2` loop boundary;
 sustained driving covers 6,422 Macintosh ticks and 143/143 frames at implemented depth 93 without
 a loud stop. Corrected Escape takes the shipped Menu Options exit at tick 1,864 after 32/32 frames.
@@ -30,16 +30,16 @@ a loud stop. A then closes the planned transmission-state slice: Mac virtual `$0
 transmission gate from 0 to 1, and remains at depth 93 through 50/50 frames without a loud stop.
 The deliberate control matrix has reached no new compatibility boundary. The extended Macintosh
 run now reaches driving, raises the measured trap floor from 51 to 63, and reads a 512×320 front
-window above the separate 512×342 surface. An initial unsynchronised capture has already closed
-the color-realization branch: the Macintosh and Amiga source RGB tables match entry for entry, as
-do their destination/device RGB tables; each machine gives source and destination the same
-`ctSeed`; and both live copies are index-preserving `srcCopy` operations over exactly
-`(0,0)-(342,512)`. Rendering the captured packed pixels through the captured destination tables
-also gives the same light-blue sky, blue horizon band, dark road, and gray dashboard on both
-machines. The old pink-road/salmon-car frame is not produced by the current build. Next synchronize
-vehicle, input, and frame boundary and compare the packed indices themselves. The first mismatch
-then belongs to simulation or rendering, not palette realization or Amiga bitplane order. Do not
-return to straight-line accelerator soaking or exhausted PICT/palette work.
+window above the separate 512×342 surface. The driving differential now selects Corvette ZR-1 on
+both machines, holds keypad 8 before the first driving iteration, and captures the first populated
+full-window `srcCopy`. Of 175,104 live pixels, 174,330 match exactly. All 774 differences (0.442%)
+are confined to `(346,1)-(510,9)`, inside the moving rear-view scene; the complete forward 3D
+world, road, terrain, cockpit, and dashboard match index for index. Source RGB tables match entry
+for entry, as do destination/device tables; each machine gives source and destination the same
+`ctSeed`; and both copies preserve indices. The old pink-road/salmon-car frame is not produced by
+the current build. Determine whether the remaining mirror strip is a one-callback capture skew or
+a real scheduling difference, then either synchronize the named capture one callback further or
+fix the scheduling cause. Do not return to straight-line accelerator soaking or palette work.
 
 The key chart labels Escape “Menu Options,” which exposed a real input gap: the driving loop does
 not call `GetNextEvent`, so each CIA keyboard edge updates the corresponding bit in the full

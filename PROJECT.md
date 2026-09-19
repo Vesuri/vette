@@ -262,9 +262,11 @@ separate 512×342 window. Next capture a named, reproducible driving state from 
 compare the chunky indices. An initial unsynchronised capture already proves that source and
 destination RGB tables match entry for entry, source and destination seeds match on both machines,
 and the live full-window copy preserves indices; captured-table rendering also reproduces the same
-sky, road, dashboard, and mirror color roles. The remaining synchronized differential therefore
-separates simulation from rendering rather than revisiting palette realization. →
-`docs/open-work.md` §Blocking.
+sky, road, dashboard, and mirror color roles. The synchronized Corvette/held-accelerator capture
+then matches 174,330 of 175,104 live pixels exactly. All 774 differences are confined to a
+164×8 strip in the moving rear-view scene; the forward 3D world, terrain, road, cockpit, and
+dashboard are exact. The remaining differential is mirror callback timing/state rather than
+palette realization or forward rendering. → `docs/open-work.md` §Blocking.
 
 ⭐⭐ **Stage A is done and measured: the Amiga display path works.** The port takes the machine
 over, brings up 512×320 in 4 bitplanes hires interlaced and displays Target 1's captured Macintosh

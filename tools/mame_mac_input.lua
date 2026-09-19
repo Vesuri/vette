@@ -69,6 +69,12 @@ function mac.press(name, mods)
 	mac.wait(GAP)
 end
 
+-- Hold/release a physical key across an arbitrary number of emulated frames.
+-- Driving reads GetKeys state rather than waiting for keyDown Events, so a
+-- bounded press is not equivalent to a held accelerator.
+function mac.key_down(name) find_field(name):set_value(1) end
+function mac.key_up(name) find_field(name):set_value(0) end
+
 mac.CMD = "Command / Open Apple"
 
 -- ⛔ MEASURED DEAD END: `manager.machine.natkeyboard:post(text)` types NOTHING on

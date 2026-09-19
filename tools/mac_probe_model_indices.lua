@@ -21,6 +21,7 @@ local pending_selector_pixmap = 0
 local protection_prompt = false
 local driving_ports = {}
 local driving_copy_captured = false
+local driving_capture_armed = false
 local palette_for_window = {}
 local last_activate_window = 0
 
@@ -130,11 +131,13 @@ local function on_copybits(pb)
 	if (u16(source + 4) & 0x8000) == 0 or (u16(destination + 4) & 0x8000) == 0 then return end
 	if u16(source + 32) ~= 4 or u16(destination + 32) ~= 4 then return end
 	local st, sl, sb, sr = rect(source_rect)
-	if stage == "driving" and not driving_copy_captured
-		and mac.frames() > 5750
+	local source_base = a24(u32(source))
+	local source_stride = u16(source + 4) & 0x3FFF
+	local viewport_sample = prog:read_u8(source_base + source_stride * 10)
+	if driving_capture_armed and not driving_copy_captured
 		and st == 0 and sl == 0 and sb == 342 and sr == 512
 		and top == 0 and left == 0 and bottom == 342 and right == 512
-		and prog:read_u8(a24(u32(source)) + (u16(source + 4) & 0x3FFF) * 100) ~= 0xFF then
+		and viewport_sample ~= 0x00 and viewport_sample ~= 0xFF then
 		driving_copy_captured = true
 		print(string.format("VP DRIVING COPY frame=%u mode=%u", mac.frames(), u16(pb + 4)))
 		dump_pixmap("DRIVING-SRC", source)
@@ -310,6 +313,9 @@ mac.run(function()
 		dump_bus_bytes("ref/mame/selector-f40-screen.raw", u32(screen),
 			(u16(screen + 4) & 0x3FFF) * (bottom - top))
 	end
+	stage = "corvette"
+	click(508, 247, 480)     -- Corvette ZR-1, matching VETTE_GARAGE_CLICK
+	mac.step("after Corvette"); mac.shot()
 	click(276, 245, 360)     -- vehicle selector ACCEPT
 	mac.step("after vehicle accept"); mac.shot()
 	click(509, 399, 180)     -- Course One ACCEPT; first drive opens copy protection
@@ -319,7 +325,12 @@ mac.run(function()
 		mac.type("16")       -- manual's copy-protection table: Chinatown has 16 blocks
 		click(451, 284, 180) -- protection OK; the accepted course continues
 	end
+	-- Match the deterministic Amiga route: keypad 8 is held before the first
+	-- driving iteration and remains held through the named-state capture.
+	mac.key_down("Keypad 8")
+	driving_capture_armed = true
 	mac.wait(1200)
+	mac.key_up("Keypad 8")
 	mac.step("driving"); mac.shot()
 	screen = main_device_pixmap()
 	if screen ~= 0 then
