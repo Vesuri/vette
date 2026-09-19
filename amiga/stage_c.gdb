@@ -18,6 +18,7 @@ if $loud_stop_hit == 0
   printf "\n===== STAGE C =====\n"
   printf "no loud stop observed before the runner's wall-time ceiling\n"
   printf "implemented depth = %u trap(s)\n", g_stageCDepth
+  printf "Mac ticks = %u, frames queued/presented = %u/%u, driving armed = %u\n", g_macTicks, g_macFramesQueued, g_macFramesPresented, s_drivingFrameStarted
   printf "===================\n\n"
   detach
   quit

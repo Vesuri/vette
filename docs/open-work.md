@@ -21,6 +21,12 @@ from partial dirty pixels. Next, run sustained controlled driving until the next
 transition, capturing the stop/event rather than returning to already-exhausted local PICT and
 palette-loop variants.
 
+The first sustained repeat covers 6,422 Macintosh ticks with 143 frames queued and all 143
+presented, driving still armed, implemented depth still 93, and no loud stop. Do not extend the
+same held-accelerator soak. Use the shipped key chart/manual to choose a deliberate driving exit or
+state transition, feed that through the existing physical KeyMap/EventRecord path, and let the
+loud-stop probe inventory the newly reached code.
+
 The MAME A-trap log remains a measured reference-run inventory → `docs/trap-log.md`,
 but Stage C has proved that it is **not an exact standalone-port first-use script**. The port has
 already executed initialization calls absent from, or much later in, that 51-row ordering. Treat

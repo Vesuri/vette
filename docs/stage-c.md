@@ -800,6 +800,12 @@ probe measures the first active loop from its true entry: picture milestones at 
 dynamic rendering at 420, and a completed presentation at 459. The next completed frame arrives
 40 ticks later, with both queued and presented counts advancing by one.
 
+The ordinary Stage C loud-stop probe now reports bounded progress as well as trap depth. A
+60-second warped target-A1200 run reaches 6,422 Macintosh ticks and 143 queued / 143 presented
+frames with driving still armed, depth still 93, and no loud stop. This closes straight-line
+accelerator soaking as a discovery method; the next coverage step must deliberately take another
+driving control or transition path.
+
 The trap-address table is stateful. The observed `GetTrapAddress`/`SetTrapAddress` pair now records
 the game's replacement for `$A9F4 ExitToShell`; routing a later invocation through that replacement
 remains part of completing the trap bridge.
