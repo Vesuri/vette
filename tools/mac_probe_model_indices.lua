@@ -27,6 +27,8 @@ local last_activate_window = 0
 local mirror_write_armed = false
 local trace_mirror_writer = os.getenv("VETTE_MIRROR_WRITER") == "1"
 local mirror_write_count = 0
+local traffic_raster_dumped = false
+local mirror_source_write_count = 0
 
 local function a24(v) return v & 0x00FFFFFF end
 local function u16(a) return prog:read_u16(a24(a)) end
@@ -97,18 +99,61 @@ local function arm_mirror_writer(pixmap)
 				mirror_write_count = mirror_write_count + 1
 				local a5 = a24(cpu.state["A5"].value)
 				local car = a24(u32(a5 - 13944))
-				print(string.format(
-					"VP MIRROR WRITE #%u frame=%u pc=%06X byte=%06X data=%08X mask=%08X old=%02X d1=%08X d2=%08X d3=%08X d4=%08X a0=%06X a1=%06X stride=%08X skew=%04X car=%06X car26=%04X buffers=%06X/%06X/%06X",
+				if mirror_write_count <= 8 then print(string.format(
+					"VP MIRROR WRITE #%u frame=%u pc=%06X byte=%06X data=%08X mask=%08X old=%02X d1=%08X d2=%08X d3=%08X d4=%08X a0=%06X a1=%06X height=%04X subtract20=%04X viewportBottom=%04X stride=%08X skew=%04X car=%06X car26=%04X buffers=%06X/%06X/%06X",
 					mirror_write_count, mac.frames(), a24(cpu.state["PC"].value), byte,
 					data, mask, prog:read_u8(byte), cpu.state["D1"].value,
 					cpu.state["D2"].value, cpu.state["D3"].value,
 					cpu.state["D4"].value, a24(cpu.state["A0"].value),
-					a24(cpu.state["A1"].value), u32(a5 - 960), u16(a5 - 13310),
+					a24(cpu.state["A1"].value), u16(a5 - 14970), u16(a5 - 964),
+					u16(a5 - 848), u32(a5 - 960), u16(a5 - 13310),
 					car, car ~= 0 and u16(car + 26) or 0, a24(u32(a5 - 20450)),
-					a24(u32(a5 - 20446)), a24(u32(a5 - 20442))))
+					a24(u32(a5 - 20446)), a24(u32(a5 - 20442)))) end
+				-- The watch byte lies on row one of the 78x84-byte raster.  At this
+				-- point A1 has advanced by one 260-byte source row, while D2 has
+				-- already been expanded from 21 longwords to the 83 DBF count.
+				if not traffic_raster_dumped and cpu.state["D2"].value == 83
+					and cpu.state["D3"].value == 172 then
+					traffic_raster_dumped = true
+					local source = a24(cpu.state["A1"].value - 260)
+					print(string.format("VP Traffic raster source=%06X rows=78 rowBytes=260", source))
+					local out = assert(io.open("ref/mame/driving-mirror-source.raw", "wb"))
+					for i = 0, 20279 do out:write(string.char(prog:read_u8(source + i))) end
+					out:close()
+				end
 			end
 		end)
 	print(string.format("VP armed mirror writer byte=%06X frame=%u", byte, mac.frames()))
+end
+
+local function arm_mirror_source_writer()
+	if not trace_mirror_writer then return end
+	local a5 = a24(cpu.state["A5"].value)
+	local owner = a24(u32(a5 - 31234))
+	local field = owner ~= 0 and a24(u32(owner + 2)) or 0
+	local first = field ~= 0 and a24(u32(field)) or 0
+	local base = first ~= 0 and a24(u32(first)) or 0
+	local row = u32(a5 - 11922 + 388 * 4)
+	local source = a24(base + row)
+	local byte = source + 262
+	print(string.format("VP mirror source owner=%06X field=%06X first=%06X base=%06X row=%08X byte=%06X",
+		owner, field, first, base, row, byte))
+	if source == 0 then return end
+	local aligned = byte & ~3
+	keep[#keep + 1] = prog:install_write_tap(aligned, aligned + 3,
+		"driving_mirror_source_writer", function(_, data, mask)
+			mirror_source_write_count = mirror_source_write_count + 1
+			if mirror_source_write_count <= 16 then
+				local writer_pc = a24(cpu.state["PC"].value)
+				print(string.format(
+					"VP MIRROR SOURCE WRITE #%u frame=%u pc=%06X byte=%06X data=%08X mask=%08X old=%02X d0=%08X d1=%08X d2=%08X d3=%08X d4=%08X a0=%06X a1=%06X",
+					mirror_source_write_count, mac.frames(), writer_pc, byte, data, mask,
+					prog:read_u8(byte), cpu.state["D0"].value,
+					cpu.state["D1"].value, cpu.state["D2"].value,
+					cpu.state["D3"].value, cpu.state["D4"].value,
+					a24(cpu.state["A0"].value), a24(cpu.state["A1"].value)))
+			end
+		end)
 end
 
 local function main_device_pixmap()
@@ -368,6 +413,7 @@ mac.run(function()
 	-- driving iteration and remains held through the named-state capture.
 	mac.key_down("Keypad 8")
 	driving_capture_armed = true
+	arm_mirror_source_writer()
 	mac.wait(1200)
 	mac.key_up("Keypad 8")
 	mac.step("driving"); mac.shot()

@@ -1559,6 +1559,19 @@ static uint32_t multiplyDivide(uint16_t value, uint16_t multiplier, uint16_t div
     return quotient & 0xffff;
 }
 
+static uint32_t multiplyDivideCentered(uint16_t value, uint16_t multiplier,
+                                       uint16_t divisor)
+{
+    if (!divisor) return 0;
+    if (multiplier == divisor) return value;
+    // QuickDraw samples a scaled destination pixel at its centre.  Adding half
+    // a source pixel before division places a duplicated row in the interior
+    // of a 77->78 stretch instead of duplicating row zero at the top edge.
+    uint32_t numerator = multiplyUnsigned16(value, multiplier) + (multiplier >> 1);
+    __asm__ volatile ("divu.w %1,%0" : "+d" (numerator) : "d" (divisor));
+    return numerator & 0xffff;
+}
+
 static bool drawIndexedPictureBits(const uint8_t* picture, uint32_t size, uint32_t& offset,
                                    const uint8_t* pictureFrame, const uint8_t* targetRect,
                                    bool packed)
@@ -1800,11 +1813,11 @@ static bool drawIndexedPictureBits(const uint8_t* picture, uint32_t size, uint32
             uint16_t copyBytes = (uint16_t)(packedRight - packedLeft) >> 1;
             for (int16_t y = targetTop; y < targetBottom; ++y) {
                 if (y < mapTop || y >= mapBottom) continue;
-                int16_t pictureY = (int16_t)(frameTop + multiplyDivide(
+                int16_t pictureY = (int16_t)(frameTop + multiplyDivideCentered(
                     (uint16_t)(y - targetTop), (uint16_t)(frameBottom - frameTop),
                     (uint16_t)(targetBottom - targetTop)));
                 if (pictureY < rasterTop || pictureY >= rasterBottom) continue;
-                int16_t sourceY = (int16_t)(copyTop + multiplyDivide(
+                int16_t sourceY = (int16_t)(copyTop + multiplyDivideCentered(
                     (uint16_t)(pictureY - rasterTop), (uint16_t)(copyBottom - copyTop),
                     (uint16_t)(rasterBottom - rasterTop)));
                 if (sourceY < sourceTop || sourceY >= sourceBottom) continue;
@@ -1828,11 +1841,11 @@ static bool drawIndexedPictureBits(const uint8_t* picture, uint32_t size, uint32
     if (valid && !usedPackedRows) {
         for (int16_t y = targetTop; y < targetBottom; ++y) {
             if (y < mapTop || y >= mapBottom) continue;
-            int16_t pictureY = (int16_t)(frameTop + multiplyDivide(
+            int16_t pictureY = (int16_t)(frameTop + multiplyDivideCentered(
                 (uint16_t)(y - targetTop), (uint16_t)(frameBottom - frameTop),
                 (uint16_t)(targetBottom - targetTop)));
             if (pictureY < rasterTop || pictureY >= rasterBottom) continue;
-            int16_t sourceY = (int16_t)(copyTop + multiplyDivide(
+            int16_t sourceY = (int16_t)(copyTop + multiplyDivideCentered(
                 (uint16_t)(pictureY - rasterTop), (uint16_t)(copyBottom - copyTop),
                 (uint16_t)(rasterBottom - rasterTop)));
             const uint8_t* sourceRow = pixels
@@ -1841,11 +1854,11 @@ static bool drawIndexedPictureBits(const uint8_t* picture, uint32_t size, uint32
                 + multiplyUnsigned16((uint16_t)(y - mapTop), destinationRowBytes);
             for (int16_t x = targetLeft; x < targetRight; ++x) {
                 if (x < mapLeft || x >= mapRight) continue;
-                int16_t pictureX = (int16_t)(frameLeft + multiplyDivide(
+                int16_t pictureX = (int16_t)(frameLeft + multiplyDivideCentered(
                     (uint16_t)(x - targetLeft), (uint16_t)(frameRight - frameLeft),
                     (uint16_t)(targetRight - targetLeft)));
                 if (pictureX < rasterLeft || pictureX >= rasterRight) continue;
-                int16_t sourceX = (int16_t)(copyLeft + multiplyDivide(
+                int16_t sourceX = (int16_t)(copyLeft + multiplyDivideCentered(
                     (uint16_t)(pictureX - rasterLeft), (uint16_t)(copyRight - copyLeft),
                     (uint16_t)(rasterRight - rasterLeft)));
                 if (sourceY >= sourceTop && sourceY < sourceBottom

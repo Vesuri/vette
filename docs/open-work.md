@@ -7,7 +7,8 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — current compatibility boundary
 
-⭐ **HEAD OF QUEUE: resolve the rear-view mirror's narrow state/timing differential.**
+⭐ **HEAD OF QUEUE: take the next deliberate gameplay transition beyond the closed driving
+control slice.**
 Complete frames are presented at the exact original `Main+$1FD2` loop boundary;
 sustained driving covers 6,422 Macintosh ticks and 143/143 frames at implemented depth 93 without
 a loud stop. Corrected Escape takes the shipped Menu Options exit at tick 1,864 after 32/32 frames.
@@ -30,28 +31,23 @@ a loud stop. A then closes the planned transmission-state slice: Mac virtual `$0
 transmission gate from 0 to 1, and remains at depth 93 through 50/50 frames without a loud stop.
 The deliberate control matrix has reached no new compatibility boundary. The extended Macintosh
 run now reaches driving, raises the measured trap floor from 51 to 63, and reads a 512×320 front
-window above the separate 512×342 surface. The driving differential now selects Corvette ZR-1 on
-both machines, holds keypad 8 before the first driving iteration, and captures the first populated
-full-window `srcCopy`. Of 175,104 live pixels, 174,330 match exactly. All 774 differences (0.442%)
-are confined to `(346,1)-(510,9)`, inside the moving rear-view scene; the complete forward 3D
-world, road, terrain, cockpit, and dashboard match index for index. Source RGB tables match entry
-for entry, as do destination/device tables; each machine gives source and destination the same
-`ctSeed`; and both copies preserve indices. The old pink-road/salmon-car frame is not produced by
-the current build. Four consecutive copies prove the mirror pattern is static rather than a
-one-callback capture skew: normal road/traffic pixels change between frames, while the same
-774-pixel signature persists. A Macintosh byte write tap attributes the edge to the original
-Traffic raster path: `Traffic+$6790` selects/fills the target buffer and the routine entered at
-`Traffic+$68B4` writes the missing low nibble. On the port that byte remains at its initial `$FF`.
-The corresponding full-row fills expose the first upstream mismatch: both use a 256-byte row and
-color index 4, but System 6 fills 78 rows while the port fills 80. Later geometry overwrites that
-two-row difference everywhere except the mirror edge. Next trace the caller/state that computes
-this height and explain 78 versus 80; fix that cause, not the mirror pixels. Do not return to
-straight-line accelerator soaking or palette work.
+window above the separate 512×342 surface. The synchronized driving differential selects Corvette
+ZR-1 on both machines, holds keypad 8 before the first driving iteration, and captures the first
+populated full-window `srcCopy`. **All 175,104 live pixels now match exactly**, including the
+rear-view scene. Source RGB tables match entry for entry, as do destination/device tables; each
+machine gives source and destination the same `ctSeed`; and both copies preserve indices. The old
+pink-road/salmon-car frame is not produced by the current build.
 
-The caller is now identified as segment 7 `FRED+$00FC..$0130`. It loads the height from
-`A5-$3A7A`, subtracts 20 only when `A5-$03C4` is nonzero, clamps against the viewport bottom at
-`A5-$0350`, and calls the Traffic fill at `FRED+$012C`. Next compare those three words at the first
-frame on both machines and trace the first differing assignment to `A5-$3A7A`.
+The former 774-pixel mirror strip was a general indexed-PICT scaling error. Traffic copies a
+78×168 rear-view picture from the unused lower portion of the 512×512 GWorld. Its PICT frame is
+77 rows high and its destination is 78 rows high. The port sampled scaled pixels at their leading
+edge and duplicated source row zero at the top; System 6 samples pixel centres and places the
+duplicate in the interior. `drawIndexedPictureBits` now uses that measured rule. The initially
+suspected FRED state is identical on both machines: `A5-$3A7A = 100`, `A5-$03C4 = 1`, and
+`A5-$0350 = 196`; both call the Traffic fill with 80 rows. The reference `d1=78` observation was
+the loop counter after two rows, not an input-height difference. Frames two through four differ by
+only 18–68 moving lower-cockpit pixels after the named boundary. Do not return to straight-line
+accelerator soaking or palette work.
 
 The key chart labels Escape “Menu Options,” which exposed a real input gap: the driving loop does
 not call `GetNextEvent`, so each CIA keyboard edge updates the corresponding bit in the full

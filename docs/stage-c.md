@@ -867,35 +867,31 @@ the renderer-authored packed indices.
 That synchronized differential now selects Corvette ZR-1 in both harnesses, holds keypad 8 before
 the first driving iteration, and captures the first populated full-window copy. A geometry-aware
 comparison ignores the four unused padding bytes in each 260-byte PixMap row and compares all
-175,104 pixels in the live 512×342 rectangle. Exactly 174,330 pixels match. The 774 mismatches
-(0.442%) occupy only `(346,1)-(510,9)`, within the rear-view mirror's changing road image. Every
-pixel outside that narrow strip—including the complete forward 3D world, terrain, road, cockpit,
-and dashboard—matches the Macintosh index for index. `tools/compare_mac_chunky.py` makes that
-packed-pixel proof repeatable. The remaining question is mirror callback timing/state, not palette
-realization, bitplane order, or the forward renderer.
+175,104 pixels in the live 512×342 rectangle. **All 175,104 now match.**
+`tools/compare_mac_chunky.py` makes that packed-pixel proof repeatable.
 
 Four consecutive full-window captures reject callback skew as the explanation. Corresponding
 frames retain the same 774-pixel mirror signature while road and traffic pixels change normally.
-At the first differing packed byte the port leaves the initial `$FF` untouched. An aligned MAME
-write tap shows the Macintosh first filling the row and then writing the missing low nibble through
-the original Traffic raster path: `Traffic+$6790` selects the backing buffer and the routine entered
-at `Traffic+$68B4` performs the byte raster operation. The next comparison is therefore the
-register/A5 input state at `Traffic+$6850/$68B4`, not QuickDraw, C2P, or a guessed coordinate fix.
-`VETTE_MIRROR_WRITER=1` enables that otherwise noisy reference write trace.
+An aligned MAME write tap shows the Macintosh first filling the row and then overwriting it through
+the original Traffic raster path. `Traffic+$6790` selects the backing buffer and `Traffic+$67A4`
+copies the 78×168 intermediate rear-view source. `VETTE_MIRROR_WRITER=1` enables that otherwise
+noisy reference write trace.
 
-The broader Traffic helper inventory finds the first differing input. The reference write carries
-`d1=78`, `d2=256`, `d3=0`, `d4=0`, and replicated pen 4; the corresponding port call to the
-original full-row fill has `d1=80`, with the same 256-byte width, origin, and pen. Subsequent
-geometry overwrites those two extra rows in the forward scene, leaving only the mirror's narrow
-edge as evidence. The next trace belongs at the caller that computes the fill height, not in the
-raster loop. `amiga/driving_traffic_base.gdb` and `driving_traffic_rasters.gdb` retain the measured
-call inventories.
+The first interpretation of the Traffic helper inventory was wrong. At `FRED+$00FC`, both machines
+carry height 100, subtract flag 1, and viewport bottom 196, and both enter the full-row fill with
+80 rows. The reference write tap's `d1=78` was observed only after the loop had completed two rows.
+The actual differential is one stage earlier: `Traffic+$5C20` copies a 78×168 image from the unused
+lower portion of the 512×512 GWorld into the mirror. Its source differs in rows 1–8.
 
-The port's fill return address maps to segment 7 `FRED+$0130`; disassembly identifies the call at
-`FRED+$012C` and the complete height calculation at `FRED+$00FC`. It loads `A5-$3A7A`, conditionally
-subtracts 20 when `A5-$03C4` is set, then clamps the result against `A5-$0350`. The 78-versus-80
-difference is therefore upstream original game state. The next probe compares those words and
-attributes the first differing store to `A5-$3A7A`.
+The producer is the game's own `_DrawPicture` call with destination `(388,0)-(466,168)`. The PICT
+frame is `(0,0)-(77,168)`, split into 60-row and 17-row indexed PackBits rasters. System 6 maps the
+77 source rows into 78 destination rows by sampling pixel centres. The port instead used leading-
+edge integer division, duplicating row zero at destination row one and shifting the visible top
+edge. `drawIndexedPictureBits` now applies centre sampling to scaled indexed PICT coordinates. The
+first synchronized frame is consequently exact. Captures two through four differ by 18, 62, and
+68 pixels respectively, all in the moving lower cockpit/driver area rather than the mirror; they
+are beyond the single named-frame synchronization boundary. `amiga/driving_fred_state.gdb`,
+`driving_raster_source.gdb`, and `driving_mirror_picture.gdb` retain the correction trail.
 
 Resolving the remaining resident-code samples shows that they are not compatibility overhead:
 `Main+$5208/$5246/$5266` are perspective division and clipping, `Main+$5A34/$5A92/$5D6A` are

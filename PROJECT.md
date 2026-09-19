@@ -263,19 +263,12 @@ compare the chunky indices. An initial unsynchronised capture already proves tha
 destination RGB tables match entry for entry, source and destination seeds match on both machines,
 and the live full-window copy preserves indices; captured-table rendering also reproduces the same
 sky, road, dashboard, and mirror color roles. The synchronized Corvette/held-accelerator capture
-then matches 174,330 of 175,104 live pixels exactly. All 774 differences are confined to a
-164×8 strip in the moving rear-view scene; the forward 3D world, terrain, road, cockpit, and
-dashboard are exact. The remaining differential is mirror raster state rather than palette
-realization or forward rendering. Four consecutive captures prove that the
-774-pixel mirror signature is static, not callback skew; a Macintosh write tap attributes its edge
-to the original `Traffic+$6790/$68B4` buffer/raster path. The first upstream mismatch is now
-measured: the reference fills 78 rows with pen 4 while the port fills 80 with otherwise identical
-width and origin. The next differential traces the caller/state that computes that height. →
-`docs/open-work.md` §Blocking.
-
-That caller is `FRED+$00FC..$0130`: the height comes from `A5-$3A7A`, is optionally reduced by 20
-under `A5-$03C4`, and is clamped to the viewport bottom at `A5-$0350`. The next measurement compares
-those three original game-state words and traces the first differing write to `A5-$3A7A`.
+now matches all 175,104 live pixels exactly. The final 774-pixel mirror strip came from the general
+indexed-PICT scaling rule: a 77-row picture is drawn into 78 rows at `(388,0)-(466,168)`, and System
+6 samples destination pixel centres. Applying the same rule removes the top-edge displacement.
+The FRED height state and 80-row Traffic fill are identical on both machines; the earlier reference
+value 78 was a post-two-row loop counter. The driving reference differential's named first frame
+is therefore closed. → `docs/open-work.md` §Blocking.
 
 ⭐⭐ **Stage A is done and measured: the Amiga display path works.** The port takes the machine
 over, brings up 512×320 in 4 bitplanes hires interlaced and displays Target 1's captured Macintosh
