@@ -29,6 +29,17 @@ static uint16_t currentModifiers()
     return modifiers;
 }
 
+static void recordKey(uint8_t raw, bool down)
+{
+    s_keyDown[raw] = down ? 1 : 0;
+    uint8_t next = (uint8_t)((s_head + 1) & 31);
+    if (next != s_tail) {
+        s_events[s_head].rawAndUp = (uint8_t)(raw | (down ? 0 : 0x80));
+        s_events[s_head].modifiers = currentModifiers();
+        s_head = next;
+    }
+}
+
 static uint32_t keyboardHandler()
 {
     uint8_t code = (uint8_t)~*ciaasdrPointer;
@@ -38,13 +49,7 @@ static uint32_t keyboardHandler()
     code = (uint8_t)((code >> 1) | (code << 7));
     uint8_t raw = (uint8_t)(code & 0x7f);
     bool down = (code & 0x80) == 0;
-    s_keyDown[raw] = down ? 1 : 0;
-    uint8_t next = (uint8_t)((s_head + 1) & 31);
-    if (next != s_tail) {
-        s_events[s_head].rawAndUp = (uint8_t)(raw | (down ? 0 : 0x80));
-        s_events[s_head].modifiers = currentModifiers();
-        s_head = next;
-    }
+    recordKey(raw, down);
     return 0;
 }
 
@@ -99,4 +104,12 @@ bool vetteInputKeyDown(uint8_t rawKey)
 uint16_t vetteInputModifiers()
 {
     return currentModifiers();
+}
+
+void vetteInputInjectProbeKey(uint8_t rawKey, bool down)
+{
+    if (rawKey >= 128) return;
+    Disable();
+    recordKey(rawKey, down);
+    Enable();
 }

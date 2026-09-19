@@ -249,8 +249,10 @@ discovery method.
 The shipped key chart labels Escape “Menu Options.” Correcting a byte-local KeyMap bit-order bug
 makes physical Escape take that original transition at tick 1,864 after 32 complete frames. The
 path exits driving, reaches implemented depth 94 and encounters no new loud stop. The next step is
-to capture the resulting Menu Options state and send a documented menu action through the ordinary
-event path until the next compatibility boundary. → `docs/open-work.md` §Blocking.
+confirmed with a diagnostic-only physical down/up pair through the ordinary edge queue: the settled
+state remains supported and trap-free. The next discovery step is a materially different documented
+in-driving branch, beginning with F1 “Helicopter View Left,” followed one bounded transition at a
+time until the next compatibility boundary. → `docs/open-work.md` §Blocking.
 
 ⭐⭐ **Stage A is done and measured: the Amiga display path works.** The port takes the machine
 over, brings up 512×320 in 4 bitplanes hires interlaced and displays Target 1's captured Macintosh

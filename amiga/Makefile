@@ -123,6 +123,14 @@ ifdef INPUT_PROBE_RAW_KEY
 EXTRA_DEFINES += -DVETTE_INPUT_PROBE_RAW_KEY=$(INPUT_PROBE_RAW_KEY)
 endif
 
+# Diagnostic only: inject one physical-style down/up edge around the first
+# driving iteration, through the same state and queue used by the CIA handler.
+# Unlike INPUT_PROBE_RAW_KEY this deliberately produces EventRecords after the
+# key's direct KeyMap action has returned execution to the event loop.
+ifdef INPUT_PROBE_EVENT_RAW_KEY
+EXTRA_DEFINES += -DVETTE_INPUT_PROBE_EVENT_RAW_KEY=$(INPUT_PROBE_EVENT_RAW_KEY)
+endif
+
 # `make FPSCOUNT=1` — the honest framerate build: one increment per painted frame and the
 # headless auto-run, no instrumentation.  docs/perf-method.md Rule 1.
 ifdef FPSCOUNT

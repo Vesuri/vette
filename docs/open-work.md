@@ -7,14 +7,16 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — current compatibility boundary
 
-⭐ **HEAD OF QUEUE: capture and drive the Menu Options state reached from Escape.** Complete frames
-are presented at the exact original `Main+$1FD2` loop boundary; sustained driving covers 6,422
-Macintosh ticks and 143/143 frames at implemented depth 93 without a loud stop. The corrected
-Escape mapping then takes the shipped transition out of driving at tick 1,864 after 32/32 frames.
-Driving is disarmed, the original flag is zero, implemented depth advances through the already
-supported `ShowCursor` path to 94, and no new loud stop occurs. Capture the resulting menu state,
-then use a documented menu action to reach the next unimplemented compatibility operation. Do not
-return to straight-line accelerator soaking or the exhausted local PICT/palette variants.
+⭐ **HEAD OF QUEUE: take a different documented in-driving branch, starting with F1 “Helicopter
+View Left.”** Complete frames are presented at the exact original `Main+$1FD2` loop boundary;
+sustained driving covers 6,422 Macintosh ticks and 143/143 frames at implemented depth 93 without
+a loud stop. Corrected Escape takes the shipped Menu Options exit at tick 1,864 after 32/32 frames.
+The physical-style queued down/up regression proves both edges are consumed after exit, but the
+settled result remains at depth 94 without a loud stop: the upper 198-row driving viewport is
+cleared, the dashboard remains, and execution waits in the supported outer event loop. That branch
+is closed for compatibility discovery. Use the same bounded edge harness with the documented F1
+view change, then other materially different controls, until execution reaches new code or the
+next loud stop. Do not return to straight-line accelerator soaking or exhausted PICT/palette work.
 
 The key chart labels Escape “Menu Options,” which exposed a real input gap: the driving loop does
 not call `GetNextEvent`, so the CIA interrupt's non-consuming raw-key state is translated into the
@@ -23,7 +25,9 @@ probe also exposed a byte-local bit-order bug: the port wrote virtual Escape `$3
 `$04`, but the game's scanner at `Main+$2DD2` consumes each byte LSB first, making that virtual key
 `$32`. Correct Escape is byte 6 bit `$20`, and keypad 8 `$5B` is byte 11 bit `$08`. The dedicated
 probes now prove both: keypad 8 reaches the original scanner as virtual `$5B`, and held Escape takes
-the Menu Options exit. The queued EventRecord path remains independent for UI actions after exit.
+the Menu Options exit. `INPUT_PROBE_EVENT_RAW_KEY` additionally injects one diagnostic-only
+physical-style down/up pair through the CIA queue's own state/update helper, with the release timed
+at the exact exit boundary. Production builds never define it.
 
 The MAME A-trap log remains a measured reference-run inventory → `docs/trap-log.md`,
 but Stage C has proved that it is **not an exact standalone-port first-use script**. The port has

@@ -4014,6 +4014,25 @@ static bool translateAmigaKey(uint8_t raw, KeyTranslation& key)
 
 static void refreshDrivingKeyMap()
 {
+#ifdef VETTE_INPUT_PROBE_EVENT_RAW_KEY
+    // Diagnostic-only physical edge: press before the first driven iteration,
+    // then release at the boundary where that key has cleared the game's
+    // driving flag.  Both edges remain in the ordinary EventRecord queue.
+    static uint8_t probeEventPhase;
+    if (probeEventPhase == 0) {
+#ifdef VETTE_GARAGE_CLICK
+        if (s_garageClickPhase >= 9) {
+#endif
+            vetteInputInjectProbeKey(VETTE_INPUT_PROBE_EVENT_RAW_KEY, true);
+            probeEventPhase = 1;
+#ifdef VETTE_GARAGE_CLICK
+        }
+#endif
+    } else if (probeEventPhase == 1 && read16(s_currentA5 - 21316) == 0) {
+        vetteInputInjectProbeKey(VETTE_INPUT_PROBE_EVENT_RAW_KEY, false);
+        probeEventPhase = 2;
+    }
+#endif
     uint8_t* keyMap = s_currentA5 + 16;
     for (uint16_t i = 0; i < 16; ++i) keyMap[i] = 0;
     for (uint16_t raw = 0; raw < 128; ++raw) {

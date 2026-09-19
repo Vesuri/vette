@@ -406,6 +406,13 @@ regressions cover both mappings. Corrected held Escape takes the original drivin
 1,864 after 32 queued and presented frames: the driving global and bridge state both clear, depth
 reaches 94 through the already-supported post-driving path, and no loud stop follows. This is a
 direct KeyMap transition; `GetNextEvent` is not called until after the driving loop has exited.
+`INPUT_PROBE_EVENT_RAW_KEY=$45` then repeats the test with an Escape down/up pair in the ordinary
+edge queue: down is enqueued before the first driven iteration, release at the exact boundary where
+the game has cleared its driving flag, and both remain available to `GetNextEvent`. The settled
+capture 180 ticks after exit is byte-identical to the first event-loop capture
+(`11e5b145…`): the upper 198-row viewport is clear, the dashboard remains, depth stays 94 and no
+loud stop occurs. Escape has therefore reached a supported waiting state rather than another
+compatibility requirement. `amiga/menu_options_capture.gdb` records that boundary.
 
 This preserves the original code flow without touching Amiga low memory. More shadows are added
 only when execution reaches them; the inventory shows that most remaining references are `Ticks`,
