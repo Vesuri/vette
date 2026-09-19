@@ -438,6 +438,15 @@ CIA keyboard edge directly into the A5-relative KeyMap shadow, while the same qu
 remains available to `GetNextEvent`. `amiga/driving_p_key_dispatch.gdb` resolves the shipped key
 table and handler; there is no P-specific runtime behavior.
 
+Raw Amiga S (`$21`, Macintosh virtual `$01`) resolves through the same shipped table to
+`Main+$3134`; there is no port-side S special case. The handler tests and changes the game's own
+A5-relative sound flag, then calls the resident `sound` segment through the original A5 jump
+table. The off and on services resolve to `sound+$021C` and `sound+$024C` respectively (their
+command records contain 17 and 19). A bounded down/up probe starts with the flag at 1, reaches 0,
+and continues active driving through 50 queued and 50 presented frames at depth 93 without a loud
+stop. `amiga/driving_s_key_dispatch.gdb` records the dispatch and service targets;
+`amiga/driving_s_state.gdb` records the settled state.
+
 This preserves the original code flow without touching Amiga low memory. More shadows are added
 only when execution reaches them; the inventory shows that most remaining references are `Ticks`,
 mouse/key state, and repeated `GrayRgn` reads.

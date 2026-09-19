@@ -13,8 +13,8 @@ commands
   x/2i $a3
   set $i = 0
   while $i < 11
-    if $target >= s_segments[$i].begin && $target < s_segments[$i].end
-      printf "P handler segment=%u offset=$%x\n", $i, $target-s_segments[$i].begin
+    if $target >= (unsigned int)s_segments[$i].begin && $target < (unsigned int)s_segments[$i].end
+      printf "P handler segment=%u offset=$%x\n", $i, $target-(unsigned int)s_segments[$i].begin
     end
     set $i = $i+1
   end

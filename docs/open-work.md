@@ -22,8 +22,11 @@ through 70/70 frames and changes 31,214 packed bytes at the matched 40th present
 cockpit/dashboard overlay while retaining the forward road and mirror. P is now measured as well:
 Mac virtual `$23` dispatches through the game's live key table to `Initialize+$1862`, stops frame
 production at a complete-frame boundary, blanks the upper viewport while retaining the dashboard,
-and settles at depth 94 without a loud stop. Continue with the remaining materially different
-controls—sound and transmission state—until one reaches new code or the next loud stop. Do not
+and settles at depth 94 without a loud stop. S is now measured too: Mac virtual `$01` dispatches
+to `Main+$3134`, changes the game's own sound flag from 1 to 0, calls the resident `sound` segment
+at offsets `$021C`/`$024C`, and remains in active driving through 50/50 frames at depth 93 without
+a loud stop. Continue with the remaining materially different control—transmission state—until it
+reaches new code or the next loud stop. Do not
 return to straight-line accelerator soaking or exhausted PICT/palette work.
 
 The key chart labels Escape “Menu Options,” which exposed a real input gap: the driving loop does

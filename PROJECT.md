@@ -254,8 +254,10 @@ state remains supported and trap-free. F1 “Helicopter View Left” is also mea
 capture changes 53,940 of 81,920 packed bytes while driving remains trap-free at depth 93.
 F5 “Front Dash” changes 31,214 packed bytes and remains trap-free through 70/70 frames. P reaches
 the original pause/options transition and settles trap-free at depth 94; updating Page-0 KeyMap
-on CIA keyboard edges makes its no-Toolbox wait observe physical key transitions. Continue the
-documented control matrix with sound and transmission state, one bounded transition at a time,
+on CIA keyboard edges makes its no-Toolbox wait observe physical key transitions. S reaches the
+original `Main+$3134` sound toggle, changes the shipped sound flag from 1 to 0, calls the resident
+sound segment, and remains trap-free through 50/50 driving frames. Continue the documented control
+matrix with transmission state, one bounded transition at a time,
 until the next compatibility boundary. → `docs/open-work.md` §Blocking.
 
 ⭐⭐ **Stage A is done and measured: the Amiga display path works.** The port takes the machine
