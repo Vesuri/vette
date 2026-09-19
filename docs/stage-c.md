@@ -421,6 +421,13 @@ at presentation 40 prove a real renderer-state change: the ordinary surface hash
 the F1 surface to `4ec4efc8…`, and 53,940 of their 81,920 packed bytes differ. The paired
 `driving_baseline_capture.gdb` and `driving_f1_capture.gdb` scripts make that coverage repeatable.
 
+Raw Amiga F5 (`$54`, Macintosh virtual `$60`) likewise takes the documented “Front Dash” branch
+without a new trap. The run remains in driving at depth 93 through 3,444 ticks and 70/70 frames.
+At matched presentation 40, `driving_f5_capture.gdb` records hash `3441bd48…`, differing from the
+baseline in 31,214 packed bytes; the game removes the cockpit/dashboard overlay while retaining the
+forward road and mirror. This closes a second materially different renderer state by pixels rather
+than merely by survival.
+
 This preserves the original code flow without touching Amiga low memory. More shadows are added
 only when execution reaches them; the inventory shows that most remaining references are `Ticks`,
 mouse/key state, and repeated `GrayRgn` reads.

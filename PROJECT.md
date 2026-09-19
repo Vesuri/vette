@@ -252,8 +252,9 @@ path exits driving, reaches implemented depth 94 and encounters no new loud stop
 confirmed with a diagnostic-only physical down/up pair through the ordinary edge queue: the settled
 state remains supported and trap-free. F1 “Helicopter View Left” is also measured: a frame-matched
 capture changes 53,940 of 81,920 packed bytes while driving remains trap-free at depth 93. Continue
-the documented control matrix one bounded transition at a time until the next compatibility
-boundary. → `docs/open-work.md` §Blocking.
+F5 “Front Dash” changes 31,214 packed bytes and remains trap-free through 70/70 frames. Continue the
+documented control matrix with non-camera state changes one bounded transition at a time until the
+next compatibility boundary. → `docs/open-work.md` §Blocking.
 
 ⭐⭐ **Stage A is done and measured: the Amiga display path works.** The port takes the machine
 over, brings up 512×320 in 4 bitplanes hires interlaced and displays Target 1's captured Macintosh

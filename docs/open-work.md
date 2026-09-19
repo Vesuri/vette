@@ -17,10 +17,11 @@ cleared, the dashboard remains, and execution waits in the supported outer event
 is closed for compatibility discovery. F1 is also now measured: it remains in driving at depth 93,
 presents 65/65 frames without a loud stop, and its 40th presented surface differs from the
 frame-matched baseline in 53,940 of 81,920 packed bytes. The view branch therefore executed; this
-is not merely proof that a key was queued. Continue with the other materially different documented
-controls—front dash/view changes, pause, sound and transmission state—until one reaches new code or
-the next loud stop. Do not return to straight-line accelerator soaking or exhausted PICT/palette
-work.
+is not merely proof that a key was queued. F5 “Front Dash” is measured too: it remains at depth 93
+through 70/70 frames and changes 31,214 packed bytes at the matched 40th presentation, removing the
+cockpit/dashboard overlay while retaining the forward road and mirror. Continue with the remaining
+materially different controls—pause, sound and transmission state—until one reaches new code or the
+next loud stop. Do not return to straight-line accelerator soaking or exhausted PICT/palette work.
 
 The key chart labels Escape “Menu Options,” which exposed a real input gap: the driving loop does
 not call `GetNextEvent`, so the CIA interrupt's non-consuming raw-key state is translated into the
