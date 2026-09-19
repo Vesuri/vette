@@ -259,8 +259,12 @@ and likewise remains trap-free through 50/50 frames. The planned control slice i
 finding a new compatibility boundary. The Macintosh reference harness now reaches live driving,
 expands the measured trap floor from 51 to 63, and proves the front window is 512×320 above a
 separate 512×342 window. Next capture a named, reproducible driving state from both machines and
-compare the chunky indices and active ColorTable before comparing displayed RGB. That separates
-simulation/render differences from palette realization. → `docs/open-work.md` §Blocking.
+compare the chunky indices. An initial unsynchronised capture already proves that source and
+destination RGB tables match entry for entry, source and destination seeds match on both machines,
+and the live full-window copy preserves indices; captured-table rendering also reproduces the same
+sky, road, dashboard, and mirror color roles. The remaining synchronized differential therefore
+separates simulation from rendering rather than revisiting palette realization. →
+`docs/open-work.md` §Blocking.
 
 ⭐⭐ **Stage A is done and measured: the Amiga display path works.** The port takes the machine
 over, brings up 512×320 in 4 bitplanes hires interlaced and displays Target 1's captured Macintosh

@@ -30,10 +30,16 @@ a loud stop. A then closes the planned transmission-state slice: Mac virtual `$0
 transmission gate from 0 to 1, and remains at depth 93 through 50/50 frames without a loud stop.
 The deliberate control matrix has reached no new compatibility boundary. The extended Macintosh
 run now reaches driving, raises the measured trap floor from 51 to 63, and reads a 512×320 front
-window above the separate 512×342 surface. Next capture the same named driving state on both
-machines and compare the 4-bit chunky indices plus active ColorTable before displayed RGB. The
-first mismatch then belongs unambiguously to simulation/rendering, color realization, or final
-presentation. Do not return to straight-line accelerator soaking or exhausted PICT/palette work.
+window above the separate 512×342 surface. An initial unsynchronised capture has already closed
+the color-realization branch: the Macintosh and Amiga source RGB tables match entry for entry, as
+do their destination/device RGB tables; each machine gives source and destination the same
+`ctSeed`; and both live copies are index-preserving `srcCopy` operations over exactly
+`(0,0)-(342,512)`. Rendering the captured packed pixels through the captured destination tables
+also gives the same light-blue sky, blue horizon band, dark road, and gray dashboard on both
+machines. The old pink-road/salmon-car frame is not produced by the current build. Next synchronize
+vehicle, input, and frame boundary and compare the packed indices themselves. The first mismatch
+then belongs to simulation or rendering, not palette realization or Amiga bitplane order. Do not
+return to straight-line accelerator soaking or exhausted PICT/palette work.
 
 The key chart labels Escape “Menu Options,” which exposed a real input gap: the driving loop does
 not call `GetNextEvent`, so each CIA keyboard edge updates the corresponding bit in the full

@@ -41,6 +41,14 @@ commands 2
       printf "  destination Window Manager seed=%u\n", *(unsigned int*)s_windowManagerColors
       dump binary memory ../tmp/driving-copy-destination.ctab s_windowManagerColors s_windowManagerColors+136
     end
+    set $i = 0
+    while $i < 8
+      if s_windows[$i].used && destinationBitmap == s_windows[$i].window+2
+        printf "  destination window slot=%u seed=%u\n", $i, *(unsigned int*)s_windowManagerColors
+        dump binary memory ../tmp/driving-copy-destination.ctab s_windowManagerColors s_windowManagerColors+136
+      end
+      set $i = $i+1
+    end
   end
   if $calls >= 12
     detach

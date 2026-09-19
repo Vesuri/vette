@@ -852,15 +852,17 @@ original Main and Traffic segments.
 
 `amiga/driving_dynamic_copybits.gdb` shows that remaining compatibility work is twelve repeated
 `srcCopy` operations between the same two PixMaps, each covering the complete
-`(0,0)-(342,512)` rectangle. Their color-table seeds differ and the resulting packed-byte map is
-not identity, so a raw copy would be incorrect. `blockMove` now transfers aligned data as
-longwords in both overlap directions, and the full-row `CopyBits` path treats equal-stride mapped
-rectangles as one contiguous span rather than restarting address calculation for 342 rows. The
-same twelve calls fall from 138 to 126 ticks, about nine percent. Dynamic samples now land in the
-contiguous palette-map loop itself; row setup and partial-frame C2P are no longer the explanation.
-Explicitly mapping four bytes per iteration repeats at exactly 126 ticks and is removed; the
-compiler's existing loop is already equivalent for this workload. The exact intro differential
-remains unchanged.
+`(0,0)-(342,512)` rectangle. The earlier probe compared stale setup state and incorrectly reported
+different color-table seeds. Extending it to identify the destination window proves the live source
+GWorld and destination window have the same seed, both on System 6 (`$527`) and on the port (`21`),
+so these calls preserve their four-bit indices. The source RGB tables match between machines entry
+for entry, as do the destination/device tables. Rendering each captured packed source through its
+captured destination table produces the same color roles: light-blue sky, blue horizon band, dark
+road, gray dashboard, and the same mirror colors. This rules out active palette realization,
+chunky-to-planar bit order, and seed-driven `CopyBits` remapping as explanations for any remaining
+driving-scene difference. `tools/render_mac_chunky.py` makes the binary-ColorTable rendering
+repeatable. The next differential must synchronize vehicle, input, and frame boundary and compare
+the renderer-authored packed indices.
 
 Resolving the remaining resident-code samples shows that they are not compatibility overhead:
 `Main+$5208/$5246/$5266` are perspective division and clipping, `Main+$5A34/$5A92/$5D6A` are
