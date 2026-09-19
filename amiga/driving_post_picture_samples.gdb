@@ -24,7 +24,7 @@ commands 2
   silent
   set $last_tick = g_macTicks
   set $samples = $samples+1
-  printf "post-picture sample[%u] elapsed=%u pc=$%08x\n", $samples, g_macTicks-$start_tick, *(unsigned int*)($sp+34)
+  printf "post-picture sample[%u] elapsed=%u active=%u task=$%08x pc=$%08x\n", $samples, g_macTicks-$start_tick, g_macVBLCallbackActive, g_macVBLCallbackTask, *(unsigned int*)($sp+34)
   continue
 end
 

@@ -49,10 +49,17 @@ tick. Larger pictures still use fresh allocations.
 `driving_frame_phases.gdb` now divides the wait at original-code boundaries: the first 33 pictures
 finish after 177 ticks, all 38 after 384, and the dynamic-renderer gate at `Main+$286A` is reached
 after 773 ticks without completing the frame. Do not keep treating PICT as the entire bottleneck;
-the 389-tick gap after the initial pictures is mostly due VBL work, not straight-line main setup.
+the 389-tick gap after the initial pictures is mostly further compatibility drawing inside later
+main-path routines, not the already-returned straight-line picture batch.
 `driving_post_picture_samples.gdb` finds 16 of 19 samples back inside the indexed PICT decoder, two
-in complete-frame conversion, and one in clearing. Identify and optimize the driving callback's
-repeated PICT geometry before profiling the dynamic renderer itself.
+in complete-frame conversion, and one in clearing. A repeat with explicit state shows all 19 have
+`g_macVBLCallbackActive == 0`: these are later synchronous main-path PICTs, not callback work.
+`driving_post_picture_picts.gdb` identifies the costly case as 512-pixel 4-bit strips whose
+horizontal mapping is 1:1 while their enclosing frame scales vertically from 157 to 156 rows. A
+retained horizontal packed-row path preserves the vertical mapping and improves the milestone
+times from 177/384/773 to 155/346/503 ticks. The exact intro differential remains pixel-perfect.
+The next bounded run should now profile the dynamic renderer and try to reach the second loop-entry
+hit that presents the first complete frame.
 
 The MAME A-trap log remains a measured reference-run inventory → `docs/trap-log.md`,
 but Stage C has proved that it is **not an exact standalone-port first-use script**. The port has

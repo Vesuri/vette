@@ -1668,6 +1668,60 @@ static bool drawIndexedPictureBits(const uint8_t* picture, uint32_t size, uint32
         }
     }
 
+    // A vertically scaled PICT can still be copied as packed rows when both
+    // horizontal mappings are 1:1.  The driving view uses 512-pixel-wide
+    // 4-bit strips in a 157->156 vertical mapping; falling through to the
+    // generic pixel loop performed two coordinate divisions for every pixel
+    // even though sourceX is only a translation of x.
+    bool horizontallyUnscaled = valid && pixelSize == 4
+        && frameRight - frameLeft == targetRight - targetLeft
+        && rasterRight - rasterLeft == copyRight - copyLeft;
+    if (!usedPackedRows && horizontallyUnscaled) {
+        int16_t translatedRasterLeft = (int16_t)(targetLeft + rasterLeft - frameLeft);
+        int16_t packedLeft = translatedRasterLeft;
+        int16_t packedRight = (int16_t)(targetLeft + rasterRight - frameLeft);
+        if (packedLeft < targetLeft) packedLeft = targetLeft;
+        if (packedLeft < mapLeft) packedLeft = mapLeft;
+        if (packedLeft < translatedRasterLeft + sourceLeft - copyLeft)
+            packedLeft = (int16_t)(translatedRasterLeft + sourceLeft - copyLeft);
+        if (packedRight > targetRight) packedRight = targetRight;
+        if (packedRight > mapRight) packedRight = mapRight;
+        if (packedRight > translatedRasterLeft + sourceRight - copyLeft)
+            packedRight = (int16_t)(translatedRasterLeft + sourceRight - copyLeft);
+        int16_t packedSourceLeft = (int16_t)(copyLeft + packedLeft - translatedRasterLeft);
+        if (packedLeft >= packedRight) {
+            usedPackedRows = true;
+        } else if (((packedSourceLeft - sourceLeft) & 1) == 0
+                   && ((packedLeft - mapLeft) & 1) == 0
+                   && ((packedRight - packedLeft) & 1) == 0) {
+            uint16_t copyBytes = (uint16_t)(packedRight - packedLeft) >> 1;
+            for (int16_t y = targetTop; y < targetBottom; ++y) {
+                if (y < mapTop || y >= mapBottom) continue;
+                int16_t pictureY = (int16_t)(frameTop + multiplyDivide(
+                    (uint16_t)(y - targetTop), (uint16_t)(frameBottom - frameTop),
+                    (uint16_t)(targetBottom - targetTop)));
+                if (pictureY < rasterTop || pictureY >= rasterBottom) continue;
+                int16_t sourceY = (int16_t)(copyTop + multiplyDivide(
+                    (uint16_t)(pictureY - rasterTop), (uint16_t)(copyBottom - copyTop),
+                    (uint16_t)(rasterBottom - rasterTop)));
+                if (sourceY < sourceTop || sourceY >= sourceBottom) continue;
+                uint8_t* source = pixels
+                    + multiplyUnsigned16((uint16_t)(sourceY - sourceTop), rowBytes)
+                    + (uint16_t)(packedSourceLeft - sourceLeft) / 2;
+                uint8_t* destination = destinationPixels
+                    + multiplyUnsigned16((uint16_t)(y - mapTop), destinationRowBytes)
+                    + (uint16_t)(packedLeft - mapLeft) / 2;
+                if (pixelsMapped) {
+                    for (uint16_t x = 0; x < copyBytes; ++x) destination[x] = source[x];
+                } else {
+                    for (uint16_t x = 0; x < copyBytes; ++x)
+                        destination[x] = packedColorMap[source[x]];
+                }
+            }
+            usedPackedRows = true;
+        }
+    }
+
     if (valid && !usedPackedRows) {
         for (int16_t y = targetTop; y < targetBottom; ++y) {
             if (y < mapTop || y >= mapBottom) continue;

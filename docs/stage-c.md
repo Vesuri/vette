@@ -738,12 +738,23 @@ before the still-unfinished dynamic renderer begins.
 
 `amiga/driving_post_picture_samples.gdb` explains that apparent 389-tick gap. Sixteen of 19 samples
 are still in `drawIndexedPictureBits` or its PackBits expansion, two are in complete-frame
-chunky-to-planar conversion, and one is in `memset`. Since the main routine has already returned
-from its last initial `DrawPicture`, this work is being performed by due VBL callbacks delivered at
-subsequent trap returns. Slow compatibility drawing advances emulated time, which makes more
-three-tick callbacks due; their drawing then delays the straight-line setup further. The next
-measurement must identify the callback's repeated PICT geometry and optimize that actual scaled
-path, rather than the already-completed initial panorama batch.
+chunky-to-planar conversion, and one is in `memset`. A repeated run recording the live callback
+state shows `g_macVBLCallbackActive == 0` for all 19 samples. The callback counter advances during
+the interval, but the sampled PICTs belong to later routines called synchronously by the main frame
+path, not to VBL callback execution. `amiga/driving_post_picture_picts.gdb` therefore activates
+after `Main+$256C` and records those later rasters directly; callback scheduling is not an
+optimization target on this evidence.
+
+That geometry probe finds six small unscaled 8-bit tiles followed by a 4-bit, 512-pixel-wide image
+split into 20-row strips. Its horizontal mapping is exactly 1:1, but the enclosing vertical frame
+maps 157 source rows to 156 destination rows. The former fast path required both axes to be
+unscaled, so this one-row vertical adjustment sent every pixel through two horizontal coordinate
+divisions. The indexed decoder now preserves the exact per-row vertical mapping while copying each
+already palette-mapped horizontal row as packed bytes. On the identical milestone probe, the first
+picture batch falls from 177 to 155 ticks, all initial pictures from 384 to 346, and entry to the
+dynamic renderer from 773 to 503 ticks: 270 ticks, or about 35 percent of the measured time to that
+gate, removed. The exact intro differential still passes all 163,840 pixels, both planar buffers,
+and the copper palette.
 
 The trap-address table is stateful. The observed `GetTrapAddress`/`SetTrapAddress` pair now records
 the game's replacement for `$A9F4 ExitToShell`; routing a later invocation through that replacement
