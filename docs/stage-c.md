@@ -756,6 +756,17 @@ dynamic renderer from 773 to 503 ticks: 270 ticks, or about 35 percent of the me
 gate, removed. The exact intro differential still passes all 163,840 pixels, both planar buffers,
 and the copper palette.
 
+`amiga/driving_dynamic_samples.gdb` begins at `Main+$286A` and samples only the remaining dynamic
+phase. Before presentation was gated, 14 of 24 samples were in `VetteScreen::presentMacFrame`, nine
+were in `CopyBits`, and only one was in resident game code. QuickDraw traps were therefore causing
+dirty rectangles from an incomplete driving iteration to be converted at ordinary trap returns,
+despite the newly proven frame boundary. Driving now accumulates those bounds without presenting
+and performs one full conversion only at the next `Main+$1FEA` loop entry. Non-driving scenes keep
+their existing trap-return cadence. The milestone times improve again, from 155/346/503 to
+112/301/428 ticks, while the exact intro differential remains unchanged. A repeat of the dynamic
+sampler contains no presentation samples: most stops are now in `CopyBits`, with the rest in the
+original Main and Traffic segments.
+
 The trap-address table is stateful. The observed `GetTrapAddress`/`SetTrapAddress` pair now records
 the game's replacement for `$A9F4 ExitToShell`; routing a later invocation through that replacement
 remains part of completing the trap bridge.

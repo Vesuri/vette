@@ -60,6 +60,11 @@ retained horizontal packed-row path preserves the vertical mapping and improves 
 times from 177/384/773 to 155/346/503 ticks. The exact intro differential remains pixel-perfect.
 The next bounded run should now profile the dynamic renderer and try to reach the second loop-entry
 hit that presents the first complete frame.
+`driving_dynamic_samples.gdb` initially found 14 of 24 samples in partial-frame C2P, nine in
+`CopyBits`, and one in game code. Driving presentation is now suppressed during construction and
+performed only at the proven next-loop boundary; milestone times improve again from 155/346/503 to
+112/301/428 ticks. The repeat contains no C2P samples and is dominated by `CopyBits`, followed by
+resident Main/Traffic code. Measure the dynamic `CopyBits` geometry next.
 
 The MAME A-trap log remains a measured reference-run inventory → `docs/trap-log.md`,
 but Stage C has proved that it is **not an exact standalone-port first-use script**. The port has

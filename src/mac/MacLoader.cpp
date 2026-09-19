@@ -4012,13 +4012,17 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
 {
     uint32_t pc = read32(frame + 2);
     uint16_t trap = read16((const uint8_t*)pc);
+    bool drivingFrameComplete = false;
     // Main+$29C6 returns directly to Main+$1FD2 while driving remains active.
     // MaxMem at +$1FEA is the first trap in that loop: its first occurrence
     // begins frame 1 and every later occurrence proves that the preceding
     // frame is complete.  Direct 68k stores bypass the QuickDraw dirty calls,
     // so expose the complete surface here rather than polling it mid-frame.
     if (trap == 0xa04d && pc == (uint32_t)(s_segments[1].begin + 0x1fea)) {
-        if (s_drivingFrameStarted) markDirtyBounds(0, 0, 320, 512);
+        if (s_drivingFrameStarted) {
+            markDirtyBounds(0, 0, 320, 512);
+            drivingFrameComplete = true;
+        }
         else s_drivingFrameStarted = true;
     } else if (trap == 0xa9b4 && pc == (uint32_t)(s_segments[1].begin + 0x29e6))
         s_drivingFrameStarted = false;
@@ -4026,7 +4030,11 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
     // due VBL work.  Restricting this to SystemTask left callbacks frozen while
     // the road renderer made only QuickDraw/BlockMove calls.
     scheduleVBLTask();
-    presentMacRuntime();
+    // QuickDraw traps inside a driving iteration describe intermediate
+    // construction, not displayable frames.  Accumulate their dirty bounds
+    // and convert only at the proven loop boundary above.  Other scenes keep
+    // the ordinary trap-return presentation cadence.
+    if (!s_drivingFrameStarted || drivingFrameComplete) presentMacRuntime();
     if (trap == 0xa02e) {                    // _BlockMove: A0, A1, D0; registers preserved
         blockMove((uint8_t*)regs[8], (uint8_t*)regs[9], regs[0]);
         ++g_blockMoveCount;
