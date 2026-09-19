@@ -7,16 +7,20 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — current compatibility boundary
 
-⭐ **HEAD OF QUEUE: take a different documented in-driving branch, starting with F1 “Helicopter
-View Left.”** Complete frames are presented at the exact original `Main+$1FD2` loop boundary;
+⭐ **HEAD OF QUEUE: continue the documented in-driving coverage matrix after F1 “Helicopter View
+Left.”** Complete frames are presented at the exact original `Main+$1FD2` loop boundary;
 sustained driving covers 6,422 Macintosh ticks and 143/143 frames at implemented depth 93 without
 a loud stop. Corrected Escape takes the shipped Menu Options exit at tick 1,864 after 32/32 frames.
 The physical-style queued down/up regression proves both edges are consumed after exit, but the
 settled result remains at depth 94 without a loud stop: the upper 198-row driving viewport is
 cleared, the dashboard remains, and execution waits in the supported outer event loop. That branch
-is closed for compatibility discovery. Use the same bounded edge harness with the documented F1
-view change, then other materially different controls, until execution reaches new code or the
-next loud stop. Do not return to straight-line accelerator soaking or exhausted PICT/palette work.
+is closed for compatibility discovery. F1 is also now measured: it remains in driving at depth 93,
+presents 65/65 frames without a loud stop, and its 40th presented surface differs from the
+frame-matched baseline in 53,940 of 81,920 packed bytes. The view branch therefore executed; this
+is not merely proof that a key was queued. Continue with the other materially different documented
+controls—front dash/view changes, pause, sound and transmission state—until one reaches new code or
+the next loud stop. Do not return to straight-line accelerator soaking or exhausted PICT/palette
+work.
 
 The key chart labels Escape “Menu Options,” which exposed a real input gap: the driving loop does
 not call `GetNextEvent`, so the CIA interrupt's non-consuming raw-key state is translated into the

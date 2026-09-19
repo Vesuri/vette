@@ -414,6 +414,13 @@ capture 180 ticks after exit is byte-identical to the first event-loop capture
 loud stop occurs. Escape has therefore reached a supported waiting state rather than another
 compatibility requirement. `amiga/menu_options_capture.gdb` records that boundary.
 
+The same queued-edge harness with raw Amiga F1 (`$50`, Macintosh virtual `$7A`) takes the key
+chart's “Helicopter View Left” branch without leaving driving or encountering another trap. A
+bounded run reaches 3,253 ticks and 65 queued/presented frames at depth 93. Frame-matched captures
+at presentation 40 prove a real renderer-state change: the ordinary surface hashes to `b2020be4…`,
+the F1 surface to `4ec4efc8…`, and 53,940 of their 81,920 packed bytes differ. The paired
+`driving_baseline_capture.gdb` and `driving_f1_capture.gdb` scripts make that coverage repeatable.
+
 This preserves the original code flow without touching Amiga low memory. More shadows are added
 only when execution reaches them; the inventory shows that most remaining references are `Ticks`,
 mouse/key state, and repeated `GrayRgn` reads.

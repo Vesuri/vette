@@ -250,9 +250,10 @@ The shipped key chart labels Escape “Menu Options.” Correcting a byte-local 
 makes physical Escape take that original transition at tick 1,864 after 32 complete frames. The
 path exits driving, reaches implemented depth 94 and encounters no new loud stop. The next step is
 confirmed with a diagnostic-only physical down/up pair through the ordinary edge queue: the settled
-state remains supported and trap-free. The next discovery step is a materially different documented
-in-driving branch, beginning with F1 “Helicopter View Left,” followed one bounded transition at a
-time until the next compatibility boundary. → `docs/open-work.md` §Blocking.
+state remains supported and trap-free. F1 “Helicopter View Left” is also measured: a frame-matched
+capture changes 53,940 of 81,920 packed bytes while driving remains trap-free at depth 93. Continue
+the documented control matrix one bounded transition at a time until the next compatibility
+boundary. → `docs/open-work.md` §Blocking.
 
 ⭐⭐ **Stage A is done and measured: the Amiga display path works.** The port takes the machine
 over, brings up 512×320 in 4 bitplanes hires interlaced and displays Target 1's captured Macintosh
