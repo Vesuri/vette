@@ -24,6 +24,7 @@ extern uint8_t vette_resources[], vette_resources_end[];
 
 void vette_line_a_handler();
 void vette_call_mac_code(void* entry, void* a5);
+extern volatile uint16_t g_macFramesPresented;
 #ifdef VETTE_MAPPED_COPY_ASM
 void vetteMappedCopyRowsAsm(const uint8_t* source, uint8_t* destination,
                             const uint8_t* map, uint32_t rowBytes, uint32_t height,
@@ -52,6 +53,12 @@ volatile uint16_t g_macVBLCallbackActive = 0;
 volatile uint16_t g_introAudioState = 0;
 volatile uint32_t g_introAudioBytes = 0;
 volatile uint16_t g_introAudioPeriod = 0;
+#ifdef VETTE_PROBE
+volatile uint32_t g_probePicture140TrapPC = 0;
+volatile uint32_t g_probePicture140Return = 0;
+volatile uint32_t g_probePicture140Ticks = 0;
+volatile uint32_t g_probePicture140Frames = 0;
+#endif
 #ifdef VETTE_MAPPED_COPY_VERIFY
 volatile uint32_t g_mappedCopyAsmTicks = 0;
 volatile uint32_t g_mappedCopyCTicks = 0;
@@ -115,6 +122,8 @@ static bool s_mouseButtonDown;
 static uint8_t s_garageClickPhase;
 static uint8_t s_garageGearPhase;
 static bool s_garageTransitionSkipped;
+static bool s_garageRecoveryPictureLoaded;
+static bool s_garageRecoverySkipped;
 #endif
 
 struct WindowSlot {
@@ -353,7 +362,7 @@ static const TrapName s_trapNames[] = {
     {0xa03b,"TIME MANAGER","DELAY"},
     {0xa03c,"TEXT UTILITIES","CMPSTRING"}, {0xa23c,"TEXT UTILITIES","CMPSTRING"},
     {0xa43c,"TEXT UTILITIES","CMPSTRING"}, {0xa63c,"TEXT UTILITIES","CMPSTRING"},
-    {0xa033,"VERTICAL RETRACE","VINSTALL"},
+    {0xa033,"VERTICAL RETRACE","VINSTALL"}, {0xa034,"VERTICAL RETRACE","VREMOVE"},
     {0xa998,"RESOURCE MANAGER","USERESFILE"}, {0xa994,"RESOURCE MANAGER","CURRESFILE"},
     {0xaa46,"WINDOW MANAGER","GETNEWCWINDOW"}, {0xa91b,"WINDOW MANAGER","MOVEWINDOW"},
     {0xa915,"WINDOW MANAGER","SHOWWINDOW"}, {0xa916,"WINDOW MANAGER","HIDEWINDOW"},
@@ -3848,6 +3857,33 @@ static int16_t installVBLTask(uint8_t* task)
     return 0;
 }
 
+static int16_t removeVBLTask(uint8_t* task)
+{
+    if (!task) return -50;                   // paramErr
+    if (read16(task + 4) != 1) return -2;   // vTypErr
+
+    uint16_t index = 0;
+    while (index < s_vblTaskCount && s_vblTasks[index] != task) ++index;
+    if (index == s_vblTaskCount) return -1; // qErr: not in the queue
+
+    if (g_macVBLCallbackTask == (uint32_t)task && g_macVBLCallbackEntry) {
+        g_macVBLCallbackEntry = 0;
+        g_macVBLCallbackTask = 0;
+        g_macVBLCallbackA5 = 0;
+    }
+    for (uint16_t i = index + 1; i < s_vblTaskCount; ++i)
+        s_vblTasks[i - 1] = s_vblTasks[i];
+    --s_vblTaskCount;
+    s_vblTasks[s_vblTaskCount] = 0;
+    for (uint16_t i = 0; i < s_vblTaskCount; ++i)
+        write32(s_vblTasks[i], i + 1 < s_vblTaskCount ? (uint32_t)s_vblTasks[i + 1] : 0);
+    write32(task, 0);
+
+    if (s_vblNextTask > index) --s_vblNextTask;
+    if (s_vblNextTask >= s_vblTaskCount) s_vblNextTask = 0;
+    return 0;
+}
+
 static void scheduleVBLTask()
 {
     if (!s_vblTaskCount || g_macVBLCallbackEntry || g_macVBLCallbackActive) return;
@@ -4224,6 +4260,18 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
 {
     uint32_t pc = read32(frame + 2);
     uint16_t trap = read16((const uint8_t*)pc);
+#ifdef VETTE_GARAGE_CLICK
+    if (trap == 0xa9bc && read16(userStack) == 140)
+        s_garageRecoveryPictureLoaded = true;
+#endif
+#ifdef VETTE_PROBE
+    if (trap == 0xa9bc && read16(userStack) == 140 && !g_probePicture140TrapPC) {
+        g_probePicture140TrapPC = pc;
+        g_probePicture140Return = read32(s_currentA5 - 0x2e9a);
+        g_probePicture140Ticks = g_macTicks;
+        g_probePicture140Frames = g_macFramesPresented;
+    }
+#endif
     bool drivingFrameComplete = false;
     bool drivingBoundary = trap == kDrivingBoundaryTrap
         && pc == (uint32_t)(s_segments[1].begin + 0x1fd2);
@@ -4658,6 +4706,11 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
         if (g_stageCDepth < 44) g_stageCDepth = 44;
         return 1;
     }
+    if (trap == 0xa034) {                    // VRemove(VBLTaskPtr in A0) -> OSErr in D0
+        regs[0] = (uint32_t)(int32_t)removeVBLTask((uint8_t*)regs[8]);
+        if (g_stageCDepth < 95) g_stageCDepth = 95;
+        return 1;
+    }
     if (trap == 0xaa46) {                    // GetNewCWindow(id, storage, behind) -> WindowPtr
         uint8_t* window = newColorWindow((int16_t)read16(userStack + 8),
                                          (uint8_t*)read32(userStack + 4),
@@ -4879,6 +4932,13 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
         if (!s_garageTransitionSkipped && s_garageClickPhase >= 3) {
             pressed = true;
             s_garageTransitionSkipped = true;
+        }
+        // The lake recovery picture waits in Main+$0FE2 for Button before it
+        // restores the port and returns.  Advance that shipped branch once so
+        // the deterministic collision run can expose what follows it.
+        if (s_garageRecoveryPictureLoaded && !s_garageRecoverySkipped) {
+            pressed = true;
+            s_garageRecoverySkipped = true;
         }
 #endif
         write16(userStack, pressed ? 1 : 0);

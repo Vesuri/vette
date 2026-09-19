@@ -7,104 +7,12 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — current compatibility boundary
 
-⭐ **HEAD OF QUEUE: exercise the first deterministic collision or course transition.**
-Complete frames are presented at the exact original `Main+$1FD2` loop boundary;
-sustained driving covers 6,422 Macintosh ticks and 143/143 frames at implemented depth 93 without
-a loud stop. Corrected Escape takes the shipped Menu Options exit at tick 1,864 after 32/32 frames.
-The physical-style queued down/up regression proves both edges are consumed after exit, but the
-settled result remains at depth 94 without a loud stop: the upper 198-row driving viewport is
-cleared, the dashboard remains, and execution waits in the supported outer event loop. That branch
-is closed for compatibility discovery. F1 is also now measured: it remains in driving at depth 93,
-presents 65/65 frames without a loud stop, and its 40th presented surface differs from the
-frame-matched baseline in 53,940 of 81,920 packed bytes. The view branch therefore executed; this
-is not merely proof that a key was queued. F5 “Front Dash” is measured too: it remains at depth 93
-through 70/70 frames and changes 31,214 packed bytes at the matched 40th presentation, removing the
-cockpit/dashboard overlay while retaining the forward road and mirror. P is now measured as well:
-Mac virtual `$23` dispatches through the game's live key table to `Initialize+$1862`, stops frame
-production at a complete-frame boundary, blanks the upper viewport while retaining the dashboard,
-and settles at depth 94 without a loud stop. S is now measured too: Mac virtual `$01` dispatches
-to `Main+$3134`, changes the game's own sound flag from 1 to 0, calls the resident `sound` segment
-at offsets `$021C`/`$024C`, and remains in active driving through 50/50 frames at depth 93 without
-a loud stop. A then closes the planned transmission-state slice: Mac virtual `$00` dispatches to
-`Main+$31AA`, changes the current car's automatic-shift field from 1 to 0, advances the game's
-transmission gate from 0 to 1, and remains at depth 93 through 50/50 frames without a loud stop.
-D “Damage Indicator” is now measured too: raw Amiga `$22` becomes Macintosh virtual `$02` and
-dispatches to `Main+$37B4`. Original code changes its A5-relative flag from 0 to 1, sets an expiry
-exactly 6,000 ticks ahead, and stays in active driving at depth 93. At the frame-matched 40th
-presentation it changes 4,637 packed bytes in the lower-right dashboard region with no palette
-change or new trap. This is a game-owned HUD transition, not a port-authored dialog. The deliberate
-control matrix has reached no new compatibility boundary. The extended Macintosh
-run now reaches driving, raises the measured trap floor from 51 to 63, and reads a 512×320 front
-window above the separate 512×342 surface. The synchronized driving differential selects Corvette
-ZR-1 on both machines, holds keypad 8 before the first driving iteration, and captures the first
-populated full-window `srcCopy`. **All 175,104 live pixels now match exactly**, including the
-rear-view scene. Source RGB tables match entry for entry, as do destination/device tables; each
-machine gives source and destination the same `ctSeed`; and both copies preserve indices. The old
-pink-road/salmon-car frame is not produced by the current build.
-
-The former 774-pixel mirror strip was a general indexed-PICT scaling error. Traffic copies a
-78×168 rear-view picture from the unused lower portion of the 512×512 GWorld. Its PICT frame is
-77 rows high and its destination is 78 rows high. The port sampled scaled pixels at their leading
-edge and duplicated source row zero at the top; System 6 samples pixel centres and places the
-duplicate in the interior. `drawIndexedPictureBits` now uses that measured rule. The initially
-suspected FRED state is identical on both machines: `A5-$3A7A = 100`, `A5-$03C4 = 1`, and
-`A5-$0350 = 196`; both call the Traffic fill with 80 rows. The reference `d1=78` observation was
-the loop counter after two rows, not an input-height difference. Frames two through four differ by
-only 18–68 moving lower-cockpit pixels after the named boundary. Do not return to palette work.
-
-The straight trajectory is now a deliberate Lake Merced collision test, not blind accelerator
-soaking. The previous 900-frame run was stationary: the current-car record stayed at
-`(12608,-6,6112)`, speed and gear stayed zero, and keypad 8's `Main+$2F1A` handler merely set the
-throttle word at `car+32`. Words 66/68 are engine RPM state; `Traffic+$3720` maps word 68 to the
-per-frame `BogasPlay` pitch. They were never position evidence.
-
-The deterministic route now waits until the shipped start state permits gear changes, holds the
-top-row `+` upshift through one original KeyMap scan, releases it as soon as `car+28` becomes 1,
-then holds keypad 8. This timing is required: `Traffic+$51FE` rejects gear changes before start
-state 3, and the original key-repeat latch would otherwise consume the only edge during the
-BUCKLE UP / GET READY countdown. Top-row `1` is not used because the active control-mode branch of
-`Main+$32CC` treats it as a steering command. At presented frame 80 the source record proves real
-motion: X has changed from 12608 to 12521, speed (`car+26`) is 14, gear is 1, throttle is 1, brake
-is 0, and the selected first-gear ratio is 8. Automatic Shift remains enabled (`car+46 = 1`); do
-not inject A. `amiga/driving_gear1_dispatch.gdb`, `driving_drivetrain.gdb`, and
-`driving_sound_event.gdb` retain the measured boundaries. Continue this moving path until the first
-post-start sampled effect or loud stop, then identify the exact Traffic caller and instrument
-before implementing anything.
-
-The key chart labels Escape “Menu Options,” which exposed a real input gap: the driving loop does
-not call `GetNextEvent`, so each CIA keyboard edge updates the corresponding bit in the full
-Macintosh KeyMap while also remaining in the event queue. That timing matters beyond driving
-frames: P enters an original wait that reads Page-0 KeyMap directly without making another Toolbox
-call. Refreshing only at the frame boundary made the released key permanent there. The first
-probe also exposed a byte-local bit-order bug: the port wrote virtual Escape `$35` as byte 6 bit
-`$04`, but the game's scanner at `Main+$2DD2` consumes each byte LSB first, making that virtual key
-`$32`. Correct Escape is byte 6 bit `$20`, and keypad 8 `$5B` is byte 11 bit `$08`. The dedicated
-probes now prove both: keypad 8 reaches the original scanner as virtual `$5B`, and held Escape takes
-the Menu Options exit. `INPUT_PROBE_EVENT_RAW_KEY` additionally injects one diagnostic-only
-physical-style down/up pair through the CIA queue's own state/update helper, with the release timed
-at the exact exit boundary. Production builds never define it.
-
-The MAME A-trap log remains a measured reference-run inventory → `docs/trap-log.md`,
-but Stage C has proved that it is **not an exact standalone-port first-use script**. The port has
-already executed initialization calls absent from, or much later in, that 63-row ordering. Treat
-63 and the intro's 36 as floors until the tracer omission is explained. Three earlier questions
-are nevertheless answered:
-the game patches exactly one trap (`_ExitToShell`), `%A5Init` calls exactly one (`_BlockMove`), and
-`QDExtensions` is dispatched by `D0` with Target 1 needing selectors 0 (`NewGWorld`) and
-1 (`LockPixels`).
-
-1. ✅ **The copy-protection requester is removed in the port.** It first fired after Course One was
-   accepted. `Main+$05FE` is now replaced only after verifying the exact shipped 12-byte prologue;
-   the replacement sets `protection passed = -1`, clears the retry flag, and returns. This is the
-   state left by the correct-answer path, without implementing `GetDItem`, text editing, modal
-   events, or persistent writable resources. ⚠ Ground truth still runs the **unpatched** original.
-
-2. ⚠ **`512×323` vs `512×320` is unreconciled.** The intro's first `DrawPicture` destination rect
-   is 512 wide by **323** tall `[MEASURED]`; `docs/mac-hardware.md` records the game painting
-   **320** rows at (64,92). Three rows are unexplained — clipped, or the recorded 320 is short.
-   Settle it before the Stage A viewport geometry is fixed, by capturing the GWorld and the screen
-   at frame 1758 and diffing the row extents. The separate driving-size question is closed and does
-   not answer these three intro rows.
+⭐ **HEAD OF QUEUE: reconcile the intro's 512×323 DrawPicture rectangle with the 512×320 displayed crop.**
+The first intro DrawPicture destination is measured as 512×323, while the verified screen crop is
+512×320 at Macintosh global (64,91) and matches all 163,840 reference pixels. Capture the source
+GWorld and destination screen at the named intro boundary, identify exactly which three rows are
+clipped or excluded, and record the actual QuickDraw clipping rule. Do not change the established
+512×320 driving/display geometry on inference alone.
 
 ## ⭐⭐ TARGET 1 — the complete intro, run by the game's own code — COMPLETE
 

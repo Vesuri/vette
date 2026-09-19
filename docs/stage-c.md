@@ -949,6 +949,26 @@ the exact Traffic caller, instrument, and framebuffer. `amiga/driving_accelerato
 `driving_gear1_dispatch.gdb`, `driving_drivetrain.gdb`, `driving_sound_event.gdb`, and the noisier
 `driving_sound_trace.gdb` preserve the evidence.
 
+The corrected route reaches the Lake Merced water collision and displays the game's own tow-truck
+recovery artwork. A probe on the actual `_GetPicture` trap records PICT 140 at the resident wrapper
+`Traffic+$663C`; that wrapper's saved return identifies the dynamic request at `Main+$0FD6`, with
+the picture ID supplied in `D7`. The surrounding shipped routine creates and shows its window,
+draws the picture, then waits at `Main+$0FE2` on `_Button` before restoring the graphics state and
+returning. This is not a host framebuffer or a port-authored requester.
+
+`GARAGE_CLICK=1` now answers that one recovery-screen `Button` poll after PICT 140 has actually
+loaded, leaving production and ordinary `SKIP_INTRO=1` input unchanged. The first click-through
+reached `$A034 VRemove` at `Main+$1FC6`: the original code passes its driving VBL record in `A0`
+before returning to the outer loop. The Vertical Retrace bridge now removes that caller-owned
+record, repairs its queue links and rotating scheduler index, and cancels the same record if it was
+selected but not yet dispatched. On the target A1200 configuration the repeated route reaches
+implemented depth 95, leaves driving disarmed, and continues without a loud stop through Macintosh
+tick 8,773. This closes the first deterministic collision/transition target.
+
+`amiga/driving_collision_picture.gdb` retains the low-overhead PICT/caller measurement. Its
+probe-only capture avoids a conditional debugger breakpoint on every Toolbox trap, which slowed
+the game enough to miss the event at the previous wall-time ceiling.
+
 The trap-address table is stateful. The observed `GetTrapAddress`/`SetTrapAddress` pair now records
 the game's replacement for `$A9F4 ExitToShell`; routing a later invocation through that replacement
 remains part of completing the trap bridge.

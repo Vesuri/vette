@@ -252,7 +252,8 @@ PROBE_SYMS += g_mappedCopyAsmTicks g_mappedCopyCTicks g_mappedCopyVerifyCalls \
 endif
 endif
 ifdef PROBES
-PROBE_SYMS +=
+PROBE_SYMS += g_probePicture140TrapPC g_probePicture140Return \
+              g_probePicture140Ticks g_probePicture140Frames
 endif
 ifdef FPSCOUNT
 PROBE_SYMS +=
