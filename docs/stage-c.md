@@ -785,17 +785,19 @@ line/polygon construction, and `Traffic+$68B4..$68BA` enters an original byte ra
 `Traffic+$6A62` is original transform math. Those paths remain byte-for-byte shipped code. The
 remaining compatible hotspot is therefore the full-surface packed-byte palette translation.
 
-That translation now has a separately callable clean-C oracle and a 68000 twin. The twin keeps
-the 256-byte map in `A2`, performs four independent table lookups per `DBF`, and handles the final
-zero to three bytes separately; `MAPPED_COPY_C=1` retains the oracle build. An isolated Amiga
-executable exercises 87,551 bytes (the maximum surface span minus one, deliberately selecting the
-three-byte tail) plus a zero-length call and traps on any mismatch; it passes under the local
-68000 runner. `VERIFY=1 PROBES=1` additionally runs C and assembly into the same destination for
-every eligible real `CopyBits`, preserves the C result, byte-compares it after assembly, and
-accumulates Macintosh ticks for both arms. `amiga/mapped_copy_verify.gdb` stops after three such
-completed calls (262,656 compared bytes); more repeats only lengthen the doubled verifier. The
-in-game differential and any performance claim remain pending until that event-driven stop reports
-zero failures; do not infer a speedup from instruction shape alone.
+That translation now has a separately callable clean-C oracle and a row-aware 68000 twin. The twin
+keeps the 256-byte map in `A2`, performs four independent table lookups per `DBF`, handles the final
+zero to three bytes separately, and applies source and destination modulos between rows;
+`MAPPED_COPY_C=1` retains the oracle build. An isolated Amiga executable exercises a contiguous
+87,551-byte span, a 342-row strided copy with different source and destination padding, and a
+zero-height call; it passes under the local 68000 runner. `VERIFY=1 PROBES=1` additionally runs C
+and assembly into the same destination for every eligible real `CopyBits`, preserves the C result,
+byte-compares it after assembly, and accumulates Macintosh ticks for both arms. The event-driven
+target-A1200 run compared 245,760 bytes over three calls with zero failures and measured 20 ticks
+for C versus 15 for assembly, a 25 percent reduction in the isolated translation cost. The normal
+build still passes the complete 163,840-pixel intro differential. Its first-frame milestones also
+improve from 112/301/428 to 107/298/420 ticks; the second loop-entry boundary remains unreached
+inside the same 60-second host ceiling.
 
 The trap-address table is stateful. The observed `GetTrapAddress`/`SetTrapAddress` pair now records
 the game's replacement for `$A9F4 ExitToShell`; routing a later invocation through that replacement

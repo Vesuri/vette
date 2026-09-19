@@ -1,26 +1,36 @@
 	.text
 	.even
-	.globl vetteMappedCopyAsm
+	.globl vetteMappedCopyRowsAsm
 
-| void vetteMappedCopyAsm(const uint8_t* source, uint8_t* destination,
-|                         const uint8_t* map, uint32_t count)
+| void vetteMappedCopyRowsAsm(const uint8_t* source, uint8_t* destination,
+|     const uint8_t* map, uint32_t rowBytes, uint32_t height,
+|     uint32_t sourceModulo, uint32_t destinationModulo)
 |
 | Translate each packed-pixel byte through a 256-entry table.  Four independent
-| lookups amortise DBF while the table stays in a2.  count is reduced to groups
-| of four, which is at most 21,888 for Vette's 512x342 GWorld and therefore fits
-| DBF's 16-bit counter without a 32-bit test in the hot loop.
-vetteMappedCopyAsm:
-	movem.l	d2-d5/a2,-(sp)
-	move.l	24(sp),a0
-	move.l	28(sp),a1
-	move.l	32(sp),a2
-	move.l	36(sp),d1
+| lookups amortise DBF while the table stays in a2.  The source and destination
+| pointers already advance by rowBytes in the inner loop; the two modulos move
+| them to the next row.  Vette's largest row/group counts fit DBF's 16-bit
+| counters, avoiding 32-bit tests in either hot loop.
+vetteMappedCopyRowsAsm:
+	movem.l	d2-d7/a2-a4,-(sp)
+	move.l	40(sp),a0
+	move.l	44(sp),a1
+	move.l	48(sp),a2
+	move.l	52(sp),d6
+	move.l	56(sp),d7
+	move.l	60(sp),a3
+	move.l	64(sp),a4
+	tst.l	d7
+	beq.s	5f
+	subq.l	#1,d7
+1:
+	move.l	d6,d1
 	move.l	d1,d0
 	andi.w	#3,d0
 	lsr.l	#2,d1
-	beq.s	2f
+	beq.s	3f
 	subq.l	#1,d1
-1:
+2:
 	moveq	#0,d2
 	moveq	#0,d3
 	moveq	#0,d4
@@ -33,16 +43,20 @@ vetteMappedCopyAsm:
 	move.b	0(a2,d3.w),(a1)+
 	move.b	0(a2,d4.w),(a1)+
 	move.b	0(a2,d5.w),(a1)+
-	dbf	d1,1b
-2:
+	dbf	d1,2b
+3:
 	tst.w	d0
 	beq.s	4f
 	subq.w	#1,d0
-3:
+6:
 	moveq	#0,d2
 	move.b	(a0)+,d2
 	move.b	0(a2,d2.w),(a1)+
-	dbf	d0,3b
+	dbf	d0,6b
 4:
-	movem.l	(sp)+,d2-d5/a2
+	adda.l	a3,a0
+	adda.l	a4,a1
+	dbf	d7,1b
+5:
+	movem.l	(sp)+,d2-d7/a2-a4
 	rts

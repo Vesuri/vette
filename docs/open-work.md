@@ -68,20 +68,14 @@ resident Main/Traffic code. Measure the dynamic `CopyBits` geometry next.
 `driving_dynamic_copybits.gdb` finds repeated non-identity `srcCopy` operations between the same
 two PixMaps over the complete `(0,0)-(342,512)` rectangle. Widening overlap-safe `blockMove` to
 longwords and mapping equal-stride full rows as one contiguous span reduces the same twelve calls
-from 138 to 126 ticks, about nine percent. Samples now land in the contiguous palette-map loop;
-explicit four-byte unrolling is neutral at 126 ticks and has been removed. Return to the genuine
-Main/Traffic share and the still-unreached second frame-boundary hit rather than retrying loop
-unrolling.
-The sampled Main/Traffic PCs are now resolved as genuine shipped projection, clipping, polygon,
-transform and traffic-raster code, so they are not port-side optimization seams. The contiguous
-mapped copy instead has a clean-C oracle plus an opt-out 68000 twin (`MAPPED_COPY_C=1`). Its
-four-lookup `DBF` loop passes an isolated 87,551-byte maximum-span-minus-one test and the zero-count
-case. Before pricing or treating it as an accepted target optimization, run
-`make clean && make SKIP_INTRO=1 GARAGE_CLICK=1 VERIFY=1 PROBES=1`, followed by
-`. ./env.sh && EXTRA_ARGS='--warp_mode=1' GDBSCRIPT=mapped_copy_verify.gdb ./diag_run.sh 90`;
-acceptance is three calls (262,656 compared bytes), zero failures, and an in-process C/asm tick
-ratio. Then rebuild without `VERIFY` and repeat the intro differential plus the first-frame phase
-probe.
+from 138 to 126 ticks, about nine percent. The remaining palette translation now uses a row-aware
+68000 helper with independent source and destination modulos. Its in-process differential compares
+245,760 bytes over three real calls with zero failures and measures 20 C ticks versus 15 assembly
+ticks on the target A1200 configuration. The complete intro differential remains exact, and the
+first-frame milestones improve from 112/301/428 to 107/298/420 ticks. The sampled Main/Traffic PCs
+are genuine shipped projection, clipping, polygon, transform and traffic-raster code rather than
+port-side seams. Return to that genuine share and the still-unreached second frame-boundary hit;
+do not retry local palette-loop variants.
 
 The MAME A-trap log remains a measured reference-run inventory → `docs/trap-log.md`,
 but Stage C has proved that it is **not an exact standalone-port first-use script**. The port has

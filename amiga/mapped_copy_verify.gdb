@@ -1,14 +1,14 @@
-# Stop at the fourth eligible full-surface mapped CopyBits, after three
-# same-process C/asm differential calls have completed.  Each call compares
-# all 87,552 bytes; more repeats only make this already-doubled probe unwieldy.
+# Stop after at least 200,000 mapped bytes have passed through the same-process
+# C/asm differential.  Counting bytes instead of calls covers both contiguous
+# full-surface copies and strided rectangles without assuming their geometry.
 # Requires VERIFY=1 PROBES=1 SKIP_INTRO=1 GARAGE_CLICK=1.
 set pagination off
 set confirm off
 
-break vetteMappedCopyAsm if g_mappedCopyVerifyCalls >= 3
+break vetteMappedCopyRowsAsm if g_mappedCopyVerifyBytes >= 200000
 commands 1
   silent
-  printf "mapped copy verify calls=%u failures=%u C=%u ticks asm=%u ticks\n", g_mappedCopyVerifyCalls, g_mappedCopyVerifyFailures, g_mappedCopyCTicks, g_mappedCopyAsmTicks
+  printf "mapped copy verify calls=%u bytes=%u failures=%u C=%u ticks asm=%u ticks\n", g_mappedCopyVerifyCalls, g_mappedCopyVerifyBytes, g_mappedCopyVerifyFailures, g_mappedCopyCTicks, g_mappedCopyAsmTicks
   detach
   quit
 end

@@ -25,8 +25,9 @@ extern uint8_t vette_resources[], vette_resources_end[];
 void vette_line_a_handler();
 void vette_call_mac_code(void* entry, void* a5);
 #ifdef VETTE_MAPPED_COPY_ASM
-void vetteMappedCopyAsm(const uint8_t* source, uint8_t* destination,
-                        const uint8_t* map, uint32_t count);
+void vetteMappedCopyRowsAsm(const uint8_t* source, uint8_t* destination,
+                            const uint8_t* map, uint32_t rowBytes, uint32_t height,
+                            uint32_t sourceModulo, uint32_t destinationModulo);
 #endif
 
 volatile uint16_t g_stageBState = 0;
@@ -55,6 +56,7 @@ volatile uint16_t g_introAudioPeriod = 0;
 volatile uint32_t g_mappedCopyAsmTicks = 0;
 volatile uint32_t g_mappedCopyCTicks = 0;
 volatile uint32_t g_mappedCopyVerifyCalls = 0;
+volatile uint32_t g_mappedCopyVerifyBytes = 0;
 volatile uint32_t g_mappedCopyVerifyFailures = 0;
 #endif
 char g_trapManager[24] = "";
@@ -573,44 +575,72 @@ static void blockMove(const uint8_t* source, uint8_t* destination, uint32_t coun
     }
 }
 
-static __attribute__((noinline)) void mappedCopyC(const uint8_t* source,
-                                                   uint8_t* destination,
-                                                   const uint8_t* map,
-                                                   uint32_t count)
+static __attribute__((noinline)) void mappedCopyRowsC(const uint8_t* source,
+                                                       uint8_t* destination,
+                                                       const uint8_t* map,
+                                                       uint32_t rowBytes,
+                                                       uint32_t height,
+                                                       uint32_t sourceModulo,
+                                                       uint32_t destinationModulo)
 {
-    while (count--) *destination++ = map[*source++];
+    while (height--) {
+        uint32_t count = rowBytes;
+        while (count--) *destination++ = map[*source++];
+        source += sourceModulo;
+        destination += destinationModulo;
+    }
 }
 
-static void mappedCopy(const uint8_t* source, uint8_t* destination,
-                       const uint8_t* map, uint32_t count)
+static void mappedCopyRows(const uint8_t* source, uint8_t* destination,
+                           const uint8_t* map, uint32_t rowBytes, uint32_t height,
+                           uint32_t sourceModulo, uint32_t destinationModulo)
 {
 #ifdef VETTE_MAPPED_COPY_VERIFY
-    // This helper is reached only for non-overlapping, full-surface srcCopy.
+    // This helper is reached only for non-overlapping palette-mapped srcCopy.
     // Run the C oracle and asm twin on identical source bytes and the same real
     // destination in one process.  Preserve the oracle output only for the
     // comparison; the 68000 has no data cache for that intervening copy to bias.
+    uint32_t count = 0;
+    for (uint32_t y = 0; y < height; ++y) count += rowBytes;
     if (count > sizeof(s_mappedCopyVerify)) {
         ++g_mappedCopyVerifyFailures;
-        mappedCopyC(source, destination, map, count);
+        mappedCopyRowsC(source, destination, map, rowBytes, height,
+                        sourceModulo, destinationModulo);
         return;
     }
     uint32_t before = g_macTicks;
-    mappedCopyC(source, destination, map, count);
+    mappedCopyRowsC(source, destination, map, rowBytes, height,
+                    sourceModulo, destinationModulo);
     g_mappedCopyCTicks += g_macTicks - before;
-    blockMove(destination, s_mappedCopyVerify, count);
+    const uint8_t* preservedSource = destination;
+    uint8_t* preservedDestination = s_mappedCopyVerify;
+    for (uint32_t y = 0; y < height; ++y) {
+        blockMove(preservedSource, preservedDestination, rowBytes);
+        preservedSource += rowBytes + destinationModulo;
+        preservedDestination += rowBytes;
+    }
     before = g_macTicks;
-    vetteMappedCopyAsm(source, destination, map, count);
+    vetteMappedCopyRowsAsm(source, destination, map, rowBytes, height,
+                           sourceModulo, destinationModulo);
     g_mappedCopyAsmTicks += g_macTicks - before;
     ++g_mappedCopyVerifyCalls;
-    for (uint32_t i = 0; i < count; ++i)
-        if (destination[i] != s_mappedCopyVerify[i]) {
-            ++g_mappedCopyVerifyFailures;
-            break;
-        }
+    g_mappedCopyVerifyBytes += count;
+    const uint8_t* compared = destination;
+    const uint8_t* expected = s_mappedCopyVerify;
+    for (uint32_t y = 0; y < height; ++y) {
+        for (uint32_t x = 0; x < rowBytes; ++x)
+            if (compared[x] != *expected++) {
+                ++g_mappedCopyVerifyFailures;
+                return;
+            }
+        compared += rowBytes + destinationModulo;
+    }
 #elif defined(VETTE_MAPPED_COPY_ASM)
-    vetteMappedCopyAsm(source, destination, map, count);
+    vetteMappedCopyRowsAsm(source, destination, map, rowBytes, height,
+                           sourceModulo, destinationModulo);
 #else
-    mappedCopyC(source, destination, map, count);
+    mappedCopyRowsC(source, destination, map, rowBytes, height,
+                    sourceModulo, destinationModulo);
 #endif
 }
 
@@ -2770,7 +2800,20 @@ static bool copyBits(const uint8_t* sourceBitmap, const uint8_t* destinationBitm
                                      destinationRowBytes);
             uint32_t contiguousBytes = multiplyUnsigned16(copyBytes, copyHeight);
             if (!colorsMapped) blockMove(source, destination, contiguousBytes);
-            else mappedCopy(source, destination, packedColorMap, contiguousBytes);
+            else mappedCopyRows(source, destination, packedColorMap,
+                                contiguousBytes, 1, 0, 0);
+            return true;
+        }
+        if (mode == 0 && colorsMapped && sourcePixels != destinationPixels) {
+            const uint8_t* source = sourcePixels
+                + multiplyUnsigned16((uint16_t)(packedSourceTop - sourceTop), sourceRowBytes)
+                + (uint16_t)(packedSourceLeft - sourceLeft) / 2;
+            uint8_t* destination = destinationPixels
+                + multiplyUnsigned16((uint16_t)(packedTop - destinationTop),
+                                     destinationRowBytes)
+                + (uint16_t)(packedLeft - destinationLeft) / 2;
+            mappedCopyRows(source, destination, packedColorMap, copyBytes, copyHeight,
+                           sourceRowBytes - copyBytes, destinationRowBytes - copyBytes);
             return true;
         }
         int16_t firstY = 0, lastY = (int16_t)copyHeight, stepY = 1;

@@ -232,6 +232,7 @@ PROBE_SYMS += g_introAudioState g_introAudioBytes g_introAudioPeriod
 ifneq ($(MAPPED_COPY_C),1)
 ifdef VERIFY
 PROBE_SYMS += g_mappedCopyAsmTicks g_mappedCopyCTicks g_mappedCopyVerifyCalls \
+              g_mappedCopyVerifyBytes \
               g_mappedCopyVerifyFailures
 endif
 endif
