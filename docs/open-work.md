@@ -5,35 +5,25 @@ that session touched). ⚠⚠ **This is a QUEUE, not a log:** an entry is **DELE
 closes it, and what the work taught goes in the doc that was wrong. `make todo` prints this file
 plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
-## Blocking — current loud stop
+## Blocking — current compatibility boundary
 
-⭐ **HEAD OF QUEUE: drive beyond the now-proven first frame and discover the next compatibility
-boundary.** The game has an exact completion edge at `Main+$1FD2`, but no Macintosh trap occurs on
-every pass. The port therefore byte-verifies the original eight-byte `TST.W`/`BEQ.W` pair, replaces
-its first word with private Line-A `$AFFF`, and emulates both original branches in the dispatcher.
-The first pass arms presentation; every later pass marks and presents exactly one complete 512×320
-surface. `driving_frame_phases.gdb` now reaches the first completion at 459 ticks after loop entry
-(picture milestones 106/297, dynamic renderer 420), and `driving_setup_boundary.gdb` measures the
-next completed frame 40 ticks later with queued and presented counts both advancing by one. The
-normal full-intro differential remains exact at 163,840/163,840 pixels. The old `$1FEA MaxMem`
-marker was wrong because the loop often branches around it; do not restore it or infer completion
-from partial dirty pixels. Next, run sustained controlled driving until the next loud stop or game
-transition, capturing the stop/event rather than returning to already-exhausted local PICT and
-palette-loop variants.
+⭐ **HEAD OF QUEUE: capture and drive the Menu Options state reached from Escape.** Complete frames
+are presented at the exact original `Main+$1FD2` loop boundary; sustained driving covers 6,422
+Macintosh ticks and 143/143 frames at implemented depth 93 without a loud stop. The corrected
+Escape mapping then takes the shipped transition out of driving at tick 1,864 after 32/32 frames.
+Driving is disarmed, the original flag is zero, implemented depth advances through the already
+supported `ShowCursor` path to 94, and no new loud stop occurs. Capture the resulting menu state,
+then use a documented menu action to reach the next unimplemented compatibility operation. Do not
+return to straight-line accelerator soaking or the exhausted local PICT/palette variants.
 
-The first sustained repeat covers 6,422 Macintosh ticks with 143 frames queued and all 143
-presented, driving still armed, implemented depth still 93, and no loud stop. Do not extend the
-same held-accelerator soak. Use the shipped key chart/manual to choose a deliberate driving exit or
-state transition, feed that through the existing physical KeyMap/EventRecord path, and let the
-loud-stop probe inventory the newly reached code.
-
-The key chart labels Escape “Menu Options,” which exposed and closed a real input gap: the driving
-loop does not call `GetNextEvent`, so the CIA interrupt's non-consuming raw-key state is now
-translated into the full Macintosh KeyMap at every exact frame boundary while its edge queue is
-preserved. The probe confirms raw Escape becomes KeyMap byte 6 bit `$04`, and the ordinary
-accelerator regression remains live. However, holding that bit for 6,436 ticks leaves driving armed
-for all 144 presented frames and reaches no trap. Next test the Escape **edge/EventRecord** path or
-another documented transition; do not mistake a level-sensitive KeyMap state for the menu action.
+The key chart labels Escape “Menu Options,” which exposed a real input gap: the driving loop does
+not call `GetNextEvent`, so the CIA interrupt's non-consuming raw-key state is translated into the
+full Macintosh KeyMap at every exact frame boundary while its edge queue is preserved. The first
+probe also exposed a byte-local bit-order bug: the port wrote virtual Escape `$35` as byte 6 bit
+`$04`, but the game's scanner at `Main+$2DD2` consumes each byte LSB first, making that virtual key
+`$32`. Correct Escape is byte 6 bit `$20`, and keypad 8 `$5B` is byte 11 bit `$08`. The dedicated
+probes now prove both: keypad 8 reaches the original scanner as virtual `$5B`, and held Escape takes
+the Menu Options exit. The queued EventRecord path remains independent for UI actions after exit.
 
 The MAME A-trap log remains a measured reference-run inventory → `docs/trap-log.md`,
 but Stage C has proved that it is **not an exact standalone-port first-use script**. The port has

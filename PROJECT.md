@@ -246,19 +246,18 @@ enters driving, and a sustained A1200 run presents 143 complete moving frames ov
 ticks without a loud stop. More straight-line accelerator soaking is therefore closed as a
 discovery method.
 
-The shipped key chart labels Escape “Menu Options.” A held physical Escape is correctly reflected
-in the live 16-byte Macintosh `KeyMap`, but 144 completed frames prove that the level alone does not
-leave driving. The next controlled test is a complete Escape press/release through the preserved
-keyboard edge/EventRecord path. Follow the resulting transition until the next loud stop, capture
-its manager/routine/selector and `(segment, offset)` caller, then implement only the behavior the
-executed path requires. → `docs/open-work.md` §Blocking — current loud stop.
+The shipped key chart labels Escape “Menu Options.” Correcting a byte-local KeyMap bit-order bug
+makes physical Escape take that original transition at tick 1,864 after 32 complete frames. The
+path exits driving, reaches implemented depth 94 and encounters no new loud stop. The next step is
+to capture the resulting Menu Options state and send a documented menu action through the ordinary
+event path until the next compatibility boundary. → `docs/open-work.md` §Blocking.
 
 ⭐⭐ **Stage A is done and measured: the Amiga display path works.** The port takes the machine
 over, brings up 512×320 in 4 bitplanes hires interlaced and displays Target 1's captured Macintosh
 frame out of chip RAM; the chip-RAM checksum matches the host-computed one byte for byte, the
 long/short field ratio is 0.500, and the window on the glass measures **exactly 512×320**,
-undistorted and centred in the standard PAL display window. ⛔ **That is a display-path proof and nothing more** — no
-Macintosh code runs yet. `tools/mac_fb_to_amiga.py` is the pixel differential every later stage is
+undistorted and centred in the standard PAL display window. ⛔ **That milestone was a display-path
+proof and nothing more** — no Macintosh code ran in Stage A itself. `tools/mac_fb_to_amiga.py` is the pixel differential every later stage is
 judged by, and it prices each transformation separately: chunky→planar is asserted **lossless**,
 the CLUT→DAC gamma of 1.435 is re-measured against MAME on every run (worst channel 1/255), and
 the OCS 4-bit quantisation floor is **8/255 worst channel, 1.52/255 mean**. ⚠ A finished Target 1

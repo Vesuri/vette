@@ -18,7 +18,7 @@ watch g_macFramesPresented
 commands 2
   silent
   if $armed_tick && g_macTicks > $armed_tick
-    printf "physical Escape refresh keyMap[6]=$%02x queued=%u presented=%u\n", *(unsigned char*)(s_currentA5+22), g_macFramesQueued, g_macFramesPresented
+    printf "physical Escape refresh keyMap[6]=$%02x (want $20) queued=%u presented=%u\n", *(unsigned char*)(s_currentA5+22), g_macFramesQueued, g_macFramesPresented
     detach
     quit
   end

@@ -397,14 +397,15 @@ and `Main+$2D26` snapshots all 16 bytes. They therefore share a complete 16-byte
 `16(A5)`, immediately below the jump table at `32(A5)`. The CIA interrupt maintains a separate
 non-consuming 128-key raw-state snapshot as well as its edge queue. At each exact driving-frame
 boundary, the port translates that snapshot into all 16 KeyMap bytes without consuming the queued
-EventRecords. A probe-only held Amiga Escape (`$45`) appears as `$04` in Macintosh KeyMap byte 6;
-the normal deterministic accelerator build still completes consecutive frames 41 ticks apart and
-advances the original throttle global to 3.
-
-Holding Escape through that direct KeyMap path for 6,436 ticks does not leave driving or reach a
-new trap (144/144 frames, depth 93). Despite the key chart's “Menu Options” label, this path is not
-a level-sensitive driving exit. Coverage must next test the queued key edge/EventRecord semantics
-or another documented transition rather than treating the KeyMap bit alone as an exit command.
+EventRecords. The first version reversed the bits within every byte: it wrote virtual Escape `$35`
+as byte 6 bit `$04`, which the game's ascending LSB-first scanner at `Main+$2DD2` reads as virtual
+key `$32`. That explains why 6,436 ticks of “Escape” never left driving: the game never received
+Escape. KeyMap bytes now use the classic low-bit-first representation, so Escape is byte 6 bit
+`$20`; accelerator `$5B` is byte 11 bit `$08`. The physical-state and deterministic-accelerator
+regressions cover both mappings. Corrected held Escape takes the original driving exit at tick
+1,864 after 32 queued and presented frames: the driving global and bridge state both clear, depth
+reaches 94 through the already-supported post-driving path, and no loud stop follows. This is a
+direct KeyMap transition; `GetNextEvent` is not called until after the driving loop has exited.
 
 This preserves the original code flow without touching Amiga low memory. More shadows are added
 only when execution reaches them; the inventory shows that most remaining references are `Ticks`,
@@ -433,8 +434,9 @@ Line-A return is a safe point, not only `SystemTask`: the road renderer can spen
 making only QuickDraw and `BlockMove` calls. An explicit active-callback flag prevents a trap nested
 inside a callback from scheduling another callback recursively. The earlier return-on-first-due
 loop let the one-tick sound task permanently starve the three-tick driving task.
-`amiga/driving_keymap.gdb` stops after the driving callback sees held keypad 8 and verifies that it
-increments the original steering/throttle global through the user-mode trampoline.
+`amiga/driving_keymap.gdb` stops after the driving callback sees correctly encoded keypad 8, while
+`amiga/driving_key_dispatch.gdb` proves that the original full-map scanner dispatches it as virtual
+key `$5B` rather than the adjacent `$5C` produced by the earlier reversed representation.
 
 ## Window and palette state
 
@@ -618,9 +620,12 @@ produce it; the blocker was callback scheduling, not an unimplemented drawing pr
 `amiga/driving_motion.gdb` captures the chunky surface at two consecutive driving-task returns.
 Its regression interval is 30 Macintosh ticks rather than adjacent callbacks, because several
 three-tick callbacks can occur inside one renderer update. On the A1200 acceptance configuration
-the held KeyMap word is `$0010`, the original throttle global advances from 3 to 21, and the two
-81,920-byte surfaces differ (`f9eb1e3e…` versus `8e540ac2…`). This is a measured moving road
-renderer, not two samples of the same setup canvas.
+the two 81,920-byte surfaces differ (`f9eb1e3e…` versus `8e540ac2…`). After correcting KeyMap's
+byte-local bit order, the held word is `$0008` and the original scanner reports virtual key `$5B`,
+the documented keypad-8 accelerator. The earlier `$0010` value was virtual `$5C`; its change to the
+two callback-control globals was therefore not evidence about acceleration and is withdrawn. The
+unchanged surface hashes remain evidence of a moving road renderer rather than two samples of the
+setup canvas.
 
 The driving renderer also uses `_BlockMove` as a direct packed-pixel primitive, bypassing
 QuickDraw's rectangle calls. The bridge now intersects each destination span with `s_colorScreen`

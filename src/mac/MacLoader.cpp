@@ -3907,7 +3907,10 @@ static void setDrivingKeyState(uint8_t virtualKey, bool down)
 {
     if (!s_currentA5 || virtualKey > 0x7f) return;
     uint8_t byteOffset = (uint8_t)(virtualKey >> 3);
-    uint8_t mask = (uint8_t)(1u << (7 - (virtualKey & 7)));
+    // GetKeys numbers the low bit of each byte first.  The shipped scanner at
+    // Main+$2DD2 confirms that representation by shifting each byte right and
+    // treating carry as the next ascending virtual-key code.
+    uint8_t mask = (uint8_t)(1u << (virtualKey & 7));
     uint8_t* keyMap = s_currentA5 + 16;
     if (down) keyMap[byteOffset] |= mask;
     else keyMap[byteOffset] &= (uint8_t)~mask;
@@ -4017,12 +4020,12 @@ static void refreshDrivingKeyMap()
         KeyTranslation key;
         if (!vetteInputKeyDown((uint8_t)raw) || !translateAmigaKey((uint8_t)raw, key)) continue;
         uint8_t byteOffset = (uint8_t)(key.virtualKey >> 3);
-        keyMap[byteOffset] |= (uint8_t)(1u << (7 - (key.virtualKey & 7)));
+        keyMap[byteOffset] |= (uint8_t)(1u << (key.virtualKey & 7));
     }
 #ifdef VETTE_GARAGE_CLICK
     // Keep the deterministic accelerator held after the scripted Course One
     // selection; physical keys are ORed into this development-only state.
-    if (s_garageClickPhase >= 9) keyMap[0x5b >> 3] |= 1u << (7 - (0x5b & 7));
+    if (s_garageClickPhase >= 9) keyMap[0x5b >> 3] |= 1u << (0x5b & 7);
 #endif
 }
 
