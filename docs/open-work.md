@@ -69,8 +69,9 @@ resident Main/Traffic code. Measure the dynamic `CopyBits` geometry next.
 two PixMaps over the complete `(0,0)-(342,512)` rectangle. Widening overlap-safe `blockMove` to
 longwords and mapping equal-stride full rows as one contiguous span reduces the same twelve calls
 from 138 to 126 ticks, about nine percent. Samples now land in the contiguous palette-map loop;
-optimize that loop only with a bounded A/B measurement, then return to the genuine Main/Traffic
-share and the still-unreached second frame-boundary hit.
+explicit four-byte unrolling is neutral at 126 ticks and has been removed. Return to the genuine
+Main/Traffic share and the still-unreached second frame-boundary hit rather than retrying loop
+unrolling.
 
 The MAME A-trap log remains a measured reference-run inventory → `docs/trap-log.md`,
 but Stage C has proved that it is **not an exact standalone-port first-use script**. The port has

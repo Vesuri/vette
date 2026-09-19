@@ -775,7 +775,9 @@ longwords in both overlap directions, and the full-row `CopyBits` path treats eq
 rectangles as one contiguous span rather than restarting address calculation for 342 rows. The
 same twelve calls fall from 138 to 126 ticks, about nine percent. Dynamic samples now land in the
 contiguous palette-map loop itself; row setup and partial-frame C2P are no longer the explanation.
-The exact intro differential remains unchanged.
+Explicitly mapping four bytes per iteration repeats at exactly 126 ticks and is removed; the
+compiler's existing loop is already equivalent for this workload. The exact intro differential
+remains unchanged.
 
 The trap-address table is stateful. The observed `GetTrapAddress`/`SetTrapAddress` pair now records
 the game's replacement for `$A9F4 ExitToShell`; routing a later invocation through that replacement
