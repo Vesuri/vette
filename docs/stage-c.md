@@ -658,11 +658,14 @@ a plain byte copy instead of a second palette walk. The cadence probe advances 1
 intro regression still matches all 163,840 displayed Macintosh pixels and both planar buffers and
 copper colors exactly.
 
-`amiga/driving_setup_boundary.gdb` measures completion at the game's `Main+$29E6` `SystemTask`
-immediately before `GetNextEvent`, rather than treating a queued conversion of an intermediate
-surface as completion. The optimized build still does not reach that boundary during a
-120-second warp run. Replacing the translated-row byte copy with aligned word transfers produced
-inconsistent cadence and a lower repeatable control result, so that experiment was removed.
+Static tracing corrects the original completion-boundary hypothesis. While driving is active,
+`Main+$29C6` branches directly back to the loop entry at `Main+$1FD2`; the `SystemTask` at
+`Main+$29E6` is reached only after that driving loop exits. The first `MaxMem` at `Main+$1FEA`
+therefore begins frame 1, and every subsequent hit begins a new frame only after the preceding
+iteration has completed. `amiga/driving_setup_boundary.gdb` now measures between those consecutive
+hits. This is a genuine complete-frame boundary, unlike a queued conversion of an intermediate
+surface. Replacing the translated-row byte copy with aligned word transfers produced inconsistent
+cadence and a lower repeatable control result, so that experiment was removed.
 
 Four further local PICT shortcuts were measured and rejected against the repeatable 183-callback /
 302-tick fused-buffer control. Decompressing eligible rows directly into their final surface fell
