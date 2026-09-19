@@ -529,6 +529,11 @@ static void blockMove(const uint8_t* source, uint8_t* destination, uint32_t coun
         if ((uint32_t)source & 1) {
             --source; --destination; *destination = *source; --count;
         }
+        while (count >= 4) {
+            source -= 4; destination -= 4;
+            *(uint32_t*)destination = *(const uint32_t*)source;
+            count -= 4;
+        }
         while (count >= 2) {
             source -= 2; destination -= 2;
             *(uint16_t*)destination = *(const uint16_t*)source;
@@ -542,6 +547,10 @@ static void blockMove(const uint8_t* source, uint8_t* destination, uint32_t coun
         }
         if ((uint32_t)source & 1) {
             *destination++ = *source++; --count;
+        }
+        while (count >= 4) {
+            *(uint32_t*)destination = *(const uint32_t*)source;
+            source += 4; destination += 4; count -= 4;
         }
         while (count >= 2) {
             *(uint16_t*)destination = *(const uint16_t*)source;
@@ -2697,6 +2706,20 @@ static bool copyBits(const uint8_t* sourceBitmap, const uint8_t* destinationBitm
     if (packedClippedPath) {
         uint16_t copyBytes = (uint16_t)(packedRight - packedLeft) >> 1;
         uint16_t copyHeight = (uint16_t)(packedBottom - packedTop);
+        if (mode == 0
+            && copyBytes == sourceRowBytes && copyBytes == destinationRowBytes
+            && packedSourceLeft == sourceLeft && packedLeft == destinationLeft) {
+            const uint8_t* source = sourcePixels
+                + multiplyUnsigned16((uint16_t)(packedSourceTop - sourceTop), sourceRowBytes);
+            uint8_t* destination = destinationPixels
+                + multiplyUnsigned16((uint16_t)(packedTop - destinationTop),
+                                     destinationRowBytes);
+            uint32_t contiguousBytes = multiplyUnsigned16(copyBytes, copyHeight);
+            if (!colorsMapped) blockMove(source, destination, contiguousBytes);
+            else for (uint32_t i = 0; i < contiguousBytes; ++i)
+                destination[i] = packedColorMap[source[i]];
+            return true;
+        }
         int16_t firstY = 0, lastY = (int16_t)copyHeight, stepY = 1;
         if (sourcePixels == destinationPixels && packedTop > packedSourceTop) {
             firstY = (int16_t)(copyHeight - 1); lastY = -1; stepY = -1;

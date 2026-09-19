@@ -65,6 +65,12 @@ hit that presents the first complete frame.
 performed only at the proven next-loop boundary; milestone times improve again from 155/346/503 to
 112/301/428 ticks. The repeat contains no C2P samples and is dominated by `CopyBits`, followed by
 resident Main/Traffic code. Measure the dynamic `CopyBits` geometry next.
+`driving_dynamic_copybits.gdb` finds repeated non-identity `srcCopy` operations between the same
+two PixMaps over the complete `(0,0)-(342,512)` rectangle. Widening overlap-safe `blockMove` to
+longwords and mapping equal-stride full rows as one contiguous span reduces the same twelve calls
+from 138 to 126 ticks, about nine percent. Samples now land in the contiguous palette-map loop;
+optimize that loop only with a bounded A/B measurement, then return to the genuine Main/Traffic
+share and the still-unreached second frame-boundary hit.
 
 The MAME A-trap log remains a measured reference-run inventory → `docs/trap-log.md`,
 but Stage C has proved that it is **not an exact standalone-port first-use script**. The port has

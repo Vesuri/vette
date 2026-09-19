@@ -767,6 +767,16 @@ their existing trap-return cadence. The milestone times improve again, from 155/
 sampler contains no presentation samples: most stops are now in `CopyBits`, with the rest in the
 original Main and Traffic segments.
 
+`amiga/driving_dynamic_copybits.gdb` shows that remaining compatibility work is twelve repeated
+`srcCopy` operations between the same two PixMaps, each covering the complete
+`(0,0)-(342,512)` rectangle. Their color-table seeds differ and the resulting packed-byte map is
+not identity, so a raw copy would be incorrect. `blockMove` now transfers aligned data as
+longwords in both overlap directions, and the full-row `CopyBits` path treats equal-stride mapped
+rectangles as one contiguous span rather than restarting address calculation for 342 rows. The
+same twelve calls fall from 138 to 126 ticks, about nine percent. Dynamic samples now land in the
+contiguous palette-map loop itself; row setup and partial-frame C2P are no longer the explanation.
+The exact intro differential remains unchanged.
+
 The trap-address table is stateful. The observed `GetTrapAddress`/`SetTrapAddress` pair now records
 the game's replacement for `$A9F4 ExitToShell`; routing a later invocation through that replacement
 remains part of completing the trap bridge.
