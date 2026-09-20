@@ -1189,6 +1189,15 @@ a bounded run ends without a loud stop, so a slow source-defined turn is no long
 compatibility failure. The next route boundary begins from the proved `(3,37)` exit rather than
 guessing a heading inside `(2,38)`.
 
+Continuing the same input-only trajectory proves which connected branch follows. In `(3,37)` the
+player advanced from local `(204,1703)` to `(1775,178)` and then `(1952,53)` while heading settled
+at 8678 and speed remained 8. It therefore approached the north edge before the east edge. At tick
+26056 the next response-197 call occurred in cell `(3,36)`, QUAD 249, at world
+`($1FEB,$127FE)`, local `(2027,2046)`, heading 8438 and speed 9. This is a genuine cell transition,
+not a coordinate prediction. `amiga/driving_freeway_after_bend.gdb` distinguishes a real
+breakpoint from the runner's wall-time interrupt with an explicit hit flag and reports player
+state through the stable A5 global; `amiga/driving_freeway_bend.gdb` uses the same scheme.
+
 The 26-record sightseeing table used by `Main+$3456` was also decoded as a possible source-native
 shortcut. Record 4 is cell `(6,26)`, only six cells from the export-221 transition at `(6,32)`, but
 the documented T command is conditional on Tour Mode. Five ordinary T down/up scans during the
