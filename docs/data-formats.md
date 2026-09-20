@@ -499,3 +499,34 @@ the same endpoint as an over-threshold impact. It stops driving, performs the re
 shutdown/play sequence, loads `D6=900` and `D7=147`, and calls `Main+$0F82` to display PICT 147.
 This is the shipped beyond-repair recovery described by the manual, distinct from Lake Merced's
 PICT 140 water recovery.
+
+## Remaining driving-data consumer map
+
+The remaining custom types are not one undifferentiated collection of physics tables. Static
+cross-references in the colour and B&W v1.02 executables prove four active families and two shipped
+but inactive resources. All nine resource sets are byte-identical between the two data forks.
+
+| type | proved outer grammar | loader / live consumer |
+|---|---|---|
+| `CLST` | 14 variable-length streams | `Traffic+$0758` selects id `(course+1)*100+variant`; `$10A8` advances an A5-$3740 cursor over signed-long coordinate records and `(-1, selector)` control records. Selectors 0..5 change traffic state, positions, saved coordinates, or attach a `FREE` path. |
+| `FREE` | 45 records x 64 bytes | `load+$0362` retains the raw pointer. `Traffic+$0CDC` and `$0D74` select record `(id-90)*64`; `$1564/$15BE` consume successive signed-byte `(dx,dz)` pairs. |
+| `FWTP` | big-endian count 224, then 224 records x 8 bytes | `load+$01DC` derives inclusive start/end pointers. `Traffic+$22E0` linearly finds word-0 keys; `$2302` chooses bytes 2..4 or 5..7 according to heading. |
+| `JHPF` | 39 records x 8 bytes, no count | `load+$01B0` retains the raw pointer. `Traffic+$2370` indexes `(id-90)*8`; nonzero word 0 may redirect once to another record. Words 1/2 supply world-coordinate offsets and byte 6 supplies the speed-scale input. |
+| `FWTM` | big-endian count 48, then 48 records x 6 bytes | `load+$0216` derives inclusive start/end pointers. `Traffic+$0CFA` linearly finds word-0 keys; `$0D1C` selects one of bytes 2..5 by heading quadrant, then attaches the corresponding `FREE` record. |
+| `CURV` | four 256-byte direction blocks | `load+$03E6` retains the raw pointer. `Traffic+$14EE` selects direction offsets 0/$100/$200/$300, selects a 128-byte subtable from object byte +$3B, starts at +$40 within it, and consumes signed-word `(dx,dz)` pairs. |
+| `TIME` | ids 128..131, each 10 records x 30 bytes | `Score+$0004` clears all four tables for reset. `$0286` inserts a result into the first record whose long at +$1A is zero or slower, shifts lower records, and writes the new long; `$04F8` renders the ten fixed-size entries. This is persistent score data, not a driving-physics input. |
+| `TURN` | 29 big-endian words | `load+$03BA` retains its pointer at A5-$373C, but no instruction in either executable reads that global. |
+| `PHAZ` | 20 big-endian words | neither executable contains a `PHAZ` Resource Manager request; there is consequently no application-side consumer to infer. |
+
+The active course path is therefore `CLST` -> (`FWTM` -> `FREE`) for scripted traffic movement,
+with `FWTP` -> `JHPF` for freeway spawning and `CURV` for the separate word-delta path. `TURN` and
+`PHAZ` are deliberately excluded from the next decoding target: their names are not evidence of a
+runtime role.
+
+Validate the outer shapes and Color/B&W equality with:
+
+```sh
+python3 tools/dump_driving_data.py \
+  'tmp/rsrc_VETTE!_VETTE!_Folder_Folder_Color_VETTE!_VETTE!.Data.rsrc' \
+  --compare 'tmp/rsrc_VETTE!_VETTE!_Folder_Folder_B&W_VETTE!_VETTE!.Data.rsrc'
+```

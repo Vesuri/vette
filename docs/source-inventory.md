@@ -104,23 +104,23 @@ largest being `Main` at 32.6 KB and `Traffic` at 27.9 KB. That is the size of th
 | `BGAS` | 1 | 15 066 | `Bogas Driver v2.1` — the sound engine |
 | `QUAD` | 1 | 11 366 | `Quad Discripter Data` [sic] |
 | `SINE` | 2 | 8 712 | `Sine Table 360`, `Tangent Table` |
-| `CLST` | 14 | 7 048 | the courses: `Course1a…c`, `Course2a…e`, `Course3a/b`, `Course4a/b` |
-| `FREE` | 1 | 2 880 | `freeway deltas` |
+| `CLST` | 14 | 7 048 | proved variable-length course command streams selected and consumed by `Traffic` |
+| `FREE` | 1 | 2 880 | proved 45 directly indexed 64-byte signed-delta paths |
 | `COMM` | 1 | 2 490 | id 0, unnamed. Pairs with the documented head-to-head `Communication` segment |
 | `PATN` | 2 | 2 048 | `Main_Map` ×2, 1 024 B each — QuickDraw patterns for the map display |
 | `STRT` | 1 | 2 222 | `Street_Names` |
 | `COLL` | 6 | 2 184 | proved angle-indexed object hulls: 91 four-signed-byte records at four-degree heading steps, selected by object collision class |
 | `COPY` | 1 | 1 991 | `Protect` — the copy protection, data-driven |
-| `FWTP` | 1 | 1 794 | `freeway traffic placement` |
+| `FWTP` | 1 | 1 794 | proved count 224 followed by keyed 8-byte freeway placement-choice records |
 | `HEXS` | 1 | 1 446 | `HexSinCos Table` |
-| `TIME` | 4 | 1 200 | ids 128-131, 300 B each, unnamed |
-| `CURV` | 1 | 1 024 | `rw curve` (real-world curve?) |
+| `TIME` | 4 | 1 200 | proved persistent score tables: ids 128-131, ten 30-byte records each |
+| `CURV` | 1 | 1 024 | proved four 256-byte direction blocks of signed coordinate deltas |
 | `PERF` | 8 | 880 | **110 B each**: `Stock`, `ZR1`, `TwinTurbo`, `Sledge`, `Porche`, `Testa`, `Lambo`, `F40` — count 54, then a proved 37-word live-car template and 17 words unreferenced by either v1.02 executable |
 | `COSS` | 1 | 516 | `Cosine Table 360` |
-| `JHPF` | 1 | 312 | `freeway traffic placement` (same name as `FWTP`) |
-| `FWTM` | 1 | 290 | `freeway traffic movement` |
-| `PHAZ` | 1 | 40 | id 128, unnamed |
-| `TURN` | 1 | 58 | `slowing table` |
+| `JHPF` | 1 | 312 | proved 39 directly indexed 8-byte placement records, optionally linked through word 0 |
+| `FWTM` | 1 | 290 | proved count 48 followed by keyed 6-byte path-choice records |
+| `PHAZ` | 1 | 40 | id 128, unnamed; no request for this type exists in either v1.02 executable |
+| `TURN` | 1 | 58 | `slowing table`; loaded and retained, but never read by either v1.02 executable |
 
 ⭐⭐ **The trigonometry is table-driven, not computed** — `Sine Table 360`, `Cosine Table 360`,
 `Tangent Table`, `HexSinCos Table`. That is the single most load-bearing fact in this file for the

@@ -7,11 +7,12 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — current compatibility boundary
 
-⭐ **HEAD OF QUEUE: inventory the remaining driving-data consumers.**
-The major geometry, world-map, collision and world-construction formats are closed. Map the loader
-and runtime consumers of `CLST`, `FREE`, `FWTP`, `JHPF`, `FWTM`, `TIME`, `CURV`, `PHAZ` and `TURN`,
-then select the next format from proved call paths rather than names. → `docs/source-inventory.md`,
-`docs/data-formats.md`.
+⭐ **HEAD OF QUEUE: decode the active `CLST` course stream.**
+The remaining consumer inventory is closed. `CLST` is the live variable-length command stream that
+drives course transitions and attaches `FREE` paths through `FWTM`; decode its selector 0..5 records,
+cursor rewinds and termination rules before changing any runtime behaviour. Treat the separate
+`FWTP` -> `JHPF` freeway-spawn path as the following target. `TURN` is loaded but unread and `PHAZ`
+is never requested, so their names do not justify speculative work. → `docs/data-formats.md`.
 
 ## ⭐⭐ TARGET 1 — the complete intro, run by the game's own code — COMPLETE
 
