@@ -1048,7 +1048,7 @@ behaviour. The standalone Amiga target has one fixed game surface and no movable
 platform-level fixed-window policy, not an ACCEPT-coordinate exception, and leaves the original
 difficulty choices and their hit regions untouched.
 
-### Modern keyboard aliases and default mouse steering
+### Modern keyboard aliases and deferred mouse steering
 
 The original key chart assigns Keyboard-mode steering/acceleration/braking to `J`/`L`, `I`, and
 `M`, but assigns no driving action to the Macintosh cursor keys. The Amiga bridge therefore aliases
@@ -1059,15 +1059,16 @@ non-driving keyboard input.
 The manual and `MENU` 126 establish that Mouse is a shipped steering mode, separate from both
 Keyboard and Joystick. Its menu handler sets A5-$5316; Main+$2BC8 reads `Mouse.h` at Page-0 $0832
 for steering, while `Traffic+$6D24` reads `MBState` at $0172 and uses a pressed button as the
-accelerator. The standalone port changes the shipped default-selection branch to select Mouse. The
-game installs one steering routine at a time, so this retains its original mutually exclusive mode
-semantics: the cursor aliases drive only after Keyboard is selected from the menu, while unrelated
-keyboard commands remain live in Mouse mode.
+accelerator. The game installs one steering routine at a time, so the modes retain their original
+mutually exclusive semantics. The standalone port now leaves the shipped Keyboard default active,
+making the cursor aliases available immediately; unrelated keyboard commands remain live if Mouse
+is selected from the menu.
 
 `Main+$2BC8` is the executable offset after the segment header. The resident `CODE 1` blob retains
 that four-byte header, so the corresponding raw patch address is `$2BCC`. Using `$2BC8` made the
-byte verification reject every clean build before `%A5Init`; a clean FS-UAE probe now reaches the
-intro with live animation, audio, and frame presentation.
+byte verification reject every clean build before `%A5Init`; correcting it restored the intro with
+live animation, audio, and frame presentation. The redirection remains installed for later Mouse
+mode diagnosis even though Mouse is no longer selected by default.
 
 Enabling it exposed another Page-0 dependency rather than licensing direct access to Amiga low
 memory. Six original centre-coordinate writes and the four reached Mouse/MBState reads are

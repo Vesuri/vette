@@ -60,6 +60,11 @@ closed and deleted, so a `#N` written in another doc goes quietly wrong — thre
 
 ## Small, cheap, and wrong if left
 
+- **Make the original Mouse steering mode effective.** Its Page-0 accesses are safely redirected
+  and the menu can select it, but physical testing found no steering, throttle, or braking response.
+  Keep Keyboard as the default until the live mode flags, shadow coordinates, and active-low button
+  state are traced through the original consumers.
+
 ## Phase 0 — scaffolding — COMPLETE (see `docs/phases.md`)
 
 ⚠ One dormant framework link trap remains intentionally deferred: `Bitmap::patternWithMask()`

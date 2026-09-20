@@ -580,23 +580,6 @@ static bool redirectLowMemoryGlobals(uint8_t* a5)
     return true;
 }
 
-static bool enableMouseSteeringDefault()
-{
-    // load+$062C is the shipped default-selection branch.  It selects exactly
-    // one Steering menu item.  Change Keyboard to Mouse here rather than
-    // recognizing menu coordinates or modifying either driving algorithm.
-    static const uint16_t original[8] = {
-        0x3b7c, 0x0100, 0xacee, 0x426d, 0xacf0, 0x426d, 0xacea, 0x426d
-    };
-    uint8_t* defaults = vette_code_4 + 0x062c;
-    for (uint16_t i = 0; i < 8; ++i)
-        if (read16(defaults + i * 2) != original[i]) return false;
-    if (read16(defaults + 16) != 0xacec) return false;
-    write16(defaults + 4, 0xacea);          // Mouse = true
-    write16(defaults + 12, 0xacee);         // Keyboard = false
-    return true;
-}
-
 static bool disableCopyProtection()
 {
     // Main+$05FE is the entry to the manual challenge.  The successful-answer
@@ -5629,8 +5612,7 @@ bool MacLoader::run(VetteScreen* screen)
     uint8_t* a5;
     if (!buildA5World(a5)) return false;
     s_currentA5 = a5;
-    if (!redirectLowMemoryGlobals(a5) || !enableMouseSteeringDefault()
-        || !disableCopyProtection()
+    if (!redirectLowMemoryGlobals(a5) || !disableCopyProtection()
         || !installDrivingBoundaryTrap() || !installStaticCollisionProbe()) return false;
 
     Disable();
