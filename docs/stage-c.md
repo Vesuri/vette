@@ -1037,8 +1037,16 @@ an invisible pointer that began at `(256,160)`. The presentation path now compos
 16x16 Cursor at that actual point, including its hot spot, black/white mask and XOR pixels, then
 restores the chunky framebuffer after the dirty rectangle has been converted. Mouse movement dirties
 only the union of the old and new cursor bounds; `HideCursor`, `ShowCursor`, and `SetCursor` likewise
-restore or redraw that small area. `_DragWindow` remains deliberately unimplemented and is now named
-in the loud stop, so a genuine request cannot be mistaken for this repaired garage click path.
+restore or redraw that small area. `_DragWindow` is also named in the loud stop, so this path could
+be identified rather than reported as an unknown trap.
+
+A second physical test then clicked the still-visible ACCEPT artwork after the difficulty choices
+appeared. The game's three active mode-1 rectangles cover only TRAINEE, ROOKIE, and PRO, so the
+click legitimately fell through to `_DragWindow`. Crashing is nevertheless not acceptable player
+behaviour. The standalone Amiga target has one fixed game surface and no movable desktop windows;
+`DragWindow` therefore consumes its twelve parameter bytes and otherwise does nothing. This is a
+platform-level fixed-window policy, not an ACCEPT-coordinate exception, and leaves the original
+difficulty choices and their hit regions untouched.
 
 ## Correction to the MAME log
 

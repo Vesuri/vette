@@ -5180,6 +5180,13 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
         if (g_stageCDepth < 82) g_stageCDepth = 82;
         return 1;
     }
+    if (trap == 0xa925) {                    // DragWindow(window, start, limits)
+        // The standalone Amiga port owns one fixed game surface, not a desktop
+        // windowing system.  Classic Vette routes harmless unclaimed content
+        // clicks here; consume the parameters and leave the surface in place.
+        if (g_stageCDepth < 97) g_stageCDepth = 97;
+        return 13;
+    }
     if (trap == 0xa92c) {                    // FindWindow(Point, WindowPtr*) -> part code
         uint8_t** resultWindow = (uint8_t**)read32(userStack);
         int16_t vertical = (int16_t)read16(userStack + 4);
