@@ -1207,6 +1207,15 @@ speed 10. That is 1,542 ticks earlier than the old route reached QUAD 249. On ro
 then uses selector 81's shipped solid bands—V `0..768` and `1280..2048`—to centre the open
 `768..1280` east/west lane while steering east. No gameplay field is written directly.
 
+QUAD 251 is itself the final response-197 curve cell, not the point at which steering should
+already unwind east. Keeping the same ordinary `$1000` keypad target through both `(3,37)` and
+`(4,37)` carried the player across the north edge into `(4,36)`. A bounded run measured world
+`($2361,$127FA)`, local `(865,2042)`, heading 3010 and speed 8 at tick 36,603. An earlier full
+Stage C snapshot caught the approach at `(4,37)`, local `(859,0)`, with selector 107/export 197
+as the last static response; active traffic was already ahead in `(6,36)` rather than pinning the
+player. `amiga/driving_freeway_row36.gdb` observes the original cell fields from the garage
+transition and proves this hand-off without a target-side probe.
+
 The 26-record sightseeing table used by `Main+$3456` was also decoded as a possible source-native
 shortcut. Record 4 is cell `(6,26)`, only six cells from the export-221 transition at `(6,32)`, but
 the documented T command is conditional on Tour Mode. Five ordinary T down/up scans during the

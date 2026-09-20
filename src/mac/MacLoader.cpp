@@ -4518,10 +4518,10 @@ static void refreshDrivingKeyMap()
         // 36.  At x=6 the shipped selector changes to 81, whose
         // solid V bands 0..768 and 1280..2048 leave an east/west lane between
         // them.  Follow that source-defined orientation and centre local V;
-        // the three curve cells use the same heading so steering unwinds before
-        // the selector-81 straight.  $0000 is east, small positive headings
+        // both branch curve cells use the same heading before the selector-81
+        // straight.  $0000 is east, small positive headings
         // move north, and values just below $8000 move south.
-        bool northeastCurve = freeway && cellX == 3 && cellY == 37;
+        bool northeastCurve = freeway && (cellX == 3 || cellX == 4) && cellY == 37;
         bool eastbound = freeway && cellY == 36 && cellX >= 3;
         uint16_t position = eastbound ? localZ : localX;
         uint16_t low = freeway ? 896 : (pass2BRN ? 240 : 128);
