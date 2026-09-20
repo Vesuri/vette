@@ -352,6 +352,36 @@ callback pattern produces **146 static Intro sites**. It contains **all 103 full
 with zero offset or trap-word mismatches; the other 43 sites are valid alternate/setup paths not
 exercised by that run.
 
+### All-segment static/live gate — complete
+
+Generate `tmp/CODE_01_traps.csv` through `tmp/CODE_10_traps.csv` by importing each extracted
+segment as raw `68000:BE:32:default`, then running `MarkEntries.java` followed by `DumpTraps.java`.
+After a `VETTE_FULL_INTRO=1` MAME trace, the checked result is:
+
+| segment | static sites | live sites | missing | word mismatch |
+|---|---:|---:|---:|---:|
+| Main | 537 | 33 | 0 | 0 |
+| Initialize | 290 | 40 | 0 | 0 |
+| Communication | 184 | 0 | 0 | 0 |
+| load | 118 | 46 | 0 | 0 |
+| Score | 113 | 0 | 0 | 0 |
+| Traffic | 40 | 3 | 0 | 0 |
+| FRED | 0 | 0 | 0 | 0 |
+| Intro | 146 | 103 | 0 | 0 |
+| sound | 1 | 1 | 0 | 0 |
+| `%A5Init` | 1 | 1 | 0 | 0 |
+
+That is **1,430 static sites** and **227 distinct live sites**, with every live `(segment,offset)`
+present and every emitted word identical. `Communication` and `Score` were not resident/exercised
+in this trace, so their maps are static coverage rather than dynamic proof. FRED's zero traps are
+consistent with the independent evidence that it is a small leaf-routine library.
+
+Re-run the exact comparison with:
+
+```sh
+python3 tools/check_trap_map.py ref/mame/traps.txt --static-dir tmp
+```
+
 ## The builds
 
 ```
