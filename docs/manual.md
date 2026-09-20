@@ -147,18 +147,22 @@ Chapter 9 (pp. 29-30) and `KeyChart.jpg` agree:
 
 The B&W-only horizon and wireframe toggles are `V` and `W`.
 
-The standalone Amiga port keeps the shipped Keyboard steering default and aliases the cursor
-cluster to that layout in the live driving KeyMap: left/right act as `J`/`L`, and up/down act as
-`I`/`M`. The original game assigns no driving action to the Macintosh cursor keys. Their ordinary
-key-event identity is preserved; the alias applies only to the continuously polled driving state.
+The standalone Amiga port aliases the cursor cluster to the Keyboard layout in the live driving
+KeyMap: left/right act as `J`/`L`, and up/down act as `I`/`M`. The original game assigns no driving
+action to the Macintosh cursor keys. Their ordinary key-event identity is preserved; the alias
+applies only to the continuously polled driving state.
 
 The shipped Options -> Steering submenu contains four mutually exclusive choices: Numeric keypad,
 Keyboard, Mouse, and Joystick. Mouse is a real driving mode, not the Gravis MouseStick setting:
 the game reads the Macintosh `Mouse` low-memory point for steering and treats the mouse button as
-the accelerator. If Mouse is deliberately selected, the standalone port redirects its direct
-Page-0 `Mouse`, `RawMouse`, `MTemp`, and `MBState` accesses to private A5-adjacent shadows updated
-from the Amiga mouse. This prevents writes into the Amiga's vector page. The physical mouse remains
-available for the ordinary menus while Keyboard steering is active.
+the accelerator. The standalone port selects this original Mouse item by default and redirects its
+direct Page-0 `Mouse`, `RawMouse`, `MTemp`, and `MBState` accesses to private A5-adjacent shadows
+updated from the Amiga mouse. This prevents writes into the Amiga's vector page.
+
+The original modes remain mutually exclusive. In Mouse mode the arrow aliases do not steer,
+accelerate, or brake, although ordinary keyboard commands continue to work. Select Keyboard from
+Options -> Steering to use the arrow aliases; the physical mouse remains available for menus in
+that mode.
 
 ## Courses and world boundaries
 

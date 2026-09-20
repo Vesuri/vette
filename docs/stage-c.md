@@ -1048,7 +1048,7 @@ behaviour. The standalone Amiga target has one fixed game surface and no movable
 platform-level fixed-window policy, not an ACCEPT-coordinate exception, and leaves the original
 difficulty choices and their hit regions untouched.
 
-### Modern keyboard aliases and safe optional mouse steering
+### Modern keyboard aliases and default mouse steering
 
 The original key chart assigns Keyboard-mode steering/acceleration/braking to `J`/`L`, `I`, and
 `M`, but assigns no driving action to the Macintosh cursor keys. The Amiga bridge therefore aliases
@@ -1059,8 +1059,10 @@ non-driving keyboard input.
 The manual and `MENU` 126 establish that Mouse is a shipped steering mode, separate from both
 Keyboard and Joystick. Its menu handler sets A5-$5316; Main+$2BC8 reads `Mouse.h` at Page-0 $0832
 for steering, while `Traffic+$6D24` reads `MBState` at $0172 and uses a pressed button as the
-accelerator. The standalone port retains the shipped Keyboard default; Mouse remains an explicit
-menu choice rather than silently replacing the requested cursor-key driving layout.
+accelerator. The standalone port changes the shipped default-selection branch to select Mouse. The
+game installs one steering routine at a time, so this retains its original mutually exclusive mode
+semantics: the cursor aliases drive only after Keyboard is selected from the menu, while unrelated
+keyboard commands remain live in Mouse mode.
 
 Enabling it exposed another Page-0 dependency rather than licensing direct access to Amiga low
 memory. Six original centre-coordinate writes and the four reached Mouse/MBState reads are
