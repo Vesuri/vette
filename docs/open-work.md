@@ -7,11 +7,11 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — current compatibility boundary
 
-⭐ **HEAD OF QUEUE: find the consumer of `PERF` words 38..54.** The outer format and the race
-template boundary are proved: `Traffic+$06BE` copies words 1..37 into the live-car structure, and
-maximum gear plus automatic/manual selection are identified from their code consumers. The final
-17 words are not touched by that loader. Find their real reader before assigning graph or physical
-meanings, then move to `OBJS` and `MAPS`. → `docs/data-formats.md`.
+⭐ **HEAD OF QUEUE: decode `OBJS` and confirm or kill its proposed two-level-of-detail pairs.**
+Start from `Initialize+$066C`, which loads the model resources, and the `QUAD` descriptor table;
+trace the fields into the renderer rather than inferring them from record shape. Test the proposed
+near/far relationship on pairs such as `F40C`/`F40S1`, `GenericC`/`GenericS` and `Taxi`/`TaxiS`.
+→ `docs/source-inventory.md` §OBJS.
 
 ## ⭐⭐ TARGET 1 — the complete intro, run by the game's own code — COMPLETE
 
@@ -69,8 +69,8 @@ implementation when a real path needs it, rather than weakening the audit or spe
 
 1. **Decode the `VETTE!.Data` record formats.** The *inventory* is done
     (`docs/source-inventory.md`); the formats are not. `PERF` now has a proved 37-word race-template
-    prefix and an unresolved 17-word tail; identify that tail's actual consumer next. Then `OBJS`
-    (160 models, recurring exact sizes, and
+    prefix; its remaining 17 words are unreferenced dead data in both v1.02 executables. Decode
+    `OBJS` next (160 models, recurring exact sizes, and
     `QUAD`'s `Quad Discripter Data` says the renderer is quad-based) and `MAPS`. ⚠ Do this against
     the `load` segment's disassembly, not by pattern-guessing — RoF's postmortem §1.2 is about
     exactly this.

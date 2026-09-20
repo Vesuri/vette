@@ -3,7 +3,7 @@
 Only fields tied to code that reads them are named here. Repeated values, apparent scales and
 plausible physical quantities remain unknown until a consumer proves them.
 
-## `PERF`: car template plus an unresolved tail
+## `PERF`: car template plus an unreferenced tail
 
 There are eight resources, IDs 100 through 800 in steps of 100: `Stock`, `ZR1`, `TwinTurbo`,
 `Sledge`, `Porche` [sic], `Testa`, `Lambo`, and `F40`. Every body is 110 bytes and starts with the
@@ -22,7 +22,7 @@ records are byte-identical.
 
 The two callers at `Traffic+$09D8` and `+$09EE` form IDs `(playerIndex+1)*100` and
 `(opponentIndex+1)*100 + 400`. Thus resource words 1..37 are a template for bytes 0..73 of each
-live car structure. Resource words 38..54 are outside the measured copy and must not yet be called
+live car structure. Resource words 38..54 are outside the measured copy and must not be called
 physics fields.
 
 ### Named template fields
@@ -38,12 +38,25 @@ Resource word 30 is not stable configuration despite being 4 in every record: in
 The other copied words are mostly zero initial state and remain unnamed until their consumers are
 mapped.
 
-### Unresolved words 38..54
+### Words 38..54 are dead data in version 1.02
 
 The final 17 words differ systematically by car; words 40 onward contain conspicuous increasing
-sequences and are likely related to the garage graph or performance. That is an observation, not a
-decode. The proved race loader neither copies nor reads them. Their consumer must be found before
-attaching units or manual specification names.
+sequences and resemble garage-graph or performance data. That resemblance is not a decode.
+
+An exhaustive source check finds no consumer:
+
+- each application resource fork contains exactly one byte occurrence of `PERF`, the immediate
+  type argument at this loader (`Traffic+$06C6` in the colour build);
+- the loader copies only words 1..37, does not store or return the resource handle or data pointer,
+  then calls `HUnlock` and `ReleaseResource`;
+- the all-segment static trap map contains no game call to `GetIndResource`, `GetNamedResource`,
+  `Get1Resource` or `RGetResource`, eliminating an indirect Resource Manager lookup of this type;
+- neither copied live-car structure contains the tail bytes.
+
+Therefore the last 17 words are **unreferenced shipped data in the colour and B&W version 1.02
+executables**. They may describe an abandoned performance-display design, but this game does not
+read them. Preserve them in extraction; do not use them to explain current behaviour or attach
+units to them.
 
 Reproduce the inventory and the exact B&W/colour equality check with:
 

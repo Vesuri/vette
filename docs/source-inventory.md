@@ -115,7 +115,7 @@ largest being `Main` at 32.6 KB and `Traffic` at 27.9 KB. That is the size of th
 | `HEXS` | 1 | 1 446 | `HexSinCos Table` |
 | `TIME` | 4 | 1 200 | ids 128-131, 300 B each, unnamed |
 | `CURV` | 1 | 1 024 | `rw curve` (real-world curve?) |
-| `PERF` | 8 | 880 | **110 B each**: `Stock`, `ZR1`, `TwinTurbo`, `Sledge`, `Porche`, `Testa`, `Lambo`, `F40` — count 54, then a proved 37-word live-car template and 17 unresolved words |
+| `PERF` | 8 | 880 | **110 B each**: `Stock`, `ZR1`, `TwinTurbo`, `Sledge`, `Porche`, `Testa`, `Lambo`, `F40` — count 54, then a proved 37-word live-car template and 17 words unreferenced by either v1.02 executable |
 | `COSS` | 1 | 516 | `Cosine Table 360` |
 | `JHPF` | 1 | 312 | `freeway traffic placement` (same name as `FWTP`) |
 | `FWTM` | 1 | 290 | `freeway traffic movement` |
@@ -130,8 +130,9 @@ lacks (the `muldiv-audit` rule in `CLAUDE.md`), and the tables port across uncha
 ⭐ `PERF` is now partially decoded from its code consumers, not its numerical shape.
 `Traffic+$06BE` skips the count and copies words 1..37 into the live-car structure; word 16 is
 maximum forward gear and word 24 selects automatic shifting. Words 38..54 remain outside that
-proved copy and deliberately unnamed until their reader is found. The B&W and colour records are
-byte-identical. → `docs/data-formats.md`, `tools/dump_perf.py`.
+proved copy and have no reader in either v1.02 executable; they are deliberately unnamed dead
+data. The B&W and colour records are byte-identical. → `docs/data-formats.md`,
+`tools/dump_perf.py`.
 
 ## Audio — ⭐⭐ this corrects a documented assumption
 

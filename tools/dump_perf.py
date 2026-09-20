@@ -64,7 +64,7 @@ def main():
             raise SystemExit("PERF resources differ between the two forks")
         print(f"PASS: PERF resources are byte-identical in {args.resource_fork} and {args.compare}")
 
-    print(" id name        words copied max_gear automatic_shift unproven_tail_words_38_54")
+    print(" id name        words copied max_gear automatic_shift unreferenced_tail_words_38_54")
     for rid, name, body in records:
         record = decode(body)
         tail = ",".join(str(value) for value in record["tail"])
