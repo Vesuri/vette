@@ -1063,7 +1063,10 @@ The first live test still failed before reaching this bridge: FS-UAE's keyboard-
 was consuming the host cursor cluster. The launch script attempted to disable both ports with the
 undocumented value `none`; the supported empty-device value is `nothing`. Production and debugger
 launchers now use `joystick_port_0=mouse` and `joystick_port_1=nothing`, preserving the physical
-mouse while delivering cursor keys through the Amiga keyboard interrupt.
+mouse. Because FS-UAE has repeatedly reassigned the supposedly empty port across these projects,
+the launchers additionally enable `full_keyboard` and install explicit host-arrow to Amiga-cursor
+input mappings. FS-UAE defines custom mappings as overriding both defaults and `joystick_port_n`,
+so cursor delivery no longer depends on its startup device assignment.
 
 The manual and `MENU` 126 establish that Mouse is a shipped steering mode, separate from both
 Keyboard and Joystick. Its menu handler sets A5-$5316; Main+$2BC8 reads `Mouse.h` at Page-0 $0832

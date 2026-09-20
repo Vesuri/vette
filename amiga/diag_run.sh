@@ -24,6 +24,9 @@ fsuae_claim_port
   --kickstart_file="$ROM" \
   --hard_drive_0="$DH0" --hard_drive_1="$DH1" \
   --joystick_port_0=mouse --joystick_port_1=nothing \
+  --full_keyboard=1 \
+  --keyboard_key_up=action_key_cursor_up --keyboard_key_down=action_key_cursor_down \
+  --keyboard_key_left=action_key_cursor_left --keyboard_key_right=action_key_cursor_right \
   --automatic_input_grab=0 --fullscreen=0 --window_width=720 --window_height=568 \
   $EXTRA_ARGS \
   --remote_debugger=20 --remote_debugger_port="$DEBUG_PORT" --remote_debugger_trigger=Vette \

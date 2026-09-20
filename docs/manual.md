@@ -157,8 +157,11 @@ Left/Right steer without requiring a keypad or a menu change.
 The supplied FS-UAE launchers explicitly attach the mouse to Amiga port 0 and leave port 1 empty.
 FS-UAE otherwise enables its keyboard-joystick fallback and consumes the host cursor keys before
 the emulated Amiga keyboard can report them. FS-UAE calls the empty-device value `nothing`, not
-`none`. The production launcher also enables automatic input grab; Command-G or the middle mouse
-button releases it.
+`none`. Some FS-UAE installations nevertheless reassign that port on startup, so the launchers do
+not rely on the port choice: they enable full-keyboard mode and explicitly map all four host arrows
+to the corresponding Amiga cursor keys. Custom input mappings override FS-UAE's keyboard-joystick
+assignment. The production launcher also enables automatic input grab; Command-G or the middle
+mouse button releases it.
 
 The shipped Options -> Steering submenu contains four mutually exclusive choices: Numeric keypad,
 Keyboard, Mouse, and Joystick. Mouse is a real driving mode, not the Gravis MouseStick setting:
