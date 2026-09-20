@@ -1166,6 +1166,22 @@ The original Mac drawing, physics, input, collision, and traffic code still exec
 the one-minute Course Two run from 260 to roughly 919 completed game frames. Production builds do
 not define that flag and retain the complete display path.
 
+The route now derives both steering bands from decoded collision data. Main-map cells
+`(2,7)..(2,22)` leave local X `0..383` open; Freeway Map QUAD 120 selects list 71, whose two solid
+rectangles leave local X `768..1280` open. A circular `$0000..$7FFF` heading error avoids the old
+wraparound dead zone. The first nominal city line locked against the live `2BRN` object in cell
+`(2,8)`: the player was at `($10B8,$47C8)` while `2BRN` was at `($109E,$47CB)` with collision state
+`FF/14/02`, and the static-bounds probe had seen no hit since tick 1159. The route therefore moves
+to the still-valid right half only through cells 9..7, then returns to its ordinary line. It uses
+only original keypad bits and never edits position, traffic, collision, heading, or mode state.
+
+With that local pass, an unmodified run crosses export 212 and reaches Freeway Map cell `(2,38)`
+at world `($1482,$136D1)`, mode 1, after 3,404 completed game frames. The last collision is the
+ordinary QUAD 221 / selector-107 response 197 at the connected freeway bend; this is the next
+source-guided steering boundary, not a missing Toolbox call. `stage_c.gdb` now reports full player
+state, the last static collision and the active object array when a bounded run ends without a
+loud stop, so a stuck route is no longer mistaken for compatibility coverage.
+
 The 26-record sightseeing table used by `Main+$3456` was also decoded as a possible source-native
 shortcut. Record 4 is cell `(6,26)`, only six cells from the export-221 transition at `(6,32)`, but
 the documented T command is conditional on Tour Mode. Five ordinary T down/up scans during the

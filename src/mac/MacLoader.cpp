@@ -4497,13 +4497,29 @@ static void refreshDrivingKeyMap()
         uint8_t* car = (uint8_t*)read32(s_currentA5 - 13944);
         uint16_t heading = car ? read16(car + 0x66) : 0x2000;
         uint16_t localX = car ? (uint16_t)(read32(car) & 0x7ff) : 192;
-        // Cells (2,7)..(2,22) have the source-defined static bound
-        // (v=0,u=384)-(v=2048,u=2048).  Centre within the remaining
-        // 0..383 corridor instead of riding its exact collision edge.
-        uint16_t target = localX > 256 ? 0x2300 : (localX < 128 ? 0x1d00 : 0x2000);
-        if (heading > target + 0x0100 && heading < 0x3800)
+        // Main-map cells (2,7)..(2,22) have the source-defined static bound
+        // (v=0,u=384)-(v=2048,u=2048), leaving the 0..383 corridor.  After
+        // export 212 switches maps, freeway QUAD 120 selects bounds list 71:
+        // solid u=0..768 and u=1280..2048, leaving a centred 768..1280 lane.
+        // Pick the lane centre from that original mode/map state; only keypad
+        // input is synthesized, never position, heading, or collision state.
+        bool freeway = (int16_t)read16(s_currentA5 - 0x3764) != 0;
+        // The deterministic Course Two traffic stream places 2BRN near
+        // local-u 158 in cell (2,8).  Move to the right half only on its
+        // approach; the same side is crowded by another shipped traffic pack
+        // around cells 20..22.  240..288 still leaves the player's hull clear
+        // of u=384, while the ordinary 128..256 line serves the rest.
+        uint16_t cellY = car ? read16(car + 0x40) : 24;
+        bool pass2BRN = !freeway && cellY <= 9 && cellY >= 7;
+        uint16_t low = freeway ? 896 : (pass2BRN ? 240 : 128);
+        uint16_t high = freeway ? 1152 : (pass2BRN ? 288 : 256);
+        uint16_t target = localX > high ? 0x2300 : (localX < low ? 0x1d00 : 0x2000);
+        int32_t headingError = (int32_t)heading - target;
+        if (headingError > 0x4000) headingError -= 0x8000;
+        if (headingError < -0x4000) headingError += 0x8000;
+        if (headingError > 0x0100)
             setDrivingKeyState(0x56, true);  // keypad 4: reduce heading
-        else if (heading + 0x0100 < target)
+        else if (headingError < -0x0100)
             setDrivingKeyState(0x58, true);  // keypad 6: correct overshoot
     }
 #endif
