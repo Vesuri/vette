@@ -288,10 +288,33 @@ Copied from the *Revs* port; each needs a Vette pass.
 | `ExportListing.java` | reusable as-is | dump `listing.txt` |
 | `ApplyNames.java` | reusable; ⚠ addresses are segment-relative | apply `symbols.csv` to the project |
 | `DumpCallGraph.java` | reusable | call graph |
-| **`DumpTraps.java`** | **does not exist — WRITE IT** | the A-line trap map. This is the abstraction boundary, and the direct replacement for Revs's `DumpHwAccesses.java` (not carried over: it hardcodes BBC I/O ranges) |
+| `DumpTraps.java` | implemented; completeness awaits all `CODE 0` roots in `entrypoints.csv` | flow-following A-line trap map; the direct replacement for Revs's BBC-specific `DumpHwAccesses.java` |
 
 ### The trap map IS the abstraction boundary
 Its output tells you exactly what `src/mac/` must implement. Generate it early.
+
+`DumpTraps.java` does **not** scan every aligned `$Axxx`-looking word: CODE resources contain inline
+data, so that would manufacture traps. It starts at the segment entry and the USER_DEFINED
+functions installed by `MarkEntries.java`, follows Ghidra's real fall-through/branch edges, treats
+an A-line word as a returning two-byte boundary, and resumes after it. The CSV records segment,
+offset, emitted word, flag-stripped base, OS/Toolbox class, published routine name, flag bits and
+containing function. Names come from the same generated `tmp/trap_names.lua` used by the live MAME
+probe; missing names remain explicit `?OS_xx` / `?TB_xxx` values.
+
+```sh
+python3 tools/gen_trap_names.py     # once; generated table is local and uncommitted
+"$GH/support/analyzeHeadless" tools/ghidra-proj Vette -process CODE_08_Intro.bin \
+  -scriptPath ghidra_scripts \
+  -preScript MarkEntries.java \
+  -postScript DumpTraps.java "$ABS/disasm/CODE_08_traps.csv" "$ABS/tmp/trap_names.lua"
+```
+
+⭐ **Measured script control:** on the Color Intro resource, seeding only its resource entry at
+offset 4 recovers 25 trap sites. That includes the live log's first sequence at `+003E`, `+0048`,
+`+0070`, `+007C`, and `+00FE`; later live sites such as `Button` at `+0224` are in other exported
+routines and correctly remain absent until `CODE 0` supplies those roots. An earlier implementation
+that trusted every Ghidra ANALYSIS function found 139 sites yet missed required roots—a larger
+number was less complete.
 
 ## The builds
 

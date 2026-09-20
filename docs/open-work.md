@@ -7,10 +7,11 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — current compatibility boundary
 
-⭐ **HEAD OF QUEUE: write `ghidra_scripts/DumpTraps.java`.** The trap map is the next static-map
-boundary. Enumerate every `$Axxx` instruction site from all extracted `CODE` resources with its
-segment and offset, then cross-check the 63-trap live floor in `docs/trap-log.md`. Re-derive this
-for Macintosh traps; Revs's hardware-access script has BBC address ranges baked into it.
+⭐ **HEAD OF QUEUE: fill `ghidra_scripts/entrypoints.csv` from `CODE 0`.** `DumpTraps.java` now
+follows only trusted roots and their control flow, deliberately rejecting Ghidra's heuristic
+functions in inline data. Enumerate all 509 Color jump-table exports as `(segment, offset)` roots,
+import them with `MarkEntries.java`, then run the static trap map across all ten code segments and
+cross-check it against the 63-trap live floor.
 
 ## ⭐⭐ TARGET 1 — the complete intro, run by the game's own code — COMPLETE
 
@@ -66,35 +67,32 @@ implementation when a real path needs it, rather than weakening the audit or spe
 
 ## Phase 1+ — carried forward, not yet actionable
 
-1. **Write `ghidra_scripts/DumpTraps.java`.** The trap map is the abstraction boundary and there is
-    no inherited script for it (Revs's `DumpHwAccesses.java` hardcodes BBC I/O ranges and was not
-    carried over). → `docs/toolchain.md`.
-2. **Fill `ghidra_scripts/entrypoints.csv` from `CODE 0`.** The jump table makes the postmortem's
+1. **Fill `ghidra_scripts/entrypoints.csv` from `CODE 0`.** The jump table makes the postmortem's
     §1.1 sweep *enumerable* rather than a search — take the win.
-3. **Read the manual / the extras before the binary.** RoF's `docs/manual.md` earned its place.
+2. **Read the manual / the extras before the binary.** RoF's `docs/manual.md` earned its place.
     Present and unread: `scans/Manual.pdf` (5.2 MB), `Map.jpg`, `MapInfo_1/2.jpg`, `KeyChart.jpg`,
     `Package.pdf`, `web_docs/cheats.txt`. ⭐ `KeyChart.jpg` is the input map and `cheats.txt` may
     name states worth reaching in the reference loop.
-4. **Decode the `VETTE!.Data` record formats.** The *inventory* is done
+3. **Decode the `VETTE!.Data` record formats.** The *inventory* is done
     (`docs/source-inventory.md`); the formats are not. ⭐ Start with **`PERF`** — eight records of
     exactly 110 bytes with meaningful names (`Stock`, `ZR1`, `F40`, …), which is the cheapest
     possible place to calibrate a decode. Then `OBJS` (160 models, recurring exact sizes, and
     `QUAD`'s `Quad Discripter Data` says the renderer is quad-based) and `MAPS`. ⚠ Do this against
     the `load` segment's disassembly, not by pattern-guessing — RoF's postmortem §1.2 is about
     exactly this.
-5. **Confirm or kill the `OBJS` two-level-of-detail reading.** The `C`/`S` name pairs
+4. **Confirm or kill the `OBJS` two-level-of-detail reading.** The `C`/`S` name pairs
     (`F40C`/`F40S1`, `GenericC`/`GenericS`, `Taxi`/`TaxiS`, …) `[INFERRED]` a near/far pair per
     object. It is load-bearing for the Amiga frame budget, so it should be confirmed early rather
     than discovered during optimisation. → `docs/source-inventory.md` §OBJS.
-6. **Explain the `Communication` segment and `COMM` 0.** 9.1 KB of code in *both* builds plus a
+5. **Explain the `Communication` segment and `COMM` 0.** 9.1 KB of code in *both* builds plus a
     2 490 B resource, in a single-player driving game. Modem head-to-head is a guess. It matters
     because 9 KB of code that the port may not need at all is 10% of the whole job.
-7. **Explain `FRED`** — 6.5 KB in both builds, name says nothing. ⭐ New evidence, and it is a
+6. **Explain `FRED`** — 6.5 KB in both builds, name says nothing. ⭐ New evidence, and it is a
     strong hint: `FRED` exports **242 of the 509 jump-table entries** — 6 508 bytes across 242
     externally-callable routines is **~27 bytes each**, so `[INFERRED]` it is a library of small leaf
     routines (maths/trig/fixed-point being the obvious candidates, which would fit the table-driven
     trig already found in the data). Cheap to settle: disassemble a dozen of its entries.
-8. ⭐ **The remaining display question is the OCS / 68000 fallback** — crop, squeeze, or none.
+7. ⭐ **The remaining display question is the OCS / 68000 fallback** — crop, squeeze, or none.
     The primary mode is locked at four-bitplane hires interlaced, and the reference run now proves
     the live driving front window is 512×320 above a separate 512×342 surface. The driving
     `CopyBits` probe also proves the game rasterises into its indexed GWorld, so chunky→planar is
