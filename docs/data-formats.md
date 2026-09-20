@@ -185,6 +185,42 @@ game's callable table rather than another encoded schema. This establishes QUAD'
 relationship to OBJS: QUAD does not contain model geometry; it describes a map cell and places
 objects whose factories subsequently choose an OBJS distance-LOD table.
 
+### QUAD dispatch and the `FRED` segment
+
+The previously unexplained `FRED` segment is now closed from both callers and initialized runtime
+data. `Main+$43D0` uses the same 270-long callback table at A5-$409E for both QUAD lists:
+
+- each aligned setup quartet is `dispatch index, D0, D1, D2`; `Main+$4412..+$4430` loads the
+  indexed callback and invokes it directly. These callbacks set the fixed-scene renderer's model
+  and variant globals and submit one or more stationary pieces;
+- each object quartet is `factory index, x, y, z`; `Main+$4440..+$44C0` resolves the callback,
+  converts the coordinates and passes it to `Main+$3E22`. The constructor calls it with the new
+  object at A1. The small callback may adjust position/orientation fields and returns in A0 the
+  initialized model/LOD descriptor used by the object.
+
+All 270 table entries are valid above-A5 jump stubs. They contain 243 distinct exports: 268 slots
+refer to 241 distinct `FRED` exports, while slots 68 and 70 refer respectively to `Main` export 98
+(a fixed-object render helper) and export 25 (a no-op). Across every aligned shipped list, 241
+dispatch indices are used and 29 are dormant. This also explains the generated-looking runs of
+six- to twenty-byte FRED routines: most are data-specific object initializers differing only in a
+model/LOD pointer, heading, or small coordinate adjustment; another family is a compact wrapper
+around the fixed-scene renderer.
+
+The callback table covers every FRED export except 255 (`FRED+$00FC`). That last routine has the
+only direct cross-segment caller, `Main+$28CE`, in the active driving frame. It emits the
+full-width patterned background bands through `Traffic+$6686` according to the current viewport
+height and flags. Thus all 242 FRED exports now have a proved caller family; the code-resource name
+is not being expanded into an invented acronym.
+
+Reproduce the runtime table classification with:
+
+```sh
+python3 tools/dump_quad.py \
+  'tmp/rsrc_VETTE!_VETTE!_Folder_Folder_Color_VETTE!_VETTE!.Data.rsrc' \
+  --runtime-globals tmp/objs_runtime_globals.raw --runtime-a5 0x4861f4 \
+  --entrypoints ghidra_scripts/entrypoints.csv
+```
+
 Validate the grammar, print all record sizes, and verify the Color/B&W resources with:
 
 ```sh

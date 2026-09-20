@@ -86,7 +86,7 @@ prior two ports had to recover the equivalent by hand, which is what `docs/renam
 | 4 | 1 618 | 1 668 | `load` | resource loading; `VETTE!.Data` is the likely subject |
 | 5 | 4 600 | 4 628 | `Score` | scoring / results |
 | 6 | 27 862 | 27 958 | `Traffic` | traffic simulation — the second-largest segment, and identical in size across builds |
-| 7 | 6 488 | 6 508 | `FRED` | ⚠ unexplained, and ~6.5 KB in both |
+| 7 | 6 488 | 6 508 | `FRED` | ⭐ world-construction callbacks: fixed-scenery draw commands and placed-object initializers, plus one per-frame background-band fill |
 | 8 | 3 358 | 3 442 | `Intro` | opening sequence |
 | 9 | 732 | 732 | `sound` | ⭐ **exactly 732 bytes in BOTH builds** — a thin shim, consistent with the audio work living in the `BGAS` driver below rather than in the application |
 | 10 | 28 664 | 28 732 | `%A5Init` | the MPW/Lisa-Pascal **globals initialiser**, compiler-generated. Not game code |
@@ -219,5 +219,10 @@ the project.** Both numbers exist to bracket it, not to size the work.
 ⭐⭐ **Also from `CODE 0`, and these are solid:** 509 jump-table entries, per-segment counts summing
 to exactly 509 (`Main` 130, `FRED` **242**, `Traffic` 80, `Initialize` 16, `Communication` 16,
 `sound` 12, `Score` 9, `Intro` 2, `load` 1, `%A5Init` 1), 31 272 B of A5-relative globals, 4 104 B
-above `a5`. `FRED`'s 242 entries in 6 508 bytes — ~27 bytes per externally-callable routine —
-`[INFERRED]` make it a small-leaf-routine library rather than a subsystem.
+above `a5`. `FRED`'s 242 entries in 6 508 bytes — ~27 bytes per externally-callable routine — are
+now fully accounted for. The 270-entry QUAD command/factory table contains 268 references to 241
+distinct `FRED` exports (plus two `Main` helpers); its one absent export, 255 / `FRED+$00FC`, is
+called directly once per active driving frame. The segment is the compact world-construction
+callback library used by QUAD, not a generic maths library. The original meaning of the name
+`FRED` remains unknown and is not needed to establish its role. → `docs/data-formats.md` §QUAD
+dispatch.

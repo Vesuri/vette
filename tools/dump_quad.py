@@ -2,6 +2,8 @@
 """Validate and summarize VETTE!.Data QUAD map-cell descriptor records."""
 
 import argparse
+import csv
+import re
 import struct
 import sys
 from collections import Counter
@@ -117,6 +119,45 @@ def runtime_responses(raw, a5, bounds):
     return responses
 
 
+def entrypoint_owners(path):
+    """Map a jump-table export number to its segment and CODE offset."""
+    owners = {}
+    with path.open(newline="") as source:
+        for row in csv.reader(source):
+            if len(row) < 4:
+                continue
+            match = re.search(r"jump-table export (\d+)", row[3])
+            if match:
+                owners[int(match.group(1))] = (int(row[0]), int(row[1], 0), row[2])
+    return owners
+
+
+def runtime_dispatch(raw, a5, records):
+    """Decode the QUAD command/factory dispatch table at A5-$409E."""
+    used = set()
+    for record in records:
+        for key in ("setup_words", "object_words"):
+            words = record[key]
+            # Descriptor 191's setup list is not command-aligned.  Do not invent
+            # a grammar for its trailing words; all ordinary lists are quartets.
+            if len(words) % 4:
+                continue
+            used.update(words[pos] for pos in range(0, len(words), 4))
+    if not used or min(used) < 0:
+        raise ValueError("QUAD dispatch indices are missing or negative")
+
+    count = max(used) + 1
+    base = a5 - len(raw)
+    table = a5 - 0x409e - base
+    exports = []
+    for index in range(count):
+        pointer = struct.unpack_from(">I", raw, table + index * 4)[0]
+        if pointer < a5 + 34 or (pointer - a5 - 34) % 8:
+            raise ValueError(f"dispatch {index} is not an above-A5 jump entry")
+        exports.append((pointer - a5 - 34) // 8)
+    return used, exports
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("resource_fork", type=Path)
@@ -126,6 +167,8 @@ def main():
                         help="captured initialized below-A5 globals")
     parser.add_argument("--runtime-a5", type=lambda value: int(value, 0),
                         help="A5 address belonging to --runtime-globals")
+    parser.add_argument("--entrypoints", type=Path,
+                        help="entrypoints.csv used to classify runtime dispatch exports")
     args = parser.parse_args()
     if (args.runtime_globals is None) != (args.runtime_a5 is None):
         parser.error("--runtime-globals and --runtime-a5 must be supplied together")
@@ -166,6 +209,26 @@ def main():
         for index, (locations, handler) in enumerate(responses):
             where = ",".join(f"{selector}:{ordinal}" for selector, ordinal in locations)
             print(f"  response={index:>2} bounds={where:<6} export={handler}")
+
+        used, dispatch = runtime_dispatch(args.runtime_globals.read_bytes(),
+                                          args.runtime_a5, records)
+        print(f"runtime QUAD dispatch: entries={len(dispatch)} used={len(used)} "
+              f"unused={len(dispatch) - len(used)} unique-exports={len(set(dispatch))}")
+        if args.entrypoints:
+            owners = entrypoint_owners(args.entrypoints)
+            unknown = sorted(set(dispatch) - set(owners))
+            if unknown:
+                raise ValueError(f"dispatch exports absent from entrypoint map: {unknown}")
+            by_segment = Counter(owners[export][0] for export in dispatch)
+            unique_by_segment = Counter(owners[export][0] for export in set(dispatch))
+            print("runtime QUAD dispatch by segment: "
+                  + " ".join(f"CODE-{segment}={by_segment[segment]} "
+                             f"({unique_by_segment[segment]} unique)"
+                             for segment in sorted(by_segment)))
+            fred_exports = {export for export, owner in owners.items() if owner[0] == 7}
+            used_fred = set(dispatch) & fred_exports
+            print(f"runtime QUAD dispatch FRED coverage: {len(used_fred)}/{len(fred_exports)} "
+                  f"exports; absent={sorted(fred_exports - used_fred)}")
 
 
 if __name__ == "__main__":

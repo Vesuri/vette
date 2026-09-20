@@ -7,11 +7,12 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — current compatibility boundary
 
-⭐ **HEAD OF QUEUE: explain `FRED` from its callers.**
-The driving-data formats and static/moving collision paths now reach their shipped dashboard,
-repair, water-recovery and beyond-repair endpoints. `FRED` still exports 242 small routines; map
-the first caller families and identify the shared operation performed by its generated-looking
-leaf entries before assigning a subsystem name. → `docs/data-formats.md`, `docs/source-inventory.md`.
+⭐ **HEAD OF QUEUE: settle the OCS / 68000 display fallback.**
+The primary AGA target and driving-data path are now understood through world construction,
+collision, damage and recovery. The remaining display decision is what an OCS/ECS machine should
+do with the 512×320 four-bitplane interlaced surface: retain it unchanged, crop it, or reject the
+configuration explicitly. Establish the real DMA/memory constraints before choosing policy. →
+`PROJECT.md` §Open decisions, `docs/mac-hardware.md`, `docs/amiga-arch.md`.
 
 ## ⭐⭐ TARGET 1 — the complete intro, run by the game's own code — COMPLETE
 
@@ -75,11 +76,10 @@ implementation when a real path needs it, rather than weakening the audit or spe
     separation, traffic response, damage, repair and terminal recovery are closed. ⚠ Do this against
     the `load` segment's disassembly, not by pattern-guessing — RoF's postmortem §1.2 is about
     exactly this.
-2. **Explain `FRED`** — 6.5 KB in both builds, name says nothing. ⭐ New evidence, and it is a
-    strong hint: `FRED` exports **242 of the 509 jump-table entries** — 6 508 bytes across 242
-    externally-callable routines is **~27 bytes each**, so `[INFERRED]` it is a library of small leaf
-    routines (maths/trig/fixed-point being the obvious candidates, which would fit the table-driven
-    trig already found in the data). Cheap to settle: disassemble a dozen of its entries.
+2. ~~**Explain `FRED`.**~~ **COMPLETE.** The 270-entry QUAD command/factory table references 241
+    of its exports; the remaining export is the directly-called per-frame background-band fill.
+    It is the world-construction callback library for fixed scenery and placed objects, not generic
+    maths. → `docs/data-formats.md` §QUAD dispatch.
 3. ⭐ **The remaining display question is the OCS / 68000 fallback** — crop, squeeze, or none.
     The primary mode is locked at four-bitplane hires interlaced, and the reference run now proves
     the live driving front window is 512×320 above a separate 512×342 surface. The driving
