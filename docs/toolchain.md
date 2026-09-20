@@ -284,11 +284,11 @@ Copied from the *Revs* port; each needs a Vette pass.
 
 | Script | Status | Purpose |
 |---|---|---|
-| `MarkEntries.java` | needs `entrypoints.csv` filled from `CODE 0` | mark entry points + disassemble |
+| `MarkEntries.java` | 509 `CODE 0` exports present; stored procedure roots remain | select rows for the current segment, promote heuristic functions to trusted USER_DEFINED roots, then disassemble |
 | `ExportListing.java` | reusable as-is | dump `listing.txt` |
 | `ApplyNames.java` | reusable; ⚠ addresses are segment-relative | apply `symbols.csv` to the project |
 | `DumpCallGraph.java` | reusable | call graph |
-| `DumpTraps.java` | implemented; completeness awaits all `CODE 0` roots in `entrypoints.csv` | flow-following A-line trap map; the direct replacement for Revs's BBC-specific `DumpHwAccesses.java` |
+| `DumpTraps.java` | implemented; stored procedure roots remain | flow-following A-line trap map; the direct replacement for Revs's BBC-specific `DumpHwAccesses.java` |
 
 ### The trap map IS the abstraction boundary
 Its output tells you exactly what `src/mac/` must implement. Generate it early.
@@ -311,10 +311,30 @@ python3 tools/gen_trap_names.py     # once; generated table is local and uncommi
 
 ⭐ **Measured script control:** on the Color Intro resource, seeding only its resource entry at
 offset 4 recovers 25 trap sites. That includes the live log's first sequence at `+003E`, `+0048`,
-`+0070`, `+007C`, and `+00FE`; later live sites such as `Button` at `+0224` are in other exported
-routines and correctly remain absent until `CODE 0` supplies those roots. An earlier implementation
-that trusted every Ghidra ANALYSIS function found 139 sites yet missed required roots—a larger
-number was less complete.
+`+0070`, `+007C`, and `+00FE`. An earlier implementation that trusted every Ghidra ANALYSIS
+function found 139 sites yet missed required roots—a larger number was less complete.
+
+### The `CODE 0` export roots
+
+`ghidra_scripts/entrypoints.csv` is generated from the Color build's intact unloaded table, not
+transcribed. Its 509 rows describe 508 distinct `(segment,address)` roots: Initialize deliberately
+exports the same routine twice. Addresses include the target resource's four-byte near-model header;
+the original routine offset remains in the note. Reproduce or verify it with:
+
+```sh
+python3 tools/code0_entrypoints.py tmp/seg_color/CODE_00.bin \
+  --check ghidra_scripts/entrypoints.csv
+```
+
+The verified per-segment counts are Main 130, Initialize 16, Communication 16, load 1, Score 9,
+Traffic 80, FRED 242, Intro 2, sound 12 and `%A5Init` 1. `MarkEntries.java` reads the segment number
+from each Ghidra program's `CODE_NN...` name and ignores the other rows. If auto-analysis already
+created a function at a root, the script promotes and names it USER_DEFINED; leaving it ANALYSIS
+would make `DumpTraps` correctly refuse to trust it.
+
+With both Intro exports seeded, the static map grows from 25 to 68 sites and contains the live
+cleanup sequence through `DisableItem`. It still omits the live `Button` at `Intro+$0224`, proving
+that the remaining completeness work is stored procedure roots rather than more `CODE 0` entries.
 
 ## The builds
 
@@ -331,5 +351,5 @@ make clean               # ⚠ mandatory before a PROBES build / after a header 
 ./diag_run.sh [secs]     # headless probe run (needs PROBES=1)
 ```
 
-Details and traps: `docs/headless-fsuae.md`. ⚠ Those scripts are inherited and **unverified in this
-repo** — there is no Amiga build yet.
+Details and traps: `docs/headless-fsuae.md`. The scripts and A1200 configuration are verified in
+this repo; the standing beam and pixel-integrity runs are recorded in `docs/amiga-lessons.md`.
