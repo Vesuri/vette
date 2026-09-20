@@ -578,23 +578,6 @@ static bool redirectLowMemoryGlobals(uint8_t* a5)
     return true;
 }
 
-static bool enableMouseSteeringDefault()
-{
-    // load+$062C is the shipped default-selection branch.  It selects exactly
-    // one Steering menu item.  Change Keyboard to Mouse here rather than
-    // recognizing menu coordinates or modifying the driving algorithms.
-    static const uint16_t original[8] = {
-        0x3b7c, 0x0100, 0xacee, 0x426d, 0xacf0, 0x426d, 0xacea, 0x426d
-    };
-    uint8_t* defaults = vette_code_4 + 0x062c;
-    for (uint16_t i = 0; i < 8; ++i)
-        if (read16(defaults + i * 2) != original[i]) return false;
-    if (read16(defaults + 16) != 0xacec) return false;
-    write16(defaults + 4, 0xacea);          // Mouse = true
-    write16(defaults + 12, 0xacee);         // Keyboard = false
-    return true;
-}
-
 static bool disableCopyProtection()
 {
     // Main+$05FE is the entry to the manual challenge.  The successful-answer
@@ -4354,16 +4337,16 @@ static bool translateAmigaKey(uint8_t raw, KeyTranslation& key)
 
 static uint8_t drivingVirtualKey(uint8_t raw, uint8_t virtualKey)
 {
-    // Modern keyboards commonly omit the numeric keypad used by VETTE!'s
-    // compact driving layout.  The original game assigns no driving action to
-    // the cursor keys, so alias the Amiga cursor cluster only in the live
-    // KeyMap.  Keep its translated Macintosh arrow codes in EventRecords so
-    // non-driving UI code still sees genuine cursor-key events.
+    // Modern keyboards commonly omit VETTE!'s intended compact driving
+    // cluster.  The original game assigns no driving action to the cursor
+    // keys, so alias the Amiga cursor cluster to its Keyboard-mode I/J/L/M
+    // controls only in the live KeyMap.  Keep translated Macintosh arrow codes
+    // in EventRecords so non-driving UI code still sees genuine cursor keys.
     switch (raw) {
-    case 0x4c: return 0x5b; // cursor up    -> keypad 8 (accelerate)
-    case 0x4d: return 0x54; // cursor down  -> keypad 2 (brake)
-    case 0x4e: return 0x58; // cursor right -> keypad 6 (steer right)
-    case 0x4f: return 0x56; // cursor left  -> keypad 4 (steer left)
+    case 0x4c: return 0x22; // cursor up    -> I (accelerate)
+    case 0x4d: return 0x2e; // cursor down  -> M (brake)
+    case 0x4e: return 0x25; // cursor right -> L (steer right)
+    case 0x4f: return 0x26; // cursor left  -> J (steer left)
     default: return virtualKey;
     }
 }
@@ -5627,8 +5610,7 @@ bool MacLoader::run(VetteScreen* screen)
     uint8_t* a5;
     if (!buildA5World(a5)) return false;
     s_currentA5 = a5;
-    if (!redirectLowMemoryGlobals(a5) || !enableMouseSteeringDefault()
-        || !disableCopyProtection()
+    if (!redirectLowMemoryGlobals(a5) || !disableCopyProtection()
         || !installDrivingBoundaryTrap() || !installStaticCollisionProbe()) return false;
 
     Disable();
