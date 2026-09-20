@@ -7,10 +7,10 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — current compatibility boundary
 
-⭐ **HEAD OF QUEUE: read the manual / the extras before the binary.** Present and unread:
-`scans/Manual.pdf`, `Map.jpg`, `MapInfo_1/2.jpg`, `KeyChart.jpg`, `Package.pdf` and
-`web_docs/cheats.txt`. Extract the input/state vocabulary and any named data structures before
-decoding `VETTE!.Data`; do not infer from binary patterns what the shipped documentation can state.
+⭐ **HEAD OF QUEUE: decode the `VETTE!.Data` record formats.** Start with the eight fixed 110-byte
+`PERF` records. Use the manual's eight exact car names and recurring specification fields to test
+the decode against the `load` segment; do not assign fields from numerical shape alone. Then move
+to `OBJS` and `MAPS`.
 
 ## ⭐⭐ TARGET 1 — the complete intro, run by the game's own code — COMPLETE
 
@@ -66,30 +66,23 @@ implementation when a real path needs it, rather than weakening the audit or spe
 
 ## Phase 1+ — carried forward, not yet actionable
 
-1. **Read the manual / the extras before the binary.** RoF's `docs/manual.md` earned its place.
-    Present and unread: `scans/Manual.pdf` (5.2 MB), `Map.jpg`, `MapInfo_1/2.jpg`, `KeyChart.jpg`,
-    `Package.pdf`, `web_docs/cheats.txt`. ⭐ `KeyChart.jpg` is the input map and `cheats.txt` may
-    name states worth reaching in the reference loop.
-2. **Decode the `VETTE!.Data` record formats.** The *inventory* is done
+1. **Decode the `VETTE!.Data` record formats.** The *inventory* is done
     (`docs/source-inventory.md`); the formats are not. ⭐ Start with **`PERF`** — eight records of
     exactly 110 bytes with meaningful names (`Stock`, `ZR1`, `F40`, …), which is the cheapest
     possible place to calibrate a decode. Then `OBJS` (160 models, recurring exact sizes, and
     `QUAD`'s `Quad Discripter Data` says the renderer is quad-based) and `MAPS`. ⚠ Do this against
     the `load` segment's disassembly, not by pattern-guessing — RoF's postmortem §1.2 is about
     exactly this.
-3. **Confirm or kill the `OBJS` two-level-of-detail reading.** The `C`/`S` name pairs
+2. **Confirm or kill the `OBJS` two-level-of-detail reading.** The `C`/`S` name pairs
     (`F40C`/`F40S1`, `GenericC`/`GenericS`, `Taxi`/`TaxiS`, …) `[INFERRED]` a near/far pair per
     object. It is load-bearing for the Amiga frame budget, so it should be confirmed early rather
     than discovered during optimisation. → `docs/source-inventory.md` §OBJS.
-4. **Explain the `Communication` segment and `COMM` 0.** 9.1 KB of code in *both* builds plus a
-    2 490 B resource, in a single-player driving game. Modem head-to-head is a guess. It matters
-    because 9 KB of code that the port may not need at all is 10% of the whole job.
-5. **Explain `FRED`** — 6.5 KB in both builds, name says nothing. ⭐ New evidence, and it is a
+3. **Explain `FRED`** — 6.5 KB in both builds, name says nothing. ⭐ New evidence, and it is a
     strong hint: `FRED` exports **242 of the 509 jump-table entries** — 6 508 bytes across 242
     externally-callable routines is **~27 bytes each**, so `[INFERRED]` it is a library of small leaf
     routines (maths/trig/fixed-point being the obvious candidates, which would fit the table-driven
     trig already found in the data). Cheap to settle: disassemble a dozen of its entries.
-6. ⭐ **The remaining display question is the OCS / 68000 fallback** — crop, squeeze, or none.
+4. ⭐ **The remaining display question is the OCS / 68000 fallback** — crop, squeeze, or none.
     The primary mode is locked at four-bitplane hires interlaced, and the reference run now proves
     the live driving front window is 512×320 above a separate 512×342 surface. The driving
     `CopyBits` probe also proves the game rasterises into its indexed GWorld, so chunky→planar is

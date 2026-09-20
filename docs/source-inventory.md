@@ -82,7 +82,7 @@ prior two ports had to recover the equivalent by hand, which is what `docs/renam
 | 0 | 4 072 | 4 088 | — | **the jump table** + Segment Loader header. Not code. Its 509 exports are now in `ghidra_scripts/entrypoints.csv`; generation and validation are documented in `docs/toolchain.md`. |
 | 1 | 32 606 | 24 994 | `Main` | the main loop / event loop |
 | 2 | 5 448 | 7 032 | `Initialize` | startup |
-| 3 | 9 106 | 9 110 | `Communication` | ⚠ **unexplained.** A single-player driving game with a `Communication` segment in *both* builds, near-identical in size, and a `COMM` resource. Modem head-to-head play is the obvious guess and it is only a guess |
+| 3 | 9 106 | 9 110 | `Communication` | ⭐ **explained by the manual:** head-to-head play over direct serial, Hayes-compatible modem, or AppleTalk; not required for the single-player milestone |
 | 4 | 1 618 | 1 668 | `load` | resource loading; `VETTE!.Data` is the likely subject |
 | 5 | 4 600 | 4 628 | `Score` | scoring / results |
 | 6 | 27 862 | 27 958 | `Traffic` | traffic simulation — the second-largest segment, and identical in size across builds |
@@ -106,7 +106,7 @@ largest being `Main` at 32.6 KB and `Traffic` at 27.9 KB. That is the size of th
 | `SINE` | 2 | 8 712 | `Sine Table 360`, `Tangent Table` |
 | `CLST` | 14 | 7 048 | the courses: `Course1a…c`, `Course2a…e`, `Course3a/b`, `Course4a/b` |
 | `FREE` | 1 | 2 880 | `freeway deltas` |
-| `COMM` | 1 | 2 490 | id 0, unnamed. Pairs with the `Communication` segment |
+| `COMM` | 1 | 2 490 | id 0, unnamed. Pairs with the documented head-to-head `Communication` segment |
 | `PATN` | 2 | 2 048 | `Main_Map` ×2, 1 024 B each — QuickDraw patterns for the map display |
 | `STRT` | 1 | 2 222 | `Street_Names` |
 | `COLL` | 6 | 2 184 | named `4*11`, `10*20`, `13*29`, `18*80`, `18*90`, `22*92` — ⭐ the names look like **grid dimensions**, and 6 sizes suggests per-course or per-object-class collision grids |
@@ -128,7 +128,10 @@ Amiga side, because it means the hot path does **not** need the 32-bit multiply/
 lacks (the `muldiv-audit` rule in `CLAUDE.md`), and the tables port across unchanged.
 
 ⚠ `PERF` being **exactly 110 bytes × 8** makes it the cheapest place to start reading data formats:
-a fixed-size record, eight instances, with meaningful names to check a decode against.
+a fixed-size record, eight instances, with meaningful names to check a decode against. The manual
+now supplies the independent schema vocabulary: engine, drivetrain/gears, dimensions,
+steering/brakes, wheels/tires, acceleration and performance, for four player Corvettes and four
+opponent cars. → `docs/manual.md`.
 
 ## Audio — ⭐⭐ this corrects a documented assumption
 

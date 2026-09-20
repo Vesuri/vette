@@ -1,0 +1,193 @@
+# What the shipped documentation says
+
+This is the port-facing digest of the scanned VETTE! manual and extras. It records facts that
+would otherwise be tempting to infer from code or data. Page numbers below are the **printed manual
+pages**; the PDF has six unnumbered front-matter pages before page 1.
+
+Sources, all local-only under `tmp/unpacked/VETTE! 1.02 Folder/`:
+
+- `scans/Manual.pdf` - 49 scanned pages, the original VETTE! manual
+- `scans/KeyChart.jpg` - keyboard command chart
+- `scans/Map.jpg`, `MapInfo_1.jpg`, `MapInfo_2.jpg` - street map and location guide
+- `scans/Package.pdf` - the later Mindscape five-game CD package
+- `web_docs/cheats.txt` - archive maintainer's cheats and version-specific patches
+
+The package scan is not the authority for the original game's requirements: it describes the
+later five-game CD bundle (System 7, 4 MB, 256-colour monitor). The original manual below describes
+the VETTE! release whose binaries are in the archive.
+
+## Supported Macintosh configurations
+
+The manual states (pp. 5-7):
+
+- all Macs need at least 1 MB RAM and an 800K drive;
+- colour requires a Mac II-series or LC, at least 2 MB RAM, a 4-bit/16-colour video card and a hard
+  drive;
+- both versions require System 6.0.2 or later;
+- the colour version specifically requires System 6.0.5 or later, 32-bit QuickDraw, the Monitors
+  setting at 16 colours, and a hard drive;
+- under MultiFinder/System 7, colour needs 1,500K RAM; 68000 Macs need MacsBug and 900K for B&W.
+
+The Gravis MouseStick instructions name four intended display configurations: **512x342** for a
+standard 9-inch screen, **512x384** for a 12-inch screen, **640x400** for a Portable, and
+**640x480** for a 13-inch RGB monitor (p. 7). This independently supports the port's chosen
+512x384 display while explaining the game's 512x342 and 512x320 Macintosh drawing surfaces.
+
+## Game flow and named states
+
+The documented single-player flow (pp. 2-10) is:
+
+1. title/intro, dismissible with the mouse button;
+2. performance-test garage: select one of four player Corvettes, optionally run the dynamometer,
+   then accept;
+3. choose `TRAINEE`, `ROOKIE`, or `PRO`;
+4. choose one of four opponent cars;
+5. choose one of four courses;
+6. answer the trivia/copy-protection question;
+7. wait for the bottom starting light, then race;
+8. finish between the two poles and under the checkerboard, followed by a win/loss scene and
+   possibly a Top Ten name entry.
+
+Player cars (Appendix A, p. 31) are:
+
+- 1989 Stock Corvette
+- 1989 ZR1 "King of the Hill" Corvette
+- Callaway "Twin Turbo" Corvette
+- Callaway "Sledgehammer" Corvette
+
+Opponent cars are Porsche 928S4, Lamborghini Countach, Ferrari Testarossa and Ferrari F40.
+These names are the semantic key for the eight 110-byte `PERF` resources. The appendix's recurring
+field groups are engine, drivetrain/gears, dimensions, steering/brakes, wheels/tires, acceleration
+and performance; use those labels to test a decode rather than assigning fields from numerical
+shape alone.
+
+### Difficulty is a concrete four-column state
+
+The selector defines this exact matrix (p. 8):
+
+| level | damage | traction | police | cruise control |
+|---|---|---|---|---|
+| TRAINEE | none | high | inactive | constant |
+| ROOKIE | reduced | moderate | active | constant |
+| PRO | realistic | realistic | active | realistic |
+
+At TRAINEE, collisions cannot damage the car; they can still slow it and cost time. Water is the
+documented exception that can end a TRAINEE race (p. 4), matching the observed Lake Merced tow
+sequence. Realistic cruise control disengages after braking or below 25 mph and must be re-engaged.
+
+## Driving model vocabulary
+
+The manual supplies names worth carrying into symbols and probes (pp. 10-14):
+
+- manual/automatic transmission; four to six forward gears plus reverse;
+- steering input, current speed, degree of turn and terrain jointly determine acceleration;
+- `turn correction`, `skid traction`, `skid rate`, and `skid scrub rate` are separately adjustable;
+- collision damage depends on speed, angle, object and skill level;
+- damage is divided into steering, turning, engine and transmission indicators, with minor,
+  moderate and severe levels;
+- gas stations repair the car when parked between pumps and building; beyond-repair damage causes
+  a tow back to the garage and ends the race;
+- active police issue speeding, reckless-driving, hit-and-run and vehicular-manslaughter tickets;
+  penalties are 5, 10, 10 and 30 seconds respectively;
+- the finish must be crossed between two poles beneath the checkerboard.
+
+The dashboard exposes race timer, cruise-control indicator, speedometer, turn signal,
+automatic-shift indicator, upshift indicator, tachometer, traffic-control icons, current street and
+upcoming cross street (p. 12). The navigation map shows player and opponent positions; the player's
+square flashes twice and heading appears at lower right (p. 18).
+
+## Renderer and performance controls
+
+These are real user-facing renderer controls, not inferred optimisation ideas (pp. 14-17):
+
+- rear-view mirror toggle;
+- sound and engine-sound toggles;
+- in-car versus helicopter view;
+- traffic density;
+- `block size`: 3x2 default for speed, 3x3 or 4x3 for more visible buildings/objects;
+- buildings toggle;
+- B&W-only horizon toggle and solid/wireframe toggle;
+- `outline`: outlines buildings and vehicles when enabled; the manual recommends disabling it on
+  68000 Macs;
+- brake rate, minimum turn, maximum turn, turn correction, skid traction, skid rate, skid scrub
+  rate and gravity.
+
+The manual's prescribed speed-up order is: rear mirror off, sound off, use an inside view instead
+of helicopter view, B&W horizon off, reduce traffic density, B&W wireframe, buildings off, use the
+B&W executable, then restore Outline off and Block Size 3x2 if preferences changed.
+
+This matters to the port roadmap: object density, visible-block radius and rendering style are
+explicit game states. They should be located in A5 globals and named before profiling or changing
+the renderer.
+
+## Complete keyboard controls
+
+Chapter 9 (pp. 29-30) and `KeyChart.jpg` agree:
+
+| action | key |
+|---|---|
+| steer left/right | `J` / `L`, or keypad `4` / `6` |
+| recover from skid | `K`, or keypad `5` |
+| full stop | `F` |
+| accelerate | `I`, or keypad `8` |
+| brake | `M`, Space, or keypad `2` |
+| accelerate left/right | `U` / `O`, or keypad `7` / `9` |
+| brake left/right | `N` / `,`, or keypad `1` / `3` |
+| views left/forward/right/helicopter | F1/F2/F3/F4 |
+| raise/lower view | F7/F8 |
+| viewing angle up/down | F9/F10 |
+| gears 1-6 | top-row `1`-`6` |
+| neutral/reverse | top-row `0` / `R` |
+| upshift/downshift | top-row `+` / `-` |
+| front dash / rear mirror | `5` / `6` (or the documented command/function equivalents) |
+| automatic shift / buildings / cruise / damage | `A` / `B` / `C` / `D` |
+| engine sound / gear-shift display / navigation / pause / sound | `E` / `G` / `H` / `P` / `S` |
+| tour mode / menu / horn | `T` / Escape or `Q` / `Z` |
+| head-to-head chat | `9` |
+
+The B&W-only horizon and wireframe toggles are `V` and `W`.
+
+## Courses and world boundaries
+
+The four course endpoints (pp. 18-21) are:
+
+1. San Francisco Zoo to Vista Point via the Golden Gate Bridge;
+2. Golden Gate Bridge to Bay Bridge;
+3. Bay Bridge to San Francisco Zoo;
+4. the first three in sequence, Zoo -> Golden Gate -> Bay Bridge -> Zoo.
+
+Routes are not fixed: the printed map shows streets but deliberately does not prescribe a route.
+The city is bounded by intentionally inaccessible/construction-blocked roads. `Map.jpg` supplies
+the authoritative street/landmark vocabulary; `MapInfo_1/2.jpg` describes the named landmarks,
+including Lake Merced as a U-shaped reservoir southwest of the zoo.
+
+The archive cheat documents one additional state: on Course 3, reverse from the Bay Bridge far
+enough with wall left/ocean right to enter hidden streets named after the developers. This is a
+useful later reference-loop target, not evidence for the normal map format.
+
+## Communication is head-to-head play
+
+The manual settles the `Communication` segment and `COMM` resource question (Chapter 7,
+pp. 22-24). VETTE! supports two-player head-to-head racing over:
+
+- direct modem-port cable (`Direct Connect`);
+- two Hayes-compatible modems at 1200 baud or faster (`Modem Connect`), including tone/pulse,
+  baud rate, auto-answer, manual AT commands, audio checksum and saved setup;
+- AppleTalk (`AppleTalk Connect`) with opponent discovery/challenge.
+
+The Options -> Communications submenu switches from Single Player to Mac to Mac. Each player may
+choose a different difficulty and Corvette; the opponent selector controls the model drawn for the
+remote car while its performance follows the other player's chosen Corvette. Course disagreement
+is resolved randomly (or by the caller for modem play). `+` opens a chat window and pauses both
+players until the message has been read.
+
+Therefore `Communication` is not mysterious game logic and is not required for the single-player
+Amiga milestone. It should remain resident-compatible but can stay unimplemented until multiplayer
+is explicitly brought into scope.
+
+## Copy protection notes
+
+The manual says the player gets two attempts; a second wrong answer allows a short drive before a
+police arrest and automatic quit (pp. 3, 9). `web_docs/cheats.txt` says version 1.02 asks only once
+on first run and records older version-specific binary patches. Those patches are historical clues,
+not a basis for this port's protection removal; the port's patch remains tied to its own disassembly.

@@ -88,8 +88,9 @@ locked, and other docs quote it by number.
 `docs/toolchain.md` §From the archive to the segments.
 
 Inside: an **8049 KiB HFS volume** as an NDIF image, plus the extras — `scans/Manual.pdf` (5.2 MB),
-`Map.jpg`, `MapInfo_1/2.jpg`, `KeyChart.jpg`, `Package.pdf`, and `web_docs/cheats.txt`. ⭐ Worth
-reading *before* the binary; RoF's `docs/manual.md` earned its place. ⚠ `readme.txt` says the build
+`Map.jpg`, `MapInfo_1/2.jpg`, `KeyChart.jpg`, `Package.pdf`, and `web_docs/cheats.txt`. ⭐ Read and
+distilled into `docs/manual.md`; it supplies the game's state/input vocabulary and proves that
+`Communication` is the optional head-to-head subsystem. ⚠ `readme.txt` says the build
 asks for a copy-protection password **once, on first run**, and the answers are in the first pages of
 `Manual.pdf` — so a reference-loop image must be set up past that, and a fresh one will stop there.
 ⚠ That constraint is about **ground truth**, and the protection decision does not retire it: the
