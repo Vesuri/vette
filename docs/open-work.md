@@ -7,10 +7,11 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — current compatibility boundary
 
-⭐ **HEAD OF QUEUE: decode the inner `OBJS` renderer records and their `QUAD` relationship.**
-The OBJS grammar, orientation groups, primitive records, raster-pattern selectors and original
-distance-LOD selector are proved. Trace the remaining flag bits and the `QUAD` descriptor table
-into their renderer consumers. Name fields only from code use, not from shape.
+⭐ **HEAD OF QUEUE: finish the `OBJS`/`QUAD` renderer semantics.**
+The OBJS grammar, orientation groups, primitive records, raster-pattern selectors, distance-LOD
+selector, and QUAD map-cell/object-placement relationship are proved. Trace the remaining OBJS
+flag bits, QUAD's second header word, and its setup/factory indices to concrete effects. Name fields
+only from code use, not from shape.
 → `docs/data-formats.md` §OBJS.
 
 ## ⭐⭐ TARGET 1 — the complete intro, run by the game's own code — COMPLETE

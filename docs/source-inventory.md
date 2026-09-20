@@ -159,11 +159,13 @@ The 16 `INST` resources, which double as a list of what the game makes noises ab
 
 ## `OBJS` — 160 named models, and the world is real San Francisco
 
-Sizes run 100 B to 1 848 B. `Initialize+$063A` proves the variable-length outer grammar: coordinate
-records, variable records, groups of references to those records, and eight group selectors. All
-160 records validate exactly, and the B&W and colour sets are byte-identical. The inner
-variable-record fields and `QUAD` relationship still need renderer consumers before they are
-named. → `docs/data-formats.md`, `tools/dump_objs.py`.
+Sizes run 100 B to 1 848 B. `Initialize+$063A` and `Main+$2A9E` prove the complete render grammar:
+four orientation-reference coordinates, geometry vertices, flagged primitives with one of 32
+raster patterns, groups of primitive references, and eight view-selected groups. All 160 records
+validate exactly, and the B&W and colour sets are byte-identical. The 192 `QUAD` records are map
+cell descriptors: each carries two header words, setup calls, and positioned object-factory calls
+which lead to the OBJS distance-LOD tables. Remaining flag/header/index meanings are explicitly
+queued rather than guessed. → `docs/data-formats.md`, `tools/dump_objs.py`, `tools/dump_quad.py`.
 
 - **Landmarks:** `GoldGate`, `BayBridge`, `Lombard`, `Marina`, `Broadway`, `SunsetBlvd`,
   `GreatHighway`, `Hwy1`, `Hwy280`, `Hwy480`, `Clay`, `Gough`, `Oak`, `Chinatown`, `Cliffhouse`,

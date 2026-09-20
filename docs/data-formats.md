@@ -150,3 +150,35 @@ python3 tools/dump_objs.py \
 
 Add `--runtime-globals tmp/objs_runtime_globals.raw --runtime-a5 0x4861f4` (using the A5 printed
 by `amiga/objs_runtime.gdb`) to enumerate the initialized LOD tables by resource name.
+
+## `QUAD` map-cell descriptors
+
+The single 11,366-byte `QUAD` resource (`1000`, `Quad Discripter Data`) begins with an exact
+following-word count and contains 192 variable-size map-cell descriptors. `Main+$2C64` builds a
+direct pointer table to them. Each descriptor is:
+
+```
+word  traffic/road behavior type
+word  second header field (meaning not yet proved)
+repeat { word dispatch index; word argument 0; word argument 1; word argument 2; }
+word  -1
+repeat { word object-factory index; word x; word y; word z; }
+word  -1
+```
+
+Two final `-1` words terminate the whole resource after the last descriptor. `Main+$43D0` indexes
+the pointer table with the current map-cell type, copies the two header words, invokes every first
+list entry through the game's dispatch table, and feeds every second-list entry plus its three
+coordinates to `Main+$3E22`, the dynamic-object constructor. `Traffic+$3D7C` independently reads
+the first header word and branches on proved values 0, 1, 2, 3, 4, 6, 7, and 8; names for those
+individual road behaviors still require tracing the branches to effects. This establishes QUAD's
+relationship to OBJS: QUAD does not contain model geometry; it describes a map cell and places
+objects whose factories subsequently choose an OBJS distance-LOD table.
+
+Validate the grammar, print all record sizes, and verify the Color/B&W resources with:
+
+```sh
+python3 tools/dump_quad.py \
+  'tmp/rsrc_VETTE!_VETTE!_Folder_Folder_Color_VETTE!_VETTE!.Data.rsrc' \
+  --compare 'tmp/rsrc_VETTE!_VETTE!_Folder_Folder_B&W_VETTE!_VETTE!.Data.rsrc'
+```
