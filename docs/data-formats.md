@@ -109,8 +109,11 @@ ignored word followed by signed `x`, `y`, and `z`; 4,933 of 4,934 ignored words 
 
 `Main+$2A9E` uses that 3-bit selector to choose one of the eight resolved group pointers and walks
 its primitive pointers to `-1`. In each primitive, flag bit 0 enables `Main+$4550`'s geometric
-facing test and bit 2 selects the outline/polyline raster path. Other observed flag bits remain
-unnamed. The second word is proved to be a raster-pattern selector: the span writer multiplies it
+facing test and bit 2 selects the outline/polyline raster path. The shipped flag values also use
+bit 1 and bit 13, but the complete `Main+$2A9E` path does not consume either: after testing bits 0
+and 2, both the outline and fill branches overwrite the flags register before rasterisation. They
+are preserved but dead metadata in this v1.02 renderer, not semantics to invent. The second word is
+proved to be a raster-pattern selector: the span writer multiplies it
 by 32 to select a packed-nibble pattern table; values span the exact range 0..31. This is why some
 car panels are dithered rather than assigned a single palette colour.
 
@@ -175,7 +178,10 @@ Descriptor 191 has 11 setup words after its header; it is retained and reported 
 not evidence for a different command grammar until reachability proves the game selects it.
 `Traffic+$3D7C` independently reads
 the first header word and branches on proved values 0, 1, 2, 3, 4, 6, 7, and 8; names for those
-individual road behaviors still require tracing the branches to effects. This establishes QUAD's
+individual road behaviors belong with the MAPS/collision trace. The second header word is written
+to A5-$2500 by `Main+$43FC`, but an exhaustive search of every resident segment finds no read; it
+is dead shipped metadata in v1.02. The two command-list indices are already direct indices into the
+game's callable table rather than another encoded schema. This establishes QUAD's
 relationship to OBJS: QUAD does not contain model geometry; it describes a map cell and places
 objects whose factories subsequently choose an OBJS distance-LOD table.
 

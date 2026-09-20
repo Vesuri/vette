@@ -164,8 +164,9 @@ four orientation-reference coordinates, geometry vertices, flagged primitives wi
 raster patterns, groups of primitive references, and eight view-selected groups. All 160 records
 validate exactly, and the B&W and colour sets are byte-identical. The 257 `QUAD` records are map
 cell descriptors: each carries two header words, setup calls, and positioned object-factory calls
-which lead to the OBJS distance-LOD tables. Remaining flag/header/index meanings are explicitly
-queued rather than guessed. → `docs/data-formats.md`, `tools/dump_objs.py`, `tools/dump_quad.py`.
+which lead to the OBJS distance-LOD tables. The otherwise-unused OBJS flag bits and QUAD second
+header word are proved unreferenced in the resident v1.02 code rather than assigned guessed
+meanings. → `docs/data-formats.md`, `tools/dump_objs.py`, `tools/dump_quad.py`.
 
 - **Landmarks:** `GoldGate`, `BayBridge`, `Lombard`, `Marina`, `Broadway`, `SunsetBlvd`,
   `GreatHighway`, `Hwy1`, `Hwy280`, `Hwy480`, `Clay`, `Gough`, `Oak`, `Chinatown`, `Cliffhouse`,

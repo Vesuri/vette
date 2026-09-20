@@ -7,12 +7,12 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — current compatibility boundary
 
-⭐ **HEAD OF QUEUE: finish the `OBJS`/`QUAD` renderer semantics.**
-The OBJS grammar, orientation groups, primitive records, raster-pattern selectors, distance-LOD
-selector, and QUAD map-cell/object-placement relationship are proved. Trace the remaining OBJS
-flag bits, QUAD's second header word, and its setup/factory indices to concrete effects. Name fields
-only from code use, not from shape.
-→ `docs/data-formats.md` §OBJS.
+⭐ **HEAD OF QUEUE: decode `MAPS` and connect map cells to QUAD road behavior.**
+The OBJS and QUAD formats are closed: geometry, primitives, patterns, view groups, distance LOD,
+map-cell descriptors and object placement are proved; the remaining shipped flag/header bits are
+demonstrably unreferenced. Start from the five `MAPS` resources and the cell lookup feeding
+`Main+$43D0`, then trace QUAD's first header word through `Traffic+$3D7C` into road/collision
+effects. Name fields only from code use, not from shape. → `docs/data-formats.md`.
 
 ## ⭐⭐ TARGET 1 — the complete intro, run by the game's own code — COMPLETE
 
@@ -71,8 +71,7 @@ implementation when a real path needs it, rather than weakening the audit or spe
 1. **Decode the `VETTE!.Data` record formats.** The *inventory* is done
     (`docs/source-inventory.md`); the formats are not. `PERF` now has a proved 37-word race-template
     prefix; its remaining 17 words are unreferenced dead data in both v1.02 executables. Decode
-    Continue `OBJS` (160 models, recurring exact sizes, and
-    `QUAD`'s `Quad Discripter Data` says the renderer is quad-based) and `MAPS`. ⚠ Do this against
+    `OBJS` and `QUAD` are now decoded; continue with `MAPS`. ⚠ Do this against
     the `load` segment's disassembly, not by pattern-guessing — RoF's postmortem §1.2 is about
     exactly this.
 2. **Explain `FRED`** — 6.5 KB in both builds, name says nothing. ⭐ New evidence, and it is a
