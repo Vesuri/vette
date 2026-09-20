@@ -80,16 +80,39 @@ The on-disk sequence is:
 4. a last index `G`, followed by `G+1` groups of indices into the variable-record table;
 5. exactly eight indices into the group table.
 
-A variable-length record has three fixed header words. Its third word is a last index `N`, making
-the complete record `N+5` words. A group begins with its reference last index and is followed by
-that many-plus-one variable-record indices.
+A variable-length record is a render primitive:
+
+```
+word  flags
+word  raster-pattern selector (0..31)
+word  edge count N
+word  N+1 byte offsets into the transformed 16-byte vertex records
+word  -1 terminator
+```
+
+The offsets are always multiples of 16, never name the first four coordinate records, and stay
+inside the model's coordinate array. Filled primitives explicitly repeat their first vertex at the
+end; the outline/polyline path may remain open. A group begins with its reference last index and is
+followed by that many-plus-one primitive indices.
 
 This is not merely a shape fit. `Initialize+$0678` obtains the resource data pointer and the code
 then performs that exact walk: it retains the coordinate block, builds pointers to every
 variable-length record, resolves each group index into one of those pointers, and finally resolves
 the eight tail indices into group pointers stored in a 40-byte runtime model descriptor.
-`Initialize+$068A` stores `C-4` as the runtime coordinate last index; the meaning of the five
-excluded coordinate records still needs a renderer consumer before it is named.
+`Initialize+$068A` stores `C-4` as the runtime coordinate last index. `Main+$2A9E/$50B0` consumes
+the first four coordinate records separately, transforms their `(x,y,z)` words, and performs three
+sign tests to produce the 3-bit (0..7) group selector. `Main+$50FC` then transforms the remaining
+`C-3` coordinate records. Thus no coordinates are discarded: the first four are orientation
+reference vertices and the rest are render geometry. Each eight-byte source coordinate is an
+ignored word followed by signed `x`, `y`, and `z`; 4,933 of 4,934 ignored words are `-1` (the lone
+`Truck` value is 6), and this renderer never reads them.
+
+`Main+$2A9E` uses that 3-bit selector to choose one of the eight resolved group pointers and walks
+its primitive pointers to `-1`. In each primitive, flag bit 0 enables `Main+$4550`'s geometric
+facing test and bit 2 selects the outline/polyline raster path. Other observed flag bits remain
+unnamed. The second word is proved to be a raster-pattern selector: the span writer multiplies it
+by 32 to select a packed-nibble pattern table; values span the exact range 0..31. This is why some
+car panels are dithered rather than assigned a single palette colour.
 
 ### Runtime model LOD tables
 

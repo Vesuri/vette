@@ -37,6 +37,7 @@ def decode(body: bytes):
     record_count = words[pos] + 1
     pos += 1
     variable_records = []
+    primitives = []
     for _ in range(record_count):
         if pos + 2 >= len(words):
             raise ValueError("truncated variable-record header")
@@ -44,7 +45,27 @@ def decode(body: bytes):
         record_words = payload_last + 5
         if payload_last < 0 or pos + record_words > len(words):
             raise ValueError(f"invalid variable-record last index {payload_last}")
-        variable_records.append(words[pos:pos + record_words])
+        record = words[pos:pos + record_words]
+        vertex_offsets = record[3:-1]
+        if record[-1] != -1:
+            raise ValueError("primitive record does not end in -1")
+        if len(vertex_offsets) != payload_last + 1:
+            raise ValueError("primitive coordinate-offset count mismatch")
+        if any(offset < 64 or offset % 16
+               or offset >= coordinate_count * 16
+               for offset in vertex_offsets):
+            raise ValueError("primitive coordinate offset is outside the geometry vertices")
+        # Main+$4550/$475C prove bit 0's facing test and bit 2's
+        # outline/polyline path.  Filled primitives are closed explicitly.
+        if not (record[0] & 4) and vertex_offsets[0] != vertex_offsets[-1]:
+            raise ValueError("filled primitive is not explicitly closed")
+        variable_records.append(record)
+        primitives.append({
+            "flags": record[0],
+            "pattern": record[1],
+            "edge_count": payload_last,
+            "vertex_offsets": vertex_offsets,
+        })
         pos += record_words
 
     group_count = words[pos] + 1
@@ -76,6 +97,7 @@ def decode(body: bytes):
         # Initialize+$068A stores coordinate_last-4 in the runtime descriptor.
         "runtime_coordinate_last": coordinate_last - 4,
         "variable_records": variable_records,
+        "primitives": primitives,
         "groups": groups,
         "selectors": selectors,
     }
