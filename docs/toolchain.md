@@ -332,9 +332,13 @@ from each Ghidra program's `CODE_NN...` name and ignores the other rows. If auto
 created a function at a root, the script promotes and names it USER_DEFINED; leaving it ANALYSIS
 would make `DumpTraps` correctly refuse to trust it.
 
-With both Intro exports seeded, the static map grows from 25 to 68 sites and contains the live
-cleanup sequence through `DisableItem`. It still omits the live `Button` at `Intro+$0224`, proving
-that the remaining completeness work is stored procedure roots rather than more `CODE 0` entries.
+The first two-export Intro run stopped at an unresolved `JSR d(A5)` and found only 68 sites. That
+was not a missing callback root: disassembly shows `Button` at `Intro+$0224` in the first export,
+after `JSR 1946(A5)`. Two Ghidra details hid it: the unresolved call supplied no fall-through, and
+Data Reference Analysis had defined the Macintosh low-memory target `$016A` on top of code at the
+same raw segment offset. `DumpTraps` now resumes after unresolved calls and lets a trusted flow edge
+replace analyzer-created data. The measured result is 75 Intro sites including `+$0224`; the live
+run's 103 distinct sites leaves 28 roots or indirect edges still to account for honestly.
 
 ## The builds
 

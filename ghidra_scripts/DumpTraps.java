@@ -14,6 +14,7 @@
 import ghidra.app.script.GhidraScript;
 import ghidra.program.model.address.Address;
 import ghidra.program.model.listing.Function;
+import ghidra.program.model.listing.CodeUnit;
 import ghidra.program.model.listing.Instruction;
 import ghidra.program.model.listing.Listing;
 import ghidra.program.model.mem.Memory;
@@ -178,11 +179,26 @@ public class DumpTraps extends GhidraScript {
 
             Instruction instruction = listing.getInstructionAt(address);
             if (instruction == null) {
+                // Raw segments are imported at address 0, the same numeric
+                // range as Macintosh low memory. Data-reference analysis can
+                // therefore define a low-memory target (for example $016A)
+                // on top of code at the same segment offset. A trusted flow
+                // edge wins over that heuristic data unit.
+                CodeUnit obstruction = listing.getCodeUnitContaining(address);
+                if (obstruction != null && !(obstruction instanceof Instruction))
+                    clearListing(obstruction.getMinAddress(), obstruction.getMaxAddress());
                 disassemble(address);
                 instruction = listing.getInstructionAt(address);
             }
             if (instruction == null) continue;
             addCandidate(candidates, instruction.getFallThrough(), memory);
+            // A5-relative JSRs are calls through CODE 0's jump table. Ghidra
+            // cannot resolve the destination and consequently supplies no
+            // fall-through, but the Segment Loader ABI still returns to the
+            // next instruction. Without this edge the Intro walk stops before
+            // its Button loop at +$0224.
+            if (instruction.getFallThrough() == null && instruction.getFlowType().isCall())
+                addCandidate(candidates, instruction.getMaxAddress().add(1), memory);
             for (Address flow : instruction.getFlows()) addCandidate(candidates, flow, memory);
         }
 

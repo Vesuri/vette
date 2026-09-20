@@ -7,12 +7,11 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — current compatibility boundary
 
-⭐ **HEAD OF QUEUE: complete the non-export roots and static trap map.** The 509 `CODE 0` exports
-are seeded, but the full Intro pass recovers 68 static sites while the live run proves 103; notably
-`Button` at `Intro+$0224` is absent because that routine is entered through a stored procedure
-pointer. Inventory stored callbacks (`WindowPtr.defProc`, VBL tasks, controls/dialog filters and
-completion routines), seed them, run `DumpTraps.java` over all ten segments, and require every live
-site to occur in the static result before calling the map complete.
+⭐ **HEAD OF QUEUE: complete and cross-check the static trap map.** The 509 `CODE 0` exports are
+seeded. Run `DumpTraps.java` over all ten segments and require every live site to occur in the
+static result. Then inventory the remaining non-export roots—stored callbacks (`WindowPtr.defProc`,
+VBL tasks, controls/dialog filters and completion routines)—and add only roots proved by an
+address-taking instruction or record store.
 
 ## ⭐⭐ TARGET 1 — the complete intro, run by the game's own code — COMPLETE
 
@@ -68,9 +67,9 @@ implementation when a real path needs it, rather than weakening the audit or spe
 
 ## Phase 1+ — carried forward, not yet actionable
 
-1. **Complete the non-export roots and static trap map.** `CODE 0` supplies 509 exports / 508
-    distinct roots. Stored procedure pointers are the remaining known root class; `Intro+$0224`
-    (`Button`) is the positive control. → `docs/toolchain.md` §The trap map.
+1. **Complete and cross-check the static trap map.** `CODE 0` supplies 509 exports / 508 distinct
+    roots. Run every segment, compare every live `(segment,offset)` site, then enumerate stored
+    procedure pointers as the remaining root class. → `docs/toolchain.md` §The trap map.
 2. **Read the manual / the extras before the binary.** RoF's `docs/manual.md` earned its place.
     Present and unread: `scans/Manual.pdf` (5.2 MB), `Map.jpg`, `MapInfo_1/2.jpg`, `KeyChart.jpg`,
     `Package.pdf`, `web_docs/cheats.txt`. ⭐ `KeyChart.jpg` is the input map and `cheats.txt` may
