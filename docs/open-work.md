@@ -7,13 +7,13 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — current compatibility boundary
 
-⭐ **HEAD OF QUEUE: decode static-impact responses and Lake Merced recovery.**
-The QUAD header-1 lookup is now proved to select one of 108 initialized lists of axis-aligned
-static collision rectangles. `Traffic+$4064` tests all four moving-hull corners, identifies the
-nearest rectangle side, and hands the list identity and side to `Traffic+$3FEE`. Decode that
-pointer/handler response dispatch, then correlate the static/water response with the already
-reproducible straight-to-Lake-Merced PICT-140 tow-truck recovery. Name fields only when code or
-live behavior proves them. → `docs/data-formats.md`, `docs/stage-c.md`.
+⭐ **HEAD OF QUEUE: identify the Lake Merced static-impact response.**
+The static dispatch is structurally closed: 44 particular QUAD collision rectangles map to 35
+distinct `Traffic` response routines; ordinary rectangles use common nearest-edge flags. Add a
+low-overhead live probe to the reproducible straight-to-Lake-Merced route, capture selector,
+rectangle ordinal, nearest side and response target at the water impact, then trace that target to
+the PICT-140 tow-truck recovery. Name fields only when this live behavior proves them. →
+`docs/data-formats.md`, `docs/stage-c.md`.
 
 ## ⭐⭐ TARGET 1 — the complete intro, run by the game's own code — COMPLETE
 

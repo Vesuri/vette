@@ -88,6 +88,35 @@ def runtime_bounds(raw, a5):
     return lists
 
 
+def runtime_responses(raw, a5, bounds):
+    """Decode special rectangle pointers and their above-A5 jump-table handlers."""
+    base = a5 - len(raw)
+    offset = lambda address: address - base
+    bounds_pointers = [
+        struct.unpack_from(">I", raw, offset(a5 - 0x424e) + selector * 4)[0]
+        for selector in range(108)
+    ]
+    locations = {}
+    for selector, (pointer, rectangles) in enumerate(zip(bounds_pointers, bounds)):
+        for ordinal in range(len(rectangles)):
+            locations.setdefault(pointer + ordinal * 8, []).append((selector, ordinal))
+
+    pointer_table = offset(a5 - 0x30c0)
+    handler_table = offset(a5 - 0x300c)
+    responses = []
+    index = 0
+    while struct.unpack_from(">I", raw, pointer_table + index * 4)[0] != 0xffffffff:
+        pointer = struct.unpack_from(">I", raw, pointer_table + index * 4)[0]
+        handler = struct.unpack_from(">I", raw, handler_table + index * 4)[0]
+        if pointer not in locations:
+            raise ValueError(f"response {index} does not point at a collision rectangle")
+        if handler < a5 + 34 or (handler - a5 - 34) % 8:
+            raise ValueError(f"response {index} handler is not an above-A5 jump entry")
+        responses.append((locations[pointer], (handler - a5 - 34) // 8))
+        index += 1
+    return responses
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("resource_fork", type=Path)
@@ -130,6 +159,10 @@ def main():
               f"used={len(selectors)} rectangles={sum(map(len, bounds))} "
               f"inverted={inverted} "
               f"count-distribution={dict(sorted(counts.items()))}")
+        responses = runtime_responses(args.runtime_globals.read_bytes(), args.runtime_a5, bounds)
+        print(f"runtime collision responses: rectangles={len(responses)} "
+              f"handlers={len({handler for _locations, handler in responses})} "
+              f"jump-exports={sorted({handler for _locations, handler in responses})}")
 
 
 if __name__ == "__main__":

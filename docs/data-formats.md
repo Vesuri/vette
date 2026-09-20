@@ -274,8 +274,12 @@ word -1
 
 The point is inside only when all four inclusive comparisons pass. For a hit, the routine computes
 the distance to all four sides, identifies the nearest side (0=min-v, 1=min-u, 2=max-v, 3=max-u),
-and passes that side plus the exact bounds-list pointer to `Traffic+$3FEE`. That routine maps list
-identity through parallel pointer/handler tables and invokes the corresponding response. The main
+and passes that side plus the exact matching rectangle pointer to `Traffic+$3FEE`. That routine
+maps rectangle identity through parallel pointer/handler tables and invokes the corresponding response. More
+precisely, the table contains 44 pointers to individual rectangle records (including records
+inside multi-rectangle lists), paired with 35 distinct above-A5 jump-table exports, all targeting
+`Traffic` response routines. Rectangles absent from this special table still report the nearest
+edge through the common collision flags. The main
 driving loop calls this test for all four corners at `Traffic+$461E..+$4696`.
 
 This corrects an earlier false negative: searching for reads of the A5-$2500 cached header copy
