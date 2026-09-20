@@ -1123,6 +1123,14 @@ at `($1400,$15800)` with mode 1. `Traffic+$2302` ran naturally at tick 8517 with
 `15/15` and the player updated to freeway cell `(2,42)`. The focused observer is
 `amiga/driving_freeway_activation.gdb`.
 
+The created-object trace closes the next link without confusing it with the other fourteen traffic
+records. The first post-transition object was JHPF id 126 at cell `(2,40)`, world
+`($13D5,$14800)`, heading 180. `Traffic+$0C78` projected it into NavigationMap key `$0078`;
+`Traffic+$0D1C` matched FWTM ids `(125,125,126,126)`, selected FREE id 126 / selector 10, and
+installed its path pointer. `Traffic+$1564` consumed the first `(0,-64)` byte pair and changed the
+object's target to `($13D5,$147C0)` in the same tick. `amiga/driving_freeway_object.gdb` follows
+that exact object pointer from construction through movement.
+
 A probe-width mistake briefly obscured this result: A5-$3764 is a big-endian word, not a byte.
 Reading the byte at `A5-$3764` observes the high byte of `0x0001` and therefore falsely reports
 zero. The disassembly at `Traffic+$5654` and the corrected word-width runtime probe both establish

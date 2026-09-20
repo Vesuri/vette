@@ -7,16 +7,11 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — current compatibility boundary
 
-⭐ **HEAD OF QUEUE: trace the first naturally spawned freeway object through `FWTM` -> `FREE`
-movement.** The input-only Course Two route now crosses the real `(2,6)` QUAD response: export 212
-changes the A5-$3764 **word** from 0 to 1 and relocates the player from Main Map world
-`($10xx,$32xx)` to Freeway Map world `($14xx,$15800)`. Three ticks later the unmodified
-`Traffic+$2302` path naturally replaces traffic through `FWTP` -> `JHPF` with the pool at `15/15`.
-The next bounded trace must follow that created object into `$0D1C`, prove its navigation-cell
-`FWTM` key and selected `FREE` id, and record at least one actual `FREE` movement step. Do not patch
-mode, count, position, spawn state, or object fields merely to make a breakpoint fire. `TURN` is
-loaded but unread and `PHAZ` is never requested, so their names do not justify speculative work.
-→ `docs/data-formats.md`.
+⭐ **HEAD OF QUEUE: make the original Mouse steering mode effective.** Its Page-0 accesses are
+safely redirected and the menu can select it, but physical testing found no steering, throttle, or
+braking response. Keep Keyboard as the default while tracing the live mode flags, redirected Mouse
+coordinates, and active-low button state through the original `Main+$2BC8` and `Traffic+$6D24`
+consumers. Correct the source of the mismatch; do not add a second host-authored steering path.
 
 ## ⭐⭐ TARGET 1 — the complete intro, run by the game's own code — COMPLETE
 
@@ -60,13 +55,6 @@ post-intro path reached them. Do not defer a trap that the loud-stop loop actual
 
 ⚠ **Refer to an item by its TITLE, not its number.** The list is renumbered every time an entry is
 closed and deleted, so a `#N` written in another doc goes quietly wrong — three of them already had.
-
-## Small, cheap, and wrong if left
-
-- **Make the original Mouse steering mode effective.** Its Page-0 accesses are safely redirected
-  and the menu can select it, but physical testing found no steering, throttle, or braking response.
-  Keep Keyboard as the default until the live mode flags, shadow coordinates, and active-low button
-  state are traced through the original consumers.
 
 ## Phase 0 — scaffolding — COMPLETE (see `docs/phases.md`)
 

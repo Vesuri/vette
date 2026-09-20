@@ -645,6 +645,14 @@ shared position/update calls. The active `CLST` streams reference IDs 90..129, `
 90..130, and dormant selector 5 at `$1226` selects ID 134 directly. No active consumer found so far
 selects 131..133.
 
+The natural Course Two transition validates this entire join dynamically. The first post-transition
+object was JHPF id 126 at cell `(2,40)`, world `($13D5,$14800)`, heading 180. Projecting it selected
+NavigationMap key `$0078`; the matching FWTM record contained direction ids
+`(125,125,126,126)`, and heading 180 selected FREE id 126 with movement selector 10. Its first
+signed pair `(0,-64)` advanced the saved cursor by two and set the target from
+`($13D5,$14800)` to `($13D5,$147C0)`. `amiga/driving_freeway_object.gdb` binds the created pointer
+and preserves the identity across every one of those calls.
+
 Validate the outer shapes and Color/B&W equality with:
 
 ```sh
