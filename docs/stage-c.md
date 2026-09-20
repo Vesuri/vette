@@ -1176,11 +1176,18 @@ to the still-valid right half only through cells 9..7, then returns to its ordin
 only original keypad bits and never edits position, traffic, collision, heading, or mode state.
 
 With that local pass, an unmodified run crosses export 212 and reaches Freeway Map cell `(2,38)`
-at world `($1482,$136D1)`, mode 1, after 3,404 completed game frames. The last collision is the
-ordinary QUAD 221 / selector-107 response 197 at the connected freeway bend; this is the next
-source-guided steering boundary, not a missing Toolbox call. `stage_c.gdb` now reports full player
-state, the last static collision and the active object array when a bounded run ends without a
-loud stop, so a stuck route is no longer mistaken for compatibility coverage.
+at world `($1482,$136D1)`, mode 1, after 3,404 completed game frames. The ordinary QUAD 221 /
+selector-107 response 197 is a connected bend, not a missing Toolbox call or a dead end. It first
+reduced local Z from 1745 to 742 and then 129 while increasing the heading from 8686 to 8806. A
+longer observation proved the hand-off: response 197 carried the player diagonally into cell
+`(3,37)`, world `($18CC,$12EA7)`, local `(204,1703)`, heading 7118, where QUAD 220 selects the same
+selector and response. No game state was patched and no loud stop occurred. The focused read-only
+observer is `amiga/driving_freeway_bend.gdb`.
+
+`stage_c.gdb` reports full player state, the last static collision and the active object array when
+a bounded run ends without a loud stop, so a slow source-defined turn is no longer mistaken for a
+compatibility failure. The next route boundary begins from the proved `(3,37)` exit rather than
+guessing a heading inside `(2,38)`.
 
 The 26-record sightseeing table used by `Main+$3456` was also decoded as a possible source-native
 shortcut. Record 4 is cell `(6,26)`, only six cells from the export-221 transition at `(6,32)`, but

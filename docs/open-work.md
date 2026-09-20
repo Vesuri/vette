@@ -7,10 +7,11 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — current compatibility boundary
 
-⭐ **HEAD OF QUEUE: continue the input-only Course Two route through the proved Freeway Map bend
-at cell `(2,38)`.** The route now passes the real city traffic blockers and export 212, reaching
-freeway QUAD 221 / selector 107 without patching game state. Follow the source-defined connected
-freeway cells with ordinary controls, then stop at the first real unimplemented trap or
+⭐ **HEAD OF QUEUE: continue the input-only Course Two route from the proved Freeway Map bend
+exit at cell `(3,37)`.** The route now passes the real city traffic blockers and export 212, and
+original response 197 carries it through QUAD 221 at `(2,38)` into QUAD 220 at `(3,37)` without
+patching game state. Follow the source-defined connected freeway cells with ordinary controls,
+then stop at the first real unimplemented trap or
 demonstrable compatibility failure and fix that cause. Do not add host-authored UI or patch game
 state merely to manufacture coverage.
 
