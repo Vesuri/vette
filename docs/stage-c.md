@@ -1010,6 +1010,21 @@ nonzero saved host stack, then state 4 in `vetteInputShutdown` with that stack c
 the whole game-cleanup-to-Amiga-restoration chain; the old unreachable bare-left-button wait has
 been removed.
 
+### Physical garage clicks use `FindWindow`
+
+The deterministic `GARAGE_CLICK=1` route initially hid a user-path gap: a real mouse-down event
+passes through `Initialize+$0AAA` and calls `_FindWindow` (`$A92C`), while the scripted events are
+consumed by the selectors' already-active modal tracking loops. The missing trap therefore stopped
+a normal build when the player clicked ACCEPT even though the diagnostic build could enter the
+game.
+
+The bridge now performs the Window Manager query. It consumes the event's global Point, walks the
+visible window chain front-to-back, returns the matching `WindowPtr`, and distinguishes
+`inContent`, `inMenuBar`, and `inDesk`. All shipped `WIND` resources use WDEF 2
+(`plainDBoxProc`), so their structure and content regions coincide; no garage-control coordinates
+or screen recognition are involved. `$A92C` is also present in the loud-stop name table, so any
+future failure at that trap is identified correctly.
+
 ## Correction to the MAME log
 
 The 51-row MAME table is a measurement of that reference run, not fabricated data, but the live

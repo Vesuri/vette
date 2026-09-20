@@ -389,7 +389,7 @@ static const TrapName s_trapNames[] = {
     {0xa998,"RESOURCE MANAGER","USERESFILE"}, {0xa994,"RESOURCE MANAGER","CURRESFILE"},
     {0xaa46,"WINDOW MANAGER","GETNEWCWINDOW"}, {0xa91b,"WINDOW MANAGER","MOVEWINDOW"},
     {0xa915,"WINDOW MANAGER","SHOWWINDOW"}, {0xa916,"WINDOW MANAGER","HIDEWINDOW"},
-    {0xa924,"WINDOW MANAGER","FRONTWINDOW"},
+    {0xa924,"WINDOW MANAGER","FRONTWINDOW"}, {0xa92c,"WINDOW MANAGER","FINDWINDOW"},
     {0xaa92,"PALETTE MANAGER","GETNEWPALETTE"}, {0xa873,"QUICKDRAW","SETPORT"},
     {0xaa28,"COLOR MANAGER","GETCTSEED"}, {0xaa39,"COLOR MANAGER","MAKEITABLE"},
     {0xa91f,"WINDOW MANAGER","SELECTWINDOW"},
@@ -1379,6 +1379,40 @@ static WindowSlot* windowSlot(uint8_t* window)
     for (uint16_t i = 0; i < sizeof(s_windows) / sizeof(s_windows[0]); ++i)
         if (s_windows[i].used && s_windows[i].window == window) return &s_windows[i];
     return 0;
+}
+
+static int16_t findWindow(int16_t vertical, int16_t horizontal, uint8_t*& found)
+{
+    found = 0;
+
+    // The menu bar owns this strip regardless of the window list.
+    if (vertical >= 0 && vertical < 20) return 1; // inMenuBar
+
+    // FindWindow receives a global Point.  Vette's shipped windows all use
+    // WDEF 2 (plainDBoxProc), so their structure and content regions coincide:
+    // a point in a visible window is inContent.  Walk the Window Manager chain
+    // front-to-back just as FrontWindow does instead of recognizing a screen
+    // or a control by coordinates.
+    uint8_t* window = s_windowList;
+    for (uint16_t visited = 0;
+         window && visited < sizeof(s_windows) / sizeof(s_windows[0]);
+         ++visited, window = (uint8_t*)read32(window + 144)) {
+        WindowSlot* slot = windowSlot(window);
+        if (!slot || !window[110]) continue;
+        uint8_t** structureHandle = (uint8_t**)read32(window + 114);
+        const uint8_t* region = structureHandle ? *structureHandle : 0;
+        if (!region || read16(region) < 10) continue;
+        const uint8_t* bounds = region + 2;
+        if (vertical >= (int16_t)read16(bounds)
+            && horizontal >= (int16_t)read16(bounds + 2)
+            && vertical < (int16_t)read16(bounds + 4)
+            && horizontal < (int16_t)read16(bounds + 6)) {
+            found = window;
+            return 3;                       // inContent
+        }
+    }
+
+    return 0;                                      // inDesk
 }
 
 static bool disposeWindow(uint8_t* window)
@@ -5031,6 +5065,17 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
         write32(userStack, (uint32_t)front);
         if (g_stageCDepth < 82) g_stageCDepth = 82;
         return 1;
+    }
+    if (trap == 0xa92c) {                    // FindWindow(Point, WindowPtr*) -> part code
+        uint8_t** resultWindow = (uint8_t**)read32(userStack);
+        int16_t vertical = (int16_t)read16(userStack + 4);
+        int16_t horizontal = (int16_t)read16(userStack + 6);
+        uint8_t* found;
+        int16_t part = findWindow(vertical, horizontal, found);
+        if (resultWindow) write32((uint8_t*)resultWindow, (uint32_t)found);
+        write16(userStack + 8, (uint16_t)part);
+        if (g_stageCDepth < 96) g_stageCDepth = 96;
+        return 9;
     }
     if (trap == 0xa91f) {                    // SelectWindow(window)
         uint8_t* window = (uint8_t*)read32(userStack);
