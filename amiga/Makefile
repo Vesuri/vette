@@ -7,6 +7,8 @@
 #   make FPSCOUNT=1      the HONEST framerate build: one counter, no probe instrumentation
 #   make SKIP_INTRO=1    report one synthetic first mouse press to skip the proven intro
 #   make GARAGE_CLICK=1  script the garage and vehicle selectors through real mouse events
+#   make GARAGE_CLICK=1 GARAGE_COURSE=2  select Course Two through its real UI before ACCEPT
+#   make GARAGE_CLICK=1 FREEWAY_ROUTE=1  steer by normal KeyMap input toward the Course Two freeway
 #   make QUIT_PROBE=1    request the Control+LMB exit at the first safe event-pump trap
 #   make FILLWATCH=1     rolling audit of the planar back buffer against the chunky Mac surface
 #   ./run.sh             boot in FS-UAE (CTRL + left mouse button quits)
@@ -154,6 +156,14 @@ endif
 # never define this.
 ifeq ($(GARAGE_CLICK),1)
 EXTRA_DEFINES += -DVETTE_GARAGE_CLICK
+endif
+
+ifdef GARAGE_COURSE
+EXTRA_DEFINES += -DVETTE_GARAGE_COURSE=$(GARAGE_COURSE)
+endif
+
+ifeq ($(FREEWAY_ROUTE),1)
+EXTRA_DEFINES += -DVETTE_FREEWAY_ROUTE
 endif
 
 # Diagnostic only: take the same deferred exit path as Control+left-mouse at

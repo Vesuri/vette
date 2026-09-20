@@ -145,6 +145,14 @@ static bool s_mouseButtonDown;
 #ifdef VETTE_GARAGE_CLICK
 static uint8_t s_garageClickPhase;
 static uint8_t s_garageGearPhase;
+#if defined(VETTE_GARAGE_COURSE) && (VETTE_GARAGE_COURSE < 1 || VETTE_GARAGE_COURSE > 4)
+#error VETTE_GARAGE_COURSE must be 1..4
+#endif
+#ifdef VETTE_GARAGE_COURSE
+static const uint8_t kGarageDrivingPhase = 11;
+#else
+static const uint8_t kGarageDrivingPhase = 9;
+#endif
 static bool s_garageTransitionSkipped;
 static bool s_garageRecoveryPictureLoaded;
 static bool s_garageRecoverySkipped;
@@ -2556,6 +2564,14 @@ static bool drawVersionOnePicture(const uint8_t* picture, uint32_t size,
             ovalWidth = (int16_t)read16(picture + offset + 2);
             offset += 4; continue;
         }
+        if (opcode == 0x2c) {                // FontName: byte count + old ID + Pascal name
+            if (offset + 2 > size) return false;
+            uint16_t bytes = read16(picture + offset);
+            if (bytes < 3 || offset + 2UL + bytes > size
+                || picture[offset + 4] > bytes - 3) return false;
+            offset += 2UL + bytes;
+            continue;                        // compact text fallback is font-independent
+        }
         if (opcode == 0x22) {
             if (offset + 6 > size) return false;
             int16_t startV = (int16_t)(read16(picture + offset) + translateV);
@@ -4381,7 +4397,7 @@ static void updateDrivingInputProbe()
     static uint8_t probeEventPhase;
     if (probeEventPhase == 0) {
 #ifdef VETTE_GARAGE_CLICK
-        if (s_garageClickPhase >= 9) {
+        if (s_garageClickPhase >= kGarageDrivingPhase) {
 #endif
             vetteInputInjectProbeKey(VETTE_INPUT_PROBE_EVENT_RAW_KEY, true);
             probeEventPhase = 1;
@@ -4412,7 +4428,7 @@ static void refreshDrivingKeyMap()
     // subsequent GetKeys after that scanner has changed the car's gear.  VBL
     // callbacks are not a safe pulse boundary: several can run without the
     // main-loop keyboard scanner running between them.
-    if (s_garageClickPhase >= 9 && s_garageGearPhase < 2) {
+    if (s_garageClickPhase >= kGarageDrivingPhase && s_garageGearPhase < 2) {
         uint8_t* car = (uint8_t*)read32(s_currentA5 - 13944);
         if (s_garageGearPhase && car && read16(car + 28)) {
             s_garageGearPhase = 2;
@@ -4428,6 +4444,21 @@ static void refreshDrivingKeyMap()
     // keypad-8 accelerator.  Physical keys remain ORed into this diagnostic
     // state above.
     if (s_garageGearPhase >= 2) keyMap[0x5b >> 3] |= 1u << (0x5b & 7);
+#ifdef VETTE_FREEWAY_ROUTE
+    // Course Two begins at cell (2,24), one cell north of an FWTP key.  Reach
+    // it through the original drivetrain: use keypad steering to settle on a
+    // southbound heading, while the ordinary harness accelerator remains held.
+    // This changes only input bits; no position, heading, or traffic state is
+    // patched for the diagnostic.
+    if (s_garageGearPhase >= 2) {
+        uint8_t* car = (uint8_t*)read32(s_currentA5 - 13944);
+        uint16_t heading = car ? read16(car + 0x66) : 0x2000;
+        if (heading > 0x2100 && heading < 0x3800)
+            setDrivingKeyState(0x56, true);  // keypad 4: reduce heading
+        else if (heading < 0x1f00)
+            setDrivingKeyState(0x58, true);  // keypad 6: correct overshoot
+    }
+#endif
 #endif
 }
 
@@ -4514,13 +4545,20 @@ static bool nextEvent(uint16_t mask, uint8_t* event)
 
 #ifdef VETTE_GARAGE_CLICK
     // Leave the garage, vehicle selector, and course selector through their
-    // real controls: ACCEPT, top plate, Corvette ZR-1, ACCEPT, then the course
-    // screen's ACCEPT (Course One is already selected).  The visible 512x320 crop
+    // real controls: ACCEPT, top plate, Corvette ZR-1, ACCEPT, optionally a
+    // requested course button, then the course screen's ACCEPT.  The visible 512x320 crop
     // begins at Macintosh global (64,91), so keep the live state local while
     // emitting ordinary mouse events.
-    if (!transition && s_garageClickPhase < 10) {
-        static const int16_t clickX[5] = { 293, 413, 444, 212, 445 };
-        static const int16_t clickY[5] = { 161,  69, 156, 154, 308 };
+#ifdef VETTE_GARAGE_COURSE
+    static const int16_t clickX[] = {
+        293, 413, 444, 212, (int16_t)(70 + 94 * (VETTE_GARAGE_COURSE - 1)), 445
+    };
+    static const int16_t clickY[] = { 161, 69, 156, 154, 308, 308 };
+#else
+    static const int16_t clickX[] = { 293, 413, 444, 212, 445 };
+    static const int16_t clickY[] = { 161,  69, 156, 154, 308 };
+#endif
+    if (!transition && s_garageClickPhase < sizeof(clickX) / sizeof(clickX[0]) * 2) {
         uint16_t click = (uint16_t)(s_garageClickPhase >> 1);
         uint16_t clickWhat = (s_garageClickPhase & 1) ? 2 : 1;
         if (mask & (1u << clickWhat)) {
@@ -4535,7 +4573,7 @@ static bool nextEvent(uint16_t mask, uint8_t* event)
             what = clickWhat;
             transition = true;
             ++s_garageClickPhase;
-            // The Course One press (phase 9) immediately enters road setup;
+            // The final ACCEPT press immediately enters road setup;
             // no further UI event poll is guaranteed before the driving VBL
             // callback begins reading KeyMap.  Hold accelerator state here,
             // independently of the mouse EventRecord that selected the course.

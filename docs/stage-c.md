@@ -616,6 +616,13 @@ chooses the already-active Course One by sending an ordinary press/release pair 
 buttons, and the decoded course-description panel. Road setup then reaches File Manager trap
 `$A007` from segment 1 + `$6074`.
 
+`GARAGE_COURSE=1..4` extends that development harness with one ordinary click on the requested
+course button before ACCEPT. Course Three exposed application `PICT 27402`, a version-1 picture
+whose text stream includes opcode `$2C` FontName: a byte count, old font ID, and Pascal font name
+(`Monaco` in the measured record). The compact picture-text fallback is font-independent, so it
+validates and skips that state record while retaining the existing loud stop for unseen drawing
+operations. Course Three then passes the former `Initialize+$17D2` DrawPicture boundary.
+
 That synchronous `GetVolInfo` caller reads only `ioVCrDate` at parameter-block offset 30. The
 bridge returns `$D51CFD76`, measured directly from the master directory block of the shipped
 `VETTE!` HFS image, and `ioResult = noErr`; it does not fabricate the unused volume fields. This

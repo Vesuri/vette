@@ -595,8 +595,12 @@ quadrant is multiplied by 90 and copied to the new object's current heading +$0C
 direction, not a speed value.
 
 `amiga/driving_freeway_spawn.gdb` records the selected key/triplet, optional link and constructed
-object for the first two naturally reached spawns. A short stationary Course One run did not enter
-`Traffic+$2302`; that negative observation is not promoted into branch-coverage evidence.
+object for the first two naturally reached spawns. The deterministic UI harness can select Course
+Two and steer with ordinary KeyMap input; that route reached FWTP key cell `(2,23)` without
+patching position or heading. The dispatcher still did not enter `Traffic+$2302`, for a proved
+earlier reason: its live traffic count and maximum were both 15, so `Traffic+$24E6` took the
+full-pool exit. Active movement and natural retirement must free a slot before this can become a
+spawn-branch coverage run.
 
 ### `FWTM` and `FREE`: navigation-directed traffic paths
 
