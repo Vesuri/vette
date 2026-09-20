@@ -4,16 +4,16 @@
 #include "Bitmap.h"
 #include "../../m68k_math.h"
 
-Bitmap::Bitmap(void* data, uint16_t width, uint16_t height, uint16_t bitplanes, bool interleaved, bool takeOwnership, uint16_t bitmapDataWidth) :
+Bitmap::Bitmap(void* data, uint16_t width, uint16_t height, uint16_t bitplanes, bool takeOwnership, uint16_t bitmapDataWidth) :
     data(data),
     width(width),
     height(height),
     bitplanes(bitplanes),
     dataWidth(bitmapDataWidth ? bitmapDataWidth : width),
     widthInBytes(((dataWidth + 15) >> 4) << 1),
-    rowSizeInBytes(interleaved ? (bitplanes * widthInBytes) : widthInBytes),
+    rowSizeInBytes(bitplanes * widthInBytes),
     bitplaneSizeInBytes(widthInBytes * height),
-    interleaved(interleaved),
+    interleaved(true),
     owner(takeOwnership),
     blittable((uint32_t)data < 0x200000 ? true : false)
 {
@@ -47,7 +47,7 @@ uint32_t Bitmap::dataSize() const
     return vette_mulu16((uint16_t)vette_mulu16((uint16_t)(dataWidth >> 3), height), bitplanes);
 }
 
-Bitmap* Bitmap::allocate(uint16_t width, uint16_t height, uint16_t bitplanes, bool interleaved, uint16_t dataWidth)
+Bitmap* Bitmap::allocate(uint16_t width, uint16_t height, uint16_t bitplanes, uint16_t dataWidth)
 {
     if (dataWidth == 0) {
         dataWidth = width;
@@ -55,7 +55,7 @@ Bitmap* Bitmap::allocate(uint16_t width, uint16_t height, uint16_t bitplanes, bo
 
     uint32_t bitmapSize = vette_mulu16((uint16_t)vette_mulu16((uint16_t)(dataWidth >> 3), height), bitplanes);
     void* data = AllocMem(bitmapSize, MEMF_CHIP | MEMF_CLEAR);
-    return data ? new Bitmap(data, width, height, bitplanes, interleaved, true, dataWidth) : 0;
+    return data ? new Bitmap(data, width, height, bitplanes, true, dataWidth) : 0;
 }
 
 Bitmap* Bitmap::generateMask(const Bitmap& source, void* data, bool singleBitplane, bool takeOwnership)
@@ -64,17 +64,16 @@ Bitmap* Bitmap::generateMask(const Bitmap& source, void* data, bool singleBitpla
     uint16_t height = source.height;
     uint16_t sourceBitplanes = source.bitplanes;
     uint16_t maskBitplanes = singleBitplane ? 1 : sourceBitplanes;
-    bool interleaved = source.interleaved;
     uint16_t dataWidth = source.dataWidth;
 
-    Bitmap* mask = data ? new Bitmap(data, width, height, maskBitplanes, interleaved, takeOwnership, dataWidth) : allocate(width, height, maskBitplanes, interleaved);
+    Bitmap* mask = data ? new Bitmap(data, width, height, maskBitplanes, takeOwnership, dataWidth) : allocate(width, height, maskBitplanes);
 
     uint16_t widthWords = dataWidth >> 4;
     uint16_t* sourceData = (uint16_t*)source.data;
     uint16_t* maskData = (uint16_t*)mask->data;
-    uint16_t sourceRowModulo = interleaved ? ((sourceBitplanes - 1) * widthWords) : 0;
-    uint16_t destRowModulo = interleaved ? ((maskBitplanes - 1) * widthWords) : 0;
-    uint16_t bitplaneModulo = widthWords * (interleaved ? 1 : height);
+    uint16_t sourceRowModulo = (sourceBitplanes - 1) * widthWords;
+    uint16_t destRowModulo = (maskBitplanes - 1) * widthWords;
+    uint16_t bitplaneModulo = widthWords;
     for (uint16_t y = 0; y < height; y++) {
         for (uint16_t x = 0; x < widthWords; x++) {
             uint16_t word = 0;

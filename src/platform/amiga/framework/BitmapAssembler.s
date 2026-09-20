@@ -319,14 +319,10 @@ c_shiftOk:
 	bra.s	c_done
 
 c_nonInterleaved:
-	; ⚠⚠ [ASSUMED] A SILENT NO-OP, inherited unimplemented from the RoF/Revs framework,
-	; where a non-interleaved Bitmap was a supported configuration and neither port ever
-	; constructed one.  THIS PROJECT HAS NOT EARNED THAT ASSUMPTION YET: the Amiga screen
-	; layout is undecided, so nothing here proves every Bitmap Vette builds is INTERLEAVED.
-	; Before the first real screen lands, either prove it (assert at Bitmap construction)
-	; or implement this arm.  A blit that runs and draws nothing is the failure shape
-	; docs/method-lessons.md names as the most expensive translation choice.
-	bra	c_done
+	; Bitmap's Vette API can construct only interleaved layouts and stores that fact in a
+	; const member.  If corruption nevertheless reaches this defensive arm, trap rather than
+	; preserving the inherited silent no-op.
+	illegal
 
 c_cpu:
 	swap	d5
@@ -729,10 +725,9 @@ cWM_interleavedMultiBitplaneMask:
 	bra.s	cWM_done
 
 cWM_nonInterleaved:
-
-	; ⚠⚠ [ASSUMED] Same silent no-op as c_nonInterleaved above, and the same unearned
-	; assumption — see there.
-	add.w	#14,sp
+	; Same construction invariant as c_nonInterleaved.  The stack cleanup is deliberately
+	; unreachable: an impossible layout must fail here, not return as a successful no-op.
+	illegal
 
 cWM_done:
 	movem.l	(sp)+,d2-d7/a2-a6

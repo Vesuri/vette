@@ -13,9 +13,11 @@ Support files: `SASCCompat.h`, `compat-include/`.
 - `REVS_*` macros → `VETTE_*` (`VETTE_SASC_ALIAS`, `VETTE_BLIT_IRQ`).
 - `revs_mulu16`/`muls16`/`divu16`/`modu16`/`divs16`/`mods16` → `vette_*`, and `m68k_math.h` moved
   from `src/cpu/` (which this port has no use for — there is no CPU to emulate) to `src/`.
-- `BitmapAssembler.s`'s two non-interleaved arms: the comments claimed the arms were unreachable,
-  which was true of *Revs*'s screen and is **unproven here**. Retagged `[ASSUMED]` — they are still
-  silent no-ops, and that has to be closed before the first real screen.
+- `BitmapAssembler.s`'s two non-interleaved arms were inherited silent no-ops. Vette now makes
+  row-interleaving a construction invariant: the layout selector was removed from `Bitmap` and
+  `allocate()`, the member is `const true`, and both impossible assembler arms execute `ILLEGAL`
+  instead of returning success. This deliberately narrows Vette's vendored API; it does not claim
+  the original general-purpose framework lacked valid non-interleaved users.
 
 **Hand-written m68k asm** (inherited as vendored by Revs): `UtilAssembler.s`,
 `AmigaHardwareAssembler.s`, `BitmapAssembler.s`, `CopperListAssembler.s` — the dA JoRMaS originals
@@ -74,4 +76,3 @@ written, not inherited, because on ECS/AGA it overrides DIWSTOP's H8/V8 rules an
 ⚠ The **AGA** DDF branch is untouched and `[ASSUMED]`: FMODE 3 fetches four words per access and the
 documented OCS formulas do not apply to it. `docs/amiga-arch.md` §`setPlayfield()` has the full
 derivation and the measured evidence.
-

@@ -43,11 +43,15 @@ Build infrastructure only; no game code. **Exit criteria:**
       `g_beamPresentsLate=0`; the `FILLWATCH=1` rolling audit decoded all 320 rows / 163,840 pixels
       from the planar back buffer with zero mismatches. Vette's fill invariant is the complete
       chunky-to-planar seam, not Revs's game-specific horizon fill.
-- [ ] The inherited framework exposes no supported-looking silent no-op: resolve the two
-      non-interleaved `BitmapAssembler.s` arms named in `docs/open-work.md`.
+- [x] The inherited framework exposes no supported-looking silent no-op. Vette's `Bitmap` API now
+      constructs only row-interleaved layouts, records that invariant in a `const` member, and the
+      two impossible `BitmapAssembler.s` arms execute `ILLEGAL` instead of returning success.
 
 ⭐ Do not skip the last two. Revs's Phase 0 is the reason its Amiga side was never in doubt while
 harder questions were being settled.
+
+⭐ **Phase 0 is CLOSED.** The remaining `patternWithMask()` multiplication link trap is guarded by
+the mandatory link audit and remains deferred until a real caller needs that operation.
 
 ## Phase 1 — The Macintosh reference loop
 

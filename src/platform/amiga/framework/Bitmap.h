@@ -5,7 +5,10 @@
 
 class Bitmap {
 public:
-    Bitmap(void* data, uint16_t width, uint16_t height, uint16_t bitplanes, bool interleaved, bool takeOwnership = false, uint16_t dataWidth = 0);
+    // Vette's Amiga backend has one bitmap representation: row-interleaved
+    // planes.  Keeping the layout out of the constructor makes selecting the
+    // unsupported assembler paths impossible at the API boundary.
+    Bitmap(void* data, uint16_t width, uint16_t height, uint16_t bitplanes, bool takeOwnership = false, uint16_t dataWidth = 0);
     ~Bitmap();
 
     __inline uint16_t widthInWords() const;
@@ -43,7 +46,7 @@ public:
     void combineWithMask(const Bitmap& background, const Bitmap& source, const Bitmap& mask, uint16_t destX = 0, uint16_t destY = 0, uint16_t backgroundX = 0, uint16_t backgroundY = 0, uint16_t sourceX = 0, uint16_t sourceY = 0, uint16_t maskX = 0, uint16_t maskY = 0, uint16_t width = 0, uint16_t height = 0, bool clearMasked = false);
     void patternWithMask(const Bitmap& mask, uint16_t destX = 0, uint16_t destY = 0, uint16_t maskX = 0, uint16_t maskY = 0, uint16_t width = 0, uint16_t height = 0, uint16_t pattern = 0xffff);
 
-    static Bitmap* allocate(uint16_t width, uint16_t height, uint16_t bitplanes, bool interleaved, uint16_t dataWidth = 0);
+    static Bitmap* allocate(uint16_t width, uint16_t height, uint16_t bitplanes, uint16_t dataWidth = 0);
     static Bitmap* generateMask(const Bitmap& source, void* data = 0, bool singleBitplane = true, bool takeOwnership = false);
 
     void* data;
@@ -54,7 +57,7 @@ public:
     uint16_t widthInBytes;
     uint16_t rowSizeInBytes;
     uint16_t bitplaneSizeInBytes;
-    bool interleaved;
+    const bool interleaved;
     bool owner;
     bool blittable;
 };
