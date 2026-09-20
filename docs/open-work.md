@@ -11,8 +11,10 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 traffic replacement.** Natural distance retirement is proved at `Traffic+$252C/$257A/$1FB6` and
 ordinary city spawning immediately refills the freed slot. The remaining gate is A5-$3764: merely
 driving into FWTP-key cell `(2,23)` leaves it clear, so the dispatcher correctly stays on the city
-branch. Reach one of the QUAD-selected transition responses through ordinary input (the nearby
-Course Three candidate is Main Map cell `(2,6)`, selector 16, response export 212), then use
+branch. The start survey proves that Courses One, Three, and Four all begin at `(6,2)`, while
+Course Two begins at `(2,24)`; simple Manhattan proximity is misleading because full-cell static
+bounds isolate the `(2,6)` lane from the shared start. Reach one of the QUAD-selected transition
+responses through ordinary race input, then use
 `amiga/driving_freeway_spawn.gdb` and `amiga/driving_freeway_movement.gdb` to capture the first
 natural `FWTP` -> `JHPF` replacement and its `FWTM` -> `FREE` movement. Do not patch the mode,
 count, position, or spawn state merely to make a breakpoint fire. `TURN` is loaded but unread and
@@ -105,3 +107,8 @@ Each entry is ONE line: what was tried, what it measured, and the doc that has t
   `tools/m68k_sweep.py`, `docs/mac-hardware.md`.
 - **Whole-file LINEAR 68020 sweep** — unusable as evidence: it decodes data as code and yields
   `callm`/`rtm`/`cmp2`/`pack` by the dozen. `docs/mac-hardware.md`.
+- **Use the T key as a freeway shortcut during a race** — all five ordinary key presses reached
+  `Main+$3456`, but A5-$5318 was zero and the shipped Tour handler rejected them without changing
+  its index or the player position. Tour Mode exists as a separate Options-menu state; do not
+  patch its guard merely to turn its 26 sightseeing coordinates into a diagnostic teleporter.
+  `docs/stage-c.md`.

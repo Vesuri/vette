@@ -1108,10 +1108,21 @@ again. The retirement path is working; it is not what prevents `$2302` from runn
 Static MAPS/QUAD/collision-response tracing identifies the actual gate. Special collision handlers
 set or clear A5-$3764 and switch the active map. Main Map cell `(2,6)`, for example, uses QUAD 21,
 collision selector 16, and its first rectangle dispatches export 212 (`Traffic+$5632`), which sets
-freeway mode. Course Three starts at world `(0x3140,0x17e0)`, cell `(6,2)`, making this a nearby
-candidate, but no route is claimed until ordinary controls cross the response rectangle. The
-bounded observation script `amiga/driving_freeway_movement.gdb` records retirement, `FWTM`/`FREE`
-movement, and the first natural `$2302` spawn without altering game state.
+freeway mode. `amiga/driving_course_start.gdb` proves the original UI selections: Courses One,
+Three, and Four all start at world `(0x3140,0x17e0)`, cell `(6,2)`, heading `$3000`; Course Two
+starts at `(0x11c0,0xc0a0)`, cell `(2,24)`, with the same heading. The apparent proximity of
+`(2,6)` to the shared start is false route guidance: the decoded full-cell bounds separate that
+lane from the start's connected static-collision component. No route is claimed until ordinary
+controls cross a response rectangle.
+
+The 26-record sightseeing table used by `Main+$3456` was also decoded as a possible source-native
+shortcut. Record 4 is cell `(6,26)`, only six cells from the export-221 transition at `(6,32)`, but
+the documented T command is conditional on Tour Mode. Five ordinary T down/up scans during the
+race reached that handler with A5-$5318 clear; every call returned without advancing the tour
+index or changing the player position. The separate Options-menu state must not be bypassed by
+patching the guard. The bounded observation script `amiga/driving_freeway_movement.gdb` records
+exports 207 and 221, retirement, `FWTM`/`FREE` movement, and the first natural `$2302` spawn without
+altering game state.
 
 ## Correction to the MAME log
 
