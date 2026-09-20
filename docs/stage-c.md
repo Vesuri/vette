@@ -1025,6 +1025,21 @@ visible window chain front-to-back, returns the matching `WindowPtr`, and distin
 or screen recognition are involved. `$A92C` is also present in the loud-stop name table, so any
 future failure at that trap is identified correctly.
 
+The following physical attempt reached `_DragWindow` (`$A925`) from `Main+$1BA8`. The live A5
+dispatch table proves that this is the generic `inContent` fallback, not a request made by the
+garage: the garage's mode-specific tracker had already failed to consume the click. Implementing
+window dragging would therefore hide an input-position failure behind unnecessary UI.
+
+The cause was the cursor half of the input bridge. `GetNextEvent` integrated the Amiga mouse
+counters into a Macintosh-local point, but the tracked QuickDraw cursor was never composited into
+the displayed pixels. A player was consequently aiming with the host pointer while the game tested
+an invisible pointer that began at `(256,160)`. The presentation path now composites the installed
+16x16 Cursor at that actual point, including its hot spot, black/white mask and XOR pixels, then
+restores the chunky framebuffer after the dirty rectangle has been converted. Mouse movement dirties
+only the union of the old and new cursor bounds; `HideCursor`, `ShowCursor`, and `SetCursor` likewise
+restore or redraw that small area. `_DragWindow` remains deliberately unimplemented and is now named
+in the loud stop, so a genuine request cannot be mistaken for this repaired garage click path.
+
 ## Correction to the MAME log
 
 The 51-row MAME table is a measurement of that reference run, not fabricated data, but the live
