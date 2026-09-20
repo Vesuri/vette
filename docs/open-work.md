@@ -7,12 +7,11 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — current compatibility boundary
 
-⭐ **HEAD OF QUEUE: settle the OCS / 68000 display fallback.**
-The primary AGA target and driving-data path are now understood through world construction,
-collision, damage and recovery. The remaining display decision is what an OCS/ECS machine should
-do with the 512×320 four-bitplane interlaced surface: retain it unchanged, crop it, or reject the
-configuration explicitly. Establish the real DMA/memory constraints before choosing policy. →
-`PROJECT.md` §Open decisions, `docs/mac-hardware.md`, `docs/amiga-arch.md`.
+⭐ **HEAD OF QUEUE: inventory the remaining driving-data consumers.**
+The major geometry, world-map, collision and world-construction formats are closed. Map the loader
+and runtime consumers of `CLST`, `FREE`, `FWTP`, `JHPF`, `FWTM`, `TIME`, `CURV`, `PHAZ` and `TURN`,
+then select the next format from proved call paths rather than names. → `docs/source-inventory.md`,
+`docs/data-formats.md`.
 
 ## ⭐⭐ TARGET 1 — the complete intro, run by the game's own code — COMPLETE
 
@@ -80,11 +79,10 @@ implementation when a real path needs it, rather than weakening the audit or spe
     of its exports; the remaining export is the directly-called per-frame background-band fill.
     It is the world-construction callback library for fixed scenery and placed objects, not generic
     maths. → `docs/data-formats.md` §QUAD dispatch.
-3. ⭐ **The remaining display question is the OCS / 68000 fallback** — crop, squeeze, or none.
-    The primary mode is locked at four-bitplane hires interlaced, and the reference run now proves
-    the live driving front window is 512×320 above a separate 512×342 surface. The driving
-    `CopyBits` probe also proves the game rasterises into its indexed GWorld, so chunky→planar is
-    a real critical-path cost rather than a hypothetical one. → `PROJECT.md` §Open decisions.
+3. ~~**Settle the OCS / 68000 fallback.**~~ **COMPLETE.** The exact 512×384 display is legal on
+    OCS, so crop and squeeze modes buy nothing. The supported package target is the user-selected
+    A1200 with 2 MiB chip and 8 MiB fast; there is no separate OCS support promise. The code keeps
+    68000 generation and legacy-correct window arithmetic. → `PROJECT.md` §Closed decisions.
 
 ## ⛔ CLOSED — measured dead ends
 

@@ -101,9 +101,12 @@ static void initializePairToPlanes()
  * has written it, it stays written.  Kickstart's own copper list writes it ($2100, a
  * 200-line NTSC-style window whose VSTOP is above 255), so a takeover that only writes
  * DIWSTRT/DIWSTOP inherits a stale VSTOP high bit and the window stays open to the bottom
- * of the frame.  Ours: HSTOP 417 has H8 set (0x2000); VSTOP 252, HSTART 161 and VSTART 92
- * all fit in their low bits.  On plain OCS the register does not exist and this is a no-op,
- * where this 384-line window requires ECS/AGA. */
+ * of the frame.  Ours: HSTOP 417 has H8 set (0x2000), VSTOP 268 has upper bit 1, while HSTART
+ * 161 and VSTART 76 fit in their low bits.  On plain OCS the register does not exist and this is
+ * a no-op;
+ * the legacy rules force HSTOP bit 8 to one and VSTOP bit 8 to !V7, which produces these exact
+ * HSTOP=$1A1 and VSTOP=$10C corners.  OCS is not the package target, but it does not require a
+ * cropped or squeezed display mode. */
 #define VS_DIWHIGH  0x2100
 
 /* BPLCON0: HIRES | 4 planes | COLOR | LACE | ECSENA.

@@ -209,7 +209,9 @@ CORE_CINCLUDES = -I"$(AMIGA_SRC)/framework/compat-include" \
 OPT        ?= -O2 -fomit-frame-pointer
 NATIVE_OPT ?= -O3 -funroll-loops
 
-# -m68000: the target is an A500 68000.  -msoft-float: no FPU.
+# -m68000: retain 68000-compatible code generation even though the supported package target is
+# the A1200.  This costs the target nothing and keeps expanded OCS-machine experiments honest.
+# -msoft-float: no FPU.
 CORE_CFLAGS = -g -MP -MMD -m68000 -msoft-float $(OPT) -nostdlib \
               -fno-tree-loop-distribution -ffunction-sections -fdata-sections \
               $(WARN) -DVETTE_PLATFORM_AMIGA \

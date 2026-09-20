@@ -42,7 +42,8 @@ centre of gravity**, and it is the thing to size before anything else.
 | **Port strategy** | ⭐⭐ **Option A: keep the original 68000 instructions, port the seams.** The segments are near-model, so there is nothing to relocate; the cost lands entirely in the trap layer. `docs/faithfulness-seam.md` §The rule |
 | **The build** | ⭐ **`Color VETTE!`.** Not the B&W one. See below — 16 colours maps onto 4 Amiga bitplanes, so the colour build is not the expensive choice it would be at 8bpp |
 | **Reference emulator** | ⭐ **MAME 0.289, driver `mac2fdhd`** (Mac II FDHD, `-nb9 mdc48`, `-ramsize 8M`). Chosen on the capability list, not reputation — it has watchpoints, a Lua API *and* an m68k gdb stub. `docs/mac-reference-loop.md` |
-| **Amiga screen mode** | ⭐⭐ **4 bitplanes, hires INTERLACED** (user decision). 16 colours at 512 px wide; the measured live driving front window is 512×320. ⚠ Free of bitplane-DMA penalty only on **AGA**; an OCS/68000 fallback remains open |
+| **Amiga screen mode** | ⭐⭐ **4 bitplanes, hires INTERLACED** (user decision). 16 colours at 512 px wide; the 512×320 Mac image is centred in a 512×384 display whose data fetch is exactly 512 px wide |
+| **Amiga machine** | ⭐⭐ **A1200, 2 MiB chip + 8 MiB fast** (user decision). No separate OCS display mode; the code remains 68000-compatible where practical, but OCS is not a supported package target |
 | **Copy protection** | ⭐ **Patched out, not reproduced.** The one deliberate, named departure from 1:1 — see `docs/faithfulness-seam.md` §The copy protection |
 
 ## Open decisions
@@ -50,33 +51,33 @@ centre of gravity**, and it is the thing to size before anything else.
 These are genuinely open and are the right things to settle before building. They are ordered by
 how much else depends on them.
 
-1. ⭐⭐ **The OCS / 68000 fallback mode, if there is one.** The primary mode is locked (4bpp hires
-   laced). ⭐ It is *reachable* on a 68000 — `[MEASURED]`, the game contains **zero 68020-only
-   instructions** in either build (`docs/mac-hardware.md`) — but hires 4bpp bitplane DMA starves a
-   68000 for most of the display window, so OCS needs a different mode or no support at all. The
-   candidates, and none is free:
-   - **lores + overscan, cropped.** ⚠ Lores overscan tops out around **368 px** against the game's
-     512, so this is a ~28% width crop plus a vertical one, and it removes the player's periphery.
-   - **lores + a 2:1 horizontal squeeze** folded into the chunky→planar merge. Nearly free there,
-     but it is a resample and has to be judged against the reference loop.
-   - **no OCS support.** Honest, and the one to pick if the frame rate is unusable anyway.
-   ⭐ The size gate is now closed: the live driving `WindowList` puts a **512×320 front window**
-   above the separate 512×342 window. Judge the fallback against 512×320.
-   ⭐⭐ **The depth question is also CLOSED and no longer an assumption:** `[MEASURED]` 4 bpp, chunky,
-   `pixelType` 0, two palette indices per byte, **high nibble = left pixel**, 16-entry CLUT.
-   ⚠ And the CLUT is not what the player saw — a **gamma table** sits between it and the DAC, so the
-   Amiga palette is derived from the *displayed* colour. → `docs/mac-hardware.md` §The display surface.
-2. **Machine target.** RoF needed 1 MB and did not fit a bare 512 KB A500. Unknown here and not
-   guessable: it depends on whether the original segments stay resident and on how the display is
-   arranged. **Decide when the first real measurement exists, not before.**
-3. **Performance target.** Deliberately not set. → `docs/perf-method.md` §The target. ⭐ Unlike both
+1. **Performance target.** Deliberately not set. → `docs/perf-method.md` §The target. ⭐ Unlike both
    prior ports there is a real reference: the Mac Plus's 7.83 MHz 68000 is within 12% of the A500's
    7.09 MHz, so the original's own framerate under the reference loop is a meaningful yardstick.
    Set the target from that plus a Phase 4 profile.
-4. **Host build: does it exist, and what for?** RoF had an SDL backend and its approximation cost
+2. **Host build: does it exist, and what for?** RoF had an SDL backend and its approximation cost
    real time; Revs deliberately had **no renderer** and used the host only for differentials.
    ⚠ This port's differentials are different again (there is no transliteration oracle), so the
    question is open rather than answered by either precedent.
+
+### Closed: no separate OCS display fallback
+
+The earlier crop/squeeze/no-support choice was based on a false premise: the exact display is
+already expressible by OCS. Its legacy high-bit rules turn `DIWSTRT=$4CA1`, `DIWSTOP=$0CA1` into
+the same `(161,76)`–`(417,268)` field window that ECS/AGA receives through `DIWHIGH=$2100`.
+`DDFSTRT=$4C` / `DDFSTOP=$C4` fetch exactly 32 words, hence exactly 512 hires pixels—no hidden
+overscan DMA. Cropping or squeezing would therefore trade away fidelity without buying
+compatibility.
+
+The package target is nevertheless the user-selected A1200 with 2 MiB chip and 8 MiB fast. The
+two 512×384×4 planar buffers alone occupy 196,608 bytes of chip RAM. The linked executable is
+about 2.3 MiB before its approximately 187 KiB BSS and dynamic Macintosh/resource allocations, so
+an unexpanded OCS machine cannot host this build regardless of display mode. Four hires bitplanes
+also consume every bitplane fetch slot inside the active 512-pixel DDF interval; an A1200 can
+execute the game and trap layer from fast RAM while those fetches proceed. There is consequently
+**no lower-quality OCS mode and no OCS support promise**. The build deliberately retains `-m68000`
+code generation and OCS-correct display arithmetic because neither costs the A1200 target and both
+keep future expanded-machine experiments honest.
 
 ⚠ **Trust the titles above, not the numbers** — this list has been renumbered twice as decisions
 locked, and other docs quote it by number.

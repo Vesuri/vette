@@ -87,7 +87,7 @@ to substitute for (Revs had to replace a uPD7002) and no two-button assumption t
 
 ## ⭐⭐ The display surface — `[MEASURED]` from the running original
 
-**This section closes the old open-work #18 (“confirm the real offscreen depth”) and re-bases #16, and it supersedes every `pltt`/`PICT` inference.** The numbers
+**This section closes the old “confirm the real offscreen depth” question and supersedes every `pltt`/`PICT` inference.** The numbers
 come from the Mac's own structures while `Color VETTE!` is on screen, read by
 `tools/mac_probe_fb.lua`, and the pixel format is *proved* rather than read off a field — see
 §How it was proved below.
@@ -103,9 +103,10 @@ come from the Mac's own structures while `Color VETTE!` is on screen, read by
 | Palette | **16 entries**, reloaded per scene (the intro's CLUT and the garage's differ) | PixMap `pmTable` |
 | Sound | mono, active through the ~20 s intro, **silent on the garage screen** | `-wavwrite` capture |
 
-⭐⭐ **512 × 320 in 16 colours is the number the port has to hit**, and it is an awkward one for PAL:
-4 bitplanes at 512 px wide is OCS hires at its maximum depth, and 320 lines is more than a
-non-interlaced PAL field shows. It is a real decision, not a formality — `PROJECT.md`, and #16.
+⭐⭐ **512 × 320 in 16 colours is the number the port has to hit.** The chosen 512×384 interlaced
+PAL display centres it at exact size. Four planes at 512 px are OCS hires at maximum depth, but the
+legacy DIW high-bit rules can express the same window as ECS/AGA; `PROJECT.md` records why the
+supported package target is nevertheless A1200 and why no cropped or squeezed fallback exists.
 
 ⭐⭐ **The game composites from an offscreen GWorld with MASKS.** The 512 × 512 scratch page caught
 mid-frame holds the spec panel, two gauge sprites, and a car image **with its black silhouette mask
