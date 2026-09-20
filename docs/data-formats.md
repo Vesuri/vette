@@ -404,3 +404,30 @@ python3 tools/dump_coll.py \
   'tmp/rsrc_VETTE!_VETTE!_Folder_Folder_Color_VETTE!_VETTE!.Data.rsrc' \
   --compare 'tmp/rsrc_VETTE!_VETTE!_Folder_Folder_B&W_VETTE!_VETTE!.Data.rsrc'
 ```
+
+### Moving-object collision pipeline
+
+`Traffic+$0600` walks the active object-pointer array and is the response dispatcher, not merely a
+hull test. It first rejects pairs whose Manhattan centre distance exceeds 170 world units. Objects
+whose four-byte tag at `+$54` is `VETT` use `Traffic+$04B6`; ordinary traffic uses `$04EE` after
+the shipped collision-group/status filters. Both leave the other object in A2 and return zero for
+a hit.
+
+The player path is swept. `Traffic+$0408` derives per-step x/z increments from the object's current
+and previous centres, caps the step count at eight, advances a scratch object from the previous
+position, rebuilds its `COLL` hull, and tests both vertex-in-hull directions at every step. The
+ordinary-traffic path tests the two current hulls in both directions. In each direction,
+`Traffic+$037E` tries all four vertices; `$033A` performs the four signed cross-product edge tests
+for one vertex. The bilateral test catches either hull contributing a contained vertex.
+
+After a hit, `$0600` dispatches independently for both objects:
+
+| object tag/state | shipped response |
+|---|---|
+| `VETT` | `$0202`: marks impact bit `$10` in byte `+$32`, snapshots the centre, steers by `±$07E9` according to the recorded collision vertex, halves word `+$42`, changes word `+$68` by five times word `+$1A`, calls the shared speed-dependent impact routine at `$4C86`, and plays the reached impact sound |
+| `OPPO` | `$02AA`: intentionally performs no mutation in this dispatcher; it only reads the global mode flag and returns |
+| other active traffic | `$012A`: combines both objects' motion into a new heading/velocity, refreshes current/previous centres, then sets byte `+$6A=-1`, duration byte `+$6B=20`, turn-step byte `+$6C=2`, and requests sound/event selector 3 |
+
+This proves separation and traffic-state response fields directly from their writers. The meaning
+of the player words beyond their arithmetic effects remains open until the shared `$4C86` path is
+traced through its speed thresholds and terminal branches.
