@@ -7,14 +7,16 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — current compatibility boundary
 
-⭐ **HEAD OF QUEUE: trace active `FWTM` -> `FREE` movement and natural traffic retirement.**
-The Course Two input-only route now reaches indexed freeway cell `(2,23)`, but the original spawn
-dispatcher exits before `Traffic+$2302` because the live traffic pool remains full (`15/15`). Trace
-the already-active movement path and the removal that frees a slot; then use
-`amiga/driving_freeway_spawn.gdb` to confirm the first natural `FWTP` -> `JHPF` replacement spawn,
-including its triplet and alternate-link branches. Do not patch the count, mode, position, or spawn
-state merely to make a breakpoint fire. `TURN` is loaded but unread and `PHAZ` is never requested,
-so their names do not justify speculative work. → `docs/data-formats.md`.
+⭐ **HEAD OF QUEUE: cross a real Main Map -> Freeway Map transition, then trace the first freeway
+traffic replacement.** Natural distance retirement is proved at `Traffic+$252C/$257A/$1FB6` and
+ordinary city spawning immediately refills the freed slot. The remaining gate is A5-$3764: merely
+driving into FWTP-key cell `(2,23)` leaves it clear, so the dispatcher correctly stays on the city
+branch. Reach one of the QUAD-selected transition responses through ordinary input (the nearby
+Course Three candidate is Main Map cell `(2,6)`, selector 16, response export 212), then use
+`amiga/driving_freeway_spawn.gdb` and `amiga/driving_freeway_movement.gdb` to capture the first
+natural `FWTP` -> `JHPF` replacement and its `FWTM` -> `FREE` movement. Do not patch the mode,
+count, position, or spawn state merely to make a breakpoint fire. `TURN` is loaded but unread and
+`PHAZ` is never requested, so their names do not justify speculative work. → `docs/data-formats.md`.
 
 ## ⭐⭐ TARGET 1 — the complete intro, run by the game's own code — COMPLETE
 

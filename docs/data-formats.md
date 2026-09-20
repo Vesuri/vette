@@ -597,10 +597,20 @@ direction, not a speed value.
 `amiga/driving_freeway_spawn.gdb` records the selected key/triplet, optional link and constructed
 object for the first two naturally reached spawns. The deterministic UI harness can select Course
 Two and steer with ordinary KeyMap input; that route reached FWTP key cell `(2,23)` without
-patching position or heading. The dispatcher still did not enter `Traffic+$2302`, for a proved
-earlier reason: its live traffic count and maximum were both 15, so `Traffic+$24E6` took the
-full-pool exit. Active movement and natural retirement must free a slot before this can become a
-spawn-branch coverage run.
+patching position or heading. This does not itself select the freeway dispatcher: A5-$3764 remains
+zero, so `Traffic+$24DE` takes the ordinary city branch rather than calling `$2302`.
+
+The full `15/15` pool is transient, not the blocker. Every 35 ticks `Traffic+$252C` scans active
+objects, computes Manhattan distance from the player, and selects objects beyond `$1400` at
+`$257A`; `$1FB6` removes the selected object and decrements the count. A natural Course Two run
+repeatedly exercised that path, after which the ordinary city branch immediately restored the
+pool. `amiga/driving_freeway_movement.gdb` records the bounded retirement and movement evidence.
+
+The mode byte is established by shipped special-collision responses selected through MAPS/QUAD
+data. For example, Main Map cell `(2,6)` uses QUAD 21 and collision selector 16; its first rectangle
+selects response-table export 212 (`Traffic+$5632`), which sets freeway mode. Other statically
+proved true-mode cells include `(3,44)`, `(6,32)`, `(13,31)`, `(24,1)`, and `(7..9,39)`. The next
+coverage run must cross one normally before the `FWTP`/`JHPF` spawn trace is meaningful.
 
 ### `FWTM` and `FREE`: navigation-directed traffic paths
 

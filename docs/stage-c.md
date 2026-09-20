@@ -1096,6 +1096,23 @@ the shipped 31,272-byte A5 world. Amiga quadrature deltas maintain the redirecte
 `RawMouse`, and `Mouse` points asynchronously at every safe trap boundary; the physical left
 button maintains active-low `MBState`. The ordinary keyboard `KeyMap` remains independently live.
 
+### Natural traffic retirement and the freeway-mode gate
+
+The Course Two input-only route reaches Main Map cell `(2,23)`, which has an `FWTP` key, but that
+coordinate alone does not switch maps. A5-$3764 remains zero and `Traffic+$24DE` consequently
+continues through the city-spawn branch. The earlier full-pool diagnosis was incomplete: the
+shipped 35-tick scan at `Traffic+$252C` naturally selects traffic farther than `$1400` at `$257A`,
+and `$1FB6` removes it and decrements the live count. Ordinary city spawning then fills the slot
+again. The retirement path is working; it is not what prevents `$2302` from running.
+
+Static MAPS/QUAD/collision-response tracing identifies the actual gate. Special collision handlers
+set or clear A5-$3764 and switch the active map. Main Map cell `(2,6)`, for example, uses QUAD 21,
+collision selector 16, and its first rectangle dispatches export 212 (`Traffic+$5632`), which sets
+freeway mode. Course Three starts at world `(0x3140,0x17e0)`, cell `(6,2)`, making this a nearby
+candidate, but no route is claimed until ordinary controls cross the response rectangle. The
+bounded observation script `amiga/driving_freeway_movement.gdb` records retirement, `FWTM`/`FREE`
+movement, and the first natural `$2302` spawn without altering game state.
+
 ## Correction to the MAME log
 
 The 51-row MAME table is a measurement of that reference run, not fabricated data, but the live
