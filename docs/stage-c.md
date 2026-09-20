@@ -976,6 +976,20 @@ tick 8,773. This closes the first deterministic collision/transition target.
 probe-only capture avoids a conditional debugger breakpoint on every Toolbox trap, which slowed
 the game enough to miss the event at the previous wall-time ceiling.
 
+The corresponding static-impact source is now measured too. A probe-only private Line-A hook at
+`Traffic+$3FFE` records the already-selected rectangle and nearest side, emulates the replaced
+`CLR.W D3`, and returns without running the ordinary trap scheduling/presentation path. On the
+same deterministic route, the last hit before PICT 140 is MAPS cell `(5,2)`, QUAD 1, collision-list
+selector 63, record 0, nearest side 3 (`max-u`). It is special response-table entry 14 and invokes
+jump-table export 229, `Traffic+$5AC2`, at tick 3459/frame 78. The `_GetPicture` request follows at
+tick 3499/frame 79.
+
+The shipped code closes the causal gap: `Traffic+$5AC2` sets the stop/recovery state, loads
+`D6=900` and `D7=140`, and calls export 18 (`Main+$0F82`), whose dynamic `_GetPicture` call is at
+`Main+$0FD6`. `amiga/driving_lake_static_collision.gdb` preserves this complete measurement. The
+Lake Merced collision is therefore QUAD static-bounds behavior, not a moving-object `COLL` hit or a
+host-generated transition.
+
 The trap-address table is now active as well as stateful. Control+left-mouse is sampled only after
 an original event-pump, `Button`, `StillDown`, or driving-boundary trap has completed; ordinary
 mouse clicks retain their one-button Macintosh meaning. The safe return is redirected through a

@@ -7,12 +7,11 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — current compatibility boundary
 
-⭐ **HEAD OF QUEUE: identify the Lake Merced static-impact response.**
-The static dispatch is structurally closed: 44 particular QUAD collision rectangles map to 35
-distinct `Traffic` response routines; ordinary rectangles use common nearest-edge flags. Add a
-low-overhead live probe to the reproducible straight-to-Lake-Merced route, capture selector,
-rectangle ordinal, nearest side and response target at the water impact, then trace that target to
-the PICT-140 tow-truck recovery. Name fields only when this live behavior proves them. →
+⭐ **HEAD OF QUEUE: finish the driving-data behavior map.**
+The QUAD/MAPS road surface and static-bounds structures, the `COLL` moving-object hulls, and the
+Lake Merced recovery response are proved. Decode the remaining packed MAPS road word and group the
+other 34 special static-impact handlers by shipped behavior, then continue through moving-object
+collision response. Name fields only from their consumers or a reproducible live route. →
 `docs/data-formats.md`, `docs/stage-c.md`.
 
 ## ⭐⭐ TARGET 1 — the complete intro, run by the game's own code — COMPLETE
@@ -72,8 +71,9 @@ implementation when a real path needs it, rather than weakening the audit or spe
 1. **Decode the `VETTE!.Data` record formats.** The *inventory* is done
     (`docs/source-inventory.md`); the formats are not. `PERF` now has a proved 37-word race-template
     prefix; its remaining 17 words are unreferenced dead data in both v1.02 executables.
-    `OBJS`, `QUAD`, and the outer `MAPS` grids are now decoded; continue through the MAPS/QUAD
-    road fields into collision behavior. ⚠ Do this against
+    `OBJS`, `QUAD`, the outer `MAPS` grids, and `COLL` are now decoded; the QUAD-selected static
+    bounds and Lake Merced response are closed. Continue through the remaining packed MAPS road
+    word and the other static/dynamic collision responses. ⚠ Do this against
     the `load` segment's disassembly, not by pattern-guessing — RoF's postmortem §1.2 is about
     exactly this.
 2. **Explain `FRED`** — 6.5 KB in both builds, name says nothing. ⭐ New evidence, and it is a

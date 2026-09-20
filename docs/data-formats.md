@@ -275,12 +275,25 @@ word -1
 The point is inside only when all four inclusive comparisons pass. For a hit, the routine computes
 the distance to all four sides, identifies the nearest side (0=min-v, 1=min-u, 2=max-v, 3=max-u),
 and passes that side plus the exact matching rectangle pointer to `Traffic+$3FEE`. That routine
-maps rectangle identity through parallel pointer/handler tables and invokes the corresponding response. More
-precisely, the table contains 44 pointers to individual rectangle records (including records
-inside multi-rectangle lists), paired with 35 distinct above-A5 jump-table exports, all targeting
+maps rectangle identity through parallel pointer/handler tables and invokes the corresponding
+response. More precisely, the table contains 44 pointers to individual rectangle records
+(including records inside multi-rectangle lists), paired with 35 distinct above-A5 jump-table exports, all targeting
 `Traffic` response routines. Rectangles absent from this special table still report the nearest
-edge through the common collision flags. The main
-driving loop calls this test for all four corners at `Traffic+$461E..+$4696`.
+edge through the common collision flags. The main driving loop calls this test for all four corners
+at `Traffic+$461E..+$4696`.
+
+The reproducible straight-ahead Lake Merced route identifies one special entry without relying on
+the rectangles' geometry or on a guessed resource name. At the collision, the current MAPS cell is
+`(5,2)`, its QUAD index is 1, QUAD header 1 selects bounds list 63, and record 0 is hit on side 3
+(`max-u`). The exact record is special-table entry 14, whose handler is jump-table export 229,
+`Traffic+$5AC2`.
+
+That handler is the recovery path itself. Once race state A5-$33F0 is at least 3, it calls the
+communication response at export 160, clears driving state, sets A5-$341A, performs the reached
+sound operations, loads `D6=900` and `D7=140`, and calls export 18 (`Main+$0F82`). That routine
+uses D6 for the recovery window and D7 as the `_GetPicture` ID at `Main+$0FD6`; the live run reaches
+PICT 140 40 Macintosh ticks after the recorded bounds hit. Thus selector 63 / record 0 is the Lake
+Merced water recovery, not an ordinary solid-edge response.
 
 This corrects an earlier false negative: searching for reads of the A5-$2500 cached header copy
 proved only that the copy is dead, not that QUAD header 1 is dead. The real consumer deliberately
@@ -288,6 +301,11 @@ rereads the descriptor. Runtime capture shows all 108 selectors are valid initia
 shipped QUAD records use 102 of them. The lists contain 296 records. Three have a lower bound
 greater than their corresponding upper bound and therefore can never pass the routine's inclusive
 comparisons; they are retained as shipped disabled bounds rather than normalised.
+
+`make SKIP_INTRO=1 GARAGE_CLICK=1 PROBES=1` with
+`amiga/driving_lake_static_collision.gdb` reproduces the selector, record, side, table slot, export,
+and PICT timing. Its probe replaces only `Traffic+$3FFE`'s `CLR.W D3`, emulates that instruction,
+and returns before ordinary trap scheduling, so it does not impose a debugger stop on each impact.
 
 The auxiliary resources have code-proved fixed grids with no leading count:
 

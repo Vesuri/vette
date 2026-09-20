@@ -63,6 +63,10 @@ volatile uint32_t g_probePicture140Return = 0;
 volatile uint32_t g_probePicture140Ticks = 0;
 volatile uint32_t g_probePicture140Frames = 0;
 volatile uint32_t g_probeIntroGeometry[46] = {0};
+// [hits, rectangle, edge, cell-x, cell-y, quad, selector, ordinal,
+//  response-table index, response export, Macintosh ticks, presented frames]
+volatile uint32_t g_probeStaticCollision[12] = {0};
+volatile uint32_t g_probeLakeCollision[12] = {0};
 #endif
 #ifdef VETTE_MAPPED_COPY_VERIFY
 volatile uint32_t g_mappedCopyAsmTicks = 0;
@@ -81,6 +85,9 @@ static const uint32_t kJumpOffset = 32;
 static const uint32_t kJumpBytes = 4072;
 static const uint16_t kJumpCount = 509;
 static const uint16_t kDrivingBoundaryTrap = 0xafff;
+#ifdef VETTE_PROBE
+static const uint16_t kStaticCollisionProbeTrap = 0xaffe;
+#endif
 static uint8_t s_a5World[kBelowA5 + kAboveA5] __attribute__((aligned(4)));
 static VetteScreen* s_loudStopScreen;
 static ResourceArchive s_resourceArchive;
@@ -551,6 +558,20 @@ static bool installDrivingBoundaryTrap()
     for (uint16_t i = 0; i < 4; ++i)
         if (read16(boundary + i * 2) != original[i]) return false;
     write16(boundary, kDrivingBoundaryTrap);
+    return true;
+}
+
+static bool installStaticCollisionProbe()
+{
+#ifdef VETTE_PROBE
+    // Traffic+$3FFE is reached only after the shipped point-in-rectangle test
+    // has selected the nearest side in D0 and retained the exact record in A3.
+    // Replace its CLR.W D3 with a private Line-A hook; the dispatcher emulates
+    // the instruction before returning to Traffic+$4000.
+    uint8_t* hook = s_segments[6].begin + 0x3ffe;
+    if (read16(hook) != 0x4243) return false;
+    write16(hook, kStaticCollisionProbeTrap);
+#endif
     return true;
 }
 
@@ -4330,6 +4351,51 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
 {
     uint32_t pc = read32(frame + 2);
     uint16_t trap = read16((const uint8_t*)pc);
+#ifdef VETTE_PROBE
+    if (trap == kStaticCollisionProbeTrap
+        && pc == (uint32_t)(s_segments[6].begin + 0x3ffe)) {
+        // movem.l d0-d7/a0-a6 gives regs[0]=D0, regs[3]=D3, regs[11]=A3.
+        // Preserve D3's upper word while emulating the replaced CLR.W D3.
+        regs[3] &= 0xffff0000UL;
+
+        uint32_t rectangle = regs[11];
+        uint16_t cellX = read16(s_currentA5 - 0x346e);
+        uint16_t cellY = read16(s_currentA5 - 0x346c);
+        uint8_t* map = (uint8_t*)read32(s_currentA5 - 0x250c);
+        uint16_t quad = read16(map + 4 * ((uint32_t)cellY * 52 + cellX));
+        uint8_t* quadTable = (uint8_t*)read32(s_currentA5 - 0x4dda);
+        uint8_t* descriptor = (uint8_t*)read32(quadTable + 4 * quad);
+        uint16_t selector = read16(descriptor + 2);
+        uint8_t* bounds = (uint8_t*)read32(s_currentA5 - 0x424e + 4 * selector);
+
+        uint32_t responseIndex = 0xffffffffUL;
+        uint32_t responseExport = 0xffffffffUL;
+        for (uint16_t i = 0; i != 44; ++i) {
+            if (read32(s_currentA5 - 0x30c0 + 4 * i) != rectangle) continue;
+            responseIndex = i;
+            uint32_t handler = read32(s_currentA5 - 0x300c + 4 * i);
+            uint32_t firstEntry = (uint32_t)s_currentA5 + kJumpOffset + 2;
+            if (handler >= firstEntry && (handler - firstEntry) % 8 == 0)
+                responseExport = (handler - firstEntry) / 8;
+            break;
+        }
+
+        g_probeStaticCollision[0]++;
+        g_probeStaticCollision[1] = rectangle;
+        g_probeStaticCollision[2] = regs[0] & 0xffff;
+        g_probeStaticCollision[3] = cellX;
+        g_probeStaticCollision[4] = cellY;
+        g_probeStaticCollision[5] = quad;
+        g_probeStaticCollision[6] = selector;
+        g_probeStaticCollision[7] = rectangle >= (uint32_t)bounds
+            ? (rectangle - (uint32_t)bounds) / 8 : 0xffffffffUL;
+        g_probeStaticCollision[8] = responseIndex;
+        g_probeStaticCollision[9] = responseExport;
+        g_probeStaticCollision[10] = g_macTicks;
+        g_probeStaticCollision[11] = g_macFramesPresented;
+        return 1;
+    }
+#endif
 #ifdef VETTE_GARAGE_CLICK
     if (trap == 0xa9bc && read16(userStack) == 140)
         s_garageRecoveryPictureLoaded = true;
@@ -4340,6 +4406,8 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
         g_probePicture140Return = read32(s_currentA5 - 0x2e9a);
         g_probePicture140Ticks = g_macTicks;
         g_probePicture140Frames = g_macFramesPresented;
+        for (uint16_t i = 0; i != 12; ++i)
+            g_probeLakeCollision[i] = g_probeStaticCollision[i];
     }
 #endif
     bool drivingFrameComplete = false;
@@ -5264,7 +5332,7 @@ bool MacLoader::run(VetteScreen* screen)
     if (!buildA5World(a5)) return false;
     s_currentA5 = a5;
     if (!redirectLowMemoryGlobals(a5) || !disableCopyProtection()
-        || !installDrivingBoundaryTrap()) return false;
+        || !installDrivingBoundaryTrap() || !installStaticCollisionProbe()) return false;
 
     Disable();
     *(void (**)())0x28 = vette_line_a_handler;

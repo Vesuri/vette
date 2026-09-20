@@ -270,6 +270,7 @@ endif
 ifdef PROBES
 PROBE_SYMS += g_probePicture140TrapPC g_probePicture140Return \
               g_probePicture140Ticks g_probePicture140Frames g_probeIntroGeometry \
+              g_probeStaticCollision g_probeLakeCollision \
               g_macExitState g_macHostReturnSP
 endif
 ifdef FPSCOUNT
