@@ -27,29 +27,25 @@ def decode(body: bytes):
     pos = 1
     records = []
     while words[pos] != -1:
-        header = words[pos:pos + 2]
-        if len(header) != 2:
-            raise ValueError("truncated QUAD record header")
-        pos += 2
-        command_lists = []
+        word_lists = []
         for _ in range(2):
-            commands = []
+            values = []
             while words[pos] != -1:
-                command = words[pos:pos + 4]
-                if len(command) != 4:
-                    raise ValueError("truncated four-word QUAD command")
-                commands.append(command)
-                pos += 4
+                values.append(words[pos])
+                pos += 1
             pos += 1
-            command_lists.append(commands)
+            word_lists.append(values)
+        if len(word_lists[0]) < 2:
+            raise ValueError("QUAD first list has no two-word header")
+        first_commands = word_lists[0][2:]
         records.append({
-            "header": header,
-            "setup_commands": command_lists[0],
-            "object_commands": command_lists[1],
+            "header": tuple(word_lists[0][:2]),
+            "setup_words": tuple(first_commands),
+            "object_words": tuple(word_lists[1]),
+            "render_aligned": not (len(first_commands) % 4 or len(word_lists[1]) % 4),
         })
 
-    # The final object's list terminator is followed by two more -1 words.
-    if words[pos:] != (-1, -1):
+    if words[pos:] != (-1, -1, -1):
         raise ValueError(f"unexpected QUAD trailer {words[pos:]}")
     return records
 
@@ -70,11 +66,12 @@ def main():
 
     records = decode(body)
     print(f"id={rid} name={name!r} bytes={len(body)} records={len(records)}")
-    print("index header0 header1 setup object")
+    print("index header0 header1 setup_words object_words aligned")
     for index, record in enumerate(records):
         print(f"{index:>5} {record['header'][0]:>7} {record['header'][1]:>7} "
-              f"{len(record['setup_commands']):>5} "
-              f"{len(record['object_commands']):>6}")
+              f"{len(record['setup_words']):>11} "
+              f"{len(record['object_words']):>12} "
+              f"{'yes' if record['render_aligned'] else 'NO'}")
 
 
 if __name__ == "__main__":

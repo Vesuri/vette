@@ -154,22 +154,26 @@ by `amiga/objs_runtime.gdb`) to enumerate the initialized LOD tables by resource
 ## `QUAD` map-cell descriptors
 
 The single 11,366-byte `QUAD` resource (`1000`, `Quad Discripter Data`) begins with an exact
-following-word count and contains 192 variable-size map-cell descriptors. `Main+$2C64` builds a
-direct pointer table to them. Each descriptor is:
+following-word count and contains 257 variable-size map-cell descriptors. `Main+$2C64` builds a
+direct pointer table by reproducing this exact wordwise grammar:
 
 ```
 word  traffic/road behavior type
 word  second header field (meaning not yet proved)
-repeat { word dispatch index; word argument 0; word argument 1; word argument 2; }
+word[] setup words
 word  -1
-repeat { word object-factory index; word x; word y; word z; }
+word[] object words
 word  -1
 ```
 
-Two final `-1` words terminate the whole resource after the last descriptor. `Main+$43D0` indexes
+Three final `-1` words terminate the whole resource after the last descriptor. `Main+$43D0` indexes
 the pointer table with the current map-cell type, copies the two header words, invokes every first
-list entry through the game's dispatch table, and feeds every second-list entry plus its three
-coordinates to `Main+$3E22`, the dynamic-object constructor. `Traffic+$3D7C` independently reads
+list entry as four words (`dispatch index`, three arguments), and feeds every four-word second-list
+entry (`object-factory index`, `x`, `y`, `z`) to `Main+$3E22`, the dynamic-object constructor.
+All second lists and all but descriptor 191's first list have the required four-word alignment.
+Descriptor 191 has 11 setup words after its header; it is retained and reported as shipped, but is
+not evidence for a different command grammar until reachability proves the game selects it.
+`Traffic+$3D7C` independently reads
 the first header word and branches on proved values 0, 1, 2, 3, 4, 6, 7, and 8; names for those
 individual road behaviors still require tracing the branches to effects. This establishes QUAD's
 relationship to OBJS: QUAD does not contain model geometry; it describes a map cell and places
