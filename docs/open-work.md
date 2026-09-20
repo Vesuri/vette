@@ -7,11 +7,11 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — current compatibility boundary
 
-⭐ **HEAD OF QUEUE: make the original Mouse steering mode effective.** Its Page-0 accesses are
-safely redirected and the menu can select it, but physical testing found no steering, throttle, or
-braking response. Keep Keyboard as the default while tracing the live mode flags, redirected Mouse
-coordinates, and active-low button state through the original `Main+$2BC8` and `Traffic+$6D24`
-consumers. Correct the source of the mismatch; do not add a second host-authored steering path.
+⭐ **HEAD OF QUEUE: resume loud-stop-led gameplay coverage beyond the proved city, recovery, and
+freeway paths.** Use the normal visible build and original controls to exercise a materially new
+gameplay transition. Stop at the first real unimplemented trap or demonstrable compatibility
+failure, preserve its original caller/state, and fix that cause. Do not add host-authored UI or
+patch game state merely to manufacture coverage.
 
 ## ⭐⭐ TARGET 1 — the complete intro, run by the game's own code — COMPLETE
 

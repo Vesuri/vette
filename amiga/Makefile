@@ -166,6 +166,12 @@ ifeq ($(FREEWAY_ROUTE),1)
 EXTRA_DEFINES += -DVETTE_FREEWAY_ROUTE
 endif
 
+# Diagnostic only: select the game's shipped Mouse steering default so the
+# physical Amiga mouse bridge and original callbacks can be traced directly.
+ifeq ($(MOUSE_CONTROL_PROBE),1)
+EXTRA_DEFINES += -DVETTE_MOUSE_CONTROL_PROBE
+endif
+
 # Diagnostic only: take the same deferred exit path as Control+left-mouse at
 # its first safe trap boundary, without requiring headless hardware input.
 ifeq ($(QUIT_PROBE),1)

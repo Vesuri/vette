@@ -1060,7 +1060,7 @@ behaviour. The standalone Amiga target has one fixed game surface and no movable
 platform-level fixed-window policy, not an ACCEPT-coordinate exception, and leaves the original
 difficulty choices and their hit regions untouched.
 
-### Modern keyboard aliases and deferred mouse steering
+### Modern keyboard aliases and original Mouse steering
 
 The original key chart assigns Keyboard-mode steering/acceleration/braking to `J`/`L`, `I`, and
 `M`, and Numeric-keypad mode to `4`/`6`, `8`, and `2`, but assigns no driving action to the
@@ -1091,8 +1091,7 @@ to Keyboard mode. Unrelated keyboard commands remain live if Mouse is selected f
 `Main+$2BC8` is the executable offset after the segment header. The resident `CODE 1` blob retains
 that four-byte header, so the corresponding raw patch address is `$2BCC`. Using `$2BC8` made the
 byte verification reject every clean build before `%A5Init`; correcting it restored the intro with
-live animation, audio, and frame presentation. The redirection remains installed for later Mouse
-mode diagnosis even though Mouse is no longer selected by default.
+live animation, audio, and frame presentation.
 
 Enabling it exposed more Page-0 dependencies rather than licensing direct access to Amiga low
 memory. Six original centre-coordinate writes, the four reached Mouse/MBState reads, and the
@@ -1102,6 +1101,24 @@ Amiga VBL trampoline already enters with the application A5, while the new shado
 shipped callback contract without touching Amiga address `$0904`. Amiga quadrature deltas maintain the redirected `MTemp`,
 `RawMouse`, and `Mouse` points asynchronously at every safe trap boundary; the physical left
 button maintains active-low `MBState`. The ordinary keyboard `KeyMap` remains independently live.
+
+The later end-to-end trace found that the earlier “default Mouse” experiment never had Mouse mode
+active: at callback selection A5-$5310 was `$0100` and A5-$5316 was zero, so Main correctly installed
+the shipped numeric-keypad routine. Changing one conditional loader-default branch was insufficient
+because the live A5 state is authoritative. `MOUSE_CONTROL_PROBE=1` is therefore diagnostic only;
+it establishes the same mutually exclusive live flags as the Options-menu Mouse item at safe trap
+boundaries without changing either consumer.
+
+With A5-$5316 genuinely `$0100`, the original Mouse callback was selected with the redirected
+`CurrentA5` intact. Real FS-UAE quadrature changed the host position and `Mouse.h`; the measured
+callback produced right steering 2 and signed steering 2. After the countdown, Main's shipped
+Mouse branch reached jump-table export 251 and its resolved address exactly matched
+`Traffic+$6D24`. That routine tests active-low `MBState` and its zero fall-through writes -1 to
+the car throttle word +$20. macOS denied automated pointer-click delivery in this run, so the
+physical pressed byte was not claimed as dynamically observed; the released byte `$80`, live
+dispatch, steering result, and exact throttle branch are independently recorded by
+`amiga/driving_mouse_control.gdb` and `amiga/driving_mouse_button.gdb`. Production remains in the
+shipped numeric-keypad mode, usable through the cursor aliases; Mouse remains a real menu choice.
 
 ### Natural traffic retirement and the freeway-mode gate
 

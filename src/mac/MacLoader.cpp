@@ -607,6 +607,21 @@ static bool redirectLowMemoryGlobals(uint8_t* a5)
     return true;
 }
 
+#ifdef VETTE_MOUSE_CONTROL_PROBE
+static void selectMouseSteeringForProbe()
+{
+    // Diagnostic only: establish the exact live state written by Steering >
+    // Mouse before Main selects its one callback.  Reapply at safe trap
+    // boundaries because %A5Init and later setup legitimately replace the
+    // loader's earlier defaults.  No steering or button consumer is changed.
+    if (!s_currentA5) return;
+    write16(s_currentA5 - 0x5316, 0x0100);  // Mouse
+    write16(s_currentA5 - 0x5310, 0);       // shipped keypad mode
+    write16(s_currentA5 - 0x5312, 0);       // Keyboard
+    write16(s_currentA5 - 0x5314, 0);       // Joystick
+}
+#endif
+
 static bool disableCopyProtection()
 {
     // Main+$05FE is the entry to the manual challenge.  The successful-answer
@@ -4688,6 +4703,9 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
 {
     uint32_t pc = read32(frame + 2);
     uint16_t trap = read16((const uint8_t*)pc);
+#ifdef VETTE_MOUSE_CONTROL_PROBE
+    selectMouseSteeringForProbe();
+#endif
     // Mouse steering reads asynchronous Page-0 state directly rather than
     // waiting for an EventRecord, so refresh its redirected shadows at every
     // safe Line-A boundary while keyboard polling remains independent.
