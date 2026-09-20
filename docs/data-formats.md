@@ -192,3 +192,54 @@ python3 tools/dump_quad.py \
   'tmp/rsrc_VETTE!_VETTE!_Folder_Folder_Color_VETTE!_VETTE!.Data.rsrc' \
   --compare 'tmp/rsrc_VETTE!_VETTE!_Folder_Folder_B&W_VETTE!_VETTE!.Data.rsrc'
 ```
+
+## `MAPS`: world, navigation and map-display grids
+
+The five `MAPS` resources are byte-identical between the colour and B&W data files, but they do
+not all share one record format. `load+$024E` loads all five and establishes their roles by storing
+separate pointers. The two world maps are:
+
+```
+word  exact following-word count = 4888
+repeat 52 * 47 times, row-major:
+    word  QUAD descriptor index
+    word  packed road word
+```
+
+Resource 1000 `Main_Map` and resource 1100 `Freeway_Map` are both 9,778 bytes. The loader skips
+their count words and stores their data pointers separately; normal/freeway transitions switch
+the active pointer rather than copying or converting the map. `Main+$437A` and
+`Traffic+$3D7C` independently compute `4 * (y*52+x)`. The first cell word indexes the 257-entry
+QUAD pointer table, which closes the data chain from MAPS cell to QUAD setup/object commands to
+OBJS model geometry.
+
+The second cell word is a packed road word, not a scalar height. The complete currently proved
+uses are deliberately recorded as bit operations rather than guessed road names:
+
+- its signed 16-bit value is multiplied by `-224`, with the low word retained as the cell's
+  vertical origin used by road and placed-object rendering;
+- bits `$1C00`, shifted down, select one of eight six-byte records (`FRED+$005C`);
+- bit `$0200` enables a Traffic selection, whose bits 13..15 select a 12-byte record
+  (`Traffic+$63C4`);
+- bits `$E000` select another 12-byte Traffic record (`Traffic+$6426`);
+- bits `$E000` and `$0300` are combined for a further Traffic selection (`Traffic+$654A`).
+
+Those consumers prove overlapping fields and derived indices, but not yet human meanings such as
+surface, slope or intersection type. The QUAD first header supplies a separate road-behaviour
+dispatch at `Traffic+$3D7C`; it must not be conflated with this packed word.
+
+The auxiliary resources have code-proved fixed grids with no leading count:
+
+| id | name | grammar | consumer evidence |
+|---:|---|---|---|
+| 3333 | `NavigationMap` | 52x47, two big-endian words/cell | `Traffic+$5FEC` uses row stride 208 and column stride 4, then reads the current and adjacent cell words for navigation/traffic decisions |
+| 4444 | `Real_world_Map_Data` | 52x47, two bytes/cell | `Traffic+$48C6` uses row stride 104 and reads the two bytes as map-display coordinates |
+| 4445 | `Freeway_Map_Data` | 52x46, two bytes/cell | the same routine selects this pointer in freeway mode; the one-row-short extent is shipped data, not padding inferred away |
+
+Validate all five dimensions and the Color/B&W equality with:
+
+```sh
+python3 tools/dump_maps.py \
+  'tmp/rsrc_VETTE!_VETTE!_Folder_Folder_Color_VETTE!_VETTE!.Data.rsrc' \
+  --compare 'tmp/rsrc_VETTE!_VETTE!_Folder_Folder_B&W_VETTE!_VETTE!.Data.rsrc'
+```

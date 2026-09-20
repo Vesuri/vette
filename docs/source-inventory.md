@@ -100,7 +100,7 @@ largest being `Main` at 32.6 KB and `Traffic` at 27.9 KB. That is the size of th
 |---|---|---|---|
 | `INST` | 16 | **373 411** | sampled instruments/effects, all named — see Audio below |
 | `OBJS` | 160 | 95 394 | the 3D object models, all named |
-| `MAPS` | 5 | 39 004 | `Main_Map`, `Freeway_Map`, `NavigationMap` (9 778/9 778/9 776 B), `Real_world_Map_Data` 4 888, `Freeway_Map_Data` 4 784 |
+| `MAPS` | 5 | 39 004 | proved 52-column grids: two counted 52x47 world maps, a raw 52x47 two-word navigation grid, and 52x47 / 52x46 two-byte map-display grids |
 | `BGAS` | 1 | 15 066 | `Bogas Driver v2.1` — the sound engine |
 | `QUAD` | 1 | 11 366 | `Quad Discripter Data` [sic] |
 | `SINE` | 2 | 8 712 | `Sine Table 360`, `Tangent Table` |
@@ -133,6 +133,13 @@ maximum forward gear and word 24 selects automatic shifting. Words 38..54 remain
 proved copy and have no reader in either v1.02 executable; they are deliberately unnamed dead
 data. The B&W and colour records are byte-identical. → `docs/data-formats.md`,
 `tools/dump_perf.py`.
+
+⭐ `MAPS` now has a code-proved outer grammar. `Main_Map` and `Freeway_Map` are 52x47 row-major
+cells, each holding a QUAD descriptor index and a packed road word. `NavigationMap` is a separate
+52x47 grid of two-word cells; `Real_world_Map_Data` and `Freeway_Map_Data` are two-byte map-display
+coordinate grids with 47 and 46 rows respectively. The packed road word has several proved bit
+consumers but intentionally remains unnamed beyond those operations. → `docs/data-formats.md`,
+`tools/dump_maps.py`.
 
 ## Audio — ⭐⭐ this corrects a documented assumption
 
