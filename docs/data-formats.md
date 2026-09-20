@@ -65,3 +65,41 @@ python3 tools/dump_perf.py \
   'tmp/rsrc_VETTE!_VETTE!_Folder_Folder_Color_VETTE!_VETTE!.Data.rsrc' \
   --compare 'tmp/rsrc_VETTE!_VETTE!_Folder_Folder_B&W_VETTE!_VETTE!.Data.rsrc'
 ```
+
+## `OBJS`: proved outer model grammar
+
+All 160 `OBJS` resources parse exactly with the walk performed by `Initialize+$063A`; the parser
+lands on the declared end of every record, and every stored index is in range. The colour and B&W
+data files' complete `OBJS` sets are byte-identical.
+
+The on-disk sequence is:
+
+1. one signed word giving the exact number of following words;
+2. a last index `C`, followed by `C+1` coordinate records of four signed words each;
+3. a last index `R`, followed by `R+1` variable-length records;
+4. a last index `G`, followed by `G+1` groups of indices into the variable-record table;
+5. exactly eight indices into the group table.
+
+A variable-length record has three fixed header words. Its third word is a last index `N`, making
+the complete record `N+5` words. A group begins with its reference last index and is followed by
+that many-plus-one variable-record indices.
+
+This is not merely a shape fit. `Initialize+$0678` obtains the resource data pointer and the code
+then performs that exact walk: it retains the coordinate block, builds pointers to every
+variable-length record, resolves each group index into one of those pointers, and finally resolves
+the eight tail indices into group pointers stored in a 40-byte runtime model descriptor.
+`Initialize+$068A` stores `C-4` as the runtime coordinate last index; the meaning of the five
+excluded coordinate records still needs a renderer consumer before it is named.
+
+`C`/`S` car pairs are structurally complex/simple candidates, but distance-based selection is not
+yet proved. For example, `F40C` has 76 coordinate records and 30 variable records while `F40S1`
+has 16 and 9; `Taxi` has 70 and 27 while `TaxiS` has 20 and 10. The size reduction is real. Calling
+it near/far LOD still requires tracing which runtime condition chooses each model.
+
+Validate all records and print their structural counts with:
+
+```sh
+python3 tools/dump_objs.py \
+  'tmp/rsrc_VETTE!_VETTE!_Folder_Folder_Color_VETTE!_VETTE!.Data.rsrc' \
+  --compare 'tmp/rsrc_VETTE!_VETTE!_Folder_Folder_B&W_VETTE!_VETTE!.Data.rsrc'
+```

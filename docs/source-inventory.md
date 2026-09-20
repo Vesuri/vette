@@ -159,9 +159,11 @@ The 16 `INST` resources, which double as a list of what the game makes noises ab
 
 ## `OBJS` — 160 named models, and the world is real San Francisco
 
-Sizes run 100 B to 1 848 B. Recurring exact sizes (110, 162, 242, 282, 366, 916) say these are
-fixed-format records whose length follows the model's complexity, and `QUAD`'s
-`Quad Discripter Data` says `[INFERRED]` the renderer is **quad-based**.
+Sizes run 100 B to 1 848 B. `Initialize+$063A` proves the variable-length outer grammar: coordinate
+records, variable records, groups of references to those records, and eight group selectors. All
+160 records validate exactly, and the B&W and colour sets are byte-identical. The inner
+variable-record fields and `QUAD` relationship still need renderer consumers before they are
+named. → `docs/data-formats.md`, `tools/dump_objs.py`.
 
 - **Landmarks:** `GoldGate`, `BayBridge`, `Lombard`, `Marina`, `Broadway`, `SunsetBlvd`,
   `GreatHighway`, `Hwy1`, `Hwy280`, `Hwy480`, `Clay`, `Gough`, `Oak`, `Chinatown`, `Cliffhouse`,
@@ -179,9 +181,11 @@ fixed-format records whose length follows the model's complexity, and `QUAD`'s
   `Bldg1200`, `Bldg600`, `LombardBldg`, `building400x400x600`, `Block1…4`, `Tree`
 - **`S`/`C` suffix pairs** — `F40C`/`F40S1`, `P928C`/`P928S`, `GenericC`/`GenericS`,
   `RossaC`/`RossaS`, `Police`/`PoliceS`, `Taxi`/`TaxiS`, `Truck`/`TruckS`, `Tanker`/`Tankers1`,
-  `s55`/`s55BW` — ⭐ `[INFERRED]` **two levels of detail per object**, a near/far pair. Worth
-  confirming early: it tells you the renderer's LOD scheme, which is a load-bearing performance fact
-  for `docs/perf-method.md` Rule 4. Note `s55BW` also hints some models are monochrome-specific.
+  `s55`/`s55BW` — the `C` records are now measured to be substantially more complex than their `S`
+  partners (for example `F40C`: 76 coordinates/30 variable records; `F40S1`: 16/9). This proves
+  **complex/simple model pairs**, not yet the proposed distance-selected near/far LOD. Confirm the
+  runtime selection before using it as a performance fact. Note `s55BW` also hints some models are
+  monochrome-specific.
 - `GenericC`/`GenericS` come in `Gn`, `red`, `br`, `vlb` colour variants — recoloured traffic.
 
 ## The trap surface — a preliminary FLOOR, not an inventory
