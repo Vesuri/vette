@@ -511,7 +511,7 @@ but inactive resources. All nine resource sets are byte-identical between the tw
 | `CLST` | 14 variable-length streams | `Traffic+$0758` selects id `(course+1)*100+variant`; `$10A8` advances an A5-$3740 cursor over signed-long coordinate records and `(-1, selector)` control records. Selectors 0..5 change traffic state, positions, saved coordinates, or attach a `FREE` path. |
 | `FREE` | 45 records x 64 bytes | `load+$0362` retains the raw pointer. `Traffic+$0CDC` and `$0D74` select record `(id-90)*64`; `$1564/$15BE` consume successive signed-byte `(dx,dz)` pairs. |
 | `FWTP` | big-endian count 224, then 224 records x 8 bytes | `load+$01DC` derives inclusive start/end pointers. `Traffic+$22E0` linearly finds word-0 keys; `$2302` chooses bytes 2..4 or 5..7 according to heading. |
-| `JHPF` | 39 records x 8 bytes, no count | `load+$01B0` retains the raw pointer. `Traffic+$2370` indexes `(id-90)*8`; nonzero word 0 may redirect once to another record. Words 1/2 supply world-coordinate offsets and byte 6 supplies the speed-scale input. |
+| `JHPF` | 39 records x 8 bytes, no count | `load+$01B0` retains the raw pointer. `Traffic+$2370` indexes `(id-90)*8`; nonzero word 0 may redirect once to another record. Words 1/2 supply world-coordinate offsets and byte 6 supplies a heading quadrant. |
 | `FWTM` | big-endian count 48, then 48 records x 6 bytes | `load+$0216` derives inclusive start/end pointers. `Traffic+$0CFA` linearly finds word-0 keys; `$0D1C` selects one of bytes 2..5 by heading quadrant, then attaches the corresponding `FREE` record. |
 | `CURV` | four 256-byte direction blocks | `load+$03E6` retains the raw pointer. `Traffic+$14EE` selects direction offsets 0/$100/$200/$300, selects a 128-byte subtable from object byte +$3B, starts at +$40 within it, and consumes signed-word `(dx,dz)` pairs. |
 | `TIME` | ids 128..131, each 10 records x 30 bytes | `Score+$0004` clears all four tables for reset. `$0286` inserts a result into the first record whose long at +$1A is zero or slower, shifts lower records, and writes the new long; `$04F8` renders the ten fixed-size entries. This is persistent score data, not a driving-physics input. |
@@ -551,6 +551,52 @@ deactivations, 96 selector-4 target updates, and exactly 12 terminal selector-3 
 active-path ids are all in 90..129. `FREE` contains 45 records selected as `(id-90)*64`, leaving
 130..134 available to dormant or other code paths. This state-dependent one-long rewind explains
 why a conventional fixed-record parse loses alignment even though the runtime remains aligned.
+
+### `FWTP` and `JHPF`: freeway traffic spawning
+
+`Traffic+$2302` builds the `FWTP` lookup key as `(player cell X << 8) | player cell Z`: word +$3E
+provides X and the low byte at +$41 provides Z. `$22E0` scans the 224 records from the start and
+returns the first matching 8-byte record. There are 223 unique keys. Key `$2412` occurs twice, at
+records 139 and 140; because the scan always starts at record 0, the latter is shipped shadowed
+data.
+
+An `FWTP` record is:
+
+```
+word  packed player-cell key
+byte  spawn cell X, first direction case
+byte  spawn cell Z, first direction case
+byte  JHPF id, first direction case
+byte  spawn cell X, opposite direction case
+byte  spawn cell Z, opposite direction case
+byte  JHPF id, opposite direction case
+```
+
+The second triplet is selected only when the player's heading is strictly between 45 and 315
+degrees; it also seeds the new object's heading field +$0C with 180 before JHPF replaces it. The
+first triplet is used at the endpoints and outside that interval. The selected JHPF id is retained
+in object byte +$BE.
+
+JHPF has no count word. IDs 90..128 map directly to its 39 8-byte records:
+
+```
+word  optional alternate JHPF id (zero means no alternate)
+word  unsigned within-cell X
+word  unsigned within-cell Z
+byte  heading quadrant, 0..3
+byte  zero in every shipped record
+```
+
+A global toggle changes on every spawn. On alternate calls only, a nonzero link replaces the
+selected record once; the code does not follow a chain. Four records link to IDs 123..126. World
+coordinates are then `(spawnCellX << 11) + localX` and `(spawnCellZ << 11) + localZ`. The heading
+quadrant is multiplied by 90 and copied to the new object's current heading +$0C, target heading
++$A2 and saved heading +$BA. This proves both the fixed-point cell size and that byte 6 is a cardinal
+direction, not a speed value.
+
+`amiga/driving_freeway_spawn.gdb` records the selected key/triplet, optional link and constructed
+object for the first two naturally reached spawns. A short stationary Course One run did not enter
+`Traffic+$2302`; that negative observation is not promoted into branch-coverage evidence.
 
 Validate the outer shapes and Color/B&W equality with:
 

@@ -78,6 +78,26 @@ def decode_active_clst(records):
     return controls, route_ids
 
 
+def decode_freeway_tables(found):
+    _name, fwtp = one(found["FWTP"], "FWTP", 100)
+    count = counted(fwtp, 8, "FWTP 100")
+    placements = [struct.unpack_from(">H6B", fwtp, 2 + index * 8)
+                  for index in range(count)]
+    keys = collections.Counter(record[0] for record in placements)
+
+    _name, jhpf = one(found["JHPF"], "JHPF", 100)
+    placement_data = [struct.unpack_from(">HHHBB", jhpf, index * 8)
+                      for index in range(len(jhpf) // 8)]
+    if any(record[4] != 0 for record in placement_data):
+        raise ValueError("JHPF byte 7 is not the shipped zero padding")
+    if any(record[3] > 3 for record in placement_data):
+        raise ValueError("JHPF heading quadrant exceeds 3")
+    links = [record[0] for record in placement_data if record[0]]
+    if any(link < 90 or link >= 90 + len(placement_data) for link in links):
+        raise ValueError("JHPF link is outside the directly indexed table")
+    return count, keys, placement_data
+
+
 def validate(found):
     clst = found["CLST"]
     expected_clst_ids = (100, 101, 102, 104, 200, 201, 202, 203, 204, 300, 301, 400, 401, 1200)
@@ -89,8 +109,7 @@ def validate(found):
     if len(free) != 45 * 64:
         raise ValueError("FREE 1 is not 45 64-byte paths")
 
-    _name, fwtp = one(found["FWTP"], "FWTP", 100)
-    fwtp_count = counted(fwtp, 8, "FWTP 100")
+    fwtp_count, fwtp_keys, jhpf_records = decode_freeway_tables(found)
 
     _name, jhpf = one(found["JHPF"], "JHPF", 100)
     if len(jhpf) != 39 * 8:
@@ -117,7 +136,7 @@ def validate(found):
     if len(turn) != 29 * 2:
         raise ValueError("TURN 1 is not 29 words")
 
-    return fwtp_count, fwtm_count, controls, route_ids
+    return fwtp_count, fwtm_count, controls, route_ids, fwtp_keys, jhpf_records
 
 
 def main():
@@ -128,7 +147,7 @@ def main():
     args = parser.parse_args()
 
     found = selected(args.resource_fork)
-    fwtp_count, fwtm_count, controls, route_ids = validate(found)
+    fwtp_count, fwtm_count, controls, route_ids, fwtp_keys, jhpf_records = validate(found)
     if args.compare:
         other = selected(args.compare)
         validate(other)
@@ -157,6 +176,12 @@ def main():
         f"ids={','.join(str(value) for value in ACTIVE_CLST_IDS)} "
         f"controls={dict(sorted(controls.items()))} "
         f"FREE-ids={len(route_ids)} range={min(route_ids)}..{max(route_ids)}"
+    )
+    duplicates = {key: count for key, count in fwtp_keys.items() if count > 1}
+    links = [(90 + index, record[0]) for index, record in enumerate(jhpf_records) if record[0]]
+    print(
+        f"FWTP keys={len(fwtp_keys)}/{fwtp_count} duplicate-counts={duplicates}; "
+        f"JHPF links={links} heading-quadrants={sorted({record[3] for record in jhpf_records})}"
     )
 
 
