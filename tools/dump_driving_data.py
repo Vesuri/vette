@@ -2,6 +2,7 @@
 """Validate the proved outer shapes of VETTE!.Data driving tables."""
 
 import argparse
+import collections
 import struct
 import sys
 from pathlib import Path
@@ -11,6 +12,7 @@ from hfs_extract import resources  # noqa: E402
 
 
 TYPES = ("CLST", "FREE", "FWTP", "JHPF", "FWTM", "TIME", "CURV", "PHAZ", "TURN")
+ACTIVE_CLST_IDS = (100, 101, 102, 200, 201, 202, 203, 204, 300, 301, 400, 401)
 
 
 def selected(path: Path):
@@ -37,11 +39,51 @@ def counted(body: bytes, width: int, kind: str):
     return count
 
 
+def decode_active_clst(records):
+    controls = collections.Counter()
+    route_ids = []
+    for rid, _name, body in records:
+        if rid not in ACTIVE_CLST_IDS:
+            continue
+        if len(body) % 4:
+            raise ValueError(f"active CLST {rid} is not long-aligned")
+        words = struct.unpack(f">{len(body) // 4}l", body)
+        marks = [i for i, value in enumerate(words) if value == -1]
+        if not marks or marks[0] % 2:
+            raise ValueError(f"active CLST {rid}: malformed coordinate prefix")
+        if words[-2:] != (-1, 3):
+            raise ValueError(f"active CLST {rid}: missing terminal (-1,3)")
+        for number, offset in enumerate(marks):
+            if offset + 1 >= len(words):
+                raise ValueError(f"active CLST {rid}: truncated control")
+            selector = words[offset + 1]
+            if selector not in (0, 2, 3, 4):
+                raise ValueError(f"active CLST {rid}: reached selector {selector}")
+            controls[selector] += 1
+            end = marks[number + 1] if number + 1 < len(marks) else len(words)
+            payload = words[offset + 2:end]
+            if selector == 3:
+                if payload or number + 1 != len(marks):
+                    raise ValueError(f"active CLST {rid}: nonterminal selector 3")
+                continue
+            if len(payload) < 2:
+                raise ValueError(f"active CLST {rid}: selector {selector} lacks coordinate pair")
+            if selector == 0:
+                ids = payload[2:]
+                if not ids or any(value < 90 or value > 134 for value in ids):
+                    raise ValueError(f"active CLST {rid}: invalid FREE path-id run")
+                route_ids.extend(ids)
+            elif len(payload[2:]) % 2:
+                raise ValueError(f"active CLST {rid}: unpaired coordinate after selector {selector}")
+    return controls, route_ids
+
+
 def validate(found):
     clst = found["CLST"]
     expected_clst_ids = (100, 101, 102, 104, 200, 201, 202, 203, 204, 300, 301, 400, 401, 1200)
     if tuple(rid for rid, _name, _body in clst) != expected_clst_ids:
         raise ValueError("unexpected CLST resource IDs/order")
+    controls, route_ids = decode_active_clst(clst)
 
     _name, free = one(found["FREE"], "FREE", 1)
     if len(free) != 45 * 64:
@@ -75,7 +117,7 @@ def validate(found):
     if len(turn) != 29 * 2:
         raise ValueError("TURN 1 is not 29 words")
 
-    return fwtp_count, fwtm_count
+    return fwtp_count, fwtm_count, controls, route_ids
 
 
 def main():
@@ -86,7 +128,7 @@ def main():
     args = parser.parse_args()
 
     found = selected(args.resource_fork)
-    fwtp_count, fwtm_count = validate(found)
+    fwtp_count, fwtm_count, controls, route_ids = validate(found)
     if args.compare:
         other = selected(args.compare)
         validate(other)
@@ -110,6 +152,12 @@ def main():
             "TURN": "29 words; loaded but unread",
         }[kind]
         print(f"{kind:<5} {len(records):>9} {size:>5} {shape}")
+    print(
+        "active CLST: "
+        f"ids={','.join(str(value) for value in ACTIVE_CLST_IDS)} "
+        f"controls={dict(sorted(controls.items()))} "
+        f"FREE-ids={len(route_ids)} range={min(route_ids)}..{max(route_ids)}"
+    )
 
 
 if __name__ == "__main__":

@@ -523,6 +523,35 @@ with `FWTP` -> `JHPF` for freeway spawning and `CURV` for the separate word-delt
 `PHAZ` are deliberately excluded from the next decoding target: their names are not evidence of a
 runtime role.
 
+### `CLST`: stateful course command streams
+
+`Traffic+$070A` proves exactly which 12 `CLST` resources are reachable. Course 0 chooses variants
+0..2, course 1 chooses 0..4, and courses 2/3 choose 0..1, producing IDs 100..102, 200..204,
+300..301 and 400..401. IDs 104 and 1200 are shipped but cannot be selected by this code. They also
+use a different two-byte alignment, so treating every resource of the type as one guessed grammar
+would be wrong.
+
+The live streams are big-endian signed-long sequences interpreted according to object byte +$59:
+
+| record | inactive interpretation | active interpretation |
+|---|---|---|
+| two nonnegative longs | target `(x,z)`; the cursor advances by both longs | the first long is a `FREE` path id; the cursor rewinds one long so the second becomes the next id |
+| `-1,0,x,z,ids...` | installs `(x,z)`, marks the object active, and immediately attaches the first following `FREE` id | resets the active position and begins a new run of `FREE` ids |
+| `-1,2,x,z` | installs and snapshots `(x,z)`, clears active byte +$59, then continues interpreting the stream in the same call | ends the current `FREE`-id run, clears active state, and continues with inactive coordinate pairs |
+| `-1,4,x,z` | saves `(x,z)` in the shared target pair and returns movement selector 3 | same operation |
+| `-1,3` | clears motion, marks object state byte +$3A as -1, snapshots its position/timing, and deliberately does not commit the advanced cursor | same terminal operation; every reachable stream ends with it |
+
+Selectors 1 and 5 exist in `Traffic+$10A8` but do not occur in any reachable stream. Selector 1
+has a coordinate payload plus a second saved coordinate pair. Selector 5 attaches fixed `FREE`
+record 44 (the record selected by id 134). Keeping those branches documented as dormant is more
+accurate than folding them into the live grammar.
+
+Across the reachable resources the stream contains 28 selector-0 activations, 25 selector-2
+deactivations, 96 selector-4 target updates, and exactly 12 terminal selector-3 records. The 899
+active-path ids are all in 90..129. `FREE` contains 45 records selected as `(id-90)*64`, leaving
+130..134 available to dormant or other code paths. This state-dependent one-long rewind explains
+why a conventional fixed-record parse loses alignment even though the runtime remains aligned.
+
 Validate the outer shapes and Color/B&W equality with:
 
 ```sh

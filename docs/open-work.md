@@ -7,12 +7,13 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — current compatibility boundary
 
-⭐ **HEAD OF QUEUE: decode the active `CLST` course stream.**
-The remaining consumer inventory is closed. `CLST` is the live variable-length command stream that
-drives course transitions and attaches `FREE` paths through `FWTM`; decode its selector 0..5 records,
-cursor rewinds and termination rules before changing any runtime behaviour. Treat the separate
-`FWTP` -> `JHPF` freeway-spawn path as the following target. `TURN` is loaded but unread and `PHAZ`
-is never requested, so their names do not justify speculative work. → `docs/data-formats.md`.
+⭐ **HEAD OF QUEUE: decode the `FWTP` -> `JHPF` freeway-spawn path.**
+The active `CLST` state machine, its `FREE`-id runs, cursor rewind and terminal selector are closed.
+Now name the fields of the keyed 8-byte `FWTP` records and directly indexed 8-byte `JHPF` records
+from `Traffic+$2302`, including the one-hop JHPF link, coordinate construction and speed scaling.
+Then use a focused runtime trace to confirm which branches the live drive reaches. `TURN` is loaded
+but unread and `PHAZ` is never requested, so their names do not justify speculative work. →
+`docs/data-formats.md`.
 
 ## ⭐⭐ TARGET 1 — the complete intro, run by the game's own code — COMPLETE
 
