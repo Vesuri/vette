@@ -4,6 +4,7 @@
 import argparse
 import struct
 import sys
+from collections import Counter
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -64,12 +65,41 @@ def road_handler(header):
     }.get(header, "diagonal 6/8")
 
 
+def runtime_bounds(raw, a5):
+    """Decode the 108 header-1 bounds lists initialized below A5."""
+    base = a5 - len(raw)
+
+    def offset(address):
+        result = address - base
+        if result < 0 or result >= len(raw):
+            raise ValueError(f"runtime pointer {address:#x} is outside captured globals")
+        return result
+
+    table = offset(a5 - 0x424e)
+    lists = []
+    for selector in range(108):
+        pointer = struct.unpack_from(">I", raw, table + selector * 4)[0]
+        pos = offset(pointer)
+        rectangles = []
+        while struct.unpack_from(">h", raw, pos)[0] != -1:
+            rectangles.append(struct.unpack_from(">4h", raw, pos))
+            pos += 8
+        lists.append(tuple(rectangles))
+    return lists
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("resource_fork", type=Path)
     parser.add_argument("--compare", type=Path,
                         help="require a second fork's QUAD resource to be byte-identical")
+    parser.add_argument("--runtime-globals", type=Path,
+                        help="captured initialized below-A5 globals")
+    parser.add_argument("--runtime-a5", type=lambda value: int(value, 0),
+                        help="A5 address belonging to --runtime-globals")
     args = parser.parse_args()
+    if (args.runtime_globals is None) != (args.runtime_a5 is None):
+        parser.error("--runtime-globals and --runtime-a5 must be supplied together")
 
     rid, name, body = quad_resource(args.resource_fork)
     if args.compare:
@@ -87,6 +117,19 @@ def main():
               f"{len(record['object_words']):>12} "
               f"{'yes' if record['render_aligned'] else 'NO':>7} "
               f"{road_handler(record['header'][0])}")
+
+    if args.runtime_globals:
+        bounds = runtime_bounds(args.runtime_globals.read_bytes(), args.runtime_a5)
+        counts = Counter(len(rectangles) for rectangles in bounds)
+        inverted = sum(1 for rectangles in bounds for low_v, low_u, high_v, high_u in rectangles
+                       if low_v > high_v or low_u > high_u)
+        selectors = {record["header"][1] for record in records}
+        if not selectors <= set(range(len(bounds))):
+            raise ValueError(f"QUAD header-1 selector outside 0..107: {max(selectors)}")
+        print(f"runtime collision bounds: selectors={len(bounds)} "
+              f"used={len(selectors)} rectangles={sum(map(len, bounds))} "
+              f"inverted={inverted} "
+              f"count-distribution={dict(sorted(counts.items()))}")
 
 
 if __name__ == "__main__":

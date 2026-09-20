@@ -7,10 +7,11 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — current compatibility boundary
 
-⭐ **HEAD OF QUEUE: decode static-world impacts and Lake Merced recovery.**
-The `COLL` resources are now closed as angle-indexed moving-object hulls and are separate from both
-the QUAD road-surface solver and static-world collision. Decode the QUAD-selected bounds lookup at
-`Traffic+$4064` and its response dispatch, then correlate the static/water result with the already
+⭐ **HEAD OF QUEUE: decode static-impact responses and Lake Merced recovery.**
+The QUAD header-1 lookup is now proved to select one of 108 initialized lists of axis-aligned
+static collision rectangles. `Traffic+$4064` tests all four moving-hull corners, identifies the
+nearest rectangle side, and hands the list identity and side to `Traffic+$3FEE`. Decode that
+pointer/handler response dispatch, then correlate the static/water response with the already
 reproducible straight-to-Lake-Merced PICT-140 tow-truck recovery. Name fields only when code or
 live behavior proves them. → `docs/data-formats.md`, `docs/stage-c.md`.
 

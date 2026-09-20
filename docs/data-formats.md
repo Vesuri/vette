@@ -162,7 +162,7 @@ direct pointer table by reproducing this exact wordwise grammar:
 
 ```
 word  traffic/road behavior type
-word  second header field (meaning not yet proved)
+word  static collision-bounds selector
 word[] setup words
 word  -1
 word[] object words
@@ -178,9 +178,9 @@ Descriptor 191 has 11 setup words after its header; it is retained and reported 
 not evidence for a different command grammar until reachability proves the game selects it.
 `Traffic+$3D7C` independently reads
 the first header word and uses it as the road-surface interpolation selector described below. The
-second header word is written
-to A5-$2500 by `Main+$43FC`, but an exhaustive search of every resident segment finds no read; it
-is dead shipped metadata in v1.02. The two command-list indices are already direct indices into the
+second header word is also written to A5-$2500 by `Main+$43FC`; that cached copy has no reader, but
+`Traffic+$4064` reads the field directly from the selected QUAD descriptor and uses it as the
+static collision-bounds selector described below. The two command-list indices are direct indices into the
 game's callable table rather than another encoded schema. This establishes QUAD's
 relationship to OBJS: QUAD does not contain model geometry; it describes a map cell and places
 objects whose factories subsequently choose an OBJS distance-LOD table.
@@ -192,6 +192,9 @@ python3 tools/dump_quad.py \
   'tmp/rsrc_VETTE!_VETTE!_Folder_Folder_Color_VETTE!_VETTE!.Data.rsrc' \
   --compare 'tmp/rsrc_VETTE!_VETTE!_Folder_Folder_B&W_VETTE!_VETTE!.Data.rsrc'
 ```
+
+Add `--runtime-globals tmp/objs_runtime_globals.raw --runtime-a5 0x4861f4` (using the A5 printed
+by `amiga/objs_runtime.gdb`) to validate the 108 initialized static-collision bounds lists.
 
 ## `MAPS`: world, navigation and map-display grids
 
@@ -253,6 +256,34 @@ set object motion word `+$10` near the corresponding cell edge from one of four 
 indexed by object heading divided by 11. This is road-surface and edge-response code, not the
 object-impact detector. Static-world collision continues at the later QUAD-selected bounds lookup
 around `Traffic+$4064`; the separate moving-object path uses the `COLL` resources below.
+
+### QUAD header 1 selects static collision rectangles
+
+`Traffic+$4064` receives one world-space corner of the moving object's rotated hull. It derives
+the 52-column MAPS cell, obtains that cell's QUAD descriptor, skips header 0, and uses header 1 as
+an index into a 108-pointer table at A5-$424E. Every pointer names a list of signed-word rectangles:
+
+```
+repeat:
+    word  minimum local v
+    word  minimum local u
+    word  maximum local v
+    word  maximum local u
+word -1
+```
+
+The point is inside only when all four inclusive comparisons pass. For a hit, the routine computes
+the distance to all four sides, identifies the nearest side (0=min-v, 1=min-u, 2=max-v, 3=max-u),
+and passes that side plus the exact bounds-list pointer to `Traffic+$3FEE`. That routine maps list
+identity through parallel pointer/handler tables and invokes the corresponding response. The main
+driving loop calls this test for all four corners at `Traffic+$461E..+$4696`.
+
+This corrects an earlier false negative: searching for reads of the A5-$2500 cached header copy
+proved only that the copy is dead, not that QUAD header 1 is dead. The real consumer deliberately
+rereads the descriptor. Runtime capture shows all 108 selectors are valid initialized lists; the
+shipped QUAD records use 102 of them. The lists contain 296 records. Three have a lower bound
+greater than their corresponding upper bound and therefore can never pass the routine's inclusive
+comparisons; they are retained as shipped disabled bounds rather than normalised.
 
 The auxiliary resources have code-proved fixed grids with no leading count:
 

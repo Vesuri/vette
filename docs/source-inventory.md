@@ -170,10 +170,11 @@ Sizes run 100 B to 1 848 B. `Initialize+$063A` and `Main+$2A9E` prove the comple
 four orientation-reference coordinates, geometry vertices, flagged primitives with one of 32
 raster patterns, groups of primitive references, and eight view-selected groups. All 160 records
 validate exactly, and the B&W and colour sets are byte-identical. The 257 `QUAD` records are map
-cell descriptors: each carries two header words, setup calls, and positioned object-factory calls
-which lead to the OBJS distance-LOD tables. The otherwise-unused OBJS flag bits and QUAD second
-header word are proved unreferenced in the resident v1.02 code rather than assigned guessed
-meanings. → `docs/data-formats.md`, `tools/dump_objs.py`, `tools/dump_quad.py`.
+cell descriptors: header 0 selects the cell's piecewise road surface; header 1 selects one of 108
+initialized static-collision rectangle lists; setup and positioned object-factory calls lead to
+the OBJS distance-LOD tables. The otherwise-unused OBJS flag bits remain proved unreferenced in
+the resident v1.02 renderer rather than assigned guessed meanings. → `docs/data-formats.md`,
+`tools/dump_objs.py`, `tools/dump_quad.py`.
 
 - **Landmarks:** `GoldGate`, `BayBridge`, `Lombard`, `Marina`, `Broadway`, `SunsetBlvd`,
   `GreatHighway`, `Hwy1`, `Hwy280`, `Hwy480`, `Clay`, `Gough`, `Oak`, `Chinatown`, `Cliffhouse`,
