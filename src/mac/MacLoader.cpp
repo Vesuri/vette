@@ -87,7 +87,8 @@ static const uint16_t kJumpCount = 509;
 // Private shadows immediately below the shipped A5 world.  The original game
 // directly touches classic-Mac Page-0 mouse globals, which are exception-vector
 // and operating-system memory on the Amiga.
-static const uint32_t kPortLowMemoryBytes = 16;
+static const uint32_t kPortLowMemoryBytes = 20;
+static const int16_t kShadowCurrentA5 = -31292;
 static const int16_t kShadowMBState = -31288;
 static const int16_t kShadowMTempV = -31284;
 static const int16_t kShadowMTempH = -31282;
@@ -538,6 +539,24 @@ static bool redirectLowMemoryGlobals(uint8_t* a5)
         }
     }
     if (keyMapReferences != 3) return false;
+
+    // The driving VBL callbacks save and reload the application's A5 world
+    // through Page-0 CurrentA5 ($0904).  The Amiga trampoline already enters
+    // them with A5 installed, but preserve the shipped store/reload contract
+    // in private storage rather than corrupting Amiga low memory.
+    if (read16(vette_code_1 + 0x1f38) != 0x21cd
+        || read16(vette_code_1 + 0x1f3a) != 0x0904) return false;
+    write16(vette_code_1 + 0x1f38, 0x2b4d); // MOVE.L A5,shadowCurrentA5(A5)
+    write16(vette_code_1 + 0x1f3a, (uint16_t)kShadowCurrentA5);
+    static const uint32_t currentA5Reads[] = {0x2b46, 0x2b7c, 0x2bb8};
+    for (uint16_t i = 0; i < sizeof(currentA5Reads) / sizeof(currentA5Reads[0]); ++i) {
+        uint8_t* instruction = vette_code_1 + currentA5Reads[i];
+        if (read16(instruction) != 0x2a78 || read16(instruction + 2) != 0x0904)
+            return false;
+        write16(instruction, 0x2a6d);       // MOVEA.L shadowCurrentA5(A5),A5
+        write16(instruction + 2, (uint16_t)kShadowCurrentA5);
+    }
+    write32(a5 + kShadowCurrentA5, (uint32_t)a5);
 
     // Mouse steering uses the Page-0 Mouse/RawMouse/MTemp points and MBState
     // directly.  Preserve the original instructions and coordinate semantics,

@@ -391,6 +391,11 @@ validated against its shipped opcode, then rewritten at the same width to an A5-
 | `WMgrPort` | `$09DE` | `8(A5)` | `Main+$08A6` |
 | `GrayRgn` | `$09EE` | `12(A5)` | `Initialize+$08C4` |
 | `KeyMap` | `$0174` | `16(A5)` | `Main+$2B54` |
+| `CurrentA5` | `$0904` | `-31292(A5)` | `Main+$1F34` / driving VBL callbacks |
+| `MBState` | `$0172` | `-31288(A5)` | `Traffic+$6D00` |
+| `MTemp` | `$0828` | `-31284(A5)` | mouse-mode initialization |
+| `RawMouse` | `$082C` | `-31280(A5)` | mouse-mode initialization |
+| `Mouse` | `$0830` | `-31276(A5)` | `Main+$2BC8` / `Traffic+$6CE6` |
 
 Sixteen encoded instructions (ten reachable in the current control-flow inventory) read `GrayRgn`,
 using both `MOVEA.L abs.w` and `MOVE.L abs.w,-(SP)`. They are all redirected to the same `12(A5)`
@@ -1089,10 +1094,12 @@ byte verification reject every clean build before `%A5Init`; correcting it resto
 live animation, audio, and frame presentation. The redirection remains installed for later Mouse
 mode diagnosis even though Mouse is no longer selected by default.
 
-Enabling it exposed another Page-0 dependency rather than licensing direct access to Amiga low
-memory. Six original centre-coordinate writes and the four reached Mouse/MBState reads are
-byte-verified and rewritten, at identical instruction width, to a private sixteen-byte prefix below
-the shipped 31,272-byte A5 world. Amiga quadrature deltas maintain the redirected `MTemp`,
+Enabling it exposed more Page-0 dependencies rather than licensing direct access to Amiga low
+memory. Six original centre-coordinate writes, the four reached Mouse/MBState reads, and the
+`CurrentA5` store plus three callback reloads are byte-verified and rewritten, at identical
+instruction width, to a private twenty-byte prefix below the shipped 31,272-byte A5 world. The
+Amiga VBL trampoline already enters with the application A5, while the new shadow preserves the
+shipped callback contract without touching Amiga address `$0904`. Amiga quadrature deltas maintain the redirected `MTemp`,
 `RawMouse`, and `Mouse` points asynchronously at every safe trap boundary; the physical left
 button maintains active-low `MBState`. The ordinary keyboard `KeyMap` remains independently live.
 
