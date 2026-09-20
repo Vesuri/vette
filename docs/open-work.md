@@ -7,13 +7,12 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — current compatibility boundary
 
-⭐ **HEAD OF QUEUE: decode the `COLL` resources and the object-impact path.**
-The five MAPS outer formats, MAPS → QUAD → OBJS chain, and QUAD header-0 surface interpolation are
-closed. The supposed QUAD “collision behavior” at `Traffic+$3D7C` is actually a proved piecewise
-road-surface solver over the cell's local 2048x2048 coordinates. Start instead at the later
-QUAD-selected bounds lookup around `Traffic+$4064`, identify how its tables reach the six named
-`COLL` resources, and correlate the result with the already reproducible straight-to-Lake-Merced
-water recovery. Name fields only when code or live behavior proves them. → `docs/data-formats.md`.
+⭐ **HEAD OF QUEUE: decode static-world impacts and Lake Merced recovery.**
+The `COLL` resources are now closed as angle-indexed moving-object hulls and are separate from both
+the QUAD road-surface solver and static-world collision. Decode the QUAD-selected bounds lookup at
+`Traffic+$4064` and its response dispatch, then correlate the static/water result with the already
+reproducible straight-to-Lake-Merced PICT-140 tow-truck recovery. Name fields only when code or
+live behavior proves them. → `docs/data-formats.md`, `docs/stage-c.md`.
 
 ## ⭐⭐ TARGET 1 — the complete intro, run by the game's own code — COMPLETE
 

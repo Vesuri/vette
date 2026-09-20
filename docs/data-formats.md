@@ -251,8 +251,8 @@ The shipped header values are 0, 1, 2, 3, 4, 6, 7, 8, 9, and 29; therefore 9 and
 take the final/default interpolation class. Four helpers at `Traffic+$3C94..+$3D42` additionally
 set object motion word `+$10` near the corresponding cell edge from one of four signed byte tables,
 indexed by object heading divided by 11. This is road-surface and edge-response code, not the
-object-impact detector. Collision decoding must begin at the later QUAD-selected bounds lookup
-around `Traffic+$4064` and the six `COLL` resources.
+object-impact detector. Static-world collision continues at the later QUAD-selected bounds lookup
+around `Traffic+$4064`; the separate moving-object path uses the `COLL` resources below.
 
 The auxiliary resources have code-proved fixed grids with no leading count:
 
@@ -266,6 +266,44 @@ Validate all five dimensions and the Color/B&W equality with:
 
 ```sh
 python3 tools/dump_maps.py \
+  'tmp/rsrc_VETTE!_VETTE!_Folder_Folder_Color_VETTE!_VETTE!.Data.rsrc' \
+  --compare 'tmp/rsrc_VETTE!_VETTE!_Folder_Folder_B&W_VETTE!_VETTE!.Data.rsrc'
+```
+
+## `COLL`: angle-indexed object collision hulls
+
+All six `COLL` resources (IDs 100..105) are exactly 364 bytes: 91 records of four signed bytes,
+covering headings 0 through 360 degrees in four-degree steps. Record 90 duplicates record 0 in
+every resource. The colour and B&W data files' complete sets are byte-identical.
+
+`load+$0410` loads the six resources in ID order into a direct pointer array. `Traffic+$02B6`
+selects one with object byte `+$6D`, rounds object heading word `+$0E` down to a multiple of four,
+and uses that value directly as the byte offset. Thus the resource index is proved to be
+`floor(heading/4)` and each four-byte record is one pre-rotated collision hull, not a grid inferred
+from the resource names.
+
+For record bytes `(a,b,c,d)` and object centre `(x,z)` from `+$AE/+$B2`, the routine materialises
+the four vertices in this order:
+
+```
+(x+a, z+b)
+(x-c, z-d)
+(x-a, z-b)
+(x+c, z+d)
+```
+
+The zero-degree samples make the intent especially clear: resources 101..105 begin
+`(-10,20,10,20)`, `(-13,29,13,29)`, `(-18,80,18,80)`, `(-18,90,18,90)`, and
+`(-22,92,22,92)`. Resource 100 (`4*11`) begins `(-2,11,2,11)`. These are oriented convex object
+bounds. `Traffic+$033A` performs the signed cross-product edge tests, and `Traffic+$037E` tests the
+four vertices of one object against the other's hull. This is the moving-object collision path;
+it is separate from the QUAD road-surface solver and from the QUAD-selected static bounds around
+`Traffic+$4064`.
+
+Validate the complete set with:
+
+```sh
+python3 tools/dump_coll.py \
   'tmp/rsrc_VETTE!_VETTE!_Folder_Folder_Color_VETTE!_VETTE!.Data.rsrc' \
   --compare 'tmp/rsrc_VETTE!_VETTE!_Folder_Folder_B&W_VETTE!_VETTE!.Data.rsrc'
 ```

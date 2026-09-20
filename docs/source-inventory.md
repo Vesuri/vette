@@ -109,7 +109,7 @@ largest being `Main` at 32.6 KB and `Traffic` at 27.9 KB. That is the size of th
 | `COMM` | 1 | 2 490 | id 0, unnamed. Pairs with the documented head-to-head `Communication` segment |
 | `PATN` | 2 | 2 048 | `Main_Map` ×2, 1 024 B each — QuickDraw patterns for the map display |
 | `STRT` | 1 | 2 222 | `Street_Names` |
-| `COLL` | 6 | 2 184 | named `4*11`, `10*20`, `13*29`, `18*80`, `18*90`, `22*92` — ⭐ the names look like **grid dimensions**, and 6 sizes suggests per-course or per-object-class collision grids |
+| `COLL` | 6 | 2 184 | proved angle-indexed object hulls: 91 four-signed-byte records at four-degree heading steps, selected by object collision class |
 | `COPY` | 1 | 1 991 | `Protect` — the copy protection, data-driven |
 | `FWTP` | 1 | 1 794 | `freeway traffic placement` |
 | `HEXS` | 1 | 1 446 | `HexSinCos Table` |
