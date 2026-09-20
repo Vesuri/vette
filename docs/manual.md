@@ -152,6 +152,14 @@ left/right act as keypad `4`/`6`, and up/down act as keypad `8`/`2`. The origina
 driving action to the Macintosh cursor keys. Their ordinary key-event identity is preserved; the
 alias applies only to the continuously polled driving state.
 
+The shipped Options -> Steering submenu contains four mutually exclusive choices: Numeric keypad,
+Keyboard, Mouse, and Joystick. Mouse is a real driving mode, not the Gravis MouseStick setting:
+the game reads the Macintosh `Mouse` low-memory point for steering and treats the mouse button as
+the accelerator. The standalone port selects that original Mouse item in the game's default branch
+and redirects its direct Page-0 `Mouse`, `RawMouse`, `MTemp`, and `MBState` accesses to private
+A5-adjacent shadows updated from the Amiga mouse. This avoids both the menu detour and writes into
+the Amiga's vector page; ordinary keyboard state continues to be maintained concurrently.
+
 ## Courses and world boundaries
 
 The four course endpoints (pp. 18-21) are:

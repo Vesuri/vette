@@ -1048,6 +1048,27 @@ behaviour. The standalone Amiga target has one fixed game surface and no movable
 platform-level fixed-window policy, not an ACCEPT-coordinate exception, and leaves the original
 difficulty choices and their hit regions untouched.
 
+### Modern keyboard aliases and default mouse steering
+
+The original key chart assigns steering/acceleration/braking to keypad `4`/`6`, `8`, and `2`, but
+assigns no driving action to the Macintosh cursor keys. The Amiga bridge therefore aliases its
+cursor-left/right/up/down raw keys to those four virtual keypad positions in the live `KeyMap`.
+Their EventRecords still carry genuine Macintosh cursor-key codes, so the alias does not corrupt
+non-driving keyboard input.
+
+The manual and `MENU` 126 establish that Mouse is a shipped steering mode, separate from both
+Keyboard and Joystick. Its menu handler sets A5-$5316; Main+$2BC8 reads `Mouse.h` at Page-0 $0832
+for steering, while `Traffic+$6D24` reads `MBState` at $0172 and uses a pressed button as the
+accelerator. The standalone default-selection branch at `load+$062C` now selects that Mouse flag
+instead of Keyboard.
+
+Enabling it exposed another Page-0 dependency rather than licensing direct access to Amiga low
+memory. Six original centre-coordinate writes and the four reached Mouse/MBState reads are
+byte-verified and rewritten, at identical instruction width, to a private sixteen-byte prefix below
+the shipped 31,272-byte A5 world. Amiga quadrature deltas maintain the redirected `MTemp`,
+`RawMouse`, and `Mouse` points asynchronously at every safe trap boundary; the physical left
+button maintains active-low `MBState`. The ordinary keyboard `KeyMap` remains independently live.
+
 ## Correction to the MAME log
 
 The 51-row MAME table is a measurement of that reference run, not fabricated data, but the live

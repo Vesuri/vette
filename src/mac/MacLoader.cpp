@@ -84,11 +84,23 @@ static const uint32_t kAboveA5 = 4104;
 static const uint32_t kJumpOffset = 32;
 static const uint32_t kJumpBytes = 4072;
 static const uint16_t kJumpCount = 509;
+// Private shadows immediately below the shipped A5 world.  The original game
+// directly touches classic-Mac Page-0 mouse globals, which are exception-vector
+// and operating-system memory on the Amiga.
+static const uint32_t kPortLowMemoryBytes = 16;
+static const int16_t kShadowMBState = -31288;
+static const int16_t kShadowMTempV = -31284;
+static const int16_t kShadowMTempH = -31282;
+static const int16_t kShadowRawMouseV = -31280;
+static const int16_t kShadowRawMouseH = -31278;
+static const int16_t kShadowMouseV = -31276;
+static const int16_t kShadowMouseH = -31274;
 static const uint16_t kDrivingBoundaryTrap = 0xafff;
 #ifdef VETTE_PROBE
 static const uint16_t kStaticCollisionProbeTrap = 0xaffe;
 #endif
-static uint8_t s_a5World[kBelowA5 + kAboveA5] __attribute__((aligned(4)));
+static uint8_t s_a5World[kPortLowMemoryBytes + kBelowA5 + kAboveA5]
+    __attribute__((aligned(4)));
 static VetteScreen* s_loudStopScreen;
 static ResourceArchive s_resourceArchive;
 static uint8_t* s_resourceMasters[572];
@@ -434,7 +446,7 @@ static bool buildA5World(uint8_t*& a5)
         || read32(vette_code_0 + 8) != kJumpBytes || read32(vette_code_0 + 12) != kJumpOffset)
         return false;
     for (uint32_t i = 0; i < sizeof(s_a5World); ++i) s_a5World[i] = 0;
-    a5 = s_a5World + kBelowA5;
+    a5 = s_a5World + kPortLowMemoryBytes + kBelowA5;
     uint8_t* jump = a5 + kJumpOffset;
     const uint8_t* source = vette_code_0 + 16;
     for (uint16_t i = 0; i < kJumpCount; ++i, source += 8, jump += 8) {
@@ -518,12 +530,68 @@ static bool redirectLowMemoryGlobals(uint8_t* a5)
         }
     }
     if (keyMapReferences != 3) return false;
+
+    // Mouse steering uses the Page-0 Mouse/RawMouse/MTemp points and MBState
+    // directly.  Preserve the original instructions and coordinate semantics,
+    // but redirect their exact, byte-verified accesses to private storage just
+    // below the shipped A5 world.  MOVE.W #$00C8,abs.w and MOVE/TST abs.w all
+    // have same-size d16(A5) forms, so no surrounding code moves.
+    struct MouseWritePatch { uint32_t offset; uint16_t address; int16_t shadow; };
+    static const MouseWritePatch mouseWrites[] = {
+        {0x1d58, 0x0830, kShadowMouseV},
+        {0x1d5e, 0x0832, kShadowMouseH},
+        {0x1d64, 0x082c, kShadowRawMouseV},
+        {0x1d6a, 0x082e, kShadowRawMouseH},
+        {0x1d70, 0x0828, kShadowMTempV},
+        {0x1d76, 0x082a, kShadowMTempH},
+    };
+    for (uint16_t i = 0; i < sizeof(mouseWrites) / sizeof(mouseWrites[0]); ++i) {
+        uint8_t* instruction = vette_code_1 + mouseWrites[i].offset;
+        if (read16(instruction) != 0x31fc || read16(instruction + 2) != 0x00c8
+            || read16(instruction + 4) != mouseWrites[i].address) return false;
+        write16(instruction, 0x3b7c);       // MOVE.W #$00C8,d16(A5)
+        write16(instruction + 4, (uint16_t)mouseWrites[i].shadow);
+    }
+    if (read16(vette_code_1 + 0x2bc8) != 0x3038
+        || read16(vette_code_1 + 0x2bca) != 0x0832
+        || read16(vette_code_6 + 0x6cea) != 0x3038
+        || read16(vette_code_6 + 0x6cec) != 0x0830
+        || read16(vette_code_6 + 0x6d04) != 0x4a38
+        || read16(vette_code_6 + 0x6d06) != 0x0172
+        || read16(vette_code_6 + 0x6d24) != 0x4a38
+        || read16(vette_code_6 + 0x6d26) != 0x0172) return false;
+    write16(vette_code_1 + 0x2bc8, 0x302d); // MOVE.W shadowMouseH(A5),D0
+    write16(vette_code_1 + 0x2bca, (uint16_t)kShadowMouseH);
+    write16(vette_code_6 + 0x6cea, 0x302d); // MOVE.W shadowMouseV(A5),D0
+    write16(vette_code_6 + 0x6cec, (uint16_t)kShadowMouseV);
+    write16(vette_code_6 + 0x6d04, 0x4a2d); // TST.B shadowMBState(A5)
+    write16(vette_code_6 + 0x6d06, (uint16_t)kShadowMBState);
+    write16(vette_code_6 + 0x6d24, 0x4a2d);
+    write16(vette_code_6 + 0x6d26, (uint16_t)kShadowMBState);
+
     write32(a5 + 4, 1);
     write32(a5 + 8, 0);
     write32(a5 + 12, 0);
     write32(a5 + 0, g_macTicks);
     for (uint16_t i = 0; i < 16; ++i) a5[16 + i] = 0;
     g_macTicksAddress = (volatile uint32_t*)(a5 + 0);
+    return true;
+}
+
+static bool enableMouseSteeringDefault()
+{
+    // load+$062C is the shipped default-selection branch.  It selects exactly
+    // one Steering menu item.  Change Keyboard to Mouse here rather than
+    // recognizing menu coordinates or modifying the driving algorithms.
+    static const uint16_t original[8] = {
+        0x3b7c, 0x0100, 0xacee, 0x426d, 0xacf0, 0x426d, 0xacea, 0x426d
+    };
+    uint8_t* defaults = vette_code_4 + 0x062c;
+    for (uint16_t i = 0; i < 8; ++i)
+        if (read16(defaults + i * 2) != original[i]) return false;
+    if (read16(defaults + 16) != 0xacec) return false;
+    write16(defaults + 4, 0xacea);          // Mouse = true
+    write16(defaults + 12, 0xacee);         // Keyboard = false
     return true;
 }
 
@@ -4367,46 +4435,85 @@ static void refreshDrivingKeyMap()
 #endif
 }
 
-static bool nextEvent(uint16_t mask, uint8_t* event)
+static int16_t addClampedMouseDelta(int16_t value, int8_t delta, int16_t maximum)
 {
-    if (!event) return false;
+    int16_t changed = (int16_t)(value + delta);
+    if (changed < 0) return 0;
+    if (changed > maximum) return maximum;
+    return changed;
+}
+
+static bool pollMacMouse()
+{
     uint16_t counters = *joy0datPointer;
     uint8_t counterX = (uint8_t)counters;
     uint8_t counterY = (uint8_t)(counters >> 8);
     bool buttonDown = AmigaHardware::isLeftMouseButtonPressed();
-    bool transition = false;
-    uint16_t what = 0;
     if (!s_mouseInitialized) {
         s_mouseCounterX = counterX;
         s_mouseCounterY = counterY;
         s_mouseButtonDown = buttonDown;
         s_mouseInitialized = true;
+        if (s_currentA5) {
+            int16_t globalV = (int16_t)(s_mouseY + 91);
+            int16_t globalH = (int16_t)(s_mouseX + 64);
+            write16(s_currentA5 + kShadowMTempV, (uint16_t)globalV);
+            write16(s_currentA5 + kShadowMTempH, (uint16_t)globalH);
+            write16(s_currentA5 + kShadowRawMouseV, (uint16_t)globalV);
+            write16(s_currentA5 + kShadowRawMouseH, (uint16_t)globalH);
+            write16(s_currentA5 + kShadowMouseV, (uint16_t)globalV);
+            write16(s_currentA5 + kShadowMouseH, (uint16_t)globalH);
+        }
     } else {
+        int8_t deltaX = (int8_t)(counterX - s_mouseCounterX);
+        int8_t deltaY = (int8_t)(counterY - s_mouseCounterY);
         int16_t oldMouseX = s_mouseX, oldMouseY = s_mouseY;
-        s_mouseX = (int16_t)(s_mouseX + (int8_t)(counterX - s_mouseCounterX));
-        s_mouseY = (int16_t)(s_mouseY + (int8_t)(counterY - s_mouseCounterY));
-        if (s_mouseX < 0) s_mouseX = 0;
-        if (s_mouseX > 511) s_mouseX = 511;
-        if (s_mouseY < 0) s_mouseY = 0;
-        if (s_mouseY > 319) s_mouseY = 319;
+        s_mouseX = addClampedMouseDelta(s_mouseX, deltaX, 511);
+        s_mouseY = addClampedMouseDelta(s_mouseY, deltaY, 319);
         if (s_mouseX != oldMouseX || s_mouseY != oldMouseY) {
             if (s_cursor.initialized && s_cursor.visible) {
                 markCursorDirtyAt(oldMouseX, oldMouseY, s_cursor.image);
                 markCursorDirtyAt(s_mouseX, s_mouseY, s_cursor.image);
             }
         }
+        if (s_currentA5 && (deltaX || deltaY)) {
+            const int16_t verticals[] = {
+                kShadowMTempV, kShadowRawMouseV, kShadowMouseV
+            };
+            const int16_t horizontals[] = {
+                kShadowMTempH, kShadowRawMouseH, kShadowMouseH
+            };
+            for (uint16_t i = 0; i < 3; ++i) {
+                int16_t v = (int16_t)read16(s_currentA5 + verticals[i]);
+                int16_t h = (int16_t)read16(s_currentA5 + horizontals[i]);
+                write16(s_currentA5 + verticals[i],
+                        (uint16_t)addClampedMouseDelta(v, deltaY, 479));
+                write16(s_currentA5 + horizontals[i],
+                        (uint16_t)addClampedMouseDelta(h, deltaX, 639));
+            }
+        }
         s_mouseCounterX = counterX;
         s_mouseCounterY = counterY;
-        if (buttonDown != s_mouseButtonDown) {
-            what = buttonDown ? 1 : 2;
-            transition = (mask & (1u << what)) != 0;
-            s_mouseButtonDown = buttonDown;
+    }
+    if (s_currentA5) s_currentA5[kShadowMBState] = buttonDown ? 0x00 : 0x80;
+    return buttonDown;
+}
+
+static bool nextEvent(uint16_t mask, uint8_t* event)
+{
+    if (!event) return false;
+    bool buttonDown = pollMacMouse();
+    bool transition = false;
+    uint16_t what = 0;
+    if (buttonDown != s_mouseButtonDown) {
+        what = buttonDown ? 1 : 2;
+        transition = (mask & (1u << what)) != 0;
+        s_mouseButtonDown = buttonDown;
 #ifdef VETTE_GARAGE_CLICK
-            // The synthetic press becomes a real hardware-up observation here;
-            // count it as the scripted release so it is not emitted twice.
-            if (!buttonDown && (s_garageClickPhase & 1)) ++s_garageClickPhase;
+        // The synthetic press becomes a real hardware-up observation here;
+        // count it as the scripted release so it is not emitted twice.
+        if (!buttonDown && (s_garageClickPhase & 1)) ++s_garageClickPhase;
 #endif
-        }
     }
 
 #ifdef VETTE_GARAGE_CLICK
@@ -4514,6 +4621,10 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
 {
     uint32_t pc = read32(frame + 2);
     uint16_t trap = read16((const uint8_t*)pc);
+    // Mouse steering reads asynchronous Page-0 state directly rather than
+    // waiting for an EventRecord, so refresh its redirected shadows at every
+    // safe Line-A boundary while keyboard polling remains independent.
+    pollMacMouse();
 #ifdef VETTE_PROBE
     if (trap == kStaticCollisionProbeTrap
         && pc == (uint32_t)(s_segments[6].begin + 0x3ffe)) {
@@ -5516,7 +5627,8 @@ bool MacLoader::run(VetteScreen* screen)
     uint8_t* a5;
     if (!buildA5World(a5)) return false;
     s_currentA5 = a5;
-    if (!redirectLowMemoryGlobals(a5) || !disableCopyProtection()
+    if (!redirectLowMemoryGlobals(a5) || !enableMouseSteeringDefault()
+        || !disableCopyProtection()
         || !installDrivingBoundaryTrap() || !installStaticCollisionProbe()) return false;
 
     Disable();
