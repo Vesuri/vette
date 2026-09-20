@@ -431,3 +431,35 @@ After a hit, `$0600` dispatches independently for both objects:
 This proves separation and traffic-state response fields directly from their writers. The meaning
 of the player words beyond their arithmetic effects remains open until the shared `$4C86` path is
 traced through its speed thresholds and terminal branches.
+
+### Player impact damage and terminal recovery
+
+`Traffic+$4C86` consumes difficulty A5-$542C and the player speed word at `+$1A`. Its entry
+thresholds exactly implement the manual's difficulty-dependent damage rule:
+
+| difficulty | no damage | ordinary damage | additional rotating cell | immediate terminal recovery |
+|---:|---:|---:|---:|---:|
+| 0 (TRAINEE) | all impacts | — | — | — |
+| 1 (ROOKIE) | speed < 30 | 30..99 | 100..200 | > 200 |
+| 2 (PRO) | speed < 15 | 15..49 | 50..160 | > 160 |
+
+The routine maintains eight damage cells at A5-$346A..-$345C. This identity is proved by two
+independent consumers: `$4E06..$50AC` draws a separate severity-dependent dashboard patch for every
+nonzero cell, while the gas-station path at `$5688` sums all eight, schedules repair time from that
+sum, and clears them as repair progresses. Each displayed cell has levels 0..3.
+
+An accepted impact starts a 60-tick dashboard-damage display interval. Medium/high impacts advance
+cell 2 modulo four. The recorded collision side selects cell 0 or 1; each rises to level 3 and also
+changes A5-$4FF6 by one in the corresponding direction. `Main+$277C` copies that signed value into
+the steering calculation, proving it is persistent collision-induced steering pull. Once the
+selected side cell is saturated, damage advances cells 4 and 5 in sequence. Cells 6/7 receive the
+average of side cells 0/1 for the two display states selected by D7. Other reached driving paths
+advance cell 3, so `$4C86` is one writer of shared damage state rather than its sole owner.
+The low two Macintosh tick bits rate-limit repeated writes: ROOKIE accepts residue 0, while PRO
+accepts residues 1..3.
+
+The terminal test is also explicit: `(cell0 + cell1) / 2 + cell2 + cell3 + cell5 >= 8` branches to
+the same endpoint as an over-threshold impact. It stops driving, performs the reached sound
+shutdown/play sequence, loads `D6=900` and `D7=147`, and calls `Main+$0F82` to display PICT 147.
+This is the shipped beyond-repair recovery described by the manual, distinct from Lake Merced's
+PICT 140 water recovery.

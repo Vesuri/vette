@@ -7,12 +7,11 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — current compatibility boundary
 
-⭐ **HEAD OF QUEUE: close the player-impact escalation path.**
-The moving-object broad phase, swept player test, bilateral hull test, and tag-specific response
-dispatcher are proved. Trace the shared speed-dependent routine at `Traffic+$4C86` through its
-thresholds and terminal branches, then correlate its state writes with the dashboard/damage
-consumers. Name fields only from those consumers or a reproducible live collision. →
-`docs/data-formats.md`, `docs/stage-c.md`.
+⭐ **HEAD OF QUEUE: explain `FRED` from its callers.**
+The driving-data formats and static/moving collision paths now reach their shipped dashboard,
+repair, water-recovery and beyond-repair endpoints. `FRED` still exports 242 small routines; map
+the first caller families and identify the shared operation performed by its generated-looking
+leaf entries before assigning a subsystem name. → `docs/data-formats.md`, `docs/source-inventory.md`.
 
 ## ⭐⭐ TARGET 1 — the complete intro, run by the game's own code — COMPLETE
 
@@ -73,7 +72,7 @@ implementation when a real path needs it, rather than weakening the audit or spe
     prefix; its remaining 17 words are unreferenced dead data in both v1.02 executables.
     `OBJS`, `QUAD`, the outer `MAPS` grids, and `COLL` are now decoded; the QUAD-selected static
     bounds, packed road word, Lake Merced response, other static response families, and moving-object
-    separation/traffic response are closed. Continue through the player-impact escalation path. ⚠ Do this against
+    separation, traffic response, damage, repair and terminal recovery are closed. ⚠ Do this against
     the `load` segment's disassembly, not by pattern-guessing — RoF's postmortem §1.2 is about
     exactly this.
 2. **Explain `FRED`** — 6.5 KB in both builds, name says nothing. ⭐ New evidence, and it is a
