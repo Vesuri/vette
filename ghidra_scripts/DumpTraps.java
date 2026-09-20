@@ -131,6 +131,24 @@ public class DumpTraps extends GhidraScript {
         if (address != null && readableWord(memory, address)) candidates.addLast(address);
     }
 
+    private void addStoredPcRelativeRoutine(ArrayDeque<Address> candidates,
+                                            Instruction instruction,
+                                            Memory memory) throws Exception {
+        Address address = instruction.getAddress();
+        int opcode = unsignedWord(memory, address);
+        // LEA d16(PC),An immediately followed by MOVE.L An,(Am)+ is compiler
+        // evidence for a stored procedure address, not merely an address-shaped
+        // constant.  Intro uses four repetitions to build the callback table
+        // later invoked by JSR (A4).  Arbitrary LEAs are deliberately ignored:
+        // most point at rectangles and other inline data.
+        if ((opcode & 0xf1ff) != 0x41fa || !readableWord(memory, address.add(4))) return;
+        int register = (opcode >> 9) & 7;
+        int store = unsignedWord(memory, address.add(4));
+        if ((store & 0xf1f8) != 0x20c8 || (store & 7) != register) return;
+        int displacement = (short)unsignedWord(memory, address.add(2));
+        addCandidate(candidates, address.add(2).add(displacement), memory);
+    }
+
     @Override
     public void run() throws Exception {
         String[] args = getScriptArgs();
@@ -191,6 +209,7 @@ public class DumpTraps extends GhidraScript {
                 instruction = listing.getInstructionAt(address);
             }
             if (instruction == null) continue;
+            addStoredPcRelativeRoutine(candidates, instruction, memory);
             addCandidate(candidates, instruction.getFallThrough(), memory);
             // A5-relative JSRs are calls through CODE 0's jump table. Ghidra
             // cannot resolve the destination and consequently supplies no

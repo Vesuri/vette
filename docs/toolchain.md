@@ -284,11 +284,11 @@ Copied from the *Revs* port; each needs a Vette pass.
 
 | Script | Status | Purpose |
 |---|---|---|
-| `MarkEntries.java` | 509 `CODE 0` exports present; stored procedure roots remain | select rows for the current segment, promote heuristic functions to trusted USER_DEFINED roots, then disassemble |
+| `MarkEntries.java` | 509 `CODE 0` exports present | select rows for the current segment, promote heuristic functions to trusted USER_DEFINED roots, then disassemble |
 | `ExportListing.java` | reusable as-is | dump `listing.txt` |
 | `ApplyNames.java` | reusable; ⚠ addresses are segment-relative | apply `symbols.csv` to the project |
 | `DumpCallGraph.java` | reusable | call graph |
-| `DumpTraps.java` | implemented; stored procedure roots remain | flow-following A-line trap map; the direct replacement for Revs's BBC-specific `DumpHwAccesses.java` |
+| `DumpTraps.java` | implemented; Intro callbacks proved and followed | flow-following A-line trap map; the direct replacement for Revs's BBC-specific `DumpHwAccesses.java` |
 
 ### The trap map IS the abstraction boundary
 Its output tells you exactly what `src/mac/` must implement. Generate it early.
@@ -300,6 +300,11 @@ an A-line word as a returning two-byte boundary, and resumes after it. The CSV r
 offset, emitted word, flag-stripped base, OS/Toolbox class, published routine name, flag bits and
 containing function. Names come from the same generated `tmp/trap_names.lua` used by the live MAME
 probe; missing names remain explicit `?OS_xx` / `?TB_xxx` values.
+
+Stored procedure roots are admitted only with store evidence. The currently proved compiler pattern
+is `LEA d16(PC),An` immediately followed by `MOVE.L An,(Am)+`: a local code address is taken and
+written into a table. Arbitrary PC-relative `LEA`s are not followed because they normally address
+rectangles and other inline data.
 
 ```sh
 python3 tools/gen_trap_names.py     # once; generated table is local and uncommitted
@@ -337,8 +342,15 @@ was not a missing callback root: disassembly shows `Button` at `Intro+$0224` in 
 after `JSR 1946(A5)`. Two Ghidra details hid it: the unresolved call supplied no fall-through, and
 Data Reference Analysis had defined the Macintosh low-memory target `$016A` on top of code at the
 same raw segment offset. `DumpTraps` now resumes after unresolved calls and lets a trusted flow edge
-replace analyzer-created data. The measured result is 75 Intro sites including `+$0224`; the live
-run's 103 distinct sites leaves 28 roots or indirect edges still to account for honestly.
+replace analyzer-created data. That recovered 75 sites including `+$0224`.
+
+The apparent remaining “28” was itself wrong: only 40 of those 75 sites overlapped the 103-site
+full-intro trace. The 63 live omissions lay in four local routines. The exported routine proves
+their roots at `+$01EE..+$0204`: it stores `+$02D0`, `+$041E`, `+$0540` and `+$097C` into a
+four-entry table and invokes entries with `JSR (A4)` at `+$0276`. Following that evidenced stored
+callback pattern produces **146 static Intro sites**. It contains **all 103 full-intro live sites**,
+with zero offset or trap-word mismatches; the other 43 sites are valid alternate/setup paths not
+exercised by that run.
 
 ## The builds
 
