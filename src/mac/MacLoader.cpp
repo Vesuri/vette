@@ -4284,11 +4284,27 @@ static bool translateAmigaKey(uint8_t raw, KeyTranslation& key)
     }
 }
 
+static uint8_t drivingVirtualKey(uint8_t raw, uint8_t virtualKey)
+{
+    // Modern keyboards commonly omit the numeric keypad used by VETTE!'s
+    // compact driving layout.  The original game assigns no driving action to
+    // the cursor keys, so alias the Amiga cursor cluster only in the live
+    // KeyMap.  Keep its translated Macintosh arrow codes in EventRecords so
+    // non-driving UI code still sees genuine cursor-key events.
+    switch (raw) {
+    case 0x4c: return 0x5b; // cursor up    -> keypad 8 (accelerate)
+    case 0x4d: return 0x54; // cursor down  -> keypad 2 (brake)
+    case 0x4e: return 0x58; // cursor right -> keypad 6 (steer right)
+    case 0x4f: return 0x56; // cursor left  -> keypad 4 (steer left)
+    default: return virtualKey;
+    }
+}
+
 extern "C" void vetteMacRawKeyChanged(uint8_t rawKey, bool down)
 {
     KeyTranslation key;
     if (!s_currentA5 || !translateAmigaKey(rawKey, key)) return;
-    setDrivingKeyState(key.virtualKey, down);
+    setDrivingKeyState(drivingVirtualKey(rawKey, key.virtualKey), down);
 }
 
 static void updateDrivingInputProbe()
@@ -4322,8 +4338,9 @@ static void refreshDrivingKeyMap()
     for (uint16_t raw = 0; raw < 128; ++raw) {
         KeyTranslation key;
         if (!vetteInputKeyDown((uint8_t)raw) || !translateAmigaKey((uint8_t)raw, key)) continue;
-        uint8_t byteOffset = (uint8_t)(key.virtualKey >> 3);
-        keyMap[byteOffset] |= (uint8_t)(1u << (key.virtualKey & 7));
+        uint8_t virtualKey = drivingVirtualKey((uint8_t)raw, key.virtualKey);
+        uint8_t byteOffset = (uint8_t)(virtualKey >> 3);
+        keyMap[byteOffset] |= (uint8_t)(1u << (virtualKey & 7));
     }
 #ifdef VETTE_GARAGE_CLICK
     // The selected car begins in neutral.  Hold top-row + (upshift) in the KeyMap that

@@ -147,6 +147,11 @@ Chapter 9 (pp. 29-30) and `KeyChart.jpg` agree:
 
 The B&W-only horizon and wireframe toggles are `V` and `W`.
 
+The standalone Amiga port additionally aliases the cursor cluster in the live driving KeyMap:
+left/right act as keypad `4`/`6`, and up/down act as keypad `8`/`2`. The original game assigns no
+driving action to the Macintosh cursor keys. Their ordinary key-event identity is preserved; the
+alias applies only to the continuously polled driving state.
+
 ## Courses and world boundaries
 
 The four course endpoints (pp. 18-21) are:
