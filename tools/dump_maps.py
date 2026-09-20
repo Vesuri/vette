@@ -25,6 +25,22 @@ def words(body: bytes):
     return struct.unpack(f">{len(body) // 2}H", body)
 
 
+def signed_word(value):
+    return value if value < 0x8000 else value - 0x10000
+
+
+def road_fields(value):
+    """Return the projections used by the shipped MAPS-word consumers."""
+    return {
+        "upper": (value & 0xE000) >> 13,
+        "middle": (value & 0x1C00) >> 10,
+        "variant": (value & 0x0300) >> 8,
+        "fine": value & 0x00FF,
+        "draw_index": ((value & 0xE000) >> 13) + ((value & 0x0300) >> 5),
+        "vertical": signed_word((value * -224) & 0xFFFF),
+    }
+
+
 def decode(records):
     by_id = {rid: (name, body) for rid, name, body in records}
     if set(by_id) != {1000, 1100, 3333, 4444, 4445}:
@@ -78,6 +94,10 @@ def main():
         print(f"id={rid} name={name!r} grid=52x47 cells={len(cells)} "
               f"QUAD={min(quad)}..{max(quad)} ({len(quad)} values) "
               f"packed-road-words={len(packed)}")
+        decoded_fields = [road_fields(value) for value in packed]
+        for field in ("upper", "middle", "variant", "fine", "draw_index", "vertical"):
+            values = sorted({decoded[field] for decoded in decoded_fields})
+            print(f"  {field}={','.join(map(str, values))}")
 
     name, cells = decoded[3333]
     print(f"id=3333 name={name!r} grid=52x47 cells={len(cells)} words/cell=2")

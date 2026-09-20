@@ -209,6 +209,24 @@ repeat 52 * 47 times, row-major:
     word  packed road word
 ```
 
+The second word has several independent, code-proved projections. `Main+$4394..+$43CC` stores the
+raw word at A5-$251C and derives the signed 16-bit cell vertical offset at A5-$2518 as the low word
+of `raw * -224`. `Traffic+$3D7C` performs the same derivation when updating another object's map
+cell. The drawing paths then extract these fields from the retained raw word:
+
+| bits | shipped use |
+|---:|---|
+| 15..13 | three-bit upper drawing selector; `Traffic+$6426` and `$63D0` use it to select 12-byte asset-table records |
+| 12..10 | three-bit middle drawing selector; `FRED+$005C` converts it to a 24-byte raster-table offset |
+| 9 | independently gates the `$63D0` asset-table path |
+| 9..8 | two-bit variant; `Traffic+$6554` combines it with bits 15..13 as `(variant << 3) + upper` |
+| 7..0 | retained as the fine portion of the raw word; the shipped main map uses values 0..3 and the freeway map uses 0 |
+
+The combined five-bit drawing index addresses another 12-byte asset table. These are renderer
+selectors because their consumers prove table selection, but the data alone does not justify
+names such as road colour, shoulder type, or scenery class. The vertical calculation consumes the
+whole raw word exactly as shipped; it must not be replaced with a guessed mask.
+
 Resource 1000 `Main_Map` and resource 1100 `Freeway_Map` are both 9,778 bytes. The loader skips
 their count words and stores their data pointers separately; normal/freeway transitions switch
 the active pointer rather than copying or converting the map. `Main+$437A` and
