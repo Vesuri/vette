@@ -119,6 +119,26 @@ def runtime_responses(raw, a5, bounds):
     return responses
 
 
+def runtime_response_197(raw, a5, records):
+    """Decode the per-QUAD reference point and correction used by export 197."""
+    base = a5 - len(raw)
+    table = a5 - 0x3236 - base
+    result = []
+    for quad, record in enumerate(records):
+        if record["header"][1] != 107:
+            continue
+        # Traffic+$5360 reads the current QUAD id, folds the second shipped
+        # range down by 13, subtracts 208, and indexes eight-byte records.
+        index = quad - (13 if quad >= 241 else 0) - 208
+        if index < 0 or table + index * 8 + 8 > len(raw):
+            raise ValueError(f"QUAD {quad}: response-197 index {index} is outside globals")
+        reference_u, reference_v, correction_u, correction_v = struct.unpack_from(
+            ">4h", raw, table + index * 8)
+        result.append((quad, index, reference_u, reference_v,
+                       correction_u, correction_v))
+    return result
+
+
 def entrypoint_owners(path):
     """Map a jump-table export number to its segment and CODE offset."""
     owners = {}
@@ -209,6 +229,15 @@ def main():
         for index, (locations, handler) in enumerate(responses):
             where = ",".join(f"{selector}:{ordinal}" for selector, ordinal in locations)
             print(f"  response={index:>2} bounds={where:<6} export={handler}")
+
+        correction = runtime_response_197(args.runtime_globals.read_bytes(),
+                                          args.runtime_a5, records)
+        print("runtime response 197: "
+              f"QUAD-records={len(correction)} table-indices={len({row[1] for row in correction})}")
+        print("  QUAD index reference-u reference-v correction-u correction-v")
+        for quad, index, reference_u, reference_v, correction_u, correction_v in correction:
+            print(f"  {quad:>4} {index:>5} {reference_u:>11} {reference_v:>11} "
+                  f"{correction_u:>12} {correction_v:>12}")
 
         used, dispatch = runtime_dispatch(args.runtime_globals.read_bytes(),
                                           args.runtime_a5, records)

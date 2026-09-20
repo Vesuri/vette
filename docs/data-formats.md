@@ -370,6 +370,17 @@ Static disassembly groups the complete contiguous export range without guessing 
 | 229 | stop driving and show the PICT-140 recovery window |
 | 230..231 | fixed relocation to `Main_Map` / `Freeway_Map` respectively |
 
+Export 197's data path is fully decoded rather than inferred from one bend. `Traffic+$5338` reads
+the active map's QUAD id, maps ids 208..227 directly to indices 0..19 and ids 241..256 to indices
+20..35, then selects an eight-byte record at A5-$3236. Each record is four signed words: a
+cell-relative `(u,v)` reference point and a two-component correction step. The routine adds the
+reference point to the current 2048-unit cell origin, computes the angular relation to the
+vehicle, conditionally reverses both correction components, and marks the common displacement
+response. The captured initialized globals contain exactly 36 indices for the 36 shipped QUADs
+using collision selector 107. `tools/dump_quad.py --runtime-globals ...` prints the complete
+QUAD-to-index-to-vector mapping; for the first proved freeway bend it gives QUAD 221
+`(8192,4096,-3,-2)` and QUAD 220 `(6144,6144,-3,-3)`.
+
 This is deliberately a behavior-family map, not a geographic-name table. Only export 229 has a
 reproducible place-specific identification so far. `dump_quad.py --runtime-globals ...` prints all
 44 special-table slots as `selector:ordinal -> export`, including the repeated uses of exports
