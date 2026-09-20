@@ -50,6 +50,20 @@ def decode(body: bytes):
     return records
 
 
+def road_handler(header):
+    """Return the control-flow class selected by Traffic+$3D7C."""
+    return {
+        0: "flat",
+        1: "u/v split",
+        2: "v/8",
+        3: "diagonal 2/6",
+        4: "(u-256)/8",
+        6: "(2048-u)/8",
+        7: "diagonal 4/8",
+        8: "(1792-v)/8",
+    }.get(header, "diagonal 6/8")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("resource_fork", type=Path)
@@ -66,12 +80,13 @@ def main():
 
     records = decode(body)
     print(f"id={rid} name={name!r} bytes={len(body)} records={len(records)}")
-    print("index header0 header1 setup_words object_words aligned")
+    print("index header0 header1 setup_words object_words aligned road-handler")
     for index, record in enumerate(records):
         print(f"{index:>5} {record['header'][0]:>7} {record['header'][1]:>7} "
               f"{len(record['setup_words']):>11} "
               f"{len(record['object_words']):>12} "
-              f"{'yes' if record['render_aligned'] else 'NO'}")
+              f"{'yes' if record['render_aligned'] else 'NO':>7} "
+              f"{road_handler(record['header'][0])}")
 
 
 if __name__ == "__main__":

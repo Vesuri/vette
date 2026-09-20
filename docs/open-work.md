@@ -7,13 +7,13 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — current compatibility boundary
 
-⭐ **HEAD OF QUEUE: connect proved MAPS/QUAD road fields to collision behavior.**
-The five MAPS outer formats and the MAPS → QUAD → OBJS chain are closed. The world cell's second
-word is demonstrably packed: its exact `$1C00`, `$0200`, `$E000`, and `$0300` consumers and its
-low-word `*-224` vertical-origin transform are documented, but their human road meanings are not.
-Trace QUAD's first header through `Traffic+$3D7C` and the packed word's Traffic selectors into the
-first reproducible collision (straight ahead into the lake is the known short route). Name fields
-only when behavior or table contents prove the names. → `docs/data-formats.md`.
+⭐ **HEAD OF QUEUE: decode the `COLL` resources and the object-impact path.**
+The five MAPS outer formats, MAPS → QUAD → OBJS chain, and QUAD header-0 surface interpolation are
+closed. The supposed QUAD “collision behavior” at `Traffic+$3D7C` is actually a proved piecewise
+road-surface solver over the cell's local 2048x2048 coordinates. Start instead at the later
+QUAD-selected bounds lookup around `Traffic+$4064`, identify how its tables reach the six named
+`COLL` resources, and correlate the result with the already reproducible straight-to-Lake-Merced
+water recovery. Name fields only when code or live behavior proves them. → `docs/data-formats.md`.
 
 ## ⭐⭐ TARGET 1 — the complete intro, run by the game's own code — COMPLETE
 

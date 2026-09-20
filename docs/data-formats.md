@@ -177,8 +177,8 @@ All second lists and all but descriptor 191's first list have the required four-
 Descriptor 191 has 11 setup words after its header; it is retained and reported as shipped, but is
 not evidence for a different command grammar until reachability proves the game selects it.
 `Traffic+$3D7C` independently reads
-the first header word and branches on proved values 0, 1, 2, 3, 4, 6, 7, and 8; names for those
-individual road behaviors belong with the MAPS/collision trace. The second header word is written
+the first header word and uses it as the road-surface interpolation selector described below. The
+second header word is written
 to A5-$2500 by `Main+$43FC`, but an exhaustive search of every resident segment finds no read; it
 is dead shipped metadata in v1.02. The two command-list indices are already direct indices into the
 game's callable table rather than another encoded schema. This establishes QUAD's
@@ -227,6 +227,32 @@ uses are deliberately recorded as bit operations rather than guessed road names:
 Those consumers prove overlapping fields and derived indices, but not yet human meanings such as
 surface, slope or intersection type. The QUAD first header supplies a separate road-behaviour
 dispatch at `Traffic+$3D7C`; it must not be conflated with this packed word.
+
+### QUAD header 0 is the cell-surface interpolation selector
+
+`Traffic+$3D7C` computes the current vehicle/object's vertical coordinate within its MAPS cell.
+Let `u = object+$6E & $7FF` and `v = object+$72 & $7FF`, so both are local coordinates within a
+2048x2048 cell. The packed road word supplies the base described above. QUAD header 0 then selects
+the following exact piecewise adjustment to that base (all divisions are arithmetic shifts by 3):
+
+| header | selected surface adjustment |
+|---:|---|
+| 0 | flat; also clears object motion word `+$10` |
+| 1 | boundary dispatch: flat for `u <= 256`; otherwise chooses the header-4 or header-2 formula from `v`, `u`, and the far edge |
+| 2 | subtract `v/8`, capped at 224 beyond `v=1792` |
+| 3 | diagonal split between the header-2 and header-6 formulas using `u+v < 2048`, with the near/far edge guards |
+| 4 | subtract `(u-256)/8` after the near edge; the near-edge region is flat |
+| 6 | subtract 224 through the near edge, then subtract `(1792-(u-256)) / 8` |
+| 7 | diagonal split between the header-4 and header-8 formulas using `u+v < 2048`, with both edge guards |
+| 8 | subtract `(1792-v)/8` before the far edge; the far-edge region is flat |
+| all other values | diagonal split between the header-6 and header-8 formulas using `v < u-256`, with both edge guards |
+
+The shipped header values are 0, 1, 2, 3, 4, 6, 7, 8, 9, and 29; therefore 9 and 29 deliberately
+take the final/default interpolation class. Four helpers at `Traffic+$3C94..+$3D42` additionally
+set object motion word `+$10` near the corresponding cell edge from one of four signed byte tables,
+indexed by object heading divided by 11. This is road-surface and edge-response code, not the
+object-impact detector. Collision decoding must begin at the later QUAD-selected bounds lookup
+around `Traffic+$4064` and the six `COLL` resources.
 
 The auxiliary resources have code-proved fixed grids with no leading count:
 
