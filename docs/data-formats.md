@@ -595,10 +595,12 @@ quadrant is multiplied by 90 and copied to the new object's current heading +$0C
 direction, not a speed value.
 
 `amiga/driving_freeway_spawn.gdb` records the selected key/triplet, optional link and constructed
-object for the first two naturally reached spawns. The deterministic UI harness can select Course
-Two and steer with ordinary KeyMap input; that route reached FWTP key cell `(2,23)` without
-patching position or heading. This does not itself select the freeway dispatcher: A5-$3764 remains
-zero, so `Traffic+$24DE` takes the ordinary city branch rather than calling `$2302`.
+object for the first two naturally reached spawns. The deterministic UI harness selects Course Two
+and steers with ordinary KeyMap input down the source-defined local-X `0..383` corridor. Crossing
+the selector-16 rectangle in Main Map cell `(2,6)` naturally dispatches export 212. The measured
+tick-8514 call moved the player from `($1085,$3204)` to `($1400,$15800)` and changed A5-$3764 from
+0 to 1; at tick 8517 `Traffic+$2302` then ran naturally with a full `15/15` pool and freeway player
+cell `(2,42)`. `amiga/driving_freeway_activation.gdb` is the focused observer for this chain.
 
 The full `15/15` pool is transient, not the blocker. Every 35 ticks `Traffic+$252C` scans active
 objects, computes Manhattan distance from the player, and selects objects beyond `$1400` at
@@ -606,11 +608,12 @@ objects, computes Manhattan distance from the player, and selects objects beyond
 repeatedly exercised that path, after which the ordinary city branch immediately restored the
 pool. `amiga/driving_freeway_movement.gdb` records the bounded retirement and movement evidence.
 
-The mode byte is established by shipped special-collision responses selected through MAPS/QUAD
+The mode word is established by shipped special-collision responses selected through MAPS/QUAD
 data. For example, Main Map cell `(2,6)` uses QUAD 21 and collision selector 16; its first rectangle
 selects response-table export 212 (`Traffic+$5632`), which sets freeway mode. Other statically
-proved true-mode cells include `(3,44)`, `(6,32)`, `(13,31)`, `(24,1)`, and `(7..9,39)`. The next
-coverage run must cross one normally before the `FWTP`/`JHPF` spawn trace is meaningful.
+proved true-mode cells include `(3,44)`, `(6,32)`, `(13,31)`, `(24,1)`, and `(7..9,39)`. Because
+the 68000 is big-endian, a byte read at A5-$3764 sees the high byte of word value 1 and misleadingly
+returns zero; runtime observers must read the full word.
 
 ### `FWTM` and `FREE`: navigation-directed traffic paths
 

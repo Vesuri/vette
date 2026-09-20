@@ -4438,6 +4438,15 @@ static void refreshDrivingKeyMap()
             // the BUCKLE UP / GET READY countdown is still running.
             s_garageGearPhase = 1;
             keyMap[0x18 >> 3] |= 1u << (0x18 & 7); // top-row +: upshift one gear
+#ifdef VETTE_FREEWAY_ROUTE
+            // Use only documented game controls to reduce the cost of this
+            // long diagnostic drive.  The normal key-repeat latch makes each
+            // held bit one toggle; the following GetKeys scan releases them.
+            keyMap[0x0b >> 3] |= 1u << (0x0b & 7); // B: buildings off
+            keyMap[0x01 >> 3] |= 1u << (0x01 & 7); // S: sound off
+            keyMap[0x0e >> 3] |= 1u << (0x0e & 7); // E: engine sound off
+            keyMap[0x60 >> 3] |= 1u << (0x60 & 7); // F5: Front Dash view
+#endif
         }
     }
     // Once Gear 1 is visible in the original record, hold the documented
@@ -4453,9 +4462,14 @@ static void refreshDrivingKeyMap()
     if (s_garageGearPhase >= 2) {
         uint8_t* car = (uint8_t*)read32(s_currentA5 - 13944);
         uint16_t heading = car ? read16(car + 0x66) : 0x2000;
-        if (heading > 0x2100 && heading < 0x3800)
+        uint16_t localX = car ? (uint16_t)(read32(car) & 0x7ff) : 192;
+        // Cells (2,7)..(2,22) have the source-defined static bound
+        // (v=0,u=384)-(v=2048,u=2048).  Centre within the remaining
+        // 0..383 corridor instead of riding its exact collision edge.
+        uint16_t target = localX > 256 ? 0x2300 : (localX < 128 ? 0x1d00 : 0x2000);
+        if (heading > target + 0x0100 && heading < 0x3800)
             setDrivingKeyState(0x56, true);  // keypad 4: reduce heading
-        else if (heading < 0x1f00)
+        else if (heading + 0x0100 < target)
             setDrivingKeyState(0x58, true);  // keypad 6: correct overshoot
     }
 #endif

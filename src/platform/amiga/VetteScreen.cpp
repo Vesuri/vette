@@ -340,6 +340,16 @@ bool VetteScreen::presentMacFrame(const uint8_t* chunky, const uint8_t* colorTab
 {
     if (!chunky || !colorTable || !m_back || m_framePending) return false;
 
+#ifdef VETTE_FREEWAY_ROUTE
+    // The freeway-route build observes original game physics and collision,
+    // not video output.  A full Mac draw has already updated `chunky` before
+    // this boundary; omit only the host chunky-to-planar conversion and swap
+    // so a long, input-only diagnostic is not paced by redundant display DMA.
+    ++g_macFramesQueued;
+    ++g_macFramesPresented;
+    return true;
+#endif
+
     // After the previous swap m_back is the frame from two updates ago.  Bring
     // forward only the rectangle that changed in the last frame, then apply the
     // new dirty rectangle.  Both buffers therefore remain coherent without a

@@ -13,28 +13,42 @@ set $retired = 0
 break *(s_segments[6].begin+0x54f8)
 commands
   silent
-  printf "freeway-transition entry tick=%u world=($%08x,$%08x) cell=(%u,%u) heading=%u mode=%d\n", g_macTicks, *(unsigned int*)($a0+0x6e), *(unsigned int*)($a0+0x72), *(unsigned short*)($a0+0x3e), *(unsigned short*)($a0+0x40), *(unsigned short*)($a0+0x66), *(signed char*)($a5-0x3764)
+  printf "freeway-transition entry tick=%u world=($%08x,$%08x) cell=(%u,%u) heading=%u mode=%d\n", g_macTicks, *(unsigned int*)($a0+0x6e), *(unsigned int*)($a0+0x72), *(unsigned short*)($a0+0x3e), *(unsigned short*)($a0+0x40), *(unsigned short*)($a0+0x66), *(signed short*)($a5-0x3764)
   continue
 end
 
 break *(s_segments[6].begin+0x5522)
 commands
   silent
-  printf "freeway-transition exit tick=%u world=($%08x,$%08x) cell=(%u,%u) heading=%u mode=%d\n", g_macTicks, *(unsigned int*)($a0+0x6e), *(unsigned int*)($a0+0x72), *(unsigned short*)($a0+0x3e), *(unsigned short*)($a0+0x40), *(unsigned short*)($a0+0x66), *(signed char*)($a5-0x3764)
+  printf "freeway-transition exit tick=%u world=($%08x,$%08x) cell=(%u,%u) heading=%u mode=%d\n", g_macTicks, *(unsigned int*)($a0+0x6e), *(unsigned int*)($a0+0x72), *(unsigned short*)($a0+0x3e), *(unsigned short*)($a0+0x40), *(unsigned short*)($a0+0x66), *(signed short*)($a5-0x3764)
+  continue
+end
+
+break *(s_segments[6].begin+0x5632)
+commands
+  silent
+  printf "freeway-transition-212 entry tick=%u world=($%08x,$%08x) cell=(%u,%u) heading=%u mode=%d\n", g_macTicks, *(unsigned int*)($a0+0x6e), *(unsigned int*)($a0+0x72), *(unsigned short*)($a0+0x3e), *(unsigned short*)($a0+0x40), *(unsigned short*)($a0+0x66), *(signed short*)($a5-0x3764)
+  continue
+end
+
+break *(s_segments[6].begin+0x565a)
+commands
+  silent
+  printf "freeway-transition-212 exit tick=%u world=($%08x,$%08x) cell=(%u,%u) heading=%u mode=%d\n", g_macTicks, *(unsigned int*)($a0+0x6e), *(unsigned int*)($a0+0x72), *(unsigned short*)($a0+0x3e), *(unsigned short*)($a0+0x40), *(unsigned short*)($a0+0x66), *(signed short*)($a5-0x3764)
   continue
 end
 
 break *(s_segments[6].begin+0x593c)
 commands
   silent
-  printf "freeway-transition-221 entry tick=%u world=($%08x,$%08x) cell=(%u,%u) heading=%u mode=%d\n", g_macTicks, *(unsigned int*)($a0+0x6e), *(unsigned int*)($a0+0x72), *(unsigned short*)($a0+0x3e), *(unsigned short*)($a0+0x40), *(unsigned short*)($a0+0x66), *(signed char*)($a5-0x3764)
+  printf "freeway-transition-221 entry tick=%u world=($%08x,$%08x) cell=(%u,%u) heading=%u mode=%d\n", g_macTicks, *(unsigned int*)($a0+0x6e), *(unsigned int*)($a0+0x72), *(unsigned short*)($a0+0x3e), *(unsigned short*)($a0+0x40), *(unsigned short*)($a0+0x66), *(signed short*)($a5-0x3764)
   continue
 end
 
 break *(s_segments[6].begin+0x596e)
 commands
   silent
-  printf "freeway-transition-221 exit tick=%u world=($%08x,$%08x) cell=(%u,%u) heading=%u mode=%d\n", g_macTicks, *(unsigned int*)($a0+0x6e), *(unsigned int*)($a0+0x72), *(unsigned short*)($a0+0x3e), *(unsigned short*)($a0+0x40), *(unsigned short*)($a0+0x66), *(signed char*)($a5-0x3764)
+  printf "freeway-transition-221 exit tick=%u world=($%08x,$%08x) cell=(%u,%u) heading=%u mode=%d\n", g_macTicks, *(unsigned int*)($a0+0x6e), *(unsigned int*)($a0+0x72), *(unsigned short*)($a0+0x3e), *(unsigned short*)($a0+0x40), *(unsigned short*)($a0+0x66), *(signed short*)($a5-0x3764)
   continue
 end
 

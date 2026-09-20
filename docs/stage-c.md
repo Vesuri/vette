@@ -1115,6 +1115,25 @@ starts at `(0x11c0,0xc0a0)`, cell `(2,24)`, with the same heading. The apparent 
 lane from the start's connected static-collision component. No route is claimed until ordinary
 controls cross a response rectangle.
 
+Course Two has a direct source-defined route to that response. Cells `(2,7)..(2,22)` leave an open
+local-X corridor `0..383`; steering around its centre with the game's ordinary keypad controls
+crosses `(2,6)` without modifying position, heading, collision, or mode state. On the measured run,
+export 212 entered at tick 8514 with world `($1085,$3204)` and mode 0, then returned in the same tick
+at `($1400,$15800)` with mode 1. `Traffic+$2302` ran naturally at tick 8517 with the pool still
+`15/15` and the player updated to freeway cell `(2,42)`. The focused observer is
+`amiga/driving_freeway_activation.gdb`.
+
+A probe-width mistake briefly obscured this result: A5-$3764 is a big-endian word, not a byte.
+Reading the byte at `A5-$3764` observes the high byte of `0x0001` and therefore falsely reports
+zero. The disassembly at `Traffic+$5654` and the corrected word-width runtime probe both establish
+the transition. All freeway-mode GDB observers now read a signed short.
+
+Long input-only diagnostic routes may compile with `FREEWAY_ROUTE=1`; that build acknowledges a
+completed Mac draw at the Amiga presentation boundary without performing C2P or a buffer swap.
+The original Mac drawing, physics, input, collision, and traffic code still execute. This reduces
+the one-minute Course Two run from 260 to roughly 919 completed game frames. Production builds do
+not define that flag and retain the complete display path.
+
 The 26-record sightseeing table used by `Main+$3456` was also decoded as a possible source-native
 shortcut. Record 4 is cell `(6,26)`, only six cells from the export-221 transition at `(6,32)`, but
 the documented T command is conditional on Tour Mode. Five ordinary T down/up scans during the

@@ -7,18 +7,16 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — current compatibility boundary
 
-⭐ **HEAD OF QUEUE: cross a real Main Map -> Freeway Map transition, then trace the first freeway
-traffic replacement.** Natural distance retirement is proved at `Traffic+$252C/$257A/$1FB6` and
-ordinary city spawning immediately refills the freed slot. The remaining gate is A5-$3764: merely
-driving into FWTP-key cell `(2,23)` leaves it clear, so the dispatcher correctly stays on the city
-branch. The start survey proves that Courses One, Three, and Four all begin at `(6,2)`, while
-Course Two begins at `(2,24)`; simple Manhattan proximity is misleading because full-cell static
-bounds isolate the `(2,6)` lane from the shared start. Reach one of the QUAD-selected transition
-responses through ordinary race input, then use
-`amiga/driving_freeway_spawn.gdb` and `amiga/driving_freeway_movement.gdb` to capture the first
-natural `FWTP` -> `JHPF` replacement and its `FWTM` -> `FREE` movement. Do not patch the mode,
-count, position, or spawn state merely to make a breakpoint fire. `TURN` is loaded but unread and
-`PHAZ` is never requested, so their names do not justify speculative work. → `docs/data-formats.md`.
+⭐ **HEAD OF QUEUE: trace the first naturally spawned freeway object through `FWTM` -> `FREE`
+movement.** The input-only Course Two route now crosses the real `(2,6)` QUAD response: export 212
+changes the A5-$3764 **word** from 0 to 1 and relocates the player from Main Map world
+`($10xx,$32xx)` to Freeway Map world `($14xx,$15800)`. Three ticks later the unmodified
+`Traffic+$2302` path naturally replaces traffic through `FWTP` -> `JHPF` with the pool at `15/15`.
+The next bounded trace must follow that created object into `$0D1C`, prove its navigation-cell
+`FWTM` key and selected `FREE` id, and record at least one actual `FREE` movement step. Do not patch
+mode, count, position, spawn state, or object fields merely to make a breakpoint fire. `TURN` is
+loaded but unread and `PHAZ` is never requested, so their names do not justify speculative work.
+→ `docs/data-formats.md`.
 
 ## ⭐⭐ TARGET 1 — the complete intro, run by the game's own code — COMPLETE
 
