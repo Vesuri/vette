@@ -115,7 +115,7 @@ largest being `Main` at 32.6 KB and `Traffic` at 27.9 KB. That is the size of th
 | `HEXS` | 1 | 1 446 | `HexSinCos Table` |
 | `TIME` | 4 | 1 200 | ids 128-131, 300 B each, unnamed |
 | `CURV` | 1 | 1 024 | `rw curve` (real-world curve?) |
-| `PERF` | 8 | 880 | **110 B each**: `Stock`, `ZR1`, `TwinTurbo`, `Sledge`, `Porche`, `Testa`, `Lambo`, `F40` — the car performance records, a fixed 110-byte struct |
+| `PERF` | 8 | 880 | **110 B each**: `Stock`, `ZR1`, `TwinTurbo`, `Sledge`, `Porche`, `Testa`, `Lambo`, `F40` — count 54, then a proved 37-word live-car template and 17 unresolved words |
 | `COSS` | 1 | 516 | `Cosine Table 360` |
 | `JHPF` | 1 | 312 | `freeway traffic placement` (same name as `FWTP`) |
 | `FWTM` | 1 | 290 | `freeway traffic movement` |
@@ -127,11 +127,11 @@ largest being `Main` at 32.6 KB and `Traffic` at 27.9 KB. That is the size of th
 Amiga side, because it means the hot path does **not** need the 32-bit multiply/divide the 68000
 lacks (the `muldiv-audit` rule in `CLAUDE.md`), and the tables port across unchanged.
 
-⚠ `PERF` being **exactly 110 bytes × 8** makes it the cheapest place to start reading data formats:
-a fixed-size record, eight instances, with meaningful names to check a decode against. The manual
-now supplies the independent schema vocabulary: engine, drivetrain/gears, dimensions,
-steering/brakes, wheels/tires, acceleration and performance, for four player Corvettes and four
-opponent cars. → `docs/manual.md`.
+⭐ `PERF` is now partially decoded from its code consumers, not its numerical shape.
+`Traffic+$06BE` skips the count and copies words 1..37 into the live-car structure; word 16 is
+maximum forward gear and word 24 selects automatic shifting. Words 38..54 remain outside that
+proved copy and deliberately unnamed until their reader is found. The B&W and colour records are
+byte-identical. → `docs/data-formats.md`, `tools/dump_perf.py`.
 
 ## Audio — ⭐⭐ this corrects a documented assumption
 
