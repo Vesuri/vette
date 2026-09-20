@@ -598,6 +598,36 @@ direction, not a speed value.
 object for the first two naturally reached spawns. A short stationary Course One run did not enter
 `Traffic+$2302`; that negative observation is not promoted into branch-coverage evidence.
 
+### `FWTM` and `FREE`: navigation-directed traffic paths
+
+`Traffic+$0C78` first projects the traffic object's current world position by 512 units in its
+heading direction. It divides the projected X/Z by 2048, indexes the 52-column `NavigationMap`
+with the already-proved 208-byte row and four-byte cell strides, and returns that cell. `$0D1C`
+uses the cell's first word as the `FWTM` lookup key. Thus the record key joins directly to the
+navigation grid; it is not a traffic-object index inferred from the resource name.
+
+The 48 unique-key records are:
+
+```
+word  NavigationMap cell word
+byte  FREE path id for heading <=45 or >315 degrees
+byte  FREE path id for heading 46..135 degrees
+byte  FREE path id for heading 136..225 degrees
+byte  FREE path id for heading 226..315 degrees
+```
+
+Zero means that no route exists for that cell/direction and takes the ordinary traffic-removal
+path. Every nonzero shipped value is a `FREE` id in 90..130. IDs 90..121 return movement selector
+9; IDs 122..130 return selector 10. The selected resource address is exactly
+`FREE + (id-90)*64`.
+
+`FREE` is therefore 45 paths for logical IDs 90..134. Each path is 32 consecutive signed-byte
+`(dx,dz)` pairs with no count or header. `Traffic+$1564` and `$15BE` consume one pair, advance the
+object's saved pointer by two, sign-extend both components, add them to world X/Z, and run the
+shared position/update calls. The active `CLST` streams reference IDs 90..129, `FWTM` reaches
+90..130, and dormant selector 5 at `$1226` selects ID 134 directly. No active consumer found so far
+selects 131..133.
+
 Validate the outer shapes and Color/B&W equality with:
 
 ```sh

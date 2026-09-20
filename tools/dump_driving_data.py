@@ -98,6 +98,20 @@ def decode_freeway_tables(found):
     return count, keys, placement_data
 
 
+def decode_movement_tables(found):
+    _name, fwtm = one(found["FWTM"], "FWTM", 100)
+    count = counted(fwtm, 6, "FWTM 100")
+    records = [struct.unpack_from(">H4B", fwtm, 2 + index * 6)
+               for index in range(count)]
+    keys = [record[0] for record in records]
+    if len(set(keys)) != len(keys):
+        raise ValueError("FWTM keys are not unique")
+    path_ids = [value for record in records for value in record[1:] if value]
+    if any(value < 90 or value > 134 for value in path_ids):
+        raise ValueError("FWTM references a path outside FREE IDs 90..134")
+    return count, keys, path_ids
+
+
 def validate(found):
     clst = found["CLST"]
     expected_clst_ids = (100, 101, 102, 104, 200, 201, 202, 203, 204, 300, 301, 400, 401, 1200)
@@ -115,8 +129,7 @@ def validate(found):
     if len(jhpf) != 39 * 8:
         raise ValueError("JHPF 100 is not 39 8-byte records")
 
-    _name, fwtm = one(found["FWTM"], "FWTM", 100)
-    fwtm_count = counted(fwtm, 6, "FWTM 100")
+    fwtm_count, fwtm_keys, fwtm_path_ids = decode_movement_tables(found)
 
     time = found["TIME"]
     if tuple(rid for rid, _name, _body in time) != (128, 129, 130, 131):
@@ -136,7 +149,8 @@ def validate(found):
     if len(turn) != 29 * 2:
         raise ValueError("TURN 1 is not 29 words")
 
-    return fwtp_count, fwtm_count, controls, route_ids, fwtp_keys, jhpf_records
+    return (fwtp_count, fwtm_count, controls, route_ids, fwtp_keys, jhpf_records,
+            fwtm_keys, fwtm_path_ids)
 
 
 def main():
@@ -147,7 +161,8 @@ def main():
     args = parser.parse_args()
 
     found = selected(args.resource_fork)
-    fwtp_count, fwtm_count, controls, route_ids, fwtp_keys, jhpf_records = validate(found)
+    (fwtp_count, fwtm_count, controls, route_ids, fwtp_keys, jhpf_records,
+     fwtm_keys, fwtm_path_ids) = validate(found)
     if args.compare:
         other = selected(args.compare)
         validate(other)
@@ -182,6 +197,10 @@ def main():
     print(
         f"FWTP keys={len(fwtp_keys)}/{fwtp_count} duplicate-counts={duplicates}; "
         f"JHPF links={links} heading-quadrants={sorted({record[3] for record in jhpf_records})}"
+    )
+    print(
+        f"FWTM keys={len(set(fwtm_keys))}/{fwtm_count} range={min(fwtm_keys)}..{max(fwtm_keys)}; "
+        f"nonzero FREE-ids={len(fwtm_path_ids)} range={min(fwtm_path_ids)}..{max(fwtm_path_ids)}"
     )
 
 
