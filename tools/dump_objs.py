@@ -81,12 +81,72 @@ def decode(body: bytes):
     }
 
 
+def runtime_lod_tables(globals_body: bytes, a5: int, records):
+    """Find initialized model-LOD tables in a captured 31,272-byte A5 world."""
+    if len(globals_body) != 31272:
+        raise ValueError(
+            f"runtime globals are {len(globals_body)} bytes, expected 31272")
+
+    names = {rid: name for rid, name, _ in records}
+    id_pos = len(globals_body) - 0x7614
+    descriptor_pos = len(globals_body) - 0x5e06
+    descriptors = {}
+    index = 0
+    while True:
+        rid = struct.unpack_from(">h", globals_body, id_pos + index * 2)[0]
+        if rid == -1:
+            break
+        descriptor = struct.unpack_from(
+            ">I", globals_body, descriptor_pos + index * 4)[0]
+        descriptors[descriptor] = (rid, names.get(rid, "?"))
+        index += 1
+
+    tables = []
+    for pos in range(0, len(globals_body) - 24, 2):
+        entries = []
+        cursor = pos
+        previous_threshold = -1
+        while cursor + 12 <= len(globals_body):
+            threshold, flags, shared, model = struct.unpack_from(
+                ">hHII", globals_body, cursor)
+            if model not in descriptors or shared == 0 or flags > 0xff:
+                break
+            entries.append((threshold, flags, shared, model))
+            cursor += 12
+            if threshold == -1:
+                break
+            if threshold < 0 or threshold <= previous_threshold:
+                break
+            previous_threshold = threshold
+
+        if len(entries) < 2 or entries[-1][0] != -1:
+            continue
+
+        # Do not report suffixes of a table whose preceding 12-byte record is
+        # itself a valid initialized model entry.
+        if pos >= 12:
+            _, prior_flags, prior_shared, prior_model = struct.unpack_from(
+                ">hHII", globals_body, pos - 12)
+            if (prior_model in descriptors and prior_shared != 0
+                    and prior_flags <= 0xff):
+                continue
+        tables.append((a5 - len(globals_body) + pos, entries, descriptors))
+    return tables
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("resource_fork", type=Path)
     parser.add_argument("--compare", type=Path,
                         help="require a second fork's OBJS resources to be byte-identical")
+    parser.add_argument("--runtime-globals", type=Path,
+                        help="scan a 31,272-byte initialized A5-world capture for LOD tables")
+    parser.add_argument("--runtime-a5", type=lambda value: int(value, 0),
+                        help="A5 address belonging to --runtime-globals")
     args = parser.parse_args()
+
+    if (args.runtime_globals is None) != (args.runtime_a5 is None):
+        parser.error("--runtime-globals and --runtime-a5 must be supplied together")
 
     records = object_records(args.resource_fork)
     if args.compare:
@@ -108,6 +168,18 @@ def main():
               f"{len(model['variable_records']):>7} "
               f"{len(model['groups']):>6} "
               f"{sum(len(group) for group in model['groups']):>4} {selectors}")
+
+    if args.runtime_globals:
+        print("\nruntime LOD tables:")
+        for address, entries, descriptors in runtime_lod_tables(
+                args.runtime_globals.read_bytes(), args.runtime_a5, records):
+            rendered = []
+            for threshold, flags, shared, model in entries:
+                rid, name = descriptors[model]
+                rendered.append(
+                    f"{threshold}:{name}({rid}) flags=0x{flags:04x} "
+                    f"shared=0x{shared:08x}")
+            print(f"0x{address:08x}: " + " -> ".join(rendered))
 
 
 if __name__ == "__main__":

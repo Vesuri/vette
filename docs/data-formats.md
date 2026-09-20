@@ -91,10 +91,31 @@ the eight tail indices into group pointers stored in a 40-byte runtime model des
 `Initialize+$068A` stores `C-4` as the runtime coordinate last index; the meaning of the five
 excluded coordinate records still needs a renderer consumer before it is named.
 
-`C`/`S` car pairs are structurally complex/simple candidates, but distance-based selection is not
-yet proved. For example, `F40C` has 76 coordinate records and 30 variable records while `F40S1`
-has 16 and 9; `Taxi` has 70 and 27 while `TaxiS` has 20 and 10. The size reduction is real. Calling
-it near/far LOD still requires tracing which runtime condition chooses each model.
+### Runtime model LOD tables
+
+The distance-based model selection is now proved at `Main+$4DCE`. The object template points at a
+sequence of 12-byte records:
+
+```
+word  maximum metric (inclusive; -1 is the final fallback)
+word  flags
+long  shared renderer/method descriptor
+long  OBJS runtime descriptor
+```
+
+The routine reads the object's unsigned long metric at object offset `$1E`, takes the first entry
+whose maximum is at least that metric, and advances 12 bytes between entries. Metrics above 65535
+go directly to the `-1` fallback. The live trace in `amiga/objs_lod_runtime.gdb` independently
+records the same table, metric and chosen-model inputs at the routine boundary.
+
+The initialized A5 world contains 20 such tables. Car examples are `1500:Porche -> 2500:P928S ->
+-1:Simplecar`, `1500:F40 -> 2500:F40S1 -> -1:Simplecar`, `1500:GenericC -> 2500:GenericS ->
+-1:Simplecar`, and `1500:Taxi -> 2500:TaxiS -> -1:Simplecar`. Truck-sized objects use 2000/3000
+thresholds and `Simpletruck` as the fallback. This confirms real detailed/medium/simple distance
+LOD, but also corrects the earlier blanket suffix inference: the player-car tables use the full
+`Porche`, `Testa`, `Lambo`, and `F40` resources as their detailed models; unloaded `P928C`,
+`RossaC`, and `F40C` are not selected by these tables. The truck table deliberately names `Truck`
+for both its 2000 and 3000 entries despite loading `TruckS`.
 
 Validate all records and print their structural counts with:
 
@@ -103,3 +124,6 @@ python3 tools/dump_objs.py \
   'tmp/rsrc_VETTE!_VETTE!_Folder_Folder_Color_VETTE!_VETTE!.Data.rsrc' \
   --compare 'tmp/rsrc_VETTE!_VETTE!_Folder_Folder_B&W_VETTE!_VETTE!.Data.rsrc'
 ```
+
+Add `--runtime-globals tmp/objs_runtime_globals.raw --runtime-a5 0x4861f4` (using the A5 printed
+by `amiga/objs_runtime.gdb`) to enumerate the initialized LOD tables by resource name.

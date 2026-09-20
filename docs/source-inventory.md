@@ -179,13 +179,15 @@ named. → `docs/data-formats.md`, `tools/dump_objs.py`.
   `FinishFlag`, `lamppost`, `Wall896`, `SpecialWall1/2`, `barri128`/`barri256`,
   `BigCurve1…5`, `Lmbrd1…3`, `Split`, `QuadSplit`, `OPseg2/3`, `BTunnel1…3`, `booth`, `Hedge`,
   `Bldg1200`, `Bldg600`, `LombardBldg`, `building400x400x600`, `Block1…4`, `Tree`
-- **`S`/`C` suffix pairs** — `F40C`/`F40S1`, `P928C`/`P928S`, `GenericC`/`GenericS`,
+- **Distance-selected model detail** — `F40C`/`F40S1`, `P928C`/`P928S`, `GenericC`/`GenericS`,
   `RossaC`/`RossaS`, `Police`/`PoliceS`, `Taxi`/`TaxiS`, `Truck`/`TruckS`, `Tanker`/`Tankers1`,
   `s55`/`s55BW` — the `C` records are now measured to be substantially more complex than their `S`
-  partners (for example `F40C`: 76 coordinates/30 variable records; `F40S1`: 16/9). This proves
-  **complex/simple model pairs**, not yet the proposed distance-selected near/far LOD. Confirm the
-  runtime selection before using it as a performance fact. Note `s55BW` also hints some models are
-  monochrome-specific.
+  partners (for example `F40C`: 76 coordinates/30 variable records; `F40S1`: 16/9).
+  `Main+$4DCE` now proves 12-byte, metric-thresholded detailed/medium/fallback tables. The important
+  correction is that suffixes alone do not define membership: the live F40 table is
+  `1500:F40 -> 2500:F40S1 -> -1:Simplecar`, while `F40C` is not loaded. Generic, Police, Taxi and
+  Tanker do use their measured complex/simple pairs. See `docs/data-formats.md` for the complete
+  record and the 20 initialized tables. Note `s55BW` also hints some models are monochrome-specific.
 - `GenericC`/`GenericS` come in `Gn`, `red`, `br`, `vlb` colour variants — recoloured traffic.
 
 ## The trap surface — a preliminary FLOOR, not an inventory
