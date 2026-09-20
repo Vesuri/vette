@@ -52,6 +52,7 @@ local regframes = {}  -- 64 KB region -> {first frame, last frame} of any trap f
 local game_order = {}  -- trap keys in order of first call BY THE GAME
 local keep = {}   -- ⚠⚠ see note 4: this is not bookkeeping, it is the tap's owner
 local protection_prompt = false
+local full_intro = os.getenv("VETTE_FULL_INTRO") == "1"
 
 -- ⭐⭐ ARGUMENT CAPTURE.
 --
@@ -632,8 +633,15 @@ mac.run(function()
 	print(string.format("VP launch at frame %d, %d dispatches so far (KEPT)", mac.frames(), n_hits))
 	phase = "launched"
 	launch_frame = mac.frames()
-	mac.wait(90)
-	click(560, 400, 360)     -- first Button poll: leave the intro
+	if full_intro then
+		-- The measured full animation closes its own window about 2 040 frames
+		-- after launch.  Keep a small margin so the next click belongs to the
+		-- garage, not to the intro's Button polling loop.
+		mac.wait(2160)
+	else
+		mac.wait(90)
+		click(560, 400, 360) -- first Button poll: leave the intro
+	end
 	phase = "garage"
 	mac.step("trap run: garage"); mac.shot()
 	click(357, 252, 240)     -- garage ACCEPT

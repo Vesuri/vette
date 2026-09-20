@@ -13,7 +13,8 @@ The report ends with an **exact live-site table**: segment, resource-relative of
 decoded name and call count.  Use that table for static-map cross-checks, not the per-segment
 distinct-site totals.  The standard scripted run clicks out of the intro after 90 frames and sees
 40 Intro sites; an older full-intro capture saw 103, so 40 is only the skip path and must not be
-used as the Intro completeness target.
+used as the Intro completeness target.  Set `VETTE_FULL_INTRO=1` to let the complete animation
+finish before the script continues through the garage.
 
 ⚠⚠ **Stage C correction:** this table accurately describes the captured MAME run, but it is not a
 complete first-use script for the standalone port. The live Amiga loud-stop loop executes several
