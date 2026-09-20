@@ -4506,23 +4506,26 @@ static void refreshDrivingKeyMap()
         // input is synthesized, never position, heading, or collision state.
         bool freeway = (int16_t)read16(s_currentA5 - 0x3764) != 0;
         // The deterministic Course Two traffic stream places 2BRN near
-        // local-u 158 in cell (2,8).  Move to the right half only on its
-        // approach; the same side is crowded by another shipped traffic pack
-        // around cells 20..22.  240..288 still leaves the player's hull clear
-        // of u=384, while the ordinary 128..256 line serves the rest.
+        // local-u 158 in cell (2,8).  Move to the right half only through its
+        // cell, then begin returning to the ordinary line in cell 7.  Extending
+        // the pass through cell 7 can leave the rotated hull pinned at local-u
+        // 259 against the shipped bound beginning at u=384.  The same side is
+        // crowded by another traffic pack around cells 20..22.
         uint16_t cellY = car ? read16(car + 0x40) : 24;
         uint16_t cellX = car ? read16(car + 0x3e) : 2;
-        bool pass2BRN = !freeway && cellY <= 9 && cellY >= 7;
+        bool pass2BRN = !freeway && cellY <= 9 && cellY >= 8;
         // The response-197 curve has connected exits through QUAD 249 at
         // (3,36) or QUAD 251 at (4,37), followed by QUADs 219 and 218 on row
         // 36.  At x=6 the shipped selector changes to 81, whose
         // solid V bands 0..768 and 1280..2048 leave an east/west lane between
         // them.  Follow that source-defined orientation and centre local V;
-        // both branch curve cells use the same heading before the selector-81
-        // straight.  $0000 is east, small positive headings
+        // the connected response-197 curve cells use the same heading before
+        // the selector-81 straight.  $0000 is east, small positive headings
         // move north, and values just below $8000 move south.
-        bool northeastCurve = freeway && (cellX == 3 || cellX == 4) && cellY == 37;
-        bool eastbound = freeway && cellY == 36 && cellX >= 3;
+        bool northeastCurve = freeway &&
+            (((cellX == 3 || cellX == 4) && cellY == 37) ||
+             ((cellX == 4 || cellX == 5) && cellY == 36));
+        bool eastbound = freeway && cellY == 36 && cellX >= 6;
         uint16_t position = eastbound ? localZ : localX;
         uint16_t low = freeway ? 896 : (pass2BRN ? 240 : 128);
         uint16_t high = freeway ? 1152 : (pass2BRN ? 288 : 256);

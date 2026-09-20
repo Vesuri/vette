@@ -1216,6 +1216,20 @@ as the last static response; active traffic was already ahead in `(6,36)` rather
 player. `amiga/driving_freeway_row36.gdb` observes the original cell fields from the garage
 transition and proves this hand-off without a target-side probe.
 
+The apparent straight on row 36 does not begin immediately after that crossing. QUAD 219 at
+`(4,36)` and QUAD 218 at `(5,36)` also select response 197; turning east in QUAD 219 repeatedly
+held the player near local `(857,2042)`. Keeping the ordinary northeast steering through both
+descriptors and enabling the selector-81 lane controller only at x=6 reaches `(6,36)` at tick
+32,475, world `($2FFC,$124A0)`, local V 1184, heading 4123 and speed 32. V=1184 lies inside the
+source-defined 768..1280 opening. The read-only `amiga/driving_freeway_straight.gdb` stops on the
+original cell transition.
+
+The same run also closes a timing-dependent city-route failure. Keeping the right-side `2BRN`
+pass active through cell `(2,7)` could pin the rotated player hull at local `(259,933)` against
+selector 8's solid bound beginning at U=384. Ending the pass after cell 8 lets the ordinary
+southwest correction move the hull off that wall; the successful run then reached the freeway
+and selector 81 without altering traffic or collision state.
+
 The 26-record sightseeing table used by `Main+$3456` was also decoded as a possible source-native
 shortcut. Record 4 is cell `(6,26)`, only six cells from the export-221 transition at `(6,32)`, but
 the documented T command is conditional on Tour Mode. Five ordinary T down/up scans during the
