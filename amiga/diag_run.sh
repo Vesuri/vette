@@ -23,6 +23,7 @@ fsuae_claim_port
   --amiga_model="$MODEL" --chip_memory=2048 --fast_memory=8192 \
   --kickstart_file="$ROM" \
   --hard_drive_0="$DH0" --hard_drive_1="$DH1" \
+  --joystick_port_0=mouse --joystick_port_1=nothing \
   --automatic_input_grab=0 --fullscreen=0 --window_width=720 --window_height=568 \
   $EXTRA_ARGS \
   --remote_debugger=20 --remote_debugger_port="$DEBUG_PORT" --remote_debugger_trigger=Vette \

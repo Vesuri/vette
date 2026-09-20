@@ -154,6 +154,12 @@ layouts in the live driving KeyMap: left/right act as `J`/`L` and keypad `4`/`6`
 ordinary cursor-key EventRecord identity is preserved. Thus Up is throttle, Down is brake, and
 Left/Right steer without requiring a keypad or a menu change.
 
+The supplied FS-UAE launchers explicitly attach the mouse to Amiga port 0 and leave port 1 empty.
+FS-UAE otherwise enables its keyboard-joystick fallback and consumes the host cursor keys before
+the emulated Amiga keyboard can report them. FS-UAE calls the empty-device value `nothing`, not
+`none`. The production launcher also enables automatic input grab; Command-G or the middle mouse
+button releases it.
+
 The shipped Options -> Steering submenu contains four mutually exclusive choices: Numeric keypad,
 Keyboard, Mouse, and Joystick. Mouse is a real driving mode, not the Gravis MouseStick setting:
 the game reads the Macintosh `Mouse` low-memory point for steering and treats the mouse button as

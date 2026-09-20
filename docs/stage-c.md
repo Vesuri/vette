@@ -1059,6 +1059,12 @@ virtual-key bits for each cursor direction; only the selected original mode cons
 EventRecords still carry genuine Macintosh cursor-key codes, so the alias does not corrupt
 non-driving keyboard input.
 
+The first live test still failed before reaching this bridge: FS-UAE's keyboard-joystick fallback
+was consuming the host cursor cluster. The launch script attempted to disable both ports with the
+undocumented value `none`; the supported empty-device value is `nothing`. Production and debugger
+launchers now use `joystick_port_0=mouse` and `joystick_port_1=nothing`, preserving the physical
+mouse while delivering cursor keys through the Amiga keyboard interrupt.
+
 The manual and `MENU` 126 establish that Mouse is a shipped steering mode, separate from both
 Keyboard and Joystick. Its menu handler sets A5-$5316; Main+$2BC8 reads `Mouse.h` at Page-0 $0832
 for steering, while `Traffic+$6D24` reads `MBState` at $0172 and uses a pressed button as the

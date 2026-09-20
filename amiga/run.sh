@@ -45,12 +45,15 @@ export FSEMU_SCREENSHOTS_DIR="$SHOTS"
 fsuae_stop_previous
 # After the exec this shell IS fs-uae, so record $$ as the emulator pid.
 fsuae_track_self
+# Port 0 remains the real Amiga mouse.  Port 1 must be "nothing" (FS-UAE's
+# documented spelling), otherwise its keyboard-joystick fallback consumes the
+# host cursor keys before they can become Amiga keyboard events.
 exec "$FSUAE" \
   --amiga_model="$MODEL" \
   --chip_memory=2048 --fast_memory=8192 \
   --kickstart_file="$ROM" \
   --hard_drive_0="$DH0" --hard_drive_1="$DH1" \
-  --joystick_port_0=none --joystick_port_1=none \
-  --automatic_input_grab=0 --fullscreen=0 --window_width=720 --window_height=568 \
+  --joystick_port_0=mouse --joystick_port_1=nothing \
+  --automatic_input_grab=1 --fullscreen=0 --window_width=720 --window_height=568 \
   --ntsc_mode=0 --state_dir="$RUN/state" \
   --screenshots_output_dir="$SHOTS"
