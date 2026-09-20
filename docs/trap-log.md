@@ -9,6 +9,12 @@ MAME, launch → title → intro → garage → vehicle/course selectors → dri
 the headless recipe in `CLAUDE.md`; it writes
 `ref/mame/traps.txt`.
 
+The report ends with an **exact live-site table**: segment, resource-relative offset, trap word,
+decoded name and call count.  Use that table for static-map cross-checks, not the per-segment
+distinct-site totals.  The standard scripted run clicks out of the intro after 90 frames and sees
+40 Intro sites; an older full-intro capture saw 103, so 40 is only the skip path and must not be
+used as the Intro completeness target.
+
 ⚠⚠ **Stage C correction:** this table accurately describes the captured MAME run, but it is not a
 complete first-use script for the standalone port. The live Amiga loud-stop loop executes several
 setup traps absent from, or later in, this ordering (`InitGraf`, `TEInit`, `InitDialogs`,

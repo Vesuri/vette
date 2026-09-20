@@ -137,7 +137,16 @@ local function on_trap()
 		local sc = segcount[mine.name]
 		if not sc then sc = {n = 0, sites = {}, seg = mine.seg}; segcount[mine.name] = sc end
 		sc.n = sc.n + 1
-		sc.sites[pc] = (sc.sites[pc] or 0) + 1
+		local site = sc.sites[pc]
+		if not site then
+			site = {count = 0, word = w, offset = pc - mine.base}
+			sc.sites[pc] = site
+		elseif site.word ~= w or site.offset ~= pc - mine.base then
+			-- A caller word changing while resident would invalidate a static map:
+			-- make that visible instead of silently retaining either observation.
+			site.changed = true
+		end
+		site.count = site.count + 1
 		if not c.game_first then
 			c.game_first = {frame = mac.frames(), phase = phase,
 				at = string.format("%s+%04X", mine.name, pc - mine.base)}
@@ -531,6 +540,25 @@ local function report()
 	end
 	p(string.format("VP    %d of %d RAM dispatches are the GAME's; the other %d are the System"
 		.. " calling traps on its behalf", tot, n_ram, n_ram - tot))
+	p("")
+	p("VP ---- exact live trap sites (stable input for the static-map cross-check) ----")
+	p(string.format("VP %-14s %6s %4s %-18s %9s %s",
+		"segment", "offset", "word", "name", "calls", "notes"))
+	for _, nm in ipairs(segnames) do
+		local sc, pcs = segcount[nm], {}
+		for pc in pairs(sc.sites) do pcs[#pcs + 1] = pc end
+		table.sort(pcs, function(a, b)
+			local sa, sb = sc.sites[a], sc.sites[b]
+			return sa.offset == sb.offset and a < b or sa.offset < sb.offset
+		end)
+		for _, pc in ipairs(pcs) do
+			local site = sc.sites[pc]
+			local trapname = name(site.word)
+			p(string.format("VP %-14s +%04X %04X %-18s %9d %s",
+				nm, site.offset, site.word, trapname, site.count,
+				site.changed and "TRAP WORD CHANGED" or ""))
+		end
+	end
 	-- ⚠⚠ Do the mapped ranges overlap?  If they do, a PC in the overlap is
 	-- attributed to whichever segment is scanned first and the number is a lie.
 	for i = 1, #bases do
