@@ -313,6 +313,32 @@ uses D6 for the recovery window and D7 as the `_GetPicture` ID at `Main+$0FD6`; 
 PICT 140 40 Macintosh ticks after the recorded bounds hit. Thus selector 63 / record 0 is the Lake
 Merced water recovery, not an ordinary solid-edge response.
 
+Static disassembly groups the complete contiguous export range without guessing place names:
+
+| exports | proved response family |
+|---:|---|
+| 197 | derives a correction vector from the current MAPS/QUAD cell and marks the common displacement response |
+| 198..205 | fixed-coordinate or fixed-offset relocation; 202/203 also select `Main_Map` |
+| 206 | sets only the common collision-side override flag |
+| 207..210 | fixed relocation, with 207 selecting `Freeway_Map` and 208/209 selecting `Main_Map` |
+| 211 | changes driving/event state and conditionally enters the shared event response at `Traffic+$52A6` |
+| 212..213 | fixed relocation selecting `Freeway_Map` |
+| 214 | starts the timed impact/spin response, resets motion/control fields, and plays the reached sound |
+| 215..217 | conditional boundary crossings between `Main_Map` and `Freeway_Map` |
+| 218..219 | install fixed five-unit correction vectors while on `Main_Map` |
+| 220..222 | fixed or conditional map-boundary relocation |
+| 223..224 | conditionally change event state through `Traffic+$52A6` |
+| 225 | conditional map-boundary relocation |
+| 226..227 | clamp A5-$268E to a minimum of -60 under their respective conditions |
+| 228 | local-coordinate gate which calls export 229 only beyond `u+v > 2048` |
+| 229 | stop driving and show the PICT-140 recovery window |
+| 230..231 | fixed relocation to `Main_Map` / `Freeway_Map` respectively |
+
+This is deliberately a behavior-family map, not a geographic-name table. Only export 229 has a
+reproducible place-specific identification so far. `dump_quad.py --runtime-globals ...` prints all
+44 special-table slots as `selector:ordinal -> export`, including the repeated uses of exports
+200, 201, 214, 218, 227, and 228.
+
 This corrects an earlier false negative: searching for reads of the A5-$2500 cached header copy
 proved only that the copy is dead, not that QUAD header 1 is dead. The real consumer deliberately
 rereads the descriptor. Runtime capture shows all 108 selectors are valid initialized lists; the

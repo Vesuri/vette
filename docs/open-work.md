@@ -7,11 +7,12 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — current compatibility boundary
 
-⭐ **HEAD OF QUEUE: finish the driving-data behavior map.**
-The QUAD/MAPS road surface and static-bounds structures, the `COLL` moving-object hulls, and the
-Lake Merced recovery response are proved. Decode the remaining packed MAPS road word and group the
-other 34 special static-impact handlers by shipped behavior, then continue through moving-object
-collision response. Name fields only from their consumers or a reproducible live route. →
+⭐ **HEAD OF QUEUE: decode moving-object collision response.**
+The MAPS packed road word and all 35 QUAD static-impact handlers are now grouped by shipped
+behavior. `COLL` proves how each object's angle-indexed hull is constructed and
+`Traffic+$033A/$037E` proves the overlap test; trace the callers beyond a hit to identify the
+separation, damage, and traffic-state response fields. Name fields only from their consumers or a
+reproducible live route. →
 `docs/data-formats.md`, `docs/stage-c.md`.
 
 ## ⭐⭐ TARGET 1 — the complete intro, run by the game's own code — COMPLETE
@@ -72,8 +73,8 @@ implementation when a real path needs it, rather than weakening the audit or spe
     (`docs/source-inventory.md`); the formats are not. `PERF` now has a proved 37-word race-template
     prefix; its remaining 17 words are unreferenced dead data in both v1.02 executables.
     `OBJS`, `QUAD`, the outer `MAPS` grids, and `COLL` are now decoded; the QUAD-selected static
-    bounds and Lake Merced response are closed. Continue through the remaining packed MAPS road
-    word and the other static/dynamic collision responses. ⚠ Do this against
+    bounds, packed road word, Lake Merced response, and all other static response families are
+    closed. Continue through moving-object collision response. ⚠ Do this against
     the `load` segment's disassembly, not by pattern-guessing — RoF's postmortem §1.2 is about
     exactly this.
 2. **Explain `FRED`** — 6.5 KB in both builds, name says nothing. ⭐ New evidence, and it is a

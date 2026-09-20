@@ -163,6 +163,9 @@ def main():
         print(f"runtime collision responses: rectangles={len(responses)} "
               f"handlers={len({handler for _locations, handler in responses})} "
               f"jump-exports={sorted({handler for _locations, handler in responses})}")
+        for index, (locations, handler) in enumerate(responses):
+            where = ",".join(f"{selector}:{ordinal}" for selector, ordinal in locations)
+            print(f"  response={index:>2} bounds={where:<6} export={handler}")
 
 
 if __name__ == "__main__":
