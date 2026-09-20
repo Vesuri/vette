@@ -1198,6 +1198,15 @@ not a coordinate prediction. `amiga/driving_freeway_after_bend.gdb` distinguishe
 breakpoint from the runner's wall-time interrupt with an explicit hit flag and reports player
 state through the stable A5 global; `amiga/driving_freeway_bend.gdb` uses the same scheme.
 
+The first freeway diagnostic controller incorrectly treated QUAD 220 as another vertical lane. It
+therefore fought response 197 and took 7,815 ticks to crawl diagonally from `(3,37)` into the
+QUAD-249 branch. The decoded map proves that `(3,37)` is a northeast curve with a second connected
+exit through QUAD 251 at `(4,37)`. Holding only the ordinary keypad steering toward heading
+`$1000` in that cell reaches QUAD 251 at tick 24,514, world `($2000,$12A20)`, heading 4074 and
+speed 10. That is 1,542 ticks earlier than the old route reached QUAD 249. On row 36 the controller
+then uses selector 81's shipped solid bands—V `0..768` and `1280..2048`—to centre the open
+`768..1280` east/west lane while steering east. No gameplay field is written directly.
+
 The 26-record sightseeing table used by `Main+$3456` was also decoded as a possible source-native
 shortcut. Record 4 is cell `(6,26)`, only six cells from the export-221 transition at `(6,32)`, but
 the documented T command is conditional on Tour Mode. Five ordinary T down/up scans during the

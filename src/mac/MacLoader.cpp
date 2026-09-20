@@ -4497,6 +4497,7 @@ static void refreshDrivingKeyMap()
         uint8_t* car = (uint8_t*)read32(s_currentA5 - 13944);
         uint16_t heading = car ? read16(car + 0x66) : 0x2000;
         uint16_t localX = car ? (uint16_t)(read32(car) & 0x7ff) : 192;
+        uint16_t localZ = car ? (uint16_t)(read32(car + 8) & 0x7ff) : 1024;
         // Main-map cells (2,7)..(2,22) have the source-defined static bound
         // (v=0,u=384)-(v=2048,u=2048), leaving the 0..383 corridor.  After
         // export 212 switches maps, freeway QUAD 120 selects bounds list 71:
@@ -4510,10 +4511,28 @@ static void refreshDrivingKeyMap()
         // around cells 20..22.  240..288 still leaves the player's hull clear
         // of u=384, while the ordinary 128..256 line serves the rest.
         uint16_t cellY = car ? read16(car + 0x40) : 24;
+        uint16_t cellX = car ? read16(car + 0x3e) : 2;
         bool pass2BRN = !freeway && cellY <= 9 && cellY >= 7;
+        // The response-197 curve has connected exits through QUAD 249 at
+        // (3,36) or QUAD 251 at (4,37), followed by QUADs 219 and 218 on row
+        // 36.  At x=6 the shipped selector changes to 81, whose
+        // solid V bands 0..768 and 1280..2048 leave an east/west lane between
+        // them.  Follow that source-defined orientation and centre local V;
+        // the three curve cells use the same heading so steering unwinds before
+        // the selector-81 straight.  $0000 is east, small positive headings
+        // move north, and values just below $8000 move south.
+        bool northeastCurve = freeway && cellX == 3 && cellY == 37;
+        bool eastbound = freeway && cellY == 36 && cellX >= 3;
+        uint16_t position = eastbound ? localZ : localX;
         uint16_t low = freeway ? 896 : (pass2BRN ? 240 : 128);
         uint16_t high = freeway ? 1152 : (pass2BRN ? 288 : 256);
-        uint16_t target = localX > high ? 0x2300 : (localX < low ? 0x1d00 : 0x2000);
+        uint16_t target;
+        if (northeastCurve)
+            target = 0x1000;
+        else if (eastbound)
+            target = position > high ? 0x0300 : (position < low ? 0x7d00 : 0x0000);
+        else
+            target = position > high ? 0x2300 : (position < low ? 0x1d00 : 0x2000);
         int32_t headingError = (int32_t)heading - target;
         if (headingError > 0x4000) headingError -= 0x8000;
         if (headingError < -0x4000) headingError += 0x8000;
