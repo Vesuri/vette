@@ -1051,18 +1051,21 @@ difficulty choices and their hit regions untouched.
 ### Modern keyboard aliases and deferred mouse steering
 
 The original key chart assigns Keyboard-mode steering/acceleration/braking to `J`/`L`, `I`, and
-`M`, but assigns no driving action to the Macintosh cursor keys. The Amiga bridge therefore aliases
-its cursor-left/right/up/down raw keys to those four virtual letter positions in the live `KeyMap`.
-Their EventRecords still carry genuine Macintosh cursor-key codes, so the alias does not corrupt
+`M`, and Numeric-keypad mode to `4`/`6`, `8`, and `2`, but assigns no driving action to the
+Macintosh cursor keys. The shipped default proved to be Numeric keypad: a live driving trace had
+A5-$5310 set and A5-$5312/$5316/$5314 clear. The earlier cursor alias supplied only `J/L/I/M`, so
+the selected numeric callback correctly ignored it. The Amiga bridge now sets both corresponding
+virtual-key bits for each cursor direction; only the selected original mode consumes one set.
+EventRecords still carry genuine Macintosh cursor-key codes, so the alias does not corrupt
 non-driving keyboard input.
 
 The manual and `MENU` 126 establish that Mouse is a shipped steering mode, separate from both
 Keyboard and Joystick. Its menu handler sets A5-$5316; Main+$2BC8 reads `Mouse.h` at Page-0 $0832
 for steering, while `Traffic+$6D24` reads `MBState` at $0172 and uses a pressed button as the
 accelerator. The game installs one steering routine at a time, so the modes retain their original
-mutually exclusive semantics. The standalone port now leaves the shipped Keyboard default active,
-making the cursor aliases available immediately; unrelated keyboard commands remain live if Mouse
-is selected from the menu.
+mutually exclusive semantics. The standalone port leaves the shipped Numeric-keypad default active;
+the dual cursor aliases make it usable on a modern keyboard while also surviving an explicit switch
+to Keyboard mode. Unrelated keyboard commands remain live if Mouse is selected from the menu.
 
 `Main+$2BC8` is the executable offset after the segment header. The resident `CODE 1` blob retains
 that four-byte header, so the corresponding raw patch address is `$2BCC`. Using `$2BC8` made the

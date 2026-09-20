@@ -147,11 +147,12 @@ Chapter 9 (pp. 29-30) and `KeyChart.jpg` agree:
 
 The B&W-only horizon and wireframe toggles are `V` and `W`.
 
-The standalone Amiga port aliases the cursor cluster to the Keyboard layout in the live driving
-KeyMap: left/right act as `J`/`L`, and up/down act as `I`/`M`. The original game assigns no driving
-action to the Macintosh cursor keys. Their ordinary key-event identity is preserved; the alias
-applies only to the continuously polled driving state. The shipped Keyboard mode remains the
-standalone port's default, so Up is throttle, Down is brake, and Left/Right steer.
+The original game defaults to Numeric keypad steering and assigns no driving action to the
+Macintosh cursor keys. The standalone Amiga port aliases each cursor key to both equivalent
+layouts in the live driving KeyMap: left/right act as `J`/`L` and keypad `4`/`6`; up/down act as
+`I`/`M` and keypad `8`/`2`. Only the currently selected original mode consumes one set. Their
+ordinary cursor-key EventRecord identity is preserved. Thus Up is throttle, Down is brake, and
+Left/Right steer without requiring a keypad or a menu change.
 
 The shipped Options -> Steering submenu contains four mutually exclusive choices: Numeric keypad,
 Keyboard, Mouse, and Joystick. Mouse is a real driving mode, not the Gravis MouseStick setting:
