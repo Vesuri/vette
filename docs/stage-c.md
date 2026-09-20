@@ -1064,6 +1064,11 @@ game installs one steering routine at a time, so this retains its original mutua
 semantics: the cursor aliases drive only after Keyboard is selected from the menu, while unrelated
 keyboard commands remain live in Mouse mode.
 
+`Main+$2BC8` is the executable offset after the segment header. The resident `CODE 1` blob retains
+that four-byte header, so the corresponding raw patch address is `$2BCC`. Using `$2BC8` made the
+byte verification reject every clean build before `%A5Init`; a clean FS-UAE probe now reaches the
+intro with live animation, audio, and frame presentation.
+
 Enabling it exposed another Page-0 dependency rather than licensing direct access to Amiga low
 memory. Six original centre-coordinate writes and the four reached Mouse/MBState reads are
 byte-verified and rewritten, at identical instruction width, to a private sixteen-byte prefix below

@@ -552,16 +552,18 @@ static bool redirectLowMemoryGlobals(uint8_t* a5)
         write16(instruction, 0x3b7c);       // MOVE.W #$00C8,d16(A5)
         write16(instruction + 4, (uint16_t)mouseWrites[i].shadow);
     }
-    if (read16(vette_code_1 + 0x2bc8) != 0x3038
-        || read16(vette_code_1 + 0x2bca) != 0x0832
+    // Main+$2BC8 is an executable offset; the embedded CODE resource retains
+    // its four-byte segment header, so its raw byte offset is $2BCC.
+    if (read16(vette_code_1 + 0x2bcc) != 0x3038
+        || read16(vette_code_1 + 0x2bce) != 0x0832
         || read16(vette_code_6 + 0x6cea) != 0x3038
         || read16(vette_code_6 + 0x6cec) != 0x0830
         || read16(vette_code_6 + 0x6d04) != 0x4a38
         || read16(vette_code_6 + 0x6d06) != 0x0172
         || read16(vette_code_6 + 0x6d24) != 0x4a38
         || read16(vette_code_6 + 0x6d26) != 0x0172) return false;
-    write16(vette_code_1 + 0x2bc8, 0x302d); // MOVE.W shadowMouseH(A5),D0
-    write16(vette_code_1 + 0x2bca, (uint16_t)kShadowMouseH);
+    write16(vette_code_1 + 0x2bcc, 0x302d); // MOVE.W shadowMouseH(A5),D0
+    write16(vette_code_1 + 0x2bce, (uint16_t)kShadowMouseH);
     write16(vette_code_6 + 0x6cea, 0x302d); // MOVE.W shadowMouseV(A5),D0
     write16(vette_code_6 + 0x6cec, (uint16_t)kShadowMouseV);
     write16(vette_code_6 + 0x6d04, 0x4a2d); // TST.B shadowMBState(A5)
