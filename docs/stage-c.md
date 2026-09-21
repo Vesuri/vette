@@ -1203,6 +1203,16 @@ Deactivate, Set, or Purge call. This is consistent with the `horn` INST's author
 replaces it. The observed run did exactly that when instrument 9 replaced it at iteration 57; no
 port-authored horn trigger or stop is required.
 
+`amiga/driving_audio_heli.gdb` covers a complete principal-view audio transition through physical
+keys rather than changing Bogas state directly. The diagnostic presses the documented F4 control;
+the shipped handler at `Main+$2F5A` replaces context 0's engine with indefinite instrument 5
+(`heli`) at 16.16 pitch `$00020000`. It then presses F2; `Main+$2F76` loads indefinite instrument 4
+(`engine`) at pitch `$00006978`. On return from that original wrapper, context 0 is playing the
+engine on its centred AUD0/1 pair at the corresponding Paula period 774. Thus helicopter ambience
+and engine sound are mutually exclusive users of the source's context 0, while contexts 1 and 2
+remain available for overlapping effects. The regression reaches both calls by driving iterations
+2 and 4 and does not patch a view, instrument, or audio context.
+
 The protection-failure police path is covered without restoring the deliberately unsupported modal
 requester. The diagnostic `FAIL_PROTECTION=1` replacement reproduces the two words left by the
 original second-wrong-answer branch at `Main+$0868`: both the processed flag at A5-$58FE and failed

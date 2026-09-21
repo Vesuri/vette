@@ -146,8 +146,10 @@ is consequently renumbered.
    on context 1, its INST declares the sustain loop 1428..4989, and key release makes no second
    Bogas call. The failed-protection checkpoint now covers `police`: the exact original two-wrong-
    answer state reaches Traffic's source-defined two-minute threshold and loads looping instrument
-   12 indefinitely on context 1. Continue with short source checkpoints for environment and result audio,
-   including concurrent playback and transitions.
+   12 indefinitely on context 1. The documented F4/F2 view transition now proves `heli` replaces
+   `engine` in context 0 and the forward view restores the centred engine voice, while both effect
+   contexts remain independent. Continue with short source checkpoints for result audio and the
+   remaining environment cues, including concurrent playback and transitions.
 6. **Automate fidelity regressions.** Keep intro and driving framebuffer differentials, palette
    checks, clean-build audits, and eventually basic audio comparisons reproducible.
 

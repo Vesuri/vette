@@ -176,6 +176,12 @@ ifdef INPUT_PROBE_EVENT_RAW_KEY
 EXTRA_DEFINES += -DVETTE_INPUT_PROBE_EVENT_RAW_KEY=$(INPUT_PROBE_EVENT_RAW_KEY)
 endif
 
+# Diagnostic only: select helicopter view through a physical F4 edge, then
+# return to the forward view through F2, to cover context-0 audio replacement.
+ifeq ($(VIEW_AUDIO_PROBE),1)
+EXTRA_DEFINES += -DVETTE_VIEW_AUDIO_PROBE
+endif
+
 # Diagnostic only: pulse the documented Z horn control for one driving KeyMap
 # scan after the countdown and initial acceleration, then release it through
 # the next ordinary scan.

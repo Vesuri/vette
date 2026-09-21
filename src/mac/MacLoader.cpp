@@ -5005,6 +5005,28 @@ extern "C" void vetteMacRawKeyChanged(uint8_t rawKey, bool down)
 
 static void updateDrivingInputProbe()
 {
+#ifdef VETTE_VIEW_AUDIO_PROBE
+    // Drive the shipped view handlers through ordinary physical key edges.
+    // F4 replaces the context-0 engine with the helicopter ambience; F2 must
+    // then restore the engine. Keep every edge across an original iteration.
+    static uint8_t viewAudioPhase;
+    static uint32_t viewAudioIteration;
+    if (s_drivingFrameStarted && viewAudioPhase == 0) {
+        viewAudioIteration = g_macDrivingIterations;
+        vetteInputInjectProbeKey(0x53, true);  // physical F4
+        viewAudioPhase = 1;
+    } else if (viewAudioPhase == 1 && g_macDrivingIterations > viewAudioIteration) {
+        vetteInputInjectProbeKey(0x53, false);
+        viewAudioIteration = g_macDrivingIterations;
+        viewAudioPhase = 2;
+    } else if (viewAudioPhase == 2 && g_macDrivingIterations > viewAudioIteration) {
+        vetteInputInjectProbeKey(0x51, true);  // physical F2
+        viewAudioPhase = 3;
+    } else if (viewAudioPhase == 3 && g_macDrivingIterations > viewAudioIteration + 1) {
+        vetteInputInjectProbeKey(0x51, false);
+        viewAudioPhase = 4;
+    }
+#endif
 #ifdef VETTE_POLICE_PROBE
     // Traffic+$0E40 waits $1C20 ticks from Main's race-start timestamp before
     // failed protection forces the cop path. Age only that timestamp once,
