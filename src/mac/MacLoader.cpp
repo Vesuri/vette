@@ -1308,14 +1308,20 @@ static BogasInstrument* bogasInstrument(uint16_t ordinal)
         source += 8;
         size -= 8;
     }
-    uint32_t allocated = (size + 1) & ~1UL;
+    // Reserve one aligned silent word after every sample. Paula always reloads
+    // a DMA voice; non-looped Bogas instruments point that reload at this word
+    // instead of accidentally repeating their complete PCM body forever.
+    uint32_t silentOffset = (size + 1) & ~1UL;
+    uint32_t allocated = silentOffset + 2;
     if (!size || allocated > 131070UL) return 0;
     instrument.chipData = (uint8_t*)AllocMem(allocated, MEMF_CHIP);
     if (!instrument.chipData) return 0;
     instrument.size = size;
     instrument.basePeriod = sampleRate ? vette_divu16(3546895UL, sampleRate) : 319;
     for (uint32_t i = 0; i < size; ++i) instrument.chipData[i] = source[i] ^ 0x80;
-    if (allocated != size) instrument.chipData[size] = 0;
+    if (silentOffset != size) instrument.chipData[size] = 0;
+    instrument.chipData[silentOffset] = 0;
+    instrument.chipData[silentOffset + 1] = 0;
     return &instrument;
 }
 
@@ -1339,8 +1345,8 @@ static void stopBogasVoice(uint16_t channel)
     *(volatile uint16_t*)(audio + 8) = 0;
 }
 
-static uint8_t* s_bogasPendingLoopData[4];
-static uint16_t s_bogasPendingLoopWords[4];
+static uint8_t* s_bogasPendingReloadData[4];
+static uint16_t s_bogasPendingReloadWords[4];
 
 static void startBogasVoice(uint16_t ordinal, uint16_t channel,
                             uint16_t period, uint16_t volume)
@@ -1357,18 +1363,19 @@ static void startBogasVoice(uint16_t ordinal, uint16_t channel,
     *dmaconPointer = (uint16_t)(DMAF_SETCLR | DMAF_MASTER | dma);
 
     // Paula latches the initial location/length when DMA starts. On the next
-    // safe Line-A boundary replace its reload registers with the INST loop;
-    // the complete attack still plays once, then later DMA reloads use only
-    // the source-declared sustain range.
-    s_bogasPendingLoopData[channel] = 0;
-    s_bogasPendingLoopWords[channel] = 0;
+    // safe Line-A boundary replace its reload registers with the INST loop or
+    // a reserved silent word. The complete attack still plays once; later DMA
+    // reloads use only the authored sustain range, or silence for a one-shot.
+    uint32_t silentOffset = (instrument->size + 1) & ~1UL;
+    s_bogasPendingReloadData[channel] = instrument->chipData + silentOffset;
+    s_bogasPendingReloadWords[channel] = 1;
     if (instrument->loopEnd > instrument->loopStart
         && instrument->loopEnd <= instrument->size) {
         uint16_t loopStart = (uint16_t)(instrument->loopStart & ~1U);
         uint16_t loopBytes = (uint16_t)((instrument->loopEnd - loopStart) & ~1U);
         if (loopBytes >= 2) {
-            s_bogasPendingLoopData[channel] = instrument->chipData + loopStart;
-            s_bogasPendingLoopWords[channel] = (uint16_t)(loopBytes / 2);
+            s_bogasPendingReloadData[channel] = instrument->chipData + loopStart;
+            s_bogasPendingReloadWords[channel] = (uint16_t)(loopBytes / 2);
         }
     }
 }
@@ -1397,8 +1404,8 @@ static void stopBogasAudio()
     for (uint16_t channel = 0; channel < 4; ++channel) {
         stopBogasVoice(channel);
         s_bogasVoiceEndTick[channel] = 0;
-        s_bogasPendingLoopData[channel] = 0;
-        s_bogasPendingLoopWords[channel] = 0;
+        s_bogasPendingReloadData[channel] = 0;
+        s_bogasPendingReloadWords[channel] = 0;
     }
     for (uint16_t i = 0; i < 3; ++i) s_bogasContexts[i].playing = false;
     s_bogasStarted = false;
@@ -1411,8 +1418,8 @@ static void suspendBogasAudio()
     if (!s_bogasStarted || s_bogasSuspended) return;
     for (uint16_t channel = 0; channel < 4; ++channel) {
         stopBogasVoice(channel);
-        s_bogasPendingLoopData[channel] = 0;
-        s_bogasPendingLoopWords[channel] = 0;
+        s_bogasPendingReloadData[channel] = 0;
+        s_bogasPendingReloadWords[channel] = 0;
     }
     // BGAS Stop/Deactivate inhibit output without freeing its three voice
     // records or their sample positions.  Keep the corresponding Paula-side
@@ -1449,12 +1456,12 @@ static void serviceBogasAudio()
 {
     if (!s_bogasStarted || s_bogasSuspended) return;
     for (uint16_t channel = 0; channel < 4; ++channel) {
-        if (!s_bogasPendingLoopData[channel]) continue;
+        if (!s_bogasPendingReloadData[channel]) continue;
         volatile uint8_t* audio = (volatile uint8_t*)(0xdff0a0UL + channel * 16);
-        *(volatile uint32_t*)(audio + 0) = (uint32_t)s_bogasPendingLoopData[channel];
-        *(volatile uint16_t*)(audio + 4) = s_bogasPendingLoopWords[channel];
-        s_bogasPendingLoopData[channel] = 0;
-        s_bogasPendingLoopWords[channel] = 0;
+        *(volatile uint32_t*)(audio + 0) = (uint32_t)s_bogasPendingReloadData[channel];
+        *(volatile uint16_t*)(audio + 4) = s_bogasPendingReloadWords[channel];
+        s_bogasPendingReloadData[channel] = 0;
+        s_bogasPendingReloadWords[channel] = 0;
     }
     for (uint16_t contextIndex = 1; contextIndex < 3; ++contextIndex) {
         BogasContext& context = s_bogasContexts[contextIndex];

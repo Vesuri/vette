@@ -40,8 +40,11 @@ class Voice:
     phase: float = 0.0
     attack: bool = True
     end_tick: int = 0
+    finished: bool = False
 
     def sample(self, output_rate):
+        if self.finished:
+            return 0
         index = int(self.phase)
         value = self.instrument.pcm[index]
         self.phase += PAULA_CLOCK / (self.period * output_rate)
@@ -52,7 +55,7 @@ class Voice:
                 length = self.instrument.loop_end - self.instrument.loop_start
                 self.phase = self.instrument.loop_start + (self.phase - size) % length
             else:
-                self.phase %= size
+                self.finished = True
         elif not self.attack:
             start = self.instrument.loop_start
             end = self.instrument.loop_end

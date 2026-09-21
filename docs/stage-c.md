@@ -1105,8 +1105,11 @@ starts from the complete PCM body; at the next safe trap boundary the bridge cha
 reload location and length. The attack therefore plays once and subsequent hardware reloads repeat
 the source-declared sustain region. The Engine resource verifies as bytes 370..5682; its INST rate
 would be Paula period 554 for a direct context, while context 0 correctly uses the 11.127 kHz mixer
-base before applying the phase step. Instruments with zero loop bounds naturally repeat their complete
-body until the original Bogas Load duration expires.
+base before applying the phase step. Instruments with zero loop bounds play their complete body
+only once, then reload a reserved silent word until the original Bogas context is replaced or
+its Load duration expires. This matters for calls such as `splash`, whose context can outlive the
+visible scene: whole-body Paula reload would otherwise loop the splash after returning to the
+garage.
 
 `amiga/bogas_lifecycle.gdb` covers the administrative wrappers separately. An ordinary, unskipped
 intro reaches `BogasClose` and `BogasPurge(300)` together at tick 90 during initialization, then
