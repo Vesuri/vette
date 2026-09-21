@@ -8,8 +8,7 @@
 	move.l	0(a2,d0.l*4),\result
 	moveq	#0,d0
 	move.w	(a0)+,d0
-	move.l	0(a2,d0.l*4),d4
-	lsr.l	#4,d4
+	move.l	0(a6,d0.l*4),d4
 	or.l	d4,\result
 	.endm
 
@@ -38,20 +37,21 @@
 | 68020 scaled long index here instead of shifting and adding each table
 | address by hand; this is the only 68020-only port assembly.
 vetteC2PRectAsm:
-	movem.l	d2-d7/a2-a5,-(sp)
-	move.l	44(sp),a3
-	move.l	48(sp),a4
-	move.l	52(sp),a2
+	movem.l	d2-d7/a2-a6,-(sp)
+	move.l	48(sp),a3
+	move.l	52(sp),a4
+	move.l	56(sp),a2
+	lea	262144(a2),a6
 	| GCC reserves a four-byte argument slot for uint16_t; on big-endian 68k
 	| the value occupies its low word. Dirty spans make groups even.
-	movea.w	62(sp),a5
+	movea.w	66(sp),a5
 	tst.l	a5
 	beq	9f
 
 0:
 	move.l	a3,a0
 	move.l	a4,a1
-	move.w	58(sp),d3
+	move.w	62(sp),d3
 	move.w	d3,d7
 	and.w	#2,d3			| one 16-pixel tail after 32-pixel batches?
 	lsr.w	#2,d7			| number of 32-pixel batches
@@ -105,5 +105,5 @@ vetteC2PRectAsm:
 	move.l	a5,d0
 	bne	0b
 9:
-	movem.l	(sp)+,d2-d7/a2-a5
+	movem.l	(sp)+,d2-d7/a2-a6
 	rts

@@ -66,7 +66,9 @@ is consequently renumbered.
    and identified presentation as 80.353% of the first moving-driving baseline. After removing a
    fully overwritten synchronization copy, adding the packed word-write C2P kernel, and deriving a
    dirty list from the driving renderer, a four-pixel/256-KiB fast-RAM lookup now halves the
-   kernel's table reads. Its assembly/C verifier covers 2,748,000 bytes with zero failures and the
+   kernel's table reads. A second 256-KiB pre-shifted copy removes the remaining shift between each
+   lookup pair. Its latest assembly/C verifier covers 2,685,680 bytes with zero failures and improves
+   the controlled C/assembly ratio from 2.521 to 2.798, about 9.9% less kernel time. The
    A1200-scaled-index kernel is verified across 3,243,112 bytes with zero failures. The warmed
    100-field window averages about 302,406 C2P ticks per update, down 18.0% from the prior 368,582,
    28.0% from the first dirty-list kernel's 419,939, and 45.6% from full-frame conversion's
@@ -77,8 +79,9 @@ is consequently renumbered.
    98.6% of that row. The fixed 260-to-256-byte driving publish now has a byte-exact 68000 assembly
    path. Its in-process oracle compared 2,048,000 bytes over 25 calls with zero failures and measured
    it at 2.366 times the C path's speed. The following 300-field profile records about 38,036 ticks
-   per publish and reduces the complete drawing row from 12.342% to 5.554%; C2P is again the largest
-   port-owned row at 41.385%.
+   per publish and reduces the complete drawing row from 12.342% to 5.554%. With the pre-shifted
+   lookup, the following standard profile records 9,766,871 C2P ticks over 35 updates, about 279,053
+   each versus 292,221 immediately before it; C2P remains the largest port-owned row at 40.647%.
    Measure the same synchronized workload on the original Macintosh and set the target from both
    results.
 3. **Fix measured visual discrepancies.** Trace wrong pixels and geometry to their source data or
@@ -89,12 +92,14 @@ is consequently renumbered.
    update, A1200 scaled indexing then cut 18.0%, and rectangle-wide traversal removed another 5.4%
    per update. The fixed 320-row CopyBits publisher is now 2.366 times as fast as its generic-C
    oracle and byte-exact across 25 moving calls; the complete drawing row has fallen from 12.342%
-   to 5.554%. Do not reintroduce the slower rectangle-list publisher. Return to the 41.385% C2P
+   to 5.554%. Do not reintroduce the slower rectangle-list publisher. The pre-shifted lookup then
+   removes another 9.9% from the controlled kernel and 4.5% per update in the standard moving
+   profile, at a further 256 KiB fast-RAM cost. Continue from the remaining 40.647% C2P
    row. The destination split now measures identical conversion at 25,459,010 ticks to chip RAM
    versus 16,977,889 to fast RAM (1.500×) across 106 frames: roughly two-thirds of the work remains
    in transpose/table processing and one-third is the extra chip-write cost. The normalized list
-   covers 63.960% of the surface in 8.981 rectangles per frame. Optimize the transpose/lookup side
-   next without broadening the dirty bounds.
+   covers 63.960% of the surface in 8.981 rectangles per frame. Continue reducing the
+   transpose/lookup side without broadening the dirty bounds.
    Prefer representation and algorithm changes before more assembly; verify every optimization
    against the reference differential and preserve game behavior.
 5. **Finish control fidelity.** Verify keyboard aliases, throttle, brake, steering, gears, mouse

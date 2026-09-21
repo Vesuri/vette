@@ -1432,6 +1432,16 @@ the additional chip-write penalty is about one-third. Post-alignment and lossles
 104,792 pixels per frame, 63.960% of the surface, in 8.981 rectangles per frame. This rules out
 dirty coverage as the first lever and directs the next work back into the transpose/lookup kernel.
 
+That lookup pair formerly required a longword shift for every eight pixels. A second 256 KiB copy
+of the four-pixel table now stores the already-shifted result, so the assembly kernel replaces the
+shift with a lookup at a fixed table offset. This keeps the source, dirty-list geometry, interleaved
+bitplanes, and chip-write pattern unchanged. The C/assembly differential compares 2,685,680 bytes
+with zero failures and improves the controlled ratio from 2.521 to 2.798, equivalent to 9.9% less
+kernel time. The display guard checks 40 consecutive frames and all 320 rows with zero bad pixels.
+In the standard 300-field A1200 profile C2P uses 9,766,871 ticks over 35 updates, about 279,053 per
+update versus 292,221 immediately before the change, and occupies 40.647% of the accounted window.
+The additional table costs 256 KiB of the configured 8 MiB fast RAM.
+
 The differential now has a real moving checkpoint rather than a neutral car with a held
 accelerator. `VETTE_DRIVING_MOTION=1` makes the Macintosh harness wait for a valid full-window
 CopyBits from Vette, latch the application A5 at that trap boundary, wait for countdown state 3,

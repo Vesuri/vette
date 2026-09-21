@@ -273,6 +273,22 @@ byte-exact across 2,684,832 output bytes, but the controlled C/assembly ratio fe
 change was removed. Do not reintroduce write pipelining without a structure that also reduces the
 instruction count.
 
+### 2026-09-21 — pre-shifted C2P lookup
+
+Each eight-pixel result previously loaded two entries from the four-pixel table, shifted the second
+longword right by four, and ORed it into the first. The ordinary build now spends another 256 KiB
+of the configured 8 MiB fast RAM on a second copy whose results are pre-shifted during startup.
+The packed source, dirty rectangles, bitplane layout, and four chip-RAM writes per 32 pixels are
+unchanged; the inner loop simply reads the second half at a fixed table offset and omits the shift.
+
+The in-process C oracle compared 2,685,680 output bytes with zero failures. The controlled
+C/assembly ratio improves from 2.521 to 2.798, which normalizes to 9.9% less kernel time.
+`FILLWATCH=1` checked 40 consecutive frames and every one of their 320 rows with zero bad frames or
+pixels. In the standard 300-field driving profile C2P uses 9,766,871 ticks over 35 updates, about
+279,053 per update versus 292,221 in the preceding 34-update run, a supporting 4.5% reduction.
+C2P remains the largest port-owned row at 40.647%; the complete profile still accounts for exactly
+100% of elapsed beam time.
+
 ## Lessons — measurement
 
 - **Compare FPS row vectors, never a `total painted` line.** A total spans a partial trailing row

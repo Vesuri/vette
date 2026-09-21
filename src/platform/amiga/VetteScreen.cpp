@@ -69,10 +69,10 @@ static uint16_t beamLine()
 static uint32_t s_pairToPlanes[4][256];
 static bool s_pairToPlanesReady = false;
 #ifdef VETTE_C2P_ASM
-// Four packed pixels -> four plane nibbles in the high half of each byte.
-// This 256 KiB fast-RAM table halves lookup traffic in the target kernel;
-// chip-RAM output remains the same four wide writes per 32 pixels.
-static uint32_t s_quadToPlanes[65536];
+// Four packed pixels -> four plane nibbles. The first 256 KiB table places
+// them in each byte's high half; the second is pre-shifted into the low half,
+// removing one long shift from every eight converted pixels.
+static uint32_t s_quadToPlanes[2][65536];
 #endif
 
 static void convertC2PSpanC(const uint8_t* source, uint8_t* destination, uint16_t groups)
@@ -112,10 +112,13 @@ static void initializePairToPlanes()
         }
     }
 #ifdef VETTE_C2P_ASM
-    for (uint32_t high = 0; high < 256; ++high)
-        for (uint32_t low = 0; low < 256; ++low)
-            s_quadToPlanes[(high << 8) | low]
-                = s_pairToPlanes[0][high] | s_pairToPlanes[1][low];
+    for (uint32_t high = 0; high < 256; ++high) {
+        for (uint32_t low = 0; low < 256; ++low) {
+            uint32_t packed = s_pairToPlanes[0][high] | s_pairToPlanes[1][low];
+            s_quadToPlanes[0][(high << 8) | low] = packed;
+            s_quadToPlanes[1][(high << 8) | low] = packed >> 4;
+        }
+    }
 #endif
     s_pairToPlanesReady = true;
 }
@@ -516,12 +519,12 @@ bool VetteScreen::presentMacFrame(const uint8_t* chunky, const uint8_t* colorTab
 #ifdef VETTE_C2P_VERIFY
             uint32_t start = vetteProfileBeamEpoch();
 #endif
-            vetteC2PRectAsm(rectangleSource, rectangleDestination, s_quadToPlanes,
+            vetteC2PRectAsm(rectangleSource, rectangleDestination, s_quadToPlanes[0],
                             groups, (uint16_t)(dirty.bottom - dirty.top));
 #ifdef VETTE_C2P_SPLIT
             g_c2pSplitChipTicks += vetteProfileBeamEpoch() - splitStart;
             splitStart = vetteProfileBeamEpoch();
-            vetteC2PRectAsm(rectangleSource, fastDestination, s_quadToPlanes,
+            vetteC2PRectAsm(rectangleSource, fastDestination, s_quadToPlanes[0],
                             groups, (uint16_t)(dirty.bottom - dirty.top));
             g_c2pSplitFastTicks += vetteProfileBeamEpoch() - splitStart;
             ++g_c2pSplitRects;
