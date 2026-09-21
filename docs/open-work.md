@@ -112,7 +112,8 @@ is consequently renumbered.
    beep2, and crash, and they begin on `BogasLoad` rather than a later `BogasPlay`. Preserve the
    source wrapper's Pascal arguments/results rather than adding scene-specific triggers. Engine,
    beep1, beep2, and crash now reach Paula from those calls using the INST source rates. Next verify
-   the pitch multiplier against reference audio, exact loop points and Load-duration semantics, then
+   the pitch multiplier against reference audio and exact Load-duration semantics (INST loop points
+   are now programmed into Paula's reload registers), then
    cover gear changes, collisions, skids, horns, police, environment, and result audio, including
    concurrent playback and transitions.
 6. **Automate fidelity regressions.** Keep intro and driving framebuffer differentials, palette

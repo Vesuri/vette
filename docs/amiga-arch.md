@@ -269,7 +269,9 @@ Line-A calls which preserve their Pascal stack/results contract. Initialize's ac
 calls build the sixteen-entry instrument table. An indefinite context-0 load starts the centred
 engine pair, subsequent context-0 plays apply the game's live 16.16 pitch stream, and context-2
 loads use the remaining Paula voices for overlapping effects. Short INST headers provide their own
-PCM length and source rate; the bridge converts the latter to a PAL Paula period. This is still an
+PCM length, source rate, and optional loop bounds; the bridge converts the rate to a PAL Paula
+period, plays the attack once, then changes Paula's reload registers to the declared sustain range.
+This is still an
 incremental Bogas backend: intro mixing remains on its proven flag-driven path, and Stop/Purge plus
 all later gameplay cues still require scenario verification. → `docs/source-inventory.md` §Audio.
 ⚠ Inherited placement rule that will apply whatever the backend is: audio work goes **AFTER** the

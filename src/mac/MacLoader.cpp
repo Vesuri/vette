@@ -376,6 +376,8 @@ struct BogasInstrument {
     uint8_t* chipData;
     uint32_t size;
     uint16_t basePeriod;
+    uint16_t loopStart;
+    uint16_t loopEnd;
 };
 static BogasInstrument s_bogasInstruments[16];
 static uint16_t s_bogasInstrumentCount;
@@ -1299,6 +1301,8 @@ static BogasInstrument* bogasInstrument(uint16_t ordinal)
     // source sample rate, PCM byte count. Looped samples legitimately have
     // nonzero first words, so the byte-count field is the structural test.
     if (size > 8 && read16(source + 6) == size - 8) {
+        instrument.loopStart = read16(source);
+        instrument.loopEnd = read16(source + 2);
         sampleRate = read16(source + 4);
         source += 8;
         size -= 8;
@@ -1334,6 +1338,9 @@ static void stopBogasVoice(uint16_t channel)
     *(volatile uint16_t*)(audio + 8) = 0;
 }
 
+static uint8_t* s_bogasPendingLoopData[4];
+static uint16_t s_bogasPendingLoopWords[4];
+
 static void startBogasVoice(uint16_t ordinal, uint16_t channel,
                             uint16_t period, uint16_t volume)
 {
@@ -1347,6 +1354,22 @@ static void startBogasVoice(uint16_t ordinal, uint16_t channel,
     *(volatile uint16_t*)(audio + 6) = period;
     *(volatile uint16_t*)(audio + 8) = volume;
     *dmaconPointer = (uint16_t)(DMAF_SETCLR | DMAF_MASTER | dma);
+
+    // Paula latches the initial location/length when DMA starts. On the next
+    // safe Line-A boundary replace its reload registers with the INST loop;
+    // the complete attack still plays once, then later DMA reloads use only
+    // the source-declared sustain range.
+    s_bogasPendingLoopData[channel] = 0;
+    s_bogasPendingLoopWords[channel] = 0;
+    if (instrument->loopEnd > instrument->loopStart
+        && instrument->loopEnd <= instrument->size) {
+        uint16_t loopStart = (uint16_t)(instrument->loopStart & ~1U);
+        uint16_t loopBytes = (uint16_t)((instrument->loopEnd - loopStart) & ~1U);
+        if (loopBytes >= 2) {
+            s_bogasPendingLoopData[channel] = instrument->chipData + loopStart;
+            s_bogasPendingLoopWords[channel] = (uint16_t)(loopBytes / 2);
+        }
+    }
 }
 
 static uint16_t bogasPeriod(uint16_t basePeriod, uint32_t pitch)
@@ -1372,6 +1395,8 @@ static void stopBogasAudio()
     for (uint16_t channel = 0; channel < 4; ++channel) {
         stopBogasVoice(channel);
         s_bogasVoiceEndTick[channel] = 0;
+        s_bogasPendingLoopData[channel] = 0;
+        s_bogasPendingLoopWords[channel] = 0;
     }
     for (uint16_t i = 0; i < 3; ++i) s_bogasContexts[i].playing = false;
     s_bogasStarted = false;
@@ -1380,6 +1405,14 @@ static void stopBogasAudio()
 static void serviceBogasAudio()
 {
     if (!s_bogasStarted) return;
+    for (uint16_t channel = 0; channel < 4; ++channel) {
+        if (!s_bogasPendingLoopData[channel]) continue;
+        volatile uint8_t* audio = (volatile uint8_t*)(0xdff0a0UL + channel * 16);
+        *(volatile uint32_t*)(audio + 0) = (uint32_t)s_bogasPendingLoopData[channel];
+        *(volatile uint16_t*)(audio + 4) = s_bogasPendingLoopWords[channel];
+        s_bogasPendingLoopData[channel] = 0;
+        s_bogasPendingLoopWords[channel] = 0;
+    }
     for (uint16_t channel = 2; channel < 4; ++channel) {
         if (!s_bogasVoiceEndTick[channel]
             || (int32_t)(g_macTicks - s_bogasVoiceEndTick[channel]) < 0) continue;

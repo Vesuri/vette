@@ -1068,6 +1068,13 @@ original pitch from `$6978` through `$88B8`, and started/expired the observed be
 loads. A separate ordinary-build intro run reached tick 2,638 / 295 presented frames at Stage C
 depth 64 with its original ordinal globals 0..4 and no loud stop.
 
+The loop metadata is now honored as well. When an INST supplies nonempty loop bounds, Paula first
+starts from the complete PCM body; at the next safe trap boundary the bridge changes only the DMA
+reload location and length. The attack therefore plays once and subsequent hardware reloads repeat
+the source-declared sustain region. The Engine resource verifies as bytes 370..5682 at base period
+554 in the bounded A1200 run. Instruments with zero loop bounds naturally repeat their complete
+body until the original Bogas Load duration expires.
+
 The corrected route reaches the Lake Merced water collision and displays the game's own tow-truck
 recovery artwork. A probe on the actual `_GetPicture` trap records PICT 140 at the resident wrapper
 `Traffic+$663C`; that wrapper's saved return identifies the dynamic request at `Main+$0FD6`, with
