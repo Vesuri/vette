@@ -1311,13 +1311,18 @@ post-change capture of the second driving update round-trips all 163,840 chunky 
 actual planar back buffer without one mismatch. This removes 81,920 redundant chip-RAM byte copies
 per full driving update without a scene-specific condition.
 
-The remaining conversion loop now has a 68000 assembly twin that preserves the existing 4 KiB
+The remaining conversion loop has a 68000 assembly twin that preserves the existing 4 KiB
 pixel-pair representation while keeping its four table bases resident in address registers. Its
-in-process oracle differential compares 2,874,776 bytes over 12,123 row spans with zero failures;
-the C/assembly beam-time ratio is 1.302 on the target A1200. The complete presentation row falls
-from 888,137 to 708,861 beam ticks per full conversion in the focused profile, with the usual caveat
-that only the back-to-back kernel ratio is a controlled performance comparison. `C2P_C=1` remains
-the clean-C fallback and `amiga/c2p_verify.gdb` is the regression reader.
+first byte-write form compared 2,874,776 bytes over 12,123 row spans with zero failures and reached
+a 1.302 C/assembly beam-time ratio on the target A1200. Inspection of Mikael Kalms' public-domain
+C2P collection then identified its OCS/ECS word-write strategy as the applicable part: the stock
+routine requires one byte per pixel, and a verified per-row unpack made it 4.7% slower than C.
+Instead, the packed kernel now combines two eight-pixel results in registers and writes four words
+per 16 pixels. Its differential compared another 257,528 bytes with zero failures and improved the
+C/assembly ratio to 1.462, about 11% less kernel time normalized through the same oracle. The
+supporting full-conversion cost falls from 708,861 to 657,557 beam ticks per call (7.2%). Only the
+back-to-back ratio is a controlled comparison. `C2P_C=1` remains the clean-C fallback and
+`amiga/c2p_verify.gdb` is the regression reader.
 
 The 26-record sightseeing table used by `Main+$3456` was also decoded as a possible source-native
 shortcut. Record 4 is cell `(6,26)`, only six cells from the export-221 transition at `(6,32)`, but

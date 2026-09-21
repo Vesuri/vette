@@ -98,6 +98,30 @@ of 1.302. In the matching 100-field full profile, presentation time per full con
 ratio is the controlled kernel result; the advancing-state window is supporting end-to-end evidence,
 not a claimed cross-run speed ratio.
 
+### 2026-09-21 — packed-input Kalms word-write adaptation
+
+The closest stock routine in Mikael Kalms' public-domain collection is
+`special/c2p1x1_4_c5_word`: a four-plane CPU5 converter whose word writes are specifically intended
+for OCS/ECS chip RAM. It does not directly accept this game's pixels, however. Kalms expects one
+byte per pixel and separated planes, while Vette supplies two four-bit pixels per byte and this
+display keeps the four planes 64 bytes apart inside each scanline.
+
+The unmodified shuffle was tested rather than assumed faster. Expanding only each dirty row to an
+8-bit fast-RAM scratch row and then invoking Kalms compared 971,016 plane bytes with the C oracle
+without a mismatch, but used 12,381,373 beam ticks against the oracle's 11,828,747: 4.7% slower
+even before considering a second framebuffer. That exact integration was discarded.
+
+The retained adaptation applies the part that fits the target: Kalms' word-write strategy. The
+packed table kernel now converts 16 pixels per iteration, interleaves the two four-plane byte sets
+in registers, and performs four chip-RAM word writes instead of eight byte writes. It remains
+68000-compatible and requires neither an unpacked surface nor a display-layout change. The
+in-process differential compared 257,528 output bytes with zero failures; the C oracle used
+3,134,605 ticks against assembly's 2,143,492, a ratio of 1.462. Normalized through the same C
+oracle, that is about 11% less kernel time than the previous 1.302-ratio byte writer. In the
+supporting 100-field profile, seven full conversions used 4,602,903 ticks, or 657,557 per call,
+down from 708,861 (7.2%); eight rather than seven advancing updates fit in the window, so only the
+back-to-back ratio is the controlled comparison.
+
 ## Lessons — measurement
 
 - **Compare FPS row vectors, never a `total painted` line.** A total spans a partial trailing row

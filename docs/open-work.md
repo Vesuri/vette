@@ -29,13 +29,16 @@ is consequently renumbered.
    sequences for geometry, object placement, palettes, surface heights, clipping, mirrors, traffic,
    animation, and the principal view modes—not merely one exact initial frame.
 2. **Establish the performance target.** The full-accounting target-A1200 profile is now in place
-   and identifies presentation as 80.353% of the first moving-driving window. Measure the same
-   synchronized workload on the original Macintosh and set the target from both results.
+   and identified presentation as 80.353% of the first moving-driving baseline. After removing a
+   fully overwritten synchronization copy and adding the packed word-write C2P kernel, the focused
+   100-field window attributes 57.692% to C2P plus palette and zero to synchronization. Measure the
+   same synchronized workload on the original Macintosh and set the target from both results.
 3. **Fix measured visual discrepancies.** Trace wrong pixels and geometry to their source data or
    implementation; do not add scene-, car-, or color-specific patches.
 4. **Optimize measured bottlenecks.** Start with the measured C2P/back-buffer/palette presentation
-   path. Prefer representation and algorithm changes before assembly; verify every optimization
-   against the reference differential and preserve game behavior.
+   path, now narrowed to conversion and palette publication rather than buffer synchronization.
+   Prefer representation and algorithm changes before assembly; verify every optimization against
+   the reference differential and preserve game behavior.
 5. **Finish control fidelity.** Verify keyboard aliases, throttle, brake, steering, gears, mouse
    steering and buttons, pause/options controls, and a reproducible FS-UAE configuration that does
    not capture the keyboard as a joystick.

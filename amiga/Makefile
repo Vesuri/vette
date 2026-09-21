@@ -118,7 +118,8 @@ endif
 endif
 
 # Chunky-to-planar row kernel. The C table implementation remains the oracle;
-# the default assembly twin keeps all four table bases in address registers.
+# the default assembly twin consumes the game's packed nibbles directly and,
+# following Kalms' OCS/ECS word-write strategy, writes 16 pixels at a time.
 # `make C2P_C=1` selects the oracle. `VERIFY=1 PROBES=1` runs both on identical
 # rows, times them back-to-back, and byte-compares their four plane spans.
 ifneq ($(C2P_C),1)
