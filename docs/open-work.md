@@ -139,9 +139,11 @@ is consequently renumbered.
    `make driving-audio-compare` proves all six Load context/duration/options/instrument
    signatures exact and the target engine pitches a source-ordered subsequence of the faster
    Macintosh run. Verify authored level and additional overlap cases, then cover gear changes,
-   collision `crash` now has a bounded original-call regression as well. Use Course Two's
-   traffic-dense bridge/freeway workload next to cover skids, horns, police, environment, and
-   result audio,
+   collision `crash` now has a bounded original-call regression as well. The full-view/full-sound
+   Course Two bridge workload proves concurrent original `skid` on context 1 and `crash` on context
+   2 while the engine remains centred; it reaches instruments 7, 8, 10 and 11 without a loud stop.
+   Continue that traffic-dense workload or use short source checkpoints for horns, police,
+   environment, and result audio,
    including concurrent playback and transitions.
 6. **Automate fidelity regressions.** Keep intro and driving framebuffer differentials, palette
    checks, clean-build audits, and eventually basic audio comparisons reproducible.

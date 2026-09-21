@@ -5056,15 +5056,6 @@ static void refreshDrivingKeyMap()
             // the BUCKLE UP / GET READY countdown is still running.
             s_garageGearPhase = 1;
             keyMap[0x18 >> 3] |= 1u << (0x18 & 7); // top-row +: upshift one gear
-#ifdef VETTE_FREEWAY_ROUTE
-            // Use only documented game controls to reduce the cost of this
-            // long diagnostic drive.  The normal key-repeat latch makes each
-            // held bit one toggle; the following GetKeys scan releases them.
-            keyMap[0x0b >> 3] |= 1u << (0x0b & 7); // B: buildings off
-            keyMap[0x01 >> 3] |= 1u << (0x01 & 7); // S: sound off
-            keyMap[0x0e >> 3] |= 1u << (0x0e & 7); // E: engine sound off
-            keyMap[0x60 >> 3] |= 1u << (0x60 & 7); // F5: Front Dash view
-#endif
         }
     }
     // Present a documented accelerator in the same GetKeys sample

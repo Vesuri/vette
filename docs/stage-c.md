@@ -1179,6 +1179,17 @@ collision path drives the already-generic Paula backend; it is not a port-author
 trigger. Broader traffic-effect coverage should use Course Two's bridge/freeway traffic rather than
 repeatedly forcing the lake outcome.
 
+That Course Two workload is now a bounded audio regression in
+`amiga/driving_audio_bridge.gdb`. `GARAGE_COURSE=2 FREEWAY_ROUTE=1` selects and drives the route
+through ordinary UI and keypad input. The route harness no longer toggles buildings, sound, engine
+sound, or the F5 view off: those old tracing shortcuts hid the picture from the user and invalidated
+audio-fidelity observation. In the full-view/full-sound run, crash first loads on context 2 at
+iteration 147 and skid loads on context 1 at iteration 148. Thus original traffic/collision code
+simultaneously owns two independent effects: skid reaches AUD3, crash reaches AUD2, and the centred
+engine remains on AUD0/1. The 900-iteration ceiling records instruments 7, 8, 10, and 11, 405
+effect Loads, no loud stop, and eventual collision-bound motion at speed 8. The probe now reports
+only each first-seen ordinal plus the final counts/mask, avoiding hundreds of repeated crash lines.
+
 The corrected route reaches the Lake Merced water collision and displays the game's own tow-truck
 recovery artwork. A probe on the actual `_GetPicture` trap records PICT 140 at the resident wrapper
 `Traffic+$663C`; that wrapper's saved return identifies the dynamic request at `Main+$0FD6`, with
