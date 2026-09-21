@@ -7,13 +7,19 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — current compatibility boundary
 
-⭐ **HEAD OF QUEUE: establish a representative moving-driving fidelity/performance workload, then
-fix what it measures.** Use a short deterministic checkpoint to capture the same moving scene on
+⭐ **HEAD OF QUEUE: establish a representative moving-driving fidelity workload, then fix what it
+measures.** Use a short deterministic checkpoint to capture the same moving scene on
 the Macintosh reference and the target A1200 configuration (2 MiB chip, 8 MiB fast). Extend the
 already exact named first-frame differential across motion, traffic, and the principal views while
 measuring time separately in game logic, drawing, resource decoding, C2P, audio, and waiting. Fix
 the highest measured visual discrepancy and performance cost in small, independently verified
 commits. Do not infer either from an unsynchronised screenshot or emulator wall-clock time.
+
+C2P and presentation time are host-machine costs: once Macintosh tick delivery and callback
+semantics are faithful, they may reduce completed-frame cadence exactly as a slower CPU would, but
+must not change the result for an equivalent complete game state. Further C2P tuning is deferred;
+do not require the A1200 to reproduce the Macintosh's loop count or traffic phase at the same wall
+time before continuing fidelity work.
 
 Long route traces are no longer the discovery mechanism. They are useful later as regressions, but
 the next unknown behavior must be reached by a short, reproducible checkpoint run. In particular,
@@ -59,9 +65,12 @@ is consequently renumbered.
    the same interval now delivers 25 callbacks on Amiga. A new motion capture reduces paired-frame
    raster differences from 6,948 to 105 pixels, but TAXI remains behind because its physics pass is
    driven by completed main-loop iterations: the Macintosh reaches the first moving state after 45
-   loops at roughly 6–7 ticks per frame, the A1200 after 26 loops at roughly 11–12. Treat the
-   remaining moving-object phase error as the measured performance gap, optimize that path, then
-   rerun the completed raster/full-object gate and extend it to alternate views.
+   loops at roughly 6–7 ticks per frame, the A1200 after 26 loops at roughly 11–12. All three paired
+   frames have different Traffic object state, so their 105 changed pixels are not valid rendering
+   discrepancies; they measure the expected phase difference between machines of different speed.
+   Make the differential require equivalent full object state, establish such a state through a
+   short diagnostic checkpoint when natural captures do not share one, then extend the exact gate
+   to motion, traffic, mirrors, and alternate views.
 2. **Establish the performance target.** The full-accounting target-A1200 profile is now in place
    and identified presentation as 80.353% of the first moving-driving baseline. After removing a
    fully overwritten synchronization copy, adding the packed word-write C2P kernel, and deriving a
@@ -90,30 +99,12 @@ is consequently renumbered.
    results.
 3. **Fix measured visual discrepancies.** Trace wrong pixels and geometry to their source data or
    implementation; do not add scene-, car-, or color-specific patches.
-4. **Optimize measured bottlenecks.** Continue with the measured C2P presentation path. The dirty
-   list cut conversion per update by about 24.4%; moving its register-bound capture ahead of the
-   general dispatcher removed 432 dispatches, the four-pixel lookup cut another 12.2% from C2P per
-   update, A1200 scaled indexing then cut 18.0%, and rectangle-wide traversal removed another 5.4%
-   per update. The fixed 320-row CopyBits publisher is now 2.366 times as fast as its generic-C
-   oracle and byte-exact across 25 moving calls; the complete drawing row has fallen from 12.342%
-   to 5.554%. Do not reintroduce the slower rectangle-list publisher. The pre-shifted lookup then
-   removes another 9.9% from the controlled kernel and 4.5% per update in the standard moving
-   profile, at a further 256 KiB fast-RAM cost. Signed word indexing then removes eight clears per
-   32 pixels with no further storage, cutting another 4.4% in isolation and 6.6% per standard-profile
-   update. Continue from the remaining 39.097% C2P
-   row. The destination split now measures identical conversion at 25,459,010 ticks to chip RAM
-   versus 16,977,889 to fast RAM (1.500×) across 106 frames: roughly two-thirds of the work remains
-   in transpose/table processing and one-third is the extra chip-write cost. The normalized list
-   covers 63.960% of the surface in 8.981 rectangles per frame. Continue reducing the
-   transpose/lookup side without broadening the dirty bounds.
-   Prefer representation and algorithm changes before more assembly; verify every optimization
-   against the reference differential and preserve game behavior.
-5. **Finish control fidelity.** Verify keyboard aliases, throttle, brake, steering, gears, mouse
+4. **Finish control fidelity.** Verify keyboard aliases, throttle, brake, steering, gears, mouse
    steering and buttons, pause/options controls, and a reproducible FS-UAE configuration that does
    not capture the keyboard as a joystick.
-6. **Finish gameplay audio fidelity.** Verify engine pitch/load, gear changes, collisions, skids,
+5. **Finish gameplay audio fidelity.** Verify engine pitch/load, gear changes, collisions, skids,
    horns, police, environment, and result audio, including concurrent playback and transitions.
-7. **Automate fidelity regressions.** Keep intro and driving framebuffer differentials, palette
+6. **Automate fidelity regressions.** Keep intro and driving framebuffer differentials, palette
    checks, clean-build audits, and eventually basic audio comparisons reproducible.
 
 ## Core game completion — after the fidelity/performance pass
@@ -157,6 +148,13 @@ is consequently renumbered.
    conversion flow, launch configuration, user instructions, and measured machine requirements.
 
 ## Deferred until a real caller exists
+
+- **Further C2P optimization.** The verified dirty-list kernel now averages about 260,675 ticks per
+  moving update and occupies 39.097% of the target profile. That is an important eventual speed
+  target, but it is a host presentation cost rather than a game-logic fidelity failure. Return to
+  it after the moving-state, controls, and audio gates, unless measurement proves it is breaking
+  callback semantics rather than merely reducing completed-frame cadence. Preserve the current
+  dirty list; do not revive the measured dead ends below.
 
 - `Bitmap::patternWithMask()` pulls in `__mulsi3`, so the mandatory `muldiv-audit` rejects any
   caller. Nothing uses it. Fix it if a real path needs it rather than weakening the audit.
