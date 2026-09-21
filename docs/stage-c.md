@@ -1270,6 +1270,14 @@ selector 81. The rendered/current coordinate pair intentionally lagged the physi
 instant, so `amiga/driving_freeway_exit.gdb` reports both instead of presenting the old pair as the
 landing position. No missing Toolbox operation or host-side map switch is involved.
 
+For work beyond that boundary, `MAIN_START=<x-cell>` optionally completes the diagnostic handoff
+after export 230 has selected and entered Main Map. It discards the response approach's retained
+heading and momentum, synchronizes the same complete player position history at row 39, and leaves
+all subsequent game code running normally. With `MAIN_START=17`, the focused run reached world and
+physics position `($8C00,$13C00)`, cell `(17,39)`, local `(1024,1024)`, heading zero and mode zero at
+tick 1,960. That cell is the shipped QUAD 136 / selector 106 descriptor. The read-only observer is
+`amiga/driving_main_return.gdb`; ordinary builds do not define `MAIN_START`.
+
 The 26-record sightseeing table used by `Main+$3456` was also decoded as a possible source-native
 shortcut. Record 4 is cell `(6,26)`, only six cells from the export-221 transition at `(6,32)`, but
 the documented T command is conditional on Tour Mode. Five ordinary T down/up scans during the

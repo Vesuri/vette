@@ -7,14 +7,15 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — current compatibility boundary
 
-⭐ **HEAD OF QUEUE: continue east from the proved export-230 landing in Main Map cell `(12,39)` to
-the next material boundary at x=17.** A source-derived diagnostic start in Freeway Map `(30,36)`
-now reaches the real selector-72 response, executes export 230, clears freeway mode and lands at
-Main Map `(12,39)` in the original code. Cells x=12..16 use QUAD 121 / selector 81; x=17 changes to
-QUAD 136 / selector 106. Stop at the first real unimplemented trap or demonstrable compatibility
-failure and fix that cause. The checkpoint remains diagnostic only: the confirmed natural-route
-class-2 `VETT`/`GGRY` collision at `(6,36)` is recorded compatibility debt, not a claim of
-successful avoidance. Do not add host-authored UI merely to manufacture coverage.
+⭐ **HEAD OF QUEUE: probe Main Map cell `(18,39)`, where the proved post-export checkpoint changes
+from QUAD 136 / selector 106 to QUAD 165 / selector 54.** `MAIN_START=17` now runs both real map
+transitions, synchronizes the complete player history after export 230, and reaches `(17,39)` at
+tick 1,960. Selector 54 contains thirteen small shipped obstacle rectangles rather than another
+full-width lane wall; identify the first material gameplay boundary from the source and runtime,
+then stop at the first real unimplemented trap or demonstrable compatibility failure and fix that
+cause. The checkpoint remains diagnostic only: the confirmed natural-route class-2 `VETT`/`GGRY`
+collision at `(6,36)` is recorded compatibility debt, not a claim of successful avoidance. Do not
+add host-authored UI merely to manufacture coverage.
 
 ## ⭐⭐ TARGET 1 — the complete intro, run by the game's own code — COMPLETE
 

@@ -4546,6 +4546,20 @@ static void refreshDrivingKeyMap()
             relocateDiagnosticCar(car, x, z, 0x0000); // eastbound straight
             write16(car + 26, 0);                 // discard pre-gateway momentum
             freewayStartPhase = 2;
+        } else if (car && freewayStartPhase == 2 && !freewayMode) {
+            // A selected freeway response may return to Main Map while
+            // preserving the approach heading and motion.  The map handler
+            // has already chosen its genuine destination; collapse the same
+            // position history there so downstream diagnostics start at rest.
+            uint32_t x = read32(car + 0x6e);
+            uint32_t z = read32(car + 0x72);
+#ifdef VETTE_MAIN_START
+            x = ((uint32_t)VETTE_MAIN_START << 11) + 1024;
+            z = (39UL << 11) + 1024;
+#endif
+            relocateDiagnosticCar(car, x, z, 0x0000);
+            write16(car + 26, 0);
+            freewayStartPhase = 3;
         }
 #endif
         uint16_t heading = car ? read16(car + 0x66) : 0x2000;

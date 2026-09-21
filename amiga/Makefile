@@ -11,6 +11,7 @@
 #   make GARAGE_CLICK=1 FREEWAY_ROUTE=1  steer by normal KeyMap input toward the Course Two freeway
 #   make GARAGE_CLICK=1 FREEWAY_ROUTE=1 FREEWAY_START=11  fast-start at freeway cell (11,36)
 #   add FREEWAY_START_U=n FREEWAY_START_V=n to choose a source-derived local point in that cell
+#   add MAIN_START=n to hand off at Main Map cell (n,39) after a real freeway-exit response
 #   make QUIT_PROBE=1    request the Control+LMB exit at the first safe event-pump trap
 #   make FILLWATCH=1     rolling audit of the planar back buffer against the chunky Mac surface
 #   ./run.sh             boot in FS-UAE (CTRL + left mouse button quits)
@@ -181,6 +182,9 @@ EXTRA_DEFINES += -DVETTE_FREEWAY_START_U=$(FREEWAY_START_U)
 endif
 ifdef FREEWAY_START_V
 EXTRA_DEFINES += -DVETTE_FREEWAY_START_V=$(FREEWAY_START_V)
+endif
+ifdef MAIN_START
+EXTRA_DEFINES += -DVETTE_MAIN_START=$(MAIN_START)
 endif
 
 # Diagnostic only: select the game's shipped Mouse steering default so the
