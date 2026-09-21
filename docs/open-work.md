@@ -122,10 +122,11 @@ is consequently renumbered.
    authored headroom and avoiding Paula's below-64 resampling artifacts. Next
    Both the shipped P pause/options transition and the ordinary Escape transition have now been
    traced: neither calls Stop, Deactivate, Dispose, or Close during the following two Macintosh
-   seconds, and Bogas remains started across the waiting state. Compare the result to reference
-   audio, derive the unused lifecycle commands from the shipped BGAS implementation, then cover
-   gear changes, collisions, skids, horns, police, environment, and result audio, including
-   concurrent playback and transitions.
+   seconds, and Bogas remains started across the waiting state. The shipped BGAS dispatcher proves
+   that Stop/Deactivate preserve voice records while Dispose tears them down; the Paula bridge now
+   preserves contexts and freezes finite deadlines accordingly. Compare the result to reference
+   audio, then cover gear changes, collisions, skids, horns, police, environment, and result audio,
+   including concurrent playback and transitions.
 6. **Automate fidelity regressions.** Keep intro and driving framebuffer differentials, palette
    checks, clean-build audits, and eventually basic audio comparisons reproducible.
 

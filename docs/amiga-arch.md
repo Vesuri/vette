@@ -287,7 +287,10 @@ and avoids the audible resampling behavior that Paula applies below 64.
 This is still an incremental Bogas backend: intro mixing remains on its proven flag-driven path,
 and later gameplay cues still require scenario verification. Real P and Escape transitions have
 now established that leaving live driving does not call Stop, Deactivate, Dispose, or Close; the
-driver remains started across the resulting waiting state. → `docs/source-inventory.md` §Audio.
+driver remains started across the resulting waiting state. Static BGAS command flow additionally
+proves that Stop/Deactivate preserve the three voice records while Dispose destroys them; the
+Paula bridge now preserves that same context ownership and freezes finite deadlines while output
+is suspended. → `docs/source-inventory.md` §Audio.
 ⚠ Inherited placement rule that will apply whatever the backend is: audio work goes **AFTER** the
 copper work in the handler, because a Paula DMA restart busy-waits on the beam and nothing that
 waits on the beam may precede the copper writes.

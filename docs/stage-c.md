@@ -1117,8 +1117,15 @@ clear the driving state at tick 1,708 in the matched diagnostic build and settle
 the following 120 Macintosh ticks neither path calls Stop, Deactivate, Dispose, or Close, and the
 Bogas started state remains set. Audio continuing into this waiting state is therefore original
 game behavior, not a missing port-side pause hook. Stop and Deactivate remain unused by these real
-paths; their eventual behavior must follow the shipped BGAS command implementation rather than
-their English names.
+paths. The shipped BGAS dispatcher nevertheless establishes an important distinction: commands 3
+and 1 only inhibit output and leave the three 120-byte voice records allocated, whereas command 2
+runs the disposal path. The Paula bridge now makes the same ownership distinction. Stop and
+Deactivate silence DMA while retaining each context, loaded instrument, pitch and finite lifetime;
+Start resumes those retained voices and shifts finite deadlines by the suspended interval. Close
+and Dispose remain the destructive teardown operations. Paula has no readable current-DMA source
+pointer, so a future real suspend/resume caller would restart a retained sample at its declared
+attack rather than the BGAS software mixer's exact byte phase; neither measured P nor Escape path
+uses that unverified edge.
 
 The corrected route reaches the Lake Merced water collision and displays the game's own tow-truck
 recovery artwork. A probe on the actual `_GetPicture` trap records PICT 140 at the resident wrapper

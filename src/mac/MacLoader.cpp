@@ -1389,6 +1389,8 @@ static uint16_t bogasPeriod(uint16_t basePeriod, uint32_t pitch)
 }
 
 static uint32_t s_bogasVoiceEndTick[4];
+static bool s_bogasSuspended;
+static uint32_t s_bogasSuspendTick;
 
 static void stopBogasAudio()
 {
@@ -1400,11 +1402,52 @@ static void stopBogasAudio()
     }
     for (uint16_t i = 0; i < 3; ++i) s_bogasContexts[i].playing = false;
     s_bogasStarted = false;
+    s_bogasSuspended = false;
+    s_bogasSuspendTick = 0;
+}
+
+static void suspendBogasAudio()
+{
+    if (!s_bogasStarted || s_bogasSuspended) return;
+    for (uint16_t channel = 0; channel < 4; ++channel) {
+        stopBogasVoice(channel);
+        s_bogasPendingLoopData[channel] = 0;
+        s_bogasPendingLoopWords[channel] = 0;
+    }
+    // BGAS Stop/Deactivate inhibit output without freeing its three voice
+    // records or their sample positions.  Keep the corresponding Paula-side
+    // contexts and finite countdowns intact for a later Start.
+    s_bogasSuspended = true;
+    s_bogasSuspendTick = g_macTicks;
+}
+
+static void resumeBogasAudio()
+{
+    if (!s_bogasStarted || !s_bogasSuspended) return;
+    uint32_t pausedTicks = g_macTicks - s_bogasSuspendTick;
+    for (uint16_t channel = 0; channel < 4; ++channel)
+        if (s_bogasVoiceEndTick[channel]) s_bogasVoiceEndTick[channel] += pausedTicks;
+
+    for (uint16_t contextIndex = 0; contextIndex < 3; ++contextIndex) {
+        BogasContext& context = s_bogasContexts[contextIndex];
+        if (!context.playing) continue;
+        if (contextIndex == 0) {
+            uint16_t period = bogasPeriod(319, context.pitch);
+            startBogasVoice(context.instrument, 0, period, 64);
+            startBogasVoice(context.instrument, 1, period, 64);
+        } else {
+            BogasInstrument* sample = bogasInstrument(context.instrument);
+            startBogasVoice(context.instrument, context.channel,
+                            sample ? sample->basePeriod : 319, 64);
+        }
+    }
+    s_bogasSuspended = false;
+    s_bogasSuspendTick = 0;
 }
 
 static void serviceBogasAudio()
 {
-    if (!s_bogasStarted) return;
+    if (!s_bogasStarted || s_bogasSuspended) return;
     for (uint16_t channel = 0; channel < 4; ++channel) {
         if (!s_bogasPendingLoopData[channel]) continue;
         volatile uint8_t* audio = (volatile uint8_t*)(0xdff0a0UL + channel * 16);
@@ -1439,7 +1482,7 @@ static void bogasLoad(uint16_t contextIndex, uint32_t duration,
     // involved in this transition.
     if (contextIndex == 0 && duration == 0x7fffffffUL && options == 0x8000UL)
         s_bogasStarted = true;
-    if (!s_bogasStarted) return;
+    if (!s_bogasStarted || s_bogasSuspended) return;
 
     if (contextIndex == 0) {
         context.channel = 0;
@@ -1470,7 +1513,7 @@ static void bogasPlay(uint32_t pitch, uint16_t contextIndex)
     if (!s_bogasStarted || contextIndex >= 3) return;
     BogasContext& context = s_bogasContexts[contextIndex];
     context.pitch = pitch;
-    if (!context.playing) return;
+    if (!context.playing || s_bogasSuspended) return;
     uint16_t period = bogasPeriod(319, pitch);
     if (contextIndex == 0) {
         *(volatile uint16_t*)0xdff0a6 = period;
@@ -5391,14 +5434,16 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
     }
     if (trap == kBogasSetTrap && pc == (uint32_t)(sound + 0x21c))
         return returnFromBogasTrap(frame, userStack, 0);
-    if (trap == kBogasStartTrap && pc == (uint32_t)(sound + 0x24c))
+    if (trap == kBogasStartTrap && pc == (uint32_t)(sound + 0x24c)) {
+        resumeBogasAudio();
         return returnFromBogasTrap(frame, userStack, 0);
+    }
     if (trap == kBogasStopTrap && pc == (uint32_t)(sound + 0x27c)) {
-        if (s_bogasStarted) stopBogasAudio();
+        suspendBogasAudio();
         return returnFromBogasTrap(frame, userStack, 0);
     }
     if (trap == kBogasDeactivateTrap && pc == (uint32_t)(sound + 0x2ac)) {
-        if (s_bogasStarted) stopBogasAudio();
+        suspendBogasAudio();
         return returnFromBogasTrap(frame, userStack, 0);
     }
 #ifdef VETTE_PROBE
