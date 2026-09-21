@@ -1331,6 +1331,12 @@ from 1.462 to 1.718, a further 14.9% kernel reduction normalized through the ora
 supporting profile uses 4,474,820 ticks for eight full conversions, or 559,353 per call (also 14.9%
 below 657,557), and attributes 55.945% of the 100-field window to C2P plus palette.
 
+A nested profile split then identifies that combined row precisely: C2P itself is 4,443,105 ticks
+(55.955% of the fixed 100-field window), palette construction is 19,084 (0.240%), and remaining
+presentation overhead is 3,249 (0.041%); synchronization and back-pressure are both zero. The
+exclusive rows still total exactly 100%. Further presentation work therefore targets conversion
+or buffer representation, not palette caching.
+
 The 26-record sightseeing table used by `Main+$3456` was also decoded as a possible source-native
 shortcut. Record 4 is cell `(6,26)`, only six cells from the export-221 transition at `(6,32)`, but
 the documented T command is conditional on Tour Mode. Five ordinary T down/up scans during the

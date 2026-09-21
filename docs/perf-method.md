@@ -134,6 +134,15 @@ The supporting 100-field profile recorded eight full conversions in 4,474,820 ti
 per call, also 14.9% below the previous 657,557. C2P plus palette now occupies 55.945% of that
 advancing-state window; synchronization remains zero.
 
+### 2026-09-21 — split the remaining presentation cost
+
+The profiler now brackets C2P and palette construction independently inside the existing inclusive
+presentation scope. In the fixed 100-field A1200 window, eight calls attribute 4,443,105 ticks
+(55.955%) to C2P, 19,084 (0.240%) to palette construction, 3,249 (0.041%) to presentation overhead,
+and zero to both synchronization and back-pressure. Accounting remains exactly 100%. The next
+presentation experiment therefore belongs in conversion or its source/destination representation;
+palette caching cannot materially change this workload.
+
 ## Lessons — measurement
 
 - **Compare FPS row vectors, never a `total painted` line.** A total spans a partial trailing row

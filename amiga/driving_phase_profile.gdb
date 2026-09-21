@@ -23,17 +23,21 @@ set $sync = g_profileTicks[5]
 set $wait = g_profileTicks[6]
 set $control = g_profileTicks[7]
 set $vbi = g_profileTicks[8]
+set $c2p = g_profileTicks[9]
+set $palette = g_profileTicks[10]
 set $other = $otherInclusive-$audio-$present-$wait
 set $resident = $elapsed-$drawing-$resource-$otherInclusive
-set $convert = $present-$sync
-set $accounted = $resident+$drawing+$resource+$audio+$other+$convert+$sync+$wait
+set $presentOverhead = $present-$sync-$c2p-$palette
+set $accounted = $resident+$drawing+$resource+$audio+$other+$c2p+$palette+$presentOverhead+$sync+$wait
 printf "beamTicks=%u (256 ticks/scanline)\n", $elapsed
 printf "resident game / callbacks  ticks=%u share=%.3f%%\n", $resident, 100.0*$resident/$elapsed
 printf "drawing traps              ticks=%u share=%.3f%% calls=%u\n", $drawing, 100.0*$drawing/$elapsed, g_profileCalls[0]
 printf "resource traps             ticks=%u share=%.3f%% calls=%u\n", $resource, 100.0*$resource/$elapsed, g_profileCalls[1]
 printf "audio shim                 ticks=%u share=%.3f%% calls=%u\n", $audio, 100.0*$audio/$elapsed, g_profileCalls[2]
 printf "other compatibility        ticks=%u share=%.3f%% calls=%u\n", $other, 100.0*$other/$elapsed, g_profileCalls[3]
-printf "C2P + palette              ticks=%u share=%.3f%% calls=%u\n", $convert, 100.0*$convert/$elapsed, g_profileCalls[4]
+printf "C2P                       ticks=%u share=%.3f%% calls=%u\n", $c2p, 100.0*$c2p/$elapsed, g_profileCalls[9]
+printf "palette construction       ticks=%u share=%.3f%% calls=%u\n", $palette, 100.0*$palette/$elapsed, g_profileCalls[10]
+printf "presentation overhead      ticks=%u share=%.3f%% calls=%u\n", $presentOverhead, 100.0*$presentOverhead/$elapsed, g_profileCalls[4]
 printf "back-buffer synchronization ticks=%u share=%.3f%% calls=%u\n", $sync, 100.0*$sync/$elapsed, g_profileCalls[5]
 printf "display back-pressure      ticks=%u share=%.3f%% calls=%u\n", $wait, 100.0*$wait/$elapsed, g_profileCalls[6]
 printf "ACCOUNTING                 ticks=%u share=%.3f%% (MUST be ~100%%)\n", $accounted, 100.0*$accounted/$elapsed

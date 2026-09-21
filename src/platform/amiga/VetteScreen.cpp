@@ -422,6 +422,9 @@ bool VetteScreen::presentMacFrame(const uint8_t* chunky, const uint8_t* colorTab
     m_syncPending = false;
 
     if (pixelsDirty) {
+#ifdef VETTE_PROBE
+        VetteProfileScope profileC2P(kProfileC2P);
+#endif
         uint16_t firstWord = (uint16_t)dirtyLeft / 16;
         uint16_t finalWord = (uint16_t)dirtyRight / 16;
         uint16_t groups = (uint16_t)((finalWord - firstWord) * 2);
@@ -461,6 +464,10 @@ bool VetteScreen::presentMacFrame(const uint8_t* chunky, const uint8_t* colorTab
         m_syncPending = true;
     }
 
+#ifdef VETTE_PROBE
+    {
+        VetteProfileScope profilePalette(kProfilePalette);
+#endif
     uint16_t finalIndex = (uint16_t)(colorTable[6] << 8 | colorTable[7]);
     if (finalIndex > 15) finalIndex = 15;
     bool deviceTable = (colorTable[4] & 0x80) != 0;
@@ -477,6 +484,9 @@ bool VetteScreen::presentMacFrame(const uint8_t* chunky, const uint8_t* colorTab
         uint8_t blue = gammaToOcs((uint16_t)(spec[6] << 8 | spec[7]));
         m_nextPalette[index] = (uint16_t)(red << 8 | green << 4 | blue);
     }
+#ifdef VETTE_PROBE
+    }
+#endif
 #ifdef VETTE_FILLWATCH
     // Rolling validation is intentionally diagnostic: it proves that dirty
     // synchronization plus the converted rectangle leave the back buffer an

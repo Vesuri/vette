@@ -14,6 +14,8 @@ enum VetteProfileCategory {
     kProfileWait,
     kProfileControl,
     kProfileVBI,
+    kProfileC2P,
+    kProfilePalette,
     kProfileCategoryCount
 };
 
