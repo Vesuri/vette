@@ -1022,6 +1022,23 @@ source-measured Paula contract for gameplay audio: reproduce the already-loaded 
 context and apply this original pitch stream. Instrument/context identity must come from the
 preceding `BogasOpen`/`BogasLoad` calls, not from a car- or sample-name special case.
 
+`amiga/driving_bogas_contexts.gdb` now records that lifecycle at the original sound-module
+boundary. Before driving, Initialize opens contexts 0, 1, and 2, then applies the context words
+0, 2, and 1 through `BogasPitch`. The moving route loads context 0 with arguments
+`($7fffffff,$8000,4)` and every measured engine `BogasPlay` targets context 0. Effects are loaded
+independently into context 2: the first bounded run observed argument tuples
+`($96,$1,10)`, `($96,$1,10)`, `($96,$1,11)`, and `($78,$1,8)`. This proves that the port must
+model contexts and loaded instruments, rather than infer sounds from a screen or car. The probe
+also prints the resident Main, Traffic, and sound bases so every caller address can be reduced to
+a stable segment offset; its engine caller is `Traffic+$3762`.
+
+The wrapper ABI is source-derived from `CODE 9`, not guessed from playback. `BogasOpen` consumes
+one word; `BogasKill` consumes a word and long; `BogasLoad` consumes word, long, long, word;
+`BogasPlay` consumes long and word; and `BogasPitch`/`BogasPurge` consume one word. Their Pascal
+epilogues leave long results in the caller's reserved result slot where applicable. This is the
+boundary the Paula implementation will replace. Instrument ordinals still need to be joined to
+the original named-resource initialization order before effect names are assigned.
+
 The corrected route reaches the Lake Merced water collision and displays the game's own tow-truck
 recovery artwork. A probe on the actual `_GetPicture` trap records PICT 140 at the resident wrapper
 `Traffic+$663C`; that wrapper's saved return identifies the dynamic request at `Main+$0FD6`, with
