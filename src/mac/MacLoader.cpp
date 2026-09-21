@@ -28,6 +28,14 @@ void vette_call_mac_code(void* entry, void* a5);
 void vette_user_exit_request();
 void vette_user_exit_trampoline();
 extern volatile uint16_t g_macFramesPresented;
+#ifdef VETTE_FILLWATCH
+extern volatile uint32_t g_fillBadFrames;
+extern volatile uint32_t g_fillBadPixels;
+extern volatile uint16_t g_fillBadX;
+extern volatile uint16_t g_fillBadY;
+extern volatile uint16_t g_fillBadExpected;
+extern volatile uint16_t g_fillBadActual;
+#endif
 #ifdef VETTE_MAPPED_COPY_ASM
 void vetteMappedCopyRowsAsm(const uint8_t* source, uint8_t* destination,
                             const uint8_t* map, uint32_t rowBytes, uint32_t height,
@@ -3101,6 +3109,89 @@ static bool currentPortIsScreen()
         && pixels == s_colorScreen;
 }
 
+static bool copyDrivingPublishDirty(const uint8_t* sourceBitmap,
+                                    const uint8_t* destinationBitmap,
+                                    const uint8_t* sourceRect,
+                                    const uint8_t* destinationRect,
+                                    uint16_t mode, const uint8_t* maskRegion)
+{
+    if (!sourceRect || !destinationRect || mode != 0 || maskRegion) return false;
+    if ((int16_t)read16(sourceRect) != 0 || (int16_t)read16(sourceRect + 2) != 0
+        || (int16_t)read16(sourceRect + 4) < 320
+        || (int16_t)read16(sourceRect + 6) != 512
+        || (int16_t)read16(destinationRect) != 0
+        || (int16_t)read16(destinationRect + 2) != 0
+        || (int16_t)read16(destinationRect + 4) != 342
+        || (int16_t)read16(destinationRect + 6) != 512) return false;
+
+    uint8_t *sourcePixels, *destinationPixels;
+    uint16_t sourceRowBytes, destinationRowBytes;
+    int16_t sourceTop, sourceLeft, sourceBottom, sourceRight;
+    int16_t destinationTop, destinationLeft, destinationBottom, destinationRight;
+    if (!bitmapPixels(sourceBitmap, sourcePixels, sourceRowBytes,
+                      sourceTop, sourceLeft, sourceBottom, sourceRight)
+        || !bitmapPixels(destinationBitmap, destinationPixels, destinationRowBytes,
+                         destinationTop, destinationLeft, destinationBottom, destinationRight)
+        || destinationPixels != s_colorScreen
+        || sourceRowBytes != 256 || destinationRowBytes != 256
+        || sourceTop != 0 || sourceLeft != 0 || sourceBottom < 320 || sourceRight != 512
+        || destinationTop != 0 || destinationLeft != 0
+        || destinationBottom != 320 || destinationRight != 512) return false;
+
+    const uint8_t* sourceColors = bitmapColorTable(sourceBitmap);
+    const uint8_t* destinationColors = bitmapColorTable(destinationBitmap);
+    if (!sourceColors || !destinationColors
+        || read32(sourceColors) != read32(destinationColors)) return false;
+
+    uint16_t boundCount = g_drivingRasterBoundCount;
+    if (!s_drivingFrameSeeded || boundCount == 0xffff) {
+        blockMove(sourcePixels, destinationPixels, sizeof(s_colorScreen));
+        return true;
+    }
+
+    // The 3D renderer always rebuilds the full exterior. Dashboard writers
+    // contribute their exact bounds through the $AFFD fast hook.
+    blockMove(sourcePixels, destinationPixels, 198u * 256u);
+    for (uint16_t i = 0; i < boundCount; ++i) {
+        const volatile int16_t* bound = g_drivingRasterBounds[i];
+        int16_t top = bound[0], left = bound[1], bottom = bound[2], right = bound[3];
+        if (top < 198) top = 198;
+        if (left < 0) left = 0;
+        if (bottom > 320) bottom = 320;
+        if (right > 512) right = 512;
+        left &= (int16_t)~1;
+        right = (int16_t)((right + 1) & ~1);
+        if (top >= bottom || left >= right) continue;
+        uint16_t byteLeft = (uint16_t)left >> 1;
+        uint16_t bytes = (uint16_t)(right - left) >> 1;
+        for (int16_t y = top; y < bottom; ++y) {
+            uint32_t offset = (uint32_t)y * 256u + byteLeft;
+            blockMove(sourcePixels + offset, destinationPixels + offset, bytes);
+        }
+    }
+#ifdef VETTE_FILLWATCH
+    // The normal CopyBits copied this entire image.  In diagnostic builds,
+    // prove that the renderer's bounds reproduce the same chunky frame before
+    // the independent chunky-to-planar verifier checks the display buffer.
+    bool bad = false;
+    for (uint32_t offset = 0; offset < sizeof(s_colorScreen); ++offset) {
+        uint8_t expected = sourcePixels[offset];
+        uint8_t actual = destinationPixels[offset];
+        if (expected == actual) continue;
+        if (!bad) {
+            g_fillBadX = (uint16_t)((offset % 256u) * 2u);
+            g_fillBadY = (uint16_t)(offset / 256u);
+            g_fillBadExpected = expected >> 4;
+            g_fillBadActual = actual >> 4;
+        }
+        bad = true;
+        ++g_fillBadPixels;
+    }
+    if (bad) ++g_fillBadFrames;
+#endif
+    return true;
+}
+
 static bool copyBits(const uint8_t* sourceBitmap, const uint8_t* destinationBitmap,
                      const uint8_t* sourceRect, const uint8_t* destinationRect,
                      uint16_t mode, const uint8_t* maskRegion)
@@ -5959,12 +6050,17 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
             }
         }
 #endif
+        const uint8_t* sourceBitmap = (const uint8_t*)read32(userStack + 18);
+        const uint8_t* sourceRect = (const uint8_t*)read32(userStack + 10);
+        uint16_t mode = read16(userStack + 4);
+        const uint8_t* maskRegion = (const uint8_t*)read32(userStack);
         s_suppressDirectScreenDirty = fullDrivingPublish;
-        bool copied = copyBits((const uint8_t*)read32(userStack + 18),
-                               destinationBitmap,
-                               (const uint8_t*)read32(userStack + 10),
-                               destinationRect, read16(userStack + 4),
-                               (const uint8_t*)read32(userStack));
+        bool copied = fullDrivingPublish
+            && copyDrivingPublishDirty(sourceBitmap, destinationBitmap, sourceRect,
+                                       destinationRect, mode, maskRegion);
+        if (!copied)
+            copied = copyBits(sourceBitmap, destinationBitmap, sourceRect,
+                              destinationRect, mode, maskRegion);
         s_suppressDirectScreenDirty = false;
         if (copied) {
             if (bitmapIsScreen(destinationBitmap)) {

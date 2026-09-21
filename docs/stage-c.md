@@ -1402,6 +1402,17 @@ change—a 5.4% reduction. The exclusive profile is now 38.266% C2P, 45.562% res
 12.297% drawing traps, and less than 2.8% for every other row. The next measured port-owned target
 is therefore the drawing-trap row, not palette, synchronization, or presentation bookkeeping.
 
+The final driving `_CopyBits` formerly copied all 81,920 visible chunky bytes from the completed
+GWorld even though the renderer's dirty list was already exact. It now publishes the contiguous
+512×198 exterior plus those same clipped dashboard/mirror bounds, with a full-copy fallback for the
+seed frame, bounds overflow, palette translation, or any call outside the proven contract. This is
+not a second framebuffer or tile cache: it transfers the original renderer's changed bounds into
+the existing logical screen. A diagnostic comparison of the partial result against the full source
+GWorld, followed by the independent planar comparison, covered 40 frames/all 320 rows with zero
+bad frames or pixels. The 300-field profile reduces drawing traps from 2,951,920 to 2,913,842 ticks
+over 32 updates (about 1.3% of that row and 0.16% of the whole window). The full publish was real
+redundant work, but it was not the explanation for the large drawing cost.
+
 The differential now has a real moving checkpoint rather than a neutral car with a held
 accelerator. `VETTE_DRIVING_MOTION=1` makes the Macintosh harness wait for a valid full-window
 CopyBits from Vette, latch the application A5 at that trap boundary, wait for countdown state 3,

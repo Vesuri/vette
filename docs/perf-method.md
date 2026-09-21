@@ -214,6 +214,25 @@ preceding 368,582 measurement. C2P is now 41.532% of the window, and twelve comp
 inside it versus ten in the previous advancing-state run; only the verifier ratio and per-call C2P
 cost are treated as controlled evidence.
 
+### 2026-09-21 — dirty final driving publish
+
+The final driving `_CopyBits` used to copy the complete 512×320 logical screen from the GWorld
+on every completed iteration. The source renderer already supplies the exact changed regions used
+by presentation: a contiguous 512×198 exterior and the captured dashboard/mirror bounds. The
+specialized publish now copies those regions only. It deliberately falls back to generic
+`CopyBits` unless the source and destination geometry, `srcCopy` mode, screen destination, packed
+row bytes, and color-table seed prove that no scaling, boolean operation, or palette mapping is
+required. The seed frame and a raster-bound overflow still copy the complete screen.
+
+`FILLWATCH=1` first compares all 81,920 destination bytes with the full source GWorld after the
+partial publish, then independently compares the planar display against the chunky screen. Forty
+successive frames covered every one of the 320 rows with zero bad frames and zero bad pixels. In
+the same 300-field A1200 harness used for the preceding rectangle-wide C2P measurement, drawing
+traps fall from 2,951,920 to 2,913,842 ticks over 32 updates: about 1,189 ticks or 1.3% of the row
+per update, only 0.16% of the whole window. Thus the full publish was redundant, but it accounts
+for very little of the remaining 12.142% drawing row; further work must split the actual QuickDraw
+operations rather than continuing to tune this transfer.
+
 ## Lessons — measurement
 
 - **Compare FPS row vectors, never a `total painted` line.** A total spans a partial trailing row

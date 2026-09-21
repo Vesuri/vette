@@ -72,9 +72,11 @@ is consequently renumbered.
    28.0% from the first dirty-list kernel's 419,939, and 45.6% from full-frame conversion's
    555,388. The kernel now walks each whole dirty rectangle per call instead of saving registers
    once per row. Its verifier covers another 3,068,576 plane bytes with zero failures; the current
-   300-field profile averages about 287,054 C2P ticks per update, a further 5.4% reduction. C2P is
-   38.266% of that window; original game/callback work is 45.562%, drawing traps 12.297%, and every
-   other exclusive category is below 2.8%.
+   300-field profile averages about 287,054 C2P ticks per update, a further 5.4% reduction. The
+   final driving CopyBits now transfers the renderer's exterior and dashboard dirty bounds rather
+   than all 81,920 chunky bytes; a 40-frame source/chunky/planar audit is exact. That only reduces
+   drawing traps about 1.3% per update, however. The current 300-field window is 38.343% C2P,
+   45.593% original game/callback work, 12.142% drawing traps, and below 2.9% for every other row.
    Measure the same synchronized workload on the original Macintosh and set the target from both
    results.
 3. **Fix measured visual discrepancies.** Trace wrong pixels and geometry to their source data or
@@ -83,8 +85,9 @@ is consequently renumbered.
    list cut conversion per update by about 24.4%; moving its register-bound capture ahead of the
    general dispatcher removed 432 dispatches, the four-pixel lookup cut another 12.2% from C2P per
    update, A1200 scaled indexing then cut 18.0%, and rectangle-wide traversal removed another 5.4%
-   per update. The next port-owned row worth splitting is drawing traps at 12.297%; determine how
-   much is the final driving CopyBits transfer versus other QuickDraw work before changing it.
+   per update. The final dirty CopyBits publish removes the full chunky-screen copy but only saves
+   about 1,189 drawing ticks per update, proving that transfer is not the source of the remaining
+   12.142% row. Split the actual QuickDraw operations next and optimize only the measured owner.
    Prefer representation and algorithm changes before more assembly; verify every optimization
    against the reference differential and preserve game behavior.
 5. **Finish control fidelity.** Verify keyboard aliases, throttle, brake, steering, gears, mouse
