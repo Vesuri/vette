@@ -102,8 +102,12 @@ is consequently renumbered.
 4. **Finish control fidelity.** Verify keyboard aliases, throttle, brake, steering, gears, mouse
    steering and buttons, pause/options controls, and a reproducible FS-UAE configuration that does
    not capture the keyboard as a joystick.
-5. **Finish gameplay audio fidelity.** Verify engine pitch/load, gear changes, collisions, skids,
-   horns, police, environment, and result audio, including concurrent playback and transitions.
+5. **Finish gameplay audio fidelity.** Implement the measured Bogas wrapper surface over Paula,
+   beginning with the engine context: live driving calls `BogasPlay` from `Traffic+$3762` about
+   once per completed frame, with its long argument following RPM from 27,000 upward while the word
+   argument remains zero. Resolve each context through the original `BogasOpen`/`BogasLoad` calls,
+   then verify engine pitch/load, gear changes, collisions, skids, horns, police, environment, and
+   result audio, including concurrent playback and transitions.
 6. **Automate fidelity regressions.** Keep intro and driving framebuffer differentials, palette
    checks, clean-build audits, and eventually basic audio comparisons reproducible.
 

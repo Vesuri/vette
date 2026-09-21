@@ -1013,6 +1013,15 @@ the exact Traffic caller, instrument, and framebuffer. `amiga/driving_accelerato
 `driving_gear1_dispatch.gdb`, `driving_drivetrain.gdb`, `driving_sound_event.gdb`, and the noisier
 `driving_sound_trace.gdb` preserve the evidence.
 
+The gameplay-audio trace now breaks directly on the resident `sound+$0174` `BogasPlay` wrapper;
+its older nested callback breakpoint stopped inside the safe-point trampoline before the sound
+hook could be armed. In a short moving A1200 run the wrapper is called 76 times from
+`Traffic+$3762`, approximately once per completed frame. Its long stack argument begins at 27,000
+and rises through 40,000 with engine RPM, while the word argument remains zero. This is the first
+source-measured Paula contract for gameplay audio: reproduce the already-loaded Bogas engine
+context and apply this original pitch stream. Instrument/context identity must come from the
+preceding `BogasOpen`/`BogasLoad` calls, not from a car- or sample-name special case.
+
 The corrected route reaches the Lake Merced water collision and displays the game's own tow-truck
 recovery artwork. A probe on the actual `_GetPicture` trap records PICT 140 at the resident wrapper
 `Traffic+$663C`; that wrapper's saved return identifies the dynamic request at `Main+$0FD6`, with
