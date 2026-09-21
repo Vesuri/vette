@@ -1,6 +1,6 @@
 	.text
 	.even
-	.globl vetteC2PSpanAsm
+	.globl vetteC2PRectAsm
 
 	.macro load8 result
 	moveq	#0,d0
@@ -23,12 +23,13 @@
 	eor.l	d4,\second
 	.endm
 
-| void vetteC2PSpanAsm(const uint8_t* source, uint8_t* destination,
-|                      const uint32_t* table, uint16_t groups)
+| void vetteC2PRectAsm(const uint8_t* source, uint8_t* destination,
+|                      const uint32_t* table, uint16_t groups, uint16_t rows)
 |
-| Four groups are 16 packed Macintosh bytes (32 pixels) and produce one long
-| in each of the four Amiga planes.  A final two-group/16-pixel tail uses word
-| writes, so callers retain their natural 16-pixel dirty-rectangle alignment.
+| Walk a complete dirty rectangle at the fixed 256-byte chunky and interleaved
+| planar row strides. Four groups are 16 packed Macintosh bytes (32 pixels)
+| and produce one long in each of the four Amiga planes. A final two-group/
+| 16-pixel tail uses word writes, so callers retain their natural alignment.
 | The 256 KiB fast-RAM table maps four packed pixels to the high nibble of four
 | plane bytes. Two lookups and one shift/OR therefore transpose eight pixels,
 | halving the former 8-bit table's lookup traffic. This keeps Vette's native
@@ -36,15 +37,21 @@
 | Kalms' public-domain c2p1x1_4_c5_word. The supported A1200 target uses its
 | 68020 scaled long index here instead of shifting and adding each table
 | address by hand; this is the only 68020-only port assembly.
-vetteC2PSpanAsm:
-	movem.l	d2-d7/a2,-(sp)
-	move.l	32(sp),a0
-	move.l	36(sp),a1
-	move.l	40(sp),a2
+vetteC2PRectAsm:
+	movem.l	d2-d7/a2-a5,-(sp)
+	move.l	44(sp),a3
+	move.l	48(sp),a4
+	move.l	52(sp),a2
 	| GCC reserves a four-byte argument slot for uint16_t; on big-endian 68k
-	| the value occupies its low word. Dirty spans make it an even number.
-	move.w	46(sp),d3
+	| the value occupies its low word. Dirty spans make groups even.
+	movea.w	62(sp),a5
+	tst.l	a5
 	beq	9f
+
+0:
+	move.l	a3,a0
+	move.l	a4,a1
+	move.w	58(sp),d3
 	move.w	d3,d7
 	and.w	#2,d3			| one 16-pixel tail after 32-pixel batches?
 	lsr.w	#2,d7			| number of 32-pixel batches
@@ -79,7 +86,7 @@ vetteC2PSpanAsm:
 
 5:
 	tst.w	d3
-	beq	9f
+	beq	8f
 	load8	d1
 	load8	d2
 	interleave2 d1,d2
@@ -89,6 +96,14 @@ vetteC2PSpanAsm:
 	swap	d2
 	move.w	d2,64(a1)
 	move.w	d1,(a1)
+8:
+	lea	256(a3),a3
+	lea	256(a4),a4
+	subq.l	#1,a5
+	| Address-register arithmetic does not set the 68k condition codes.
+	| Copy the remaining row count through scratch D0 before branching.
+	move.l	a5,d0
+	bne	0b
 9:
-	movem.l	(sp)+,d2-d7/a2
+	movem.l	(sp)+,d2-d7/a2-a5
 	rts

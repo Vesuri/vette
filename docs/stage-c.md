@@ -1392,6 +1392,16 @@ resident Macintosh code and other port assembly retain their broader settings. T
 (21.6% less kernel time). A warmed 100-field profile records 3,326,465 C2P ticks over eleven calls,
 about 302,406 each and 18.0% below the preceding version. C2P falls to 41.532% of that window.
 
+The same kernel now traverses all rows of one normalized dirty rectangle in a single assembly call.
+This keeps the dirty-list representation, interleaved destination, exact 16-pixel horizontal
+bounds, 256-byte source/destination row strides, and the established inner transpose unchanged; it
+removes the per-scanline call and register-save cost. The assembly/C differential covers another
+3,068,576 plane bytes with zero failures. In the corrected-scheduler 300-field A1200 profile, C2P
+uses 9,185,732 ticks over 32 calls, about 287,054 per update versus 303,395 immediately before the
+change—a 5.4% reduction. The exclusive profile is now 38.266% C2P, 45.562% resident game/callbacks,
+12.297% drawing traps, and less than 2.8% for every other row. The next measured port-owned target
+is therefore the drawing-trap row, not palette, synchronization, or presentation bookkeeping.
+
 The differential now has a real moving checkpoint rather than a neutral car with a held
 accelerator. `VETTE_DRIVING_MOTION=1` makes the Macintosh harness wait for a valid full-window
 CopyBits from Vette, latch the application A5 at that trap boundary, wait for countdown state 3,

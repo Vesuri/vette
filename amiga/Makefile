@@ -117,12 +117,12 @@ EXTRA_DEFINES += -DVETTE_MAPPED_COPY_VERIFY
 endif
 endif
 
-# Chunky-to-planar row kernel. The C table implementation remains the oracle;
+# Chunky-to-planar rectangle kernel. The C table implementation remains the oracle;
 # the default assembly twin consumes the game's packed nibbles directly and,
 # extending Kalms' OCS/ECS wide-write strategy, writes 32-pixel longword
 # batches plus an exact 16-pixel word tail.
 # `make C2P_C=1` selects the oracle. `VERIFY=1 PROBES=1` runs both on identical
-# rows, times them back-to-back, and byte-compares their four plane spans.
+# rectangles, times them back-to-back, and byte-compares every four-plane row.
 ifneq ($(C2P_C),1)
 EXTRA_DEFINES += -DVETTE_C2P_ASM
 ifdef VERIFY

@@ -16,8 +16,8 @@
 
 extern "C" {
 #ifdef VETTE_C2P_ASM
-void vetteC2PSpanAsm(const uint8_t* source, uint8_t* destination,
-                     const uint32_t* table, uint16_t groups);
+void vetteC2PRectAsm(const uint8_t* source, uint8_t* destination,
+                     const uint32_t* table, uint16_t groups, uint16_t rows);
 #endif
 #ifdef VETTE_C2P_VERIFY
 volatile uint32_t g_c2pAsmTicks = 0;
@@ -488,6 +488,21 @@ bool VetteScreen::presentMacFrame(const uint8_t* chunky, const uint8_t* colorTab
             uint16_t firstWord = (uint16_t)dirty.left / 16;
             uint16_t finalWord = (uint16_t)dirty.right / 16;
             uint16_t groups = (uint16_t)((finalWord - firstWord) * 2);
+#ifdef VETTE_C2P_ASM
+            const uint8_t* rectangleSource = chunky + (uint32_t)dirty.top * (kWidth / 2)
+                                           + (uint16_t)dirty.left / 2;
+            uint8_t* rectangleDestination = m_back
+                                          + (uint32_t)(dirty.top + kMacTop) * kRowStride
+                                          + firstWord * 2;
+#ifdef VETTE_C2P_VERIFY
+            uint32_t start = vetteProfileBeamEpoch();
+#endif
+            vetteC2PRectAsm(rectangleSource, rectangleDestination, s_quadToPlanes,
+                            groups, (uint16_t)(dirty.bottom - dirty.top));
+#ifdef VETTE_C2P_VERIFY
+            g_c2pAsmTicks += vetteProfileBeamEpoch() - start;
+#endif
+#endif
             for (int16_t y = dirty.top; y < dirty.bottom; ++y) {
                 const uint8_t* source = chunky + (uint32_t)y * (kWidth / 2)
                                       + (uint16_t)dirty.left / 2;
@@ -495,16 +510,11 @@ bool VetteScreen::presentMacFrame(const uint8_t* chunky, const uint8_t* colorTab
                                      + firstWord * 2;
 #ifdef VETTE_C2P_ASM
 #ifdef VETTE_C2P_VERIFY
-                uint32_t start = vetteProfileBeamEpoch();
-#endif
-                vetteC2PSpanAsm(source, destination, s_quadToPlanes, groups);
-#ifdef VETTE_C2P_VERIFY
-                g_c2pAsmTicks += vetteProfileBeamEpoch() - start;
                 for (uint16_t plane = 0; plane < kPlanes; ++plane)
                     for (uint16_t x = 0; x < groups; ++x)
                         s_c2pVerifyBytes[plane * kBytesPerRow + x]
                             = destination[plane * kBytesPerRow + x];
-                start = vetteProfileBeamEpoch();
+                uint32_t start = vetteProfileBeamEpoch();
                 convertC2PSpanC(source, destination, groups);
                 g_c2pCTicks += vetteProfileBeamEpoch() - start;
                 ++g_c2pVerifyCalls;
