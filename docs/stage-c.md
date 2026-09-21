@@ -1433,9 +1433,11 @@ The motion differential now applies the same `$3BD90000` seed at the first road-
 call on both machines. This is a diagnostic-only input fixture selected by the original route
 state (`stage == driving` in MAME, final ACCEPT phase on Amiga); normal builds remain clock-seeded.
 Both first captured active lists are consequently `VETT`, `OPPO`, `TAXI`. Their records have
-already advanced by different amounts because completed frames occur about every seven Macintosh
-ticks and every thirteen Amiga ticks, and the regenerated sequences contain no identical complete
-player tuple by chance. The next gate must therefore establish an equivalent simulation-phase
+already advanced by different amounts because completed frames originally occurred about every
+seven Macintosh ticks and every thirteen Amiga ticks. After the two C2P optimizations the Amiga
+interval falls to roughly ten or eleven ticks, and three complete player tuples align naturally
+again. The best pair differs by only 13 dashboard pixels, but its active objects have advanced and
+spawned at different phases. The next gate must therefore establish an equivalent simulation-phase
 checkpoint independently of presentation cadence. The stationary RPM-11 checkpoint remains
 pixel-exact after the scheduler change.
 
