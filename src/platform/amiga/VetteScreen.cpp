@@ -15,6 +15,17 @@
 #include "PerfProbe.h"
 
 extern "C" {
+#ifdef VETTE_C2P_ASM
+void vetteC2PSpanAsm(const uint8_t* source, uint8_t* destination,
+                     const uint32_t* table, uint16_t groups);
+#endif
+#ifdef VETTE_C2P_VERIFY
+volatile uint32_t g_c2pAsmTicks = 0;
+volatile uint32_t g_c2pCTicks = 0;
+volatile uint32_t g_c2pVerifyCalls = 0;
+volatile uint32_t g_c2pVerifyBytes = 0;
+volatile uint32_t g_c2pVerifyFailures = 0;
+#endif
 volatile uint16_t g_macFramesQueued = 0;
 volatile uint16_t g_macFramesPresented = 0;
 volatile uint16_t g_beamPresentLine = 0;
@@ -50,6 +61,22 @@ static uint16_t beamLine()
 // inner loop that was too slow to keep up with the intro on a 68000.
 static uint32_t s_pairToPlanes[4][256];
 static bool s_pairToPlanesReady = false;
+
+static void convertC2PSpanC(const uint8_t* source, uint8_t* destination, uint16_t groups)
+{
+    for (uint16_t group = 0; group < groups; ++group, source += 4, ++destination) {
+        uint32_t packed = s_pairToPlanes[0][source[0]] | s_pairToPlanes[1][source[1]]
+                        | s_pairToPlanes[2][source[2]] | s_pairToPlanes[3][source[3]];
+        destination[0] = (uint8_t)(packed >> 24);
+        destination[VetteScreen::kBytesPerRow] = (uint8_t)(packed >> 16);
+        destination[VetteScreen::kBytesPerRow * 2] = (uint8_t)(packed >> 8);
+        destination[VetteScreen::kBytesPerRow * 3] = (uint8_t)packed;
+    }
+}
+
+#ifdef VETTE_C2P_VERIFY
+static uint8_t s_c2pVerifyBytes[VetteScreen::kRowStride];
+#endif
 
 static void initializePairToPlanes()
 {
@@ -397,25 +424,37 @@ bool VetteScreen::presentMacFrame(const uint8_t* chunky, const uint8_t* colorTab
     if (pixelsDirty) {
         uint16_t firstWord = (uint16_t)dirtyLeft / 16;
         uint16_t finalWord = (uint16_t)dirtyRight / 16;
+        uint16_t groups = (uint16_t)((finalWord - firstWord) * 2);
         for (int16_t y = dirtyTop; y < dirtyBottom; ++y) {
             const uint8_t* source = chunky + (uint32_t)y * (kWidth / 2)
                                   + (uint16_t)dirtyLeft / 2;
-            uint8_t* destination = m_back + (uint32_t)(y + kMacTop) * kRowStride;
-            for (uint16_t word = firstWord; word < finalWord; ++word, source += 8) {
-            uint32_t first = s_pairToPlanes[0][source[0]] | s_pairToPlanes[1][source[1]]
-                           | s_pairToPlanes[2][source[2]] | s_pairToPlanes[3][source[3]];
-            uint32_t second = s_pairToPlanes[0][source[4]] | s_pairToPlanes[1][source[5]]
-                            | s_pairToPlanes[2][source[6]] | s_pairToPlanes[3][source[7]];
-            uint16_t column = word * 2;
-            destination[column] = (uint8_t)(first >> 24);
-            destination[column + 1] = (uint8_t)(second >> 24);
-            destination[kBytesPerRow + column] = (uint8_t)(first >> 16);
-            destination[kBytesPerRow + column + 1] = (uint8_t)(second >> 16);
-            destination[kBytesPerRow * 2 + column] = (uint8_t)(first >> 8);
-            destination[kBytesPerRow * 2 + column + 1] = (uint8_t)(second >> 8);
-            destination[kBytesPerRow * 3 + column] = (uint8_t)first;
-            destination[kBytesPerRow * 3 + column + 1] = (uint8_t)second;
-            }
+            uint8_t* destination = m_back + (uint32_t)(y + kMacTop) * kRowStride
+                                 + firstWord * 2;
+#ifdef VETTE_C2P_ASM
+#ifdef VETTE_C2P_VERIFY
+            uint32_t start = vetteProfileBeamEpoch();
+#endif
+            vetteC2PSpanAsm(source, destination, &s_pairToPlanes[0][0], groups);
+#ifdef VETTE_C2P_VERIFY
+            g_c2pAsmTicks += vetteProfileBeamEpoch() - start;
+            for (uint16_t plane = 0; plane < kPlanes; ++plane)
+                for (uint16_t x = 0; x < groups; ++x)
+                    s_c2pVerifyBytes[plane * kBytesPerRow + x]
+                        = destination[plane * kBytesPerRow + x];
+            start = vetteProfileBeamEpoch();
+            convertC2PSpanC(source, destination, groups);
+            g_c2pCTicks += vetteProfileBeamEpoch() - start;
+            ++g_c2pVerifyCalls;
+            g_c2pVerifyBytes += (uint32_t)groups * kPlanes;
+            for (uint16_t plane = 0; plane < kPlanes; ++plane)
+                for (uint16_t x = 0; x < groups; ++x)
+                    if (s_c2pVerifyBytes[plane * kBytesPerRow + x]
+                        != destination[plane * kBytesPerRow + x])
+                        ++g_c2pVerifyFailures;
+#endif
+#else
+            convertC2PSpanC(source, destination, groups);
+#endif
         }
         m_syncTop = dirtyTop; m_syncLeft = dirtyLeft;
         m_syncBottom = dirtyBottom; m_syncRight = dirtyRight;

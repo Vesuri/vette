@@ -82,6 +82,22 @@ conversion after the omission decodes all 163,840 planar pixels back to their si
 source with zero differences (`amiga/driving_planar_check.gdb` and
 `tools/verify_driving_planar.py`).
 
+### 2026-09-21 — 68000 C2P row kernel
+
+The retained 4 KiB pixel-pair table is already the right representation: four lookups transpose
+eight chunky pixels into four complete plane bytes. The generated C loop, however, repeatedly
+reconstructed the four table bases and used long shift/extract sequences for the scattered plane
+stores. `C2P.s` keeps the table quarters in address registers and performs one tight group loop;
+`C2P_C=1` retains the C oracle.
+
+The `VERIFY=1 PROBES=1` in-process differential runs assembly and C back-to-back on identical rows
+and the same chip-RAM destination. It compared 2,874,776 output bytes across 12,123 spans with zero
+failures. The C oracle used 34,854,037 beam ticks against assembly's 26,764,037, a C/assembly ratio
+of 1.302. In the matching 100-field full profile, presentation time per full conversion fell from
+888,137 to 708,861 beam ticks (20.2%); seven instead of six updates fit in the window. The in-process
+ratio is the controlled kernel result; the advancing-state window is supporting end-to-end evidence,
+not a claimed cross-run speed ratio.
+
 ## Lessons — measurement
 
 - **Compare FPS row vectors, never a `total painted` line.** A total spans a partial trailing row

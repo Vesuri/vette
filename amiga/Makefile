@@ -117,6 +117,17 @@ EXTRA_DEFINES += -DVETTE_MAPPED_COPY_VERIFY
 endif
 endif
 
+# Chunky-to-planar row kernel. The C table implementation remains the oracle;
+# the default assembly twin keeps all four table bases in address registers.
+# `make C2P_C=1` selects the oracle. `VERIFY=1 PROBES=1` runs both on identical
+# rows, times them back-to-back, and byte-compares their four plane spans.
+ifneq ($(C2P_C),1)
+EXTRA_DEFINES += -DVETTE_C2P_ASM
+ifdef VERIFY
+EXTRA_DEFINES += -DVETTE_C2P_VERIFY
+endif
+endif
+
 # `make PROBES=1` — the sub-frame timing accumulators, read via the gdb stub (amiga/diag_run.sh).
 # OFF by default: the probes read chip registers several times per iteration, which is exactly
 # what a framerate build must not do.  ⚠ NEVER quote a framerate from a PROBES build.
@@ -304,6 +315,12 @@ ifdef VERIFY
 PROBE_SYMS += g_mappedCopyAsmTicks g_mappedCopyCTicks g_mappedCopyVerifyCalls \
               g_mappedCopyVerifyBytes \
               g_mappedCopyVerifyFailures
+endif
+endif
+ifneq ($(C2P_C),1)
+ifdef VERIFY
+PROBE_SYMS += g_c2pAsmTicks g_c2pCTicks g_c2pVerifyCalls g_c2pVerifyBytes \
+              g_c2pVerifyFailures
 endif
 endif
 ifdef PROBES
