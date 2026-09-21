@@ -90,8 +90,11 @@ is consequently renumbered.
    per update. The fixed 320-row CopyBits publisher is now 2.366 times as fast as its generic-C
    oracle and byte-exact across 25 moving calls; the complete drawing row has fallen from 12.342%
    to 5.554%. Do not reintroduce the slower rectangle-list publisher. Return to the 41.385% C2P
-   row and measure whether its remaining cost is the transpose kernel, chip-RAM writes, or dirty
-   coverage before choosing the next change.
+   row. The destination split now measures identical conversion at 25,459,010 ticks to chip RAM
+   versus 16,977,889 to fast RAM (1.500×) across 106 frames: roughly two-thirds of the work remains
+   in transpose/table processing and one-third is the extra chip-write cost. The normalized list
+   covers 63.960% of the surface in 8.981 rectangles per frame. Optimize the transpose/lookup side
+   next without broadening the dirty bounds.
    Prefer representation and algorithm changes before more assembly; verify every optimization
    against the reference differential and preserve game behavior.
 5. **Finish control fidelity.** Verify keyboard aliases, throttle, brake, steering, gears, mouse

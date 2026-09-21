@@ -252,6 +252,20 @@ CopyBits core is 1,293,230 ticks over 34 calls, about 38,036 per publish versus 
 the complete drawing row falls from 12.342% to 5.554%. C2P is now again the largest port-owned row
 at 41.385%, so it is the next measurement target.
 
+### 2026-09-21 — C2P destination and coverage split
+
+`C2P_SPLIT=1 PROBES=1` runs every normalized rectangle through the same assembly routine twice,
+first into the real chip-RAM back buffer and then into an equivalently aligned fast-RAM buffer.
+The timed inputs, table, geometry, row stride, and instruction path are identical; only the write
+destination changes. It also counts post-alignment/post-coalescing pixels and rectangles.
+
+Over 106 moving frames and 952 rectangles, the real destination used 25,459,010 ticks and the fast
+destination 16,977,889 ticks, a 1.500 ratio. Thus fast-RAM transpose/table work is about two-thirds
+of the current C2P cost, while the additional chip-RAM write penalty is about one-third. The same
+sample converts 104,792 pixels per frame, 63.960% of the 512×320 surface, in 8.981 rectangles per
+frame. Dirty coverage is already materially below a full frame; the next optimization should target
+the transpose/lookup instruction path rather than inflate or replace the dirty representation.
+
 ## Lessons — measurement
 
 - **Compare FPS row vectors, never a `total painted` line.** A total spans a partial trailing row

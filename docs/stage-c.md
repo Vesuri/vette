@@ -1424,6 +1424,14 @@ of their 320 rows with zero bad pixels. In the next 300-field profile the CopyBi
 ticks over 34 calls, about 38,036 per publish, and the complete drawing row is 5.554% rather than
 12.342%. C2P is now the largest remaining port-owned row at 41.385%.
 
+A diagnostic destination split then ran each normalized C2P rectangle through the identical
+assembly routine into the real chip-RAM back buffer and an equivalent fast-RAM buffer. Across 106
+moving frames and 952 rectangles, chip RAM used 25,459,010 ticks versus 16,977,889 for fast RAM, a
+1.500 ratio. The transpose/table path therefore represents roughly two-thirds of current C2P time;
+the additional chip-write penalty is about one-third. Post-alignment and lossless coalescing cover
+104,792 pixels per frame, 63.960% of the surface, in 8.981 rectangles per frame. This rules out
+dirty coverage as the first lever and directs the next work back into the transpose/lookup kernel.
+
 The differential now has a real moving checkpoint rather than a neutral car with a held
 accelerator. `VETTE_DRIVING_MOTION=1` makes the Macintosh harness wait for a valid full-window
 CopyBits from Vette, latch the application A5 at that trap boundary, wait for countdown state 3,

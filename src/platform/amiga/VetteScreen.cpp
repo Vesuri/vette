@@ -26,6 +26,13 @@ volatile uint32_t g_c2pVerifyCalls = 0;
 volatile uint32_t g_c2pVerifyBytes = 0;
 volatile uint32_t g_c2pVerifyFailures = 0;
 #endif
+#ifdef VETTE_C2P_SPLIT
+volatile uint32_t g_c2pSplitChipTicks = 0;
+volatile uint32_t g_c2pSplitFastTicks = 0;
+volatile uint32_t g_c2pSplitFrames = 0;
+volatile uint32_t g_c2pSplitRects = 0;
+volatile uint32_t g_c2pSplitPixels = 0;
+#endif
 volatile uint16_t g_macFramesQueued = 0;
 volatile uint16_t g_macFramesPresented = 0;
 volatile uint16_t g_beamPresentLine = 0;
@@ -82,6 +89,9 @@ static void convertC2PSpanC(const uint8_t* source, uint8_t* destination, uint16_
 
 #ifdef VETTE_C2P_VERIFY
 static uint8_t s_c2pVerifyBytes[VetteScreen::kRowStride];
+#endif
+#ifdef VETTE_C2P_SPLIT
+static uint8_t s_c2pSplitFast[VetteScreen::kPictureBytes];
 #endif
 
 static void initializePairToPlanes()
@@ -480,6 +490,9 @@ bool VetteScreen::presentMacFrame(const uint8_t* chunky, const uint8_t* colorTab
     m_syncRectCount = 0;
 
     if (pixelsDirty) {
+#ifdef VETTE_C2P_SPLIT
+        ++g_c2pSplitFrames;
+#endif
 #ifdef VETTE_PROBE
         VetteProfileScope profileC2P(kProfileC2P);
 #endif
@@ -494,11 +507,30 @@ bool VetteScreen::presentMacFrame(const uint8_t* chunky, const uint8_t* colorTab
             uint8_t* rectangleDestination = m_back
                                           + (uint32_t)(dirty.top + kMacTop) * kRowStride
                                           + firstWord * 2;
+#ifdef VETTE_C2P_SPLIT
+            uint8_t* fastDestination = s_c2pSplitFast
+                                     + (uint32_t)(dirty.top + kMacTop) * kRowStride
+                                     + firstWord * 2;
+            uint32_t splitStart = vetteProfileBeamEpoch();
+#endif
 #ifdef VETTE_C2P_VERIFY
             uint32_t start = vetteProfileBeamEpoch();
 #endif
             vetteC2PRectAsm(rectangleSource, rectangleDestination, s_quadToPlanes,
                             groups, (uint16_t)(dirty.bottom - dirty.top));
+#ifdef VETTE_C2P_SPLIT
+            g_c2pSplitChipTicks += vetteProfileBeamEpoch() - splitStart;
+            splitStart = vetteProfileBeamEpoch();
+            vetteC2PRectAsm(rectangleSource, fastDestination, s_quadToPlanes,
+                            groups, (uint16_t)(dirty.bottom - dirty.top));
+            g_c2pSplitFastTicks += vetteProfileBeamEpoch() - splitStart;
+            ++g_c2pSplitRects;
+            // Keep the diagnostic out of libgcc's very costly 32-bit multiply;
+            // the production audit deliberately rejects that runtime helper.
+            uint16_t splitWidth = (uint16_t)(dirty.right - dirty.left);
+            for (int16_t splitY = dirty.top; splitY < dirty.bottom; ++splitY)
+                g_c2pSplitPixels += splitWidth;
+#endif
 #ifdef VETTE_C2P_VERIFY
             g_c2pAsmTicks += vetteProfileBeamEpoch() - start;
 #endif

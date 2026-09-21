@@ -138,6 +138,16 @@ EXTRA_DEFINES += -DVETTE_DRIVING_COPY_VERIFY
 endif
 endif
 
+# Diagnostic only: run each normalized C2P rectangle once to the real chip-RAM
+# back buffer and once to an equivalent fast-RAM buffer, timing both destinations.
+# Use with PROBES=1; ordinary builds do not allocate the comparison buffer.
+ifeq ($(C2P_SPLIT),1)
+ifndef PROBES
+$(error C2P_SPLIT=1 requires PROBES=1)
+endif
+EXTRA_DEFINES += -DVETTE_C2P_SPLIT
+endif
+
 # `make PROBES=1` — the sub-frame timing accumulators, read via the gdb stub (amiga/diag_run.sh).
 # OFF by default: the probes read chip registers several times per iteration, which is exactly
 # what a framerate build must not do.  ⚠ NEVER quote a framerate from a PROBES build.
@@ -344,6 +354,10 @@ ifdef VERIFY
 PROBE_SYMS += g_c2pAsmTicks g_c2pCTicks g_c2pVerifyCalls g_c2pVerifyBytes \
               g_c2pVerifyFailures
 endif
+endif
+ifeq ($(C2P_SPLIT),1)
+PROBE_SYMS += g_c2pSplitChipTicks g_c2pSplitFastTicks g_c2pSplitFrames \
+              g_c2pSplitRects g_c2pSplitPixels
 endif
 ifneq ($(DRIVING_COPY_C),1)
 ifdef VERIFY
