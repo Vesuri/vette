@@ -1303,6 +1303,14 @@ nested VBI diagnostic is 0.322% and the same-rate empty bracket only 0.035%, so 
 road logic or PICT decoding—is the first measured optimization target. The reproducible entry point
 is `make driving-profile`; detailed numbers and measurement rules are in `docs/perf-method.md`.
 
+The first presentation split found that the back-buffer synchronization copy alone occupied
+39.711% of a focused 100-field window. Driving's next dirty rectangle covers the complete previous
+one, so the port now skips synchronization only under that general containment condition; partial
+dirty rectangles still copy forward untouched pixels. The synchronization row falls to zero and a
+post-change capture of the second driving update round-trips all 163,840 chunky pixels through the
+actual planar back buffer without one mismatch. This removes 81,920 redundant chip-RAM byte copies
+per full driving update without a scene-specific condition.
+
 The 26-record sightseeing table used by `Main+$3456` was also decoded as a possible source-native
 shortcut. Record 4 is cell `(6,26)`, only six cells from the export-221 transition at `(6,32)`, but
 the documented T command is conditional on Tour Mode. Five ordinary T down/up scans during the

@@ -10,6 +10,7 @@ enum VetteProfileCategory {
     kProfileAudio,
     kProfileOtherTrap,
     kProfilePresent,
+    kProfileSync,
     kProfileWait,
     kProfileControl,
     kProfileVBI,

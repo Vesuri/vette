@@ -19,23 +19,26 @@ set $resource = g_profileTicks[1]
 set $audio = g_profileTicks[2]
 set $otherInclusive = g_profileTicks[3]
 set $present = g_profileTicks[4]
-set $wait = g_profileTicks[5]
-set $control = g_profileTicks[6]
-set $vbi = g_profileTicks[7]
+set $sync = g_profileTicks[5]
+set $wait = g_profileTicks[6]
+set $control = g_profileTicks[7]
+set $vbi = g_profileTicks[8]
 set $other = $otherInclusive-$audio-$present-$wait
 set $resident = $elapsed-$drawing-$resource-$otherInclusive
-set $accounted = $resident+$drawing+$resource+$audio+$other+$present+$wait
+set $convert = $present-$sync
+set $accounted = $resident+$drawing+$resource+$audio+$other+$convert+$sync+$wait
 printf "beamTicks=%u (256 ticks/scanline)\n", $elapsed
 printf "resident game / callbacks  ticks=%u share=%.3f%%\n", $resident, 100.0*$resident/$elapsed
 printf "drawing traps              ticks=%u share=%.3f%% calls=%u\n", $drawing, 100.0*$drawing/$elapsed, g_profileCalls[0]
 printf "resource traps             ticks=%u share=%.3f%% calls=%u\n", $resource, 100.0*$resource/$elapsed, g_profileCalls[1]
 printf "audio shim                 ticks=%u share=%.3f%% calls=%u\n", $audio, 100.0*$audio/$elapsed, g_profileCalls[2]
 printf "other compatibility        ticks=%u share=%.3f%% calls=%u\n", $other, 100.0*$other/$elapsed, g_profileCalls[3]
-printf "C2P + palette              ticks=%u share=%.3f%% calls=%u\n", $present, 100.0*$present/$elapsed, g_profileCalls[4]
-printf "display back-pressure      ticks=%u share=%.3f%% calls=%u\n", $wait, 100.0*$wait/$elapsed, g_profileCalls[5]
+printf "C2P + palette              ticks=%u share=%.3f%% calls=%u\n", $convert, 100.0*$convert/$elapsed, g_profileCalls[4]
+printf "back-buffer synchronization ticks=%u share=%.3f%% calls=%u\n", $sync, 100.0*$sync/$elapsed, g_profileCalls[5]
+printf "display back-pressure      ticks=%u share=%.3f%% calls=%u\n", $wait, 100.0*$wait/$elapsed, g_profileCalls[6]
 printf "ACCOUNTING                 ticks=%u share=%.3f%% (MUST be ~100%%)\n", $accounted, 100.0*$accounted/$elapsed
-printf "nested VBI diagnostic      ticks=%u share=%.3f%% calls=%u\n", $vbi, 100.0*$vbi/$elapsed, g_profileCalls[7]
-printf "empty bracket control      ticks=%u share=%.3f%% calls=%u\n", $control, 100.0*$control/$elapsed, g_profileCalls[6]
+printf "nested VBI diagnostic      ticks=%u share=%.3f%% calls=%u\n", $vbi, 100.0*$vbi/$elapsed, g_profileCalls[8]
+printf "empty bracket control      ticks=%u share=%.3f%% calls=%u\n", $control, 100.0*$control/$elapsed, g_profileCalls[7]
 printf "========================================\n\n"
 detach
 quit

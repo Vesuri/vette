@@ -66,6 +66,22 @@ The nested VBI diagnostic is 0.322%; the empty-bracket control is 0.035%. The fi
 target is therefore the presentation path, not resident road logic or PICT decoding. These are
 probe-build attribution numbers, not shipping-build framerate numbers.
 
+### 2026-09-21 — remove synchronization fully covered by C2P
+
+A focused 100-field baseline separated the presentation row: copying the previous dirty rectangle
+from front to back consumed 39.711% of the complete window, while conversion and palette work used
+38.236%. All four updates covered the complete 512×320 surface, so each 81,920-byte synchronization
+copy was immediately overwritten by C2P.
+
+`presentMacFrame` now omits that copy only when the new normalized dirty rectangle fully contains
+the pending synchronization rectangle. Partial updates retain the old path. In the matching short
+run the synchronization row is exactly zero and six rather than four updates fit in the window.
+Those update counts describe different amounts of advancing game state and are not claimed as a
+controlled speed ratio; the deleted row itself is the priced work. A capture of the second driving
+conversion after the omission decodes all 163,840 planar pixels back to their simultaneous chunky
+source with zero differences (`amiga/driving_planar_check.gdb` and
+`tools/verify_driving_planar.py`).
+
 ## Lessons — measurement
 
 - **Compare FPS row vectors, never a `total painted` line.** A total spans a partial trailing row

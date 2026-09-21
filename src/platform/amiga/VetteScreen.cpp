@@ -361,11 +361,26 @@ bool VetteScreen::presentMacFrame(const uint8_t* chunky, const uint8_t* colorTab
     return true;
 #endif
 
-    // After the previous swap m_back is the frame from two updates ago.  Bring
-    // forward only the rectangle that changed in the last frame, then apply the
-    // new dirty rectangle.  Both buffers therefore remain coherent without a
-    // full-screen chip-RAM copy.
-    if (m_syncPending) {
+    if (dirtyTop < 0) dirtyTop = 0;
+    if (dirtyLeft < 0) dirtyLeft = 0;
+    if (dirtyBottom > (int16_t)kMacHeight) dirtyBottom = kMacHeight;
+    if (dirtyRight > (int16_t)kWidth) dirtyRight = kWidth;
+    dirtyLeft &= (int16_t)~15;
+    dirtyRight = (int16_t)((dirtyRight + 15) & ~15);
+    bool pixelsDirty = dirtyTop < dirtyBottom && dirtyLeft < dirtyRight;
+
+    // After the previous swap m_back is the frame from two updates ago. Bring
+    // forward the rectangle changed last time unless this conversion replaces
+    // every one of those bytes anyway. Driving marks the complete 512x320
+    // surface: copying its old 81,920 planar bytes immediately before fully
+    // overwriting them consumed 39.7% of the measured update window.
+    bool replacesSync = pixelsDirty && m_syncPending
+        && dirtyTop <= m_syncTop && dirtyLeft <= m_syncLeft
+        && dirtyBottom >= m_syncBottom && dirtyRight >= m_syncRight;
+    if (m_syncPending && !replacesSync) {
+#ifdef VETTE_PROBE
+        VetteProfileScope profileSync(kProfileSync);
+#endif
         uint16_t byteLeft = (uint16_t)m_syncLeft / 8;
         uint16_t byteRight = (uint16_t)m_syncRight / 8;
         for (int16_t y = m_syncTop; y < m_syncBottom; ++y) {
@@ -376,16 +391,9 @@ bool VetteScreen::presentMacFrame(const uint8_t* chunky, const uint8_t* colorTab
                     m_back[offset] = m_chip[offset];
             }
         }
-        m_syncPending = false;
     }
+    m_syncPending = false;
 
-    if (dirtyTop < 0) dirtyTop = 0;
-    if (dirtyLeft < 0) dirtyLeft = 0;
-    if (dirtyBottom > (int16_t)kMacHeight) dirtyBottom = kMacHeight;
-    if (dirtyRight > (int16_t)kWidth) dirtyRight = kWidth;
-    dirtyLeft &= (int16_t)~15;
-    dirtyRight = (int16_t)((dirtyRight + 15) & ~15);
-    bool pixelsDirty = dirtyTop < dirtyBottom && dirtyLeft < dirtyRight;
     if (pixelsDirty) {
         uint16_t firstWord = (uint16_t)dirtyLeft / 16;
         uint16_t finalWord = (uint16_t)dirtyRight / 16;
