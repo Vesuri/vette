@@ -122,6 +122,18 @@ supporting 100-field profile, seven full conversions used 4,602,903 ticks, or 65
 down from 708,861 (7.2%); eight rather than seven advancing updates fit in the window, so only the
 back-to-back ratio is the controlled comparison.
 
+### 2026-09-21 — 32-pixel longword C2P batches
+
+The same packed kernel now combines two 16-pixel results once more and writes one 32-pixel
+longword to each plane. A separate word-write tail preserves the existing 16-pixel dirty-boundary
+contract, so narrow drawing does not convert an enlarged rectangle merely to suit the fast path.
+The verifier exercised both paths and compared 722,008 output bytes with zero failures. The C
+oracle used 9,046,373 beam ticks against assembly's 5,264,348, a ratio of 1.718. Normalized through
+the oracle, this is another 14.9% kernel reduction from the 1.462-ratio word-only implementation.
+The supporting 100-field profile recorded eight full conversions in 4,474,820 ticks, or 559,353
+per call, also 14.9% below the previous 657,557. C2P plus palette now occupies 55.945% of that
+advancing-state window; synchronization remains zero.
+
 ## Lessons — measurement
 
 - **Compare FPS row vectors, never a `total painted` line.** A total spans a partial trailing row

@@ -31,7 +31,7 @@ is consequently renumbered.
 2. **Establish the performance target.** The full-accounting target-A1200 profile is now in place
    and identified presentation as 80.353% of the first moving-driving baseline. After removing a
    fully overwritten synchronization copy and adding the packed word-write C2P kernel, the focused
-   100-field window attributes 57.692% to C2P plus palette and zero to synchronization. Measure the
+   100-field window attributes 55.945% to C2P plus palette and zero to synchronization. Measure the
    same synchronized workload on the original Macintosh and set the target from both results.
 3. **Fix measured visual discrepancies.** Trace wrong pixels and geometry to their source data or
    implementation; do not add scene-, car-, or color-specific patches.

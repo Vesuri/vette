@@ -1324,6 +1324,13 @@ supporting full-conversion cost falls from 708,861 to 657,557 beam ticks per cal
 back-to-back ratio is a controlled comparison. `C2P_C=1` remains the clean-C fallback and
 `amiga/c2p_verify.gdb` is the regression reader.
 
+The packed kernel then extends the same batching to 32 pixels and four longword plane writes,
+retaining an exact 16-pixel word tail rather than widening dirty rectangles. The in-process
+differential covers 722,008 more plane bytes with zero failures and raises the C/assembly ratio
+from 1.462 to 1.718, a further 14.9% kernel reduction normalized through the oracle. The matching
+supporting profile uses 4,474,820 ticks for eight full conversions, or 559,353 per call (also 14.9%
+below 657,557), and attributes 55.945% of the 100-field window to C2P plus palette.
+
 The 26-record sightseeing table used by `Main+$3456` was also decoded as a possible source-native
 shortcut. Record 4 is cell `(6,26)`, only six cells from the export-221 transition at `(6,32)`, but
 the documented T command is conditional on Tour Mode. Five ordinary T down/up scans during the
