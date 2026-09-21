@@ -92,6 +92,9 @@ driving-audio-capture:
 	  GDBTAIL=240 EXTRA_ARGS="--warp_mode=1" GDBSCRIPT=driving_audio_events.gdb \
 	  ./diag_run.sh 150
 	@cp amiga/.run/gdb-out.log tmp/amiga-driving-audio.log
+	@python3 tools/render_paula_audio.py amiga/assets/vette.resources \
+		tmp/amiga-driving-audio.log tmp/amiga-driving-audio.wav
+	@python3 tools/audio_reference_report.py tmp/amiga-driving-audio.wav
 
 driving-motion-capture:
 	@rm -f tmp/driving-motion-sequence.tsv tmp/driving-motion-source-*.raw tmp/driving-motion-globals-*.bin tmp/driving-motion-car-*.bin tmp/driving-motion-object-*.bin

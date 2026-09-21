@@ -134,7 +134,9 @@ is consequently renumbered.
    the moving-driving passage begins at 75.500 seconds in the present capture.
    `make driving-audio-capture` records the matching target wrapper timeline: the current
    100-iteration road run has one Start, six Loads, 99 engine Play updates, and no lifecycle stop or
-   loud stop. Reconstruct its four Paula voices and compare pitch, duration, cue timing and overlap,
+   loud stop. Its reconstructed four-voice waveform proves engine-period error stays within
+   -3.100..+0.710 cents and direct effects within +2.133 cents of their source rates. Compare
+   duration, cue timing, authored level and overlap against the Macintosh PCM,
    then cover gear changes, collisions, skids, horns, police, environment, and result audio,
    including concurrent playback and transitions.
 6. **Automate fidelity regressions.** Keep intro and driving framebuffer differentials, palette

@@ -1142,10 +1142,21 @@ boundary. It performs a clean A1200 diagnostic build, follows the bounded Course
 for 100 original driving iterations, and retains the complete event log in
 `tmp/amiga-driving-audio.log`. The measured run contains one Start, six Loads and 99 engine Play
 updates with no Stop, Deactivate or loud stop. Context 0 loads the indefinite Engine at tick 1,678;
-context 2 then loads beep1 three times, beep2 once and thud twice. At the tick-2,661 ceiling the
+context 2 then loads beep1 twice, beep2 once and thud twice. At the tick-2,661 ceiling the
 engine is still playing on the centred channel pair at pitch `$9858`, while the last finite effect
 has expired. `amiga/driving_audio_events.gdb` records every tick, context, duration, options word,
 instrument ordinal and Play pitch in a machine-readable form suitable for Paula reconstruction.
+
+`tools/render_paula_audio.py` now performs that reconstruction outside the game. It reads the VRS1
+archive and wrapper-event log, models each hardware voice's integer period, phase continuity,
+initial full-sample attack, declared reload loop and finite tick deadline, and writes a diagnostic
+48 kHz stereo WAV. This is verification tooling, not a software mixer in the Amiga executable.
+The measured interval is 16.383 seconds from ticks 1,678..2,661. AUD0/1 keep the engine centred;
+the context-2 AUD2 effects appear only on the right output. Across all 99 engine Play calls, Paula
+period quantization differs from Bogas's fixed 11.127 kHz phase-step target by -3.100..+0.710
+cents. The worst direct-effect rate error is +2.133 cents for thud. The earlier incorrect-pitch
+class is therefore closed for this workload; cue timing, authored level and overlap remain to be
+compared against the Macintosh PCM.
 
 The corrected route reaches the Lake Merced water collision and displays the game's own tow-truck
 recovery artwork. A probe on the actual `_GetPicture` trap records PICT 140 at the resident wrapper
