@@ -5076,13 +5076,13 @@ static void refreshDrivingKeyMap()
 #ifdef VETTE_FOLLOW_ROAD
         // Course One starts immediately before a right-hand bend.  The game's
         // accelerate-right control increases the heading from roughly $3000
-        // on a $0000..$3fff circle.  Release it near $3c00, before the wrap,
+        // on a $0000..$3fff circle.  Release it near $3d00, before the wrap,
         // then continue with its ordinary straight accelerator.  This
         // is a normal-road fidelity workload; the old straight-to-water line
         // remains available by omitting FOLLOW_ROAD.
         static bool initialRightTurnComplete;
         uint8_t* car = (uint8_t*)read32(s_currentA5 - 13944);
-        if (car && read16(car + 0x66) >= 0x3c00) initialRightTurnComplete = true;
+        if (car && read16(car + 0x66) >= 0x3d00) initialRightTurnComplete = true;
         uint16_t accelerator = initialRightTurnComplete ? 0x5b : 0x5c; // keypad 8 / 9
         keyMap[accelerator >> 3] |= 1u << (accelerator & 7);
 #else

@@ -725,7 +725,7 @@ mac.run(function()
 		if follow_road then
 			if not mac.wait_for("initial right turn", function()
 				local car = car_address()
-				return car ~= 0 and u16(car + 0x66) >= 0x3c00
+				return car ~= 0 and u16(car + 0x66) >= 0x3d00
 			end, 1200) then return end
 			mac.key_up("Keypad 9")
 			mac.key_down("Keypad 8")

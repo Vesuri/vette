@@ -1718,7 +1718,7 @@ Long fidelity and audio observations now have a separate normal-road input workl
 `FOLLOW_ROAD=1` with the deterministic garage harness holds the game's own keypad-9
 accelerate/right control after the original shift scanner reaches first gear. Course One begins at
 about heading `$3000` on the game's `$0000..$3FFF` heading circle, and that control increases the
-heading; it is released near `$3C00`, before the wrap, and keypad 8 remains held for straight acceleration. The target checkpoint
+heading; it is released near `$3D00`, before the wrap, and keypad 8 remains held for straight acceleration. The target checkpoint
 continues for 100 original driving iterations after startup rather than ending the emulator as soon
 as steering is released. `amiga/driving_follow_road.gdb` preserves the bounded proof. This
 does not replace the straight-to-water route, which remains the collision/recovery fixture when

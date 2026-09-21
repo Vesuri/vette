@@ -28,7 +28,7 @@ compatibility debt, not blockers for fidelity or performance work.
 
 For bounded driving runs that need continued motion rather than the lake collision, build with
 `GARAGE_CLICK=1 FOLLOW_ROAD=1`. The harness uses the shipped keypad-9 accelerate/right input from
-the Course One start, releases it near heading `$3C00`, and continues on keypad 8. Omitting
+the Course One start, releases it near heading `$3D00`, and continues on keypad 8. Omitting
 `FOLLOW_ROAD` retains the straight-to-water collision checkpoint.
 
 ⚠ **Refer to an item by its TITLE, not its number.** Entries are deleted when closed and the list
