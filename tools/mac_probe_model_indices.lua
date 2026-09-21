@@ -23,6 +23,20 @@ local driving_ports = {}
 local driving_copy_captures = 0
 local driving_capture_armed = false
 local driving_sequence_manifest = nil
+local driving_motion = os.getenv("VETTE_DRIVING_MOTION") == "1"
+local driving_capture_limit = driving_motion and 48 or 4
+local driving_capture_stem = driving_motion and "driving-motion-source" or "driving-copy-source"
+local driving_manifest_path = driving_motion and
+	"ref/mame/driving-motion-sequence.tsv" or "ref/mame/driving-sequence.tsv"
+local last_driving_state = nil
+local driving_frame_ready = false
+local driving_a5 = 0
+if driving_motion then
+	os.remove(driving_manifest_path)
+	for i = 1, driving_capture_limit do
+		os.remove(string.format("ref/mame/%s-%u.raw", driving_capture_stem, i))
+	end
+end
 local palette_for_window = {}
 local last_activate_window = 0
 local mirror_write_armed = false
@@ -244,19 +258,30 @@ local function on_copybits(pb)
 	local source_base = a24(u32(source))
 	local source_stride = u16(source + 4) & 0x3FFF
 	local viewport_sample = prog:read_u8(source_base + source_stride * 10)
-	if driving_capture_armed and driving_copy_captures < 4
-		and st == 0 and sl == 0 and sb == 342 and sr == 512
+	local a5 = a24(cpu.state["A5"].value)
+	local car = a5 ~= 0 and a24(u32(a5 - 0x3678)) or 0
+	local state_key = car ~= 0 and string.format("%d/%d/%d/%08X/%08X/%u",
+		s16(u16(car + 0x44)), s16(u16(car + 0x1C)), s16(u16(car + 0x1A)),
+		u32(car), u32(car + 8), u16(car + 0x66)) or nil
+	if stage == "driving" and st == 0 and sl == 0 and sb == 342 and sr == 512
 		and top == 0 and left == 0 and bottom == 342 and right == 512
 		and viewport_sample ~= 0x00 and viewport_sample ~= 0xFF then
+		driving_a5 = a5
+		driving_frame_ready = true
+	end
+	if driving_capture_armed and driving_copy_captures < driving_capture_limit
+		and st == 0 and sl == 0 and sb == 342 and sr == 512
+		and top == 0 and left == 0 and bottom == 342 and right == 512
+		and viewport_sample ~= 0x00 and viewport_sample ~= 0xFF
+		and (not driving_motion or state_key ~= last_driving_state) then
 		driving_copy_captures = driving_copy_captures + 1
+		last_driving_state = state_key
 		print(string.format("VP DRIVING COPY #%u frame=%u mode=%u",
 			driving_copy_captures, mac.frames(), u16(pb + 4)))
 		if driving_sequence_manifest == nil then
-			driving_sequence_manifest = assert(io.open("ref/mame/driving-sequence.tsv", "w"))
+			driving_sequence_manifest = assert(io.open(driving_manifest_path, "w"))
 			driving_sequence_manifest:write("capture\tticks\trpm\tgear\tspeed\tx\ty\theading\n")
 		end
-		local a5 = a24(cpu.state["A5"].value)
-		local car = a24(u32(a5 - 0x3678))
 		driving_sequence_manifest:write(string.format(
 			"%u\t%u\t%d\t%d\t%d\t%08X\t%08X\t%u\n",
 			driving_copy_captures, u32(0x016A), s16(u16(car + 0x44)),
@@ -264,10 +289,10 @@ local function on_copybits(pb)
 			u32(car + 8), u16(car + 0x66)))
 		driving_sequence_manifest:flush()
 		local source_top, _, source_bottom, _ = rect(source + 6)
-		dump_bytes(string.format("ref/mame/driving-copy-source-%u.raw", driving_copy_captures),
+		dump_bytes(string.format("ref/mame/%s-%u.raw", driving_capture_stem, driving_copy_captures),
 			a24(u32(source)),
 			(u16(source + 4) & 0x3FFF) * (source_bottom - source_top))
-		if driving_copy_captures == 1 then
+		if driving_copy_captures == 1 and not driving_motion then
 			arm_dashboard_writer(source)
 			dump_pixmap("DRIVING-SRC", source)
 			dump_pixmap("DRIVING-DST", destination)
@@ -456,8 +481,37 @@ mac.run(function()
 		mac.type("16")       -- manual's copy-protection table: Chinatown has 16 blocks
 		click(451, 284, 180) -- protection OK; the accepted course continues
 	end
-	-- Match the deterministic Amiga route: keypad 8 is held before the first
-	-- driving iteration and remains held through the named-state capture.
+	-- Match the deterministic Amiga route.  Traffic+$51FE rejects shifts before
+	-- countdown state 3, so wait for that original-game state, pulse top-row +
+	-- until gear 1 is visible, and only then hold keypad 8.  The older stationary
+	-- capture deliberately retains its neutral behavior.
+	if driving_motion then
+		local function car_address()
+			local a5 = driving_a5
+			return a5 ~= 0 and a24(u32(a5 - 0x3678)) or 0, a5
+		end
+		if not mac.wait_for("first complete driving frame", function()
+			return driving_frame_ready
+		end, 2400) then return end
+		if not mac.wait_for("driving countdown state 3", function()
+			local car, a5 = car_address()
+			return car ~= 0 and s16(u16(a5 - 13296)) >= 3
+		end, 1800) then return end
+		-- The Amiga harness asserts accelerator in the same GetKeys refresh that
+		-- first observes gear 1.  Have it waiting before the shift so MAME cannot
+		-- lose one physics iteration to its once-per-video-frame Lua poll.
+		mac.key_down("Keypad 8")
+		-- GetKeys is sampled by the driving loop, not the Event Manager.  Keep the
+		-- bit down until that scanner observes it; a short ADB press can begin and
+		-- end while the slow renderer owns the CPU and is therefore not an input.
+		mac.key_down("=  +")
+		local shifted = mac.wait_for("gear 1", function()
+			local car = car_address()
+			return car ~= 0 and s16(u16(car + 0x1C)) == 1
+		end, 600)
+		mac.key_up("=  +")
+		if not shifted then return end
+	end
 	mac.key_down("Keypad 8")
 	driving_capture_armed = true
 	arm_mirror_source_writer()

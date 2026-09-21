@@ -28,8 +28,13 @@ is consequently renumbered.
 1. **Build the representative driving differential.** Compare synchronized original and Amiga
    sequences for geometry, object placement, palettes, surface heights, clipping, mirrors, traffic,
    animation, and the principal view modes—not merely one exact initial frame. State-keyed capture
-   now proves two shared stationary-render states (RPM 11 and 23) exact across 350,208 active pixels;
-   extend the same method to actual motion, traffic, and alternate views.
+   now proves two shared stationary-render states (RPM 11 and 23) exact across 350,208 active pixels.
+   The moving harness reaches gear 1 through the original shift scanner and captures 37 Macintosh
+   and 40 Amiga source frames at the same full-window CopyBits boundary. Five player-state tuples
+   overlap, but their dashboard/scene phases do not: the earliest differs by only 46 lower-right
+   pixels, while later coincident player states differ much more. Add the dashboard and traffic
+   phase to the checkpoint key (or establish an equivalent complete-state checkpoint) before
+   classifying those pixels as renderer defects; then extend to alternate views.
 2. **Establish the performance target.** The full-accounting target-A1200 profile is now in place
    and identified presentation as 80.353% of the first moving-driving baseline. After removing a
    fully overwritten synchronization copy, adding the packed word-write C2P kernel, and deriving a

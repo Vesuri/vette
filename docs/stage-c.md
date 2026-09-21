@@ -1367,6 +1367,23 @@ whole-window difference is not presented as a controlled speed ratio. The exclus
 total exactly 100%. Further presentation work therefore targets conversion, not palette caching or
 the now-lightweight bound capture.
 
+The differential now has a real moving checkpoint rather than a neutral car with a held
+accelerator. `VETTE_DRIVING_MOTION=1` makes the Macintosh harness wait for a valid full-window
+CopyBits from Vette, latch the application A5 at that trap boundary, wait for countdown state 3,
+hold top-row `+` until the original scanner reports gear 1, and assert keypad 8 at the same input
+boundary used by the Amiga harness. It records distinct 512-row source GWorlds and player state.
+`make driving-motion-capture` records the Amiga side at the identical CopyBits boundary;
+`make driving-motion-compare` pairs them by RPM, gear, speed, position and heading.
+
+The first run produced 37 Macintosh and 40 Amiga moving states, with five shared player tuples.
+This also found the next synchronization requirement rather than a palette guess: the first shared
+tuple differs in only 46 lower-right pixels, but later tuples differ in dashboard and scene regions
+even though the player record agrees. Relative tick positions differ, so the player tuple is not a
+complete game state—dashboard phase and traffic/collision state can legitimately be different.
+Those fields must be added to the key, or seeded through a complete diagnostic checkpoint, before
+the larger pixel deltas can be called port defects. The stationary RPM-11/RPM-23 exact regression
+remains separate and unchanged.
+
 The 26-record sightseeing table used by `Main+$3456` was also decoded as a possible source-native
 shortcut. Record 4 is cell `(6,26)`, only six cells from the export-221 transition at `(6,32)`, but
 the documented T command is conditional on Tour Mode. Five ordinary T down/up scans during the

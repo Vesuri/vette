@@ -8,7 +8,7 @@
 #
 # The Amiga build is in amiga/ and is the real target: `cd amiga && . ./env.sh && make`.
 
-.PHONY: all todo driving-sequence-capture driving-sequence-compare driving-profile help
+.PHONY: all todo driving-sequence-capture driving-sequence-compare driving-motion-capture driving-motion-compare driving-profile help
 
 all: help
 
@@ -18,6 +18,8 @@ help:
 	@echo "  make todo     what is open (docs/open-work.md + a live marker sweep)"
 	@echo "  make driving-sequence-compare  compare saved MAME/Amiga driving frames"
 	@echo "  make driving-sequence-capture  capture Amiga frames at saved Macintosh game states"
+	@echo "  make driving-motion-compare    compare saved moving-driving frames by game state"
+	@echo "  make driving-motion-capture    capture distinct completed moving Amiga frames"
 	@echo "  make driving-profile  build and measure 300 PAL fields of target-A1200 driving"
 	@echo
 	@echo "There is no host build yet — see PROJECT.md 'Open decisions' #6."
@@ -51,6 +53,21 @@ driving-sequence-capture:
 driving-sequence-compare:
 	@python3 tools/compare_driving_sequence.py \
 		ref/mame/driving-copy-source tmp/driving-copy-source \
+		--match-state \
+		$(if $(REQUIRE_EXACT),--require-exact,)
+
+driving-motion-capture:
+	@rm -f tmp/driving-motion-sequence.tsv tmp/driving-motion-source-*.raw
+	@cd amiga && . ./env.sh && $(MAKE) clean && \
+	  $(MAKE) -j4 SKIP_INTRO=1 GARAGE_CLICK=1 && \
+	  GDBTAIL=160 EXTRA_ARGS="--warp_mode=1" GDBSCRIPT=driving_motion_sequence.gdb \
+	  ./diag_run.sh 150
+
+driving-motion-compare:
+	@python3 tools/compare_driving_sequence.py \
+		ref/mame/driving-motion-source tmp/driving-motion-source \
+		--reference-manifest ref/mame/driving-motion-sequence.tsv \
+		--amiga-manifest tmp/driving-motion-sequence.tsv \
 		--match-state \
 		$(if $(REQUIRE_EXACT),--require-exact,)
 
