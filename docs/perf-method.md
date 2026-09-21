@@ -167,6 +167,21 @@ the second conversion and `tools/verify_driving_planar.py` compares all 163,840 
 differences. `FILLWATCH=1` then samples eight rows per update; 40 frames covered all 320 rows with
 zero bad frames and zero bad pixels.
 
+### 2026-09-21 — lightweight raster-bound capture
+
+The first dirty-list implementation sent every `$AFFD` marker through the complete Line-A C++
+dispatcher. The handler now recognizes that private word before its general register save, appends
+the D4/D3/D1/D2-derived rectangle to a 64-entry fast-RAM buffer, emulates `ASL.L #2,D2`, and returns
+directly. Overflow saturates the count and makes the next boundary request a full conversion, so
+lost bounds cannot produce stale pixels. Coalescing happens once at the completed-frame boundary.
+
+The captured presentation list is unchanged: thirteen dashboard/mirror rectangles plus the outside
+view. Both the complete second-frame comparison and the 40-frame rolling audit remain pixel-exact.
+In the warmed 100-field profile, general compatibility dispatches fall from 457 to 25 and that row
+falls from 364,116 ticks (4.569%) to 192,036 (2.418%). The two advancing runs performed different
+amounts of C2P work, so their total elapsed times are not treated as a controlled speed comparison;
+the removed dispatcher call count and within-run accounting are the defensible evidence.
+
 ## Lessons — measurement
 
 - **Compare FPS row vectors, never a `total painted` line.** A total spans a partial trailing row

@@ -71,7 +71,9 @@ GWorld publication transport, not evidence that every destination pixel changed,
 `GrayRgn` over `(20,0)-(320,512)` is likewise construction rather than a completed frame. The 3D
 renderer redraws the outside view `(0,0)-(198,512)`. Traffic's two packed rectangle writers receive
 dashboard and mirror bounds in D4/D3/D1/D2; their original `ASL.L #2,D2` entry instructions are
-replaced by a private Line-A hook that records those bounds and then performs the displaced shift.
+replaced by a private Line-A hook. A short assembly branch in the exception handler records those
+bounds, performs the displaced shift, and returns directly; it does not enter the general Toolbox
+dispatcher. Sixty-four raw bounds fit before an overflow marker conservatively requests a full frame.
 A typical completed frame is consequently the outside view plus thirteen small dashboard/mirror
 rectangles, rather than one nearly full-screen union. The first completed driving frame is converted
 in full to seed double-buffer history. The second partial conversion and its simultaneous chunky
@@ -1350,13 +1352,19 @@ A nested profile split then identified the full-frame combined row precisely: C2
 4,443,105 ticks (55.955% of the fixed 100-field window), palette construction 19,084 (0.240%), and
 remaining presentation overhead 3,249 (0.041%); synchronization and back-pressure were both zero.
 
-The renderer-derived driving dirty list reduces the warmed 100-field window to 3,779,452 C2P ticks
+The renderer-derived driving dirty list reduced one warmed 100-field window to 3,779,452 C2P ticks
 for nine calls, about 419,939 per call versus roughly 555,388 in the preceding eight-call full-frame
 profile (24.4% less per call). Back-buffer synchronization is 7,933 ticks (0.100%). The added raster
-hooks appear in the broader compatibility row, which is 364,116 ticks for 457 calls; this is the
-cost of recovering exact bounds from the shipped renderer and remains an optimization candidate.
-The exclusive rows still total exactly 100%. Further presentation work therefore targets conversion
-and the hook path, not palette caching.
+hooks initially appeared in the broader compatibility row, which was 364,116 ticks for 457 calls.
+
+The `$AFFD` hook now has an assembly fast path before the general Line-A register save and C++
+dispatch. It appends the raw register bounds to a 64-entry fast-RAM buffer and the ordinary driving
+boundary coalesces them once per frame. The same representative rectangle capture remains exactly
+fourteen entries. In the matching 100-field profile this removes 432 general dispatches and reduces
+the compatibility row to 192,036 ticks for 25 calls. C2P varied with the advancing scene, so the
+whole-window difference is not presented as a controlled speed ratio. The exclusive rows still
+total exactly 100%. Further presentation work therefore targets conversion, not palette caching or
+the now-lightweight bound capture.
 
 The 26-record sightseeing table used by `Main+$3456` was also decoded as a possible source-native
 shortcut. Record 4 is cell `(6,26)`, only six cells from the export-221 transition at `(6,32)`, but

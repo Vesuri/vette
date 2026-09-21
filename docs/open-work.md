@@ -38,11 +38,11 @@ is consequently renumbered.
    results.
 3. **Fix measured visual discrepancies.** Trace wrong pixels and geometry to their source data or
    implementation; do not add scene-, car-, or color-specific patches.
-4. **Optimize measured bottlenecks.** Continue with the measured C2P presentation path and the
-   renderer-bound hook overhead. The dirty list cut conversion per update by about 24.4%, while its
-   register-bound hooks now contribute to the 4.569% compatibility row. Prefer representation and
-   algorithm changes before more assembly; verify every optimization against the reference
-   differential and preserve game behavior.
+4. **Optimize measured bottlenecks.** Continue with the measured C2P presentation path. The dirty
+   list cut conversion per update by about 24.4%; moving its register-bound capture ahead of the
+   general dispatcher then removed 432 dispatches from the 100-field profile and reduced the broad
+   compatibility row from 4.569% to 2.418%. Prefer representation and algorithm changes before more
+   assembly; verify every optimization against the reference differential and preserve game behavior.
 5. **Finish control fidelity.** Verify keyboard aliases, throttle, brake, steering, gears, mouse
    steering and buttons, pause/options controls, and a reproducible FS-UAE configuration that does
    not capture the keyboard as a joystick.

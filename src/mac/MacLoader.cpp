@@ -58,6 +58,8 @@ volatile uint16_t g_macExitState = 0;
 volatile uint16_t g_introAudioState = 0;
 volatile uint32_t g_introAudioBytes = 0;
 volatile uint16_t g_introAudioPeriod = 0;
+volatile int16_t g_drivingRasterBounds[64][4] = {{0}};
+volatile uint16_t g_drivingRasterBoundCount = 0;
 #ifdef VETTE_PROBE
 volatile uint32_t g_probePicture140TrapPC = 0;
 volatile uint32_t g_probePicture140Return = 0;
@@ -4973,23 +4975,6 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
     bool drivingSteadyFrame = false;
     bool drivingBoundary = trap == kDrivingBoundaryTrap
         && pc == (uint32_t)(s_segments[1].begin + 0x1fd2);
-    bool drivingRaster = trap == kDrivingRasterTrap
-        && (pc == (uint32_t)(s_segments[6].begin + 0x67a4)
-            || pc == (uint32_t)(s_segments[6].begin + 0x67fa));
-    if (drivingRaster) {
-        // Entry contract recovered from the shipped callers and loops:
-        // D4=y, D3=x in pixels, D1=rows, D2=groups of eight pixels.
-        int16_t top = (int16_t)regs[4];
-        if (top < 0) top = 0;
-        else if (top > 340) top = 340;
-        uint16_t height = (uint16_t)regs[1];
-        uint32_t left = regs[3];
-        uint32_t right = left + ((uint16_t)regs[2] << 3);
-        if (s_drivingFrameStarted && left < 512 && right > left)
-            markDrivingDirtyBounds(top, (int16_t)left, (int16_t)(top + height),
-                                   (int16_t)(right > 512 ? 512 : right));
-        regs[2] <<= 2;                       // original ASL.L #2,D2
-    }
     // Emulate Main+$1FD2's original TST.W -21316(A5) / BEQ.W $29DA pair.
     // The handler adds two to the saved PC, hence each stored target is -2.
     if (drivingBoundary) {
@@ -4998,6 +4983,16 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
         bool driving = read16(s_currentA5 - 21316) != 0;
         if (driving) {
             if (s_drivingFrameStarted) {
+                uint16_t rasterBoundCount = g_drivingRasterBoundCount;
+                bool rasterBoundsOverflowed = rasterBoundCount == 0xffff;
+                if (!rasterBoundsOverflowed) {
+                    for (uint16_t i = 0; i < rasterBoundCount; ++i) {
+                        const volatile int16_t* rectangle = g_drivingRasterBounds[i];
+                        markDrivingDirtyBounds(rectangle[0], rectangle[1],
+                                               rectangle[2], rectangle[3]);
+                    }
+                }
+                g_drivingRasterBoundCount = 0;
                 // The original 3D renderer rebuilds the complete exterior
                 // viewport. Dashboard writers contribute separate rectangles
                 // through the Traffic hooks above.
@@ -5006,7 +5001,7 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
                 markCurrentCursorDirty();
                 s_pixelsDirty = false;
                 s_dirtyRectCount = 0;
-                if (!s_drivingFrameSeeded) {
+                if (!s_drivingFrameSeeded || rasterBoundsOverflowed) {
                     // Seed one complete frame. The other planar buffer is then
                     // brought forward by VetteScreen's covered synchronization
                     // on the following partial update.
@@ -5025,6 +5020,7 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
                 drivingFrameComplete = true;
             }
             else {
+                g_drivingRasterBoundCount = 0;
                 s_drivingDirtyRectCount = 0;
                 s_drivingFrameSeeded = false;
                 s_drivingFrameStarted = true;
@@ -5034,11 +5030,13 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
             s_drivingFrameStarted = false;
             s_drivingFrameSeeded = false;
             s_drivingDirtyRectCount = 0;
+            g_drivingRasterBoundCount = 0;
             write32(frame + 2, (uint32_t)(s_segments[1].begin + 0x29d8));
         }
     } else if (trap == 0xa9b4 && pc == (uint32_t)(s_segments[1].begin + 0x29e6)) {
         s_drivingFrameStarted = s_drivingFrameSeeded = false;
         s_drivingDirtyRectCount = 0;
+        g_drivingRasterBoundCount = 0;
     }
     // Every handled trap return is a user-mode-safe opportunity to deliver
     // due VBL work.  Restricting this to SystemTask left callbacks frozen while
@@ -5057,7 +5055,6 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
         if (exitChordPressed()) requestExitAfterTrap(frame);
         return 1;
     }
-    if (drivingRaster) return 1;
     if (routePatchedTrap(trap, frame)) return 1;
     if (trap == 0xa9f4) {                    // original ExitToShell after patch cleanup
         g_macVBLCallbackEntry = 0;

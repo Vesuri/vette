@@ -33,6 +33,40 @@ vette_user_exit_trampoline:
 
 	.globl vette_line_a_handler
 vette_line_a_handler:
+	| $AFFD is the high-frequency driving raster marker. Keep it out of the
+	| general C++ compatibility dispatcher: its entry contract is D4=y,
+	| D3=x, D1=rows, D2=eight-pixel groups. Record the raw rectangle in fast
+	| RAM, emulate the displaced ASL.L #2,D2, and return directly.
+	movem.l d0/a0,-(sp)
+	move.l 10(sp),a0
+	cmpi.w #0xaffd,(a0)
+	bne.s 3f
+	move.w g_drivingRasterBoundCount,d0
+	cmpi.w #64,d0
+	blo.s 4f
+	move.w #0xffff,g_drivingRasterBoundCount
+	bra.s 5f
+4:
+	lsl.w #3,d0
+	lea g_drivingRasterBounds,a0
+	adda.l d0,a0
+	move.w d4,(a0)+
+	move.w d3,(a0)+
+	move.w d4,d0
+	add.w d1,d0
+	move.w d0,(a0)+
+	move.w d2,d0
+	lsl.w #3,d0
+	add.w d3,d0
+	move.w d0,(a0)
+	addq.w #1,g_drivingRasterBoundCount
+5:
+	asl.l #2,d2
+	movem.l (sp)+,d0/a0
+	addq.l #2,2(sp)
+	rte
+3:
+	movem.l (sp)+,d0/a0
 	movem.l d0-d7/a0-a6,-(sp)
 	move.l sp,a0
 	lea 60(sp),a1
