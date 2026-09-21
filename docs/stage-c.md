@@ -1158,6 +1158,19 @@ cents. The worst direct-effect rate error is +2.133 cents for thud. The earlier 
 class is therefore closed for this workload; cue timing, authored level and overlap remain to be
 compared against the Macintosh PCM.
 
+The Macintosh oracle now traces the same wrapper events directly. It obtains `CurrentA5`, follows
+CODE 0 entries 500/501/505..507, and verifies the Segment Manager's actual loaded form
+`[segment:w][$4EF9][target:l]` before installing observation taps. The synchronized reference has
+the same six Load signatures byte-for-byte: engine, beep1, beep1, beep2, thud, thud with identical
+contexts, durations and options. `tools/compare_audio_events.py` makes this an automated gate. The
+target's 99 engine Play calls / 33 distinct pitch steps form a source-ordered subsequence of the
+faster Macintosh's 118 calls / 43 steps; no pitch is invented or reordered. Relative Load ticks
+for the first four events are Mac `0,6,152,297` and target `0,4,153,302`. The later thuds occur at
+Mac `364,371` versus target `417,447`, after road/traffic progression has diverged. Elapsed ticks
+are therefore reported but deliberately not required to match: completed-frame cadence is a
+machine-speed effect, while event identity, duration, ordering and pitch progression are fidelity
+contracts. Run `make driving-audio-compare` after the two capture targets.
+
 The corrected route reaches the Lake Merced water collision and displays the game's own tow-truck
 recovery artwork. A probe on the actual `_GetPicture` trap records PICT 140 at the resident wrapper
 `Traffic+$663C`; that wrapper's saved return identifies the dynamic request at `Main+$0FD6`, with

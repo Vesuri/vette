@@ -29,6 +29,9 @@ local driving_capture_limit = driving_motion and 40 or 4
 local trace_random = os.getenv("VETTE_RANDOM_TRACE") == "1"
 local trace_traffic_position = os.getenv("VETTE_TRAFFIC_POSITION_TRACE") == "1"
 local trace_traffic_init = os.getenv("VETTE_TRAFFIC_INIT_TRACE") == "1"
+local trace_audio = os.getenv("VETTE_AUDIO_TRACE") == "1"
+local audio_trace_armed = false
+local audio_trace_signature = ""
 local random_calls = 0
 local random_seed_text = os.getenv("VETTE_FIDELITY_RANDOM_SEED")
 local fidelity_random_seed = random_seed_text and
@@ -76,6 +79,53 @@ local function a24(v) return v & 0x00FFFFFF end
 local function u16(a) return prog:read_u16(a24(a)) end
 local function u32(a) return prog:read_u32(a24(a)) end
 local function s16(v) return v >= 0x8000 and v - 0x10000 or v end
+
+local function arm_audio_trace()
+	if not trace_audio or audio_trace_armed then return end
+	local a5 = a24(u32(0x0904)) -- CurrentA5
+	if a5 == 0 then return end
+	local wrappers = {
+		{500, "load"}, {501, "play"}, {505, "start"},
+		{506, "stop"}, {507, "deactivate"},
+	}
+	local targets = {}
+	local signature = string.format("%06X", a5)
+	for _, wrapper in ipairs(wrappers) do
+		local entry = a5 + 32 + wrapper[1] * 8
+		signature = signature .. string.format("/%04X:%04X:%08X",
+			u16(entry), u16(entry + 2), u32(entry + 4))
+		if u16(entry + 2) ~= 0x4EF9 then
+			if signature ~= audio_trace_signature then
+				audio_trace_signature = signature
+				print("MACAUDIO jump-state " .. signature)
+			end
+			return
+		end
+		targets[#targets + 1] = {a24(u32(entry + 4)), wrapper[2]}
+	end
+	audio_trace_armed = true
+	for _, wrapper in ipairs(targets) do
+		local target, name = wrapper[1], wrapper[2]
+		keep[#keep + 1] = prog:install_read_tap(target & ~3, (target & ~3) + 3,
+			"vette_audio_" .. name, function(_, data, _)
+				if a24(cpu.state["PC"].value) ~= target then return data end
+				local sp = a24(cpu.state["SP"].value)
+				local ticks = u32(0x016A)
+				if name == "load" then
+					print(string.format("MACAUDIO load tick=%u context=%u duration=%u options=$%08X instrument=%u",
+						ticks, u16(sp + 4), u32(sp + 6), u32(sp + 10), u16(sp + 14)))
+				elseif name == "play" then
+					print(string.format("MACAUDIO play tick=%u context=%u pitch=$%08X",
+						ticks, u16(sp + 8), u32(sp + 4)))
+				else
+					print(string.format("MACAUDIO %s tick=%u", name, ticks))
+				end
+				return data
+			end)
+	end
+	print(string.format("MACAUDIO armed a5=%06X load=%06X play=%06X", a5,
+		targets[1][1], targets[2][1]))
+end
 
 local function rect(a)
 	return s16(u16(a)), s16(u16(a + 2)), s16(u16(a + 4)), s16(u16(a + 6))
@@ -479,6 +529,7 @@ local function on_copybits(pb)
 end
 
 local function on_trap()
+	arm_audio_trace()
 	local sp = cpu.state["SP"].value
 	local pc = u32(sp + 2)
 	local trap = u16(pc)

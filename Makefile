@@ -8,7 +8,7 @@
 #
 # The Amiga build is in amiga/ and is the real target: `cd amiga && . ./env.sh && make`.
 
-.PHONY: all todo driving-sequence-capture driving-sequence-compare driving-motion-reference driving-audio-reference driving-audio-capture driving-motion-capture driving-motion-compare driving-profile help
+.PHONY: all todo driving-sequence-capture driving-sequence-compare driving-motion-reference driving-audio-reference driving-audio-capture driving-audio-compare driving-motion-capture driving-motion-compare driving-profile help
 
 all: help
 
@@ -22,6 +22,7 @@ help:
 	@echo "  make driving-motion-reference  capture distinct moving frames on the Macintosh oracle"
 	@echo "  make driving-audio-reference   capture/report Macintosh intro and moving-driving audio"
 	@echo "  make driving-audio-capture     capture target Bogas/Paula events for the same road workload"
+	@echo "  make driving-audio-compare     compare reference/target audio events by source progression"
 	@echo "  make driving-motion-capture    capture distinct completed moving Amiga frames"
 	@echo "  make driving-profile  build and measure 300 PAL fields of target-A1200 driving"
 	@echo
@@ -74,7 +75,7 @@ driving-motion-reference:
 driving-audio-reference:
 	@mkdir -p tmp
 	@timeout -k 5 360 env SDL_VIDEODRIVER=dummy VETTE_DRIVING_MOTION=1 \
-		VETTE_FOLLOW_ROAD=1 VETTE_FIDELITY_RANDOM_SEED=3BD90000 \
+		VETTE_FOLLOW_ROAD=1 VETTE_FIDELITY_RANDOM_SEED=3BD90000 VETTE_AUDIO_TRACE=1 \
 		mame mac2fdhd -rompath ref/mame/roms -nb9 mdc48 \
 		-ramsize 8M -hard ref/mame/hd/608_2GB_drive.hd \
 		-video none -sound none -window -skip_gameinfo -nothrottle \
@@ -95,6 +96,10 @@ driving-audio-capture:
 	@python3 tools/render_paula_audio.py amiga/assets/vette.resources \
 		tmp/amiga-driving-audio.log tmp/amiga-driving-audio.wav
 	@python3 tools/audio_reference_report.py tmp/amiga-driving-audio.wav
+
+driving-audio-compare:
+	@python3 tools/compare_audio_events.py \
+		tmp/mame-driving-audio.log tmp/amiga-driving-audio.log
 
 driving-motion-capture:
 	@rm -f tmp/driving-motion-sequence.tsv tmp/driving-motion-source-*.raw tmp/driving-motion-globals-*.bin tmp/driving-motion-car-*.bin tmp/driving-motion-object-*.bin
