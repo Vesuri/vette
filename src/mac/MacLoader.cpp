@@ -4533,8 +4533,16 @@ static void refreshDrivingKeyMap()
             relocateDiagnosticCar(car, x, z, 0x2000); // north through the gateway
             freewayStartPhase = 1;
         } else if (car && freewayStartPhase == 1 && freewayMode) {
-            uint32_t x = ((uint32_t)VETTE_FREEWAY_START << 11) + 1024;
-            uint32_t z = (36UL << 11) + 1024;
+            uint32_t localX = 1024;
+            uint32_t localZ = 1024;
+#ifdef VETTE_FREEWAY_START_U
+            localX = VETTE_FREEWAY_START_U;
+#endif
+#ifdef VETTE_FREEWAY_START_V
+            localZ = VETTE_FREEWAY_START_V;
+#endif
+            uint32_t x = ((uint32_t)VETTE_FREEWAY_START << 11) + localX;
+            uint32_t z = (36UL << 11) + localZ;
             relocateDiagnosticCar(car, x, z, 0x0000); // eastbound straight
             write16(car + 26, 0);                 // discard pre-gateway momentum
             freewayStartPhase = 2;

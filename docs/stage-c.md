@@ -1260,6 +1260,16 @@ This is explicitly a diagnostic checkpoint, not evidence that the natural route 
 confirmed x=6 `VETT`/`GGRY` collision; production builds define neither `FREEWAY_START` nor the
 input-only `FREEWAY_ROUTE` controller.
 
+The checkpoint also makes the far freeway exit directly testable. Freeway cell `(30,36)` is QUAD
+125, selector 72. Its third shipped rectangle is V `0..2048`, U `1536..2048`, and runtime response
+table entry 11 maps that exact rectangle to jump-table export 230 (`Traffic+$5B26`). A diagnostic
+start at cell 30, local `(1600,1024)`, entered export 230 at tick 1,957 with freeway mode 1. In the
+same tick the original handler changed the physics coordinates to `($6080,$13C07)` and cleared
+freeway mode. `Traffic+$69BE` then derived and stored Main Map cell `(12,39)`; that cell is QUAD 121,
+selector 81. The rendered/current coordinate pair intentionally lagged the physics pair at that
+instant, so `amiga/driving_freeway_exit.gdb` reports both instead of presenting the old pair as the
+landing position. No missing Toolbox operation or host-side map switch is involved.
+
 The 26-record sightseeing table used by `Main+$3456` was also decoded as a possible source-native
 shortcut. Record 4 is cell `(6,26)`, only six cells from the export-221 transition at `(6,32)`, but
 the documented T command is conditional on Tour Mode. Five ordinary T down/up scans during the
