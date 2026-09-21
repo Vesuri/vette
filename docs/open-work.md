@@ -131,8 +131,10 @@ is consequently renumbered.
    that Stop/Deactivate preserve voice records while Dispose tears them down; the Paula bridge now
    preserves contexts and freezes finite deadlines accordingly. `make driving-audio-reference`
    now records the synchronized Macintosh run as 48 kHz PCM and reports its real active passages;
-   the moving-driving passage begins at 75.500 seconds in the present capture. Capture or
-   reconstruct the matching Paula interval and compare pitch, duration, cue timing and overlap,
+   the moving-driving passage begins at 75.500 seconds in the present capture.
+   `make driving-audio-capture` records the matching target wrapper timeline: the current
+   100-iteration road run has one Start, six Loads, 99 engine Play updates, and no lifecycle stop or
+   loud stop. Reconstruct its four Paula voices and compare pitch, duration, cue timing and overlap,
    then cover gear changes, collisions, skids, horns, police, environment, and result audio,
    including concurrent playback and transitions.
 6. **Automate fidelity regressions.** Keep intro and driving framebuffer differentials, palette

@@ -1137,6 +1137,16 @@ under `tmp/`; `tools/audio_reference_report.py` makes the channel and activity m
 repeatable. This establishes the reference half of the audio differential; the next comparison
 must capture or reconstruct the Paula voices over the same Bogas-call interval.
 
+`make driving-audio-capture` establishes that target interval at the same original wrapper
+boundary. It performs a clean A1200 diagnostic build, follows the bounded Course One road workload
+for 100 original driving iterations, and retains the complete event log in
+`tmp/amiga-driving-audio.log`. The measured run contains one Start, six Loads and 99 engine Play
+updates with no Stop, Deactivate or loud stop. Context 0 loads the indefinite Engine at tick 1,678;
+context 2 then loads beep1 three times, beep2 once and thud twice. At the tick-2,661 ceiling the
+engine is still playing on the centred channel pair at pitch `$9858`, while the last finite effect
+has expired. `amiga/driving_audio_events.gdb` records every tick, context, duration, options word,
+instrument ordinal and Play pitch in a machine-readable form suitable for Paula reconstruction.
+
 The corrected route reaches the Lake Merced water collision and displays the game's own tow-truck
 recovery artwork. A probe on the actual `_GetPicture` trap records PICT 140 at the resident wrapper
 `Traffic+$663C`; that wrapper's saved return identifies the dynamic request at `Main+$0FD6`, with

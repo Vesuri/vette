@@ -8,7 +8,7 @@
 #
 # The Amiga build is in amiga/ and is the real target: `cd amiga && . ./env.sh && make`.
 
-.PHONY: all todo driving-sequence-capture driving-sequence-compare driving-motion-reference driving-audio-reference driving-motion-capture driving-motion-compare driving-profile help
+.PHONY: all todo driving-sequence-capture driving-sequence-compare driving-motion-reference driving-audio-reference driving-audio-capture driving-motion-capture driving-motion-compare driving-profile help
 
 all: help
 
@@ -21,6 +21,7 @@ help:
 	@echo "  make driving-motion-compare    compare saved moving-driving frames by game state"
 	@echo "  make driving-motion-reference  capture distinct moving frames on the Macintosh oracle"
 	@echo "  make driving-audio-reference   capture/report Macintosh intro and moving-driving audio"
+	@echo "  make driving-audio-capture     capture target Bogas/Paula events for the same road workload"
 	@echo "  make driving-motion-capture    capture distinct completed moving Amiga frames"
 	@echo "  make driving-profile  build and measure 300 PAL fields of target-A1200 driving"
 	@echo
@@ -83,6 +84,14 @@ driving-audio-reference:
 		-nvram_directory ref/mame/nvram \
 		-autoboot_script tools/mac_probe_model_indices.lua > tmp/mame-driving-audio.log 2>&1
 	@python3 tools/audio_reference_report.py tmp/vette-reference-driving.wav
+
+driving-audio-capture:
+	@mkdir -p tmp
+	@cd amiga && . ./env.sh && $(MAKE) clean && \
+	  $(MAKE) -j4 PROBES=1 SKIP_INTRO=1 GARAGE_CLICK=1 FOLLOW_ROAD=1 && \
+	  GDBTAIL=240 EXTRA_ARGS="--warp_mode=1" GDBSCRIPT=driving_audio_events.gdb \
+	  ./diag_run.sh 150
+	@cp amiga/.run/gdb-out.log tmp/amiga-driving-audio.log
 
 driving-motion-capture:
 	@rm -f tmp/driving-motion-sequence.tsv tmp/driving-motion-source-*.raw tmp/driving-motion-globals-*.bin tmp/driving-motion-car-*.bin tmp/driving-motion-object-*.bin
