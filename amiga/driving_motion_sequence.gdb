@@ -11,12 +11,14 @@ set $last_speed = -32768
 set $last_x = 0xffffffff
 set $last_y = 0xffffffff
 set $last_heading = 0xffff
+set $last_physics_x = 0xffffffff
+set $last_physics_y = 0xffffffff
 
 set logging file ../tmp/driving-motion-sequence.tsv
 set logging overwrite on
 set logging redirect on
 set logging enabled on
-printf "capture\tticks\trpm\tgear\tspeed\tx\ty\theading\n"
+printf "capture\tticks\trpm\tgear\tspeed\tx\ty\theading\tphysics_x\tphysics_y\n"
 set logging enabled off
 set logging overwrite off
 
@@ -34,8 +36,10 @@ commands
   set $x = *(unsigned int*)$car
   set $y = *(unsigned int*)($car+8)
   set $heading = *(unsigned short*)($car+0x66)
+  set $physics_x = *(unsigned int*)($car+0x6e)
+  set $physics_y = *(unsigned int*)($car+0x72)
   set $full = *(short*)sourceRect == 0 && *(short*)(sourceRect+2) == 0 && *(short*)(sourceRect+4) == 342 && *(short*)(sourceRect+6) == 512 && *(short*)destinationRect == 0 && *(short*)(destinationRect+2) == 0 && *(short*)(destinationRect+4) == 342 && *(short*)(destinationRect+6) == 512
-  if $full && $gear == 1 && $speed > 0 && ($rpm != $last_rpm || $gear != $last_gear || $speed != $last_speed || $x != $last_x || $y != $last_y || $heading != $last_heading)
+  if $full && $gear == 1 && $speed > 0 && ($rpm != $last_rpm || $gear != $last_gear || $speed != $last_speed || $x != $last_x || $y != $last_y || $heading != $last_heading || $physics_x != $last_physics_x || $physics_y != $last_physics_y)
     set $i = 0
     while $i < 8
       if s_gworlds[$i].used && sourceBitmap == &s_gworlds[$i].port[2]
@@ -46,12 +50,15 @@ commands
         set $last_x = $x
         set $last_y = $y
         set $last_heading = $heading
+        set $last_physics_x = $physics_x
+        set $last_physics_y = $physics_y
         set logging enabled on
-        printf "%u\t%u\t%d\t%d\t%d\t%08x\t%08x\t%u\n", $captures, g_macTicks, $rpm, $gear, $speed, $x, $y, $heading
+        printf "%u\t%u\t%d\t%d\t%d\t%08x\t%08x\t%u\t%08x\t%08x\n", $captures, g_macTicks, $rpm, $gear, $speed, $x, $y, $heading, $physics_x, $physics_y
         set logging enabled off
         set $rows = *(short*)(&s_gworlds[$i].pixMap[10])-*(short*)(&s_gworlds[$i].pixMap[6])
         set $stride = *(unsigned short*)(&s_gworlds[$i].pixMap[4])&0x3fff
         eval "dump binary memory ../tmp/driving-motion-source-%u.raw s_gworlds[$i].pixels s_gworlds[$i].pixels+$rows*$stride", $captures
+        eval "dump binary memory ../tmp/driving-motion-globals-%u.bin s_currentA5-31272 s_currentA5", $captures
         printf "captured moving state %u tick=%u rpm=%d speed=%d pos=($%08x,$%08x) heading=%u\n", $captures, g_macTicks, $rpm, $speed, $x, $y, $heading
       end
       set $i = $i+1

@@ -24,7 +24,7 @@ local driving_copy_captures = 0
 local driving_capture_armed = false
 local driving_sequence_manifest = nil
 local driving_motion = os.getenv("VETTE_DRIVING_MOTION") == "1"
-local driving_capture_limit = driving_motion and 48 or 4
+local driving_capture_limit = driving_motion and 40 or 4
 local driving_capture_stem = driving_motion and "driving-motion-source" or "driving-copy-source"
 local driving_manifest_path = driving_motion and
 	"ref/mame/driving-motion-sequence.tsv" or "ref/mame/driving-sequence.tsv"
@@ -35,6 +35,7 @@ if driving_motion then
 	os.remove(driving_manifest_path)
 	for i = 1, driving_capture_limit do
 		os.remove(string.format("ref/mame/%s-%u.raw", driving_capture_stem, i))
+		os.remove(string.format("ref/mame/driving-motion-globals-%u.bin", i))
 	end
 end
 local palette_for_window = {}
@@ -260,9 +261,9 @@ local function on_copybits(pb)
 	local viewport_sample = prog:read_u8(source_base + source_stride * 10)
 	local a5 = a24(cpu.state["A5"].value)
 	local car = a5 ~= 0 and a24(u32(a5 - 0x3678)) or 0
-	local state_key = car ~= 0 and string.format("%d/%d/%d/%08X/%08X/%u",
+	local state_key = car ~= 0 and string.format("%d/%d/%d/%08X/%08X/%u/%08X/%08X",
 		s16(u16(car + 0x44)), s16(u16(car + 0x1C)), s16(u16(car + 0x1A)),
-		u32(car), u32(car + 8), u16(car + 0x66)) or nil
+		u32(car), u32(car + 8), u16(car + 0x66), u32(car + 0x6E), u32(car + 0x72)) or nil
 	if stage == "driving" and st == 0 and sl == 0 and sb == 342 and sr == 512
 		and top == 0 and left == 0 and bottom == 342 and right == 512
 		and viewport_sample ~= 0x00 and viewport_sample ~= 0xFF then
@@ -280,18 +281,28 @@ local function on_copybits(pb)
 			driving_copy_captures, mac.frames(), u16(pb + 4)))
 		if driving_sequence_manifest == nil then
 			driving_sequence_manifest = assert(io.open(driving_manifest_path, "w"))
-			driving_sequence_manifest:write("capture\tticks\trpm\tgear\tspeed\tx\ty\theading\n")
+			driving_sequence_manifest:write(driving_motion and
+				"capture\tticks\trpm\tgear\tspeed\tx\ty\theading\tphysics_x\tphysics_y\n" or
+				"capture\tticks\trpm\tgear\tspeed\tx\ty\theading\n")
 		end
-		driving_sequence_manifest:write(string.format(
-			"%u\t%u\t%d\t%d\t%d\t%08X\t%08X\t%u\n",
+		local row = string.format(
+			"%u\t%u\t%d\t%d\t%d\t%08X\t%08X\t%u",
 			driving_copy_captures, u32(0x016A), s16(u16(car + 0x44)),
 			s16(u16(car + 0x1C)), s16(u16(car + 0x1A)), u32(car),
-			u32(car + 8), u16(car + 0x66)))
+			u32(car + 8), u16(car + 0x66))
+		if driving_motion then
+			row = row .. string.format("\t%08X\t%08X", u32(car + 0x6E), u32(car + 0x72))
+		end
+		driving_sequence_manifest:write(row .. "\n")
 		driving_sequence_manifest:flush()
 		local source_top, _, source_bottom, _ = rect(source + 6)
 		dump_bytes(string.format("ref/mame/%s-%u.raw", driving_capture_stem, driving_copy_captures),
 			a24(u32(source)),
 			(u16(source + 4) & 0x3FFF) * (source_bottom - source_top))
+		if driving_motion then
+			dump_bytes(string.format("ref/mame/driving-motion-globals-%u.bin",
+				driving_copy_captures), a5 - 31272, 31272)
+		end
 		if driving_copy_captures == 1 and not driving_motion then
 			arm_dashboard_writer(source)
 			dump_pixmap("DRIVING-SRC", source)
@@ -515,7 +526,7 @@ mac.run(function()
 	mac.key_down("Keypad 8")
 	driving_capture_armed = true
 	arm_mirror_source_writer()
-	mac.wait(1200)
+	mac.wait(driving_motion and 500 or 1200)
 	mac.key_up("Keypad 8")
 	mac.step("driving"); mac.shot()
 	screen = main_device_pixmap()
@@ -527,4 +538,5 @@ mac.run(function()
 		if table ~= 0 then dump_bytes("ref/mame/driving-device.ctab", table, 136) end
 	end
 	print(string.format("VP model CopyBits captures=%u", captures))
+	if driving_motion then manager.machine:exit() end
 end)

@@ -10,7 +10,7 @@ from pathlib import Path
 from compare_mac_chunky import compare_surfaces, format_bounds
 
 
-STATE_FIELDS = ("rpm", "gear", "speed", "x", "y", "heading")
+BASE_STATE_FIELDS = ("rpm", "gear", "speed", "x", "y", "heading")
 
 
 def numbered_frames(prefix: Path) -> dict[int, Path]:
@@ -23,7 +23,7 @@ def numbered_frames(prefix: Path) -> dict[int, Path]:
     return frames
 
 
-def read_manifest(path: Path) -> dict[int, dict[str, int]]:
+def read_manifest(path: Path, state_fields: tuple[str, ...]) -> dict[int, dict[str, int]]:
     if not path.exists():
         return {}
     lines = path.read_text().splitlines()
@@ -34,7 +34,7 @@ def read_manifest(path: Path) -> dict[int, dict[str, int]]:
     rows = csv.DictReader(lines[header:], delimiter="\t")
     if rows.fieldnames is None or "capture" not in rows.fieldnames:
         raise SystemExit(f"{path}: missing capture column")
-    missing = [field for field in STATE_FIELDS if field not in rows.fieldnames]
+    missing = [field for field in state_fields if field not in rows.fieldnames]
     if missing:
         raise SystemExit(f"{path}: missing state columns {missing}")
     result = {}
@@ -43,8 +43,8 @@ def read_manifest(path: Path) -> dict[int, dict[str, int]]:
             continue
         capture = int(row["capture"])
         result[capture] = {
-            field: int(row[field], 16 if field in ("x", "y") else 10)
-            for field in STATE_FIELDS
+            field: int(row[field], 16 if field in ("x", "y") or field.endswith(("_x", "_y")) else 10)
+            for field in state_fields
         }
     return result
 
@@ -66,7 +66,11 @@ def main() -> None:
     parser.add_argument(
         "--match-state", action="store_true",
         help="pair frames by the complete state tuple instead of capture ordinal")
+    parser.add_argument(
+        "--state-field", action="append", default=[],
+        help="append a manifest column to the base player-state match key")
     args = parser.parse_args()
+    state_fields = BASE_STATE_FIELDS + tuple(args.state_field)
 
     reference = numbered_frames(args.reference_prefix)
     amiga = numbered_frames(args.amiga_prefix)
@@ -76,8 +80,8 @@ def main() -> None:
     amiga_manifest_path = (
         args.amiga_manifest
         or args.amiga_prefix.parent / "driving-sequence.tsv")
-    reference_manifest = read_manifest(reference_manifest_path)
-    amiga_manifest = read_manifest(amiga_manifest_path)
+    reference_manifest = read_manifest(reference_manifest_path, state_fields)
+    amiga_manifest = read_manifest(amiga_manifest_path, state_fields)
     if bool(reference_manifest) != bool(amiga_manifest):
         raise SystemExit(
             "state manifests must be present for both sequences or neither: "
@@ -103,7 +107,7 @@ def main() -> None:
         def index_states(frames, manifest, label):
             result = {}
             for capture in sorted(frames.keys() & manifest.keys()):
-                state = tuple(manifest[capture][field] for field in STATE_FIELDS)
+                state = tuple(manifest[capture][field] for field in state_fields)
                 if state in result:
                     raise SystemExit(
                         f"{label}: duplicate state in captures "
@@ -129,11 +133,11 @@ def main() -> None:
         for state in sorted(missing_amiga_states, key=lambda item: reference_states[item]):
             print(
                 f"  reference-only frame {reference_states[state]}: "
-                + ", ".join(f"{field}={value}" for field, value in zip(STATE_FIELDS, state)))
+                + ", ".join(f"{field}={value}" for field, value in zip(state_fields, state)))
         for state in sorted(missing_reference_states, key=lambda item: amiga_states[item]):
             print(
                 f"  Amiga-only frame {amiga_states[state]}: "
-                + ", ".join(f"{field}={value}" for field, value in zip(STATE_FIELDS, state)))
+                + ", ".join(f"{field}={value}" for field, value in zip(state_fields, state)))
     else:
         pairs = [(frame, frame, None) for frame in sorted(reference)]
 
@@ -166,7 +170,7 @@ def main() -> None:
         if reference_manifest and not args.match_state:
             if reference_frame not in reference_manifest or amiga_frame not in amiga_manifest:
                 raise SystemExit(f"frame {reference_frame}: missing state-manifest row")
-            for field in STATE_FIELDS:
+            for field in state_fields:
                 left = reference_manifest[reference_frame][field]
                 right = amiga_manifest[amiga_frame][field]
                 if left != right:
@@ -185,7 +189,7 @@ def main() -> None:
             status += " [pixel result is not a fidelity comparison]"
         if args.match_state:
             state_label = ", ".join(
-                f"{field}={value}" for field, value in zip(STATE_FIELDS, matched_state))
+                f"{field}={value}" for field, value in zip(state_fields, matched_state))
             print(
                 f"reference frame {reference_frame} / Amiga frame {amiga_frame} "
                 f"({state_label}): {status}")

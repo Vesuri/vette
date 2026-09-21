@@ -1375,13 +1375,21 @@ boundary used by the Amiga harness. It records distinct 512-row source GWorlds a
 `make driving-motion-capture` records the Amiga side at the identical CopyBits boundary;
 `make driving-motion-compare` pairs them by RPM, gear, speed, position and heading.
 
-The first run produced 37 Macintosh and 40 Amiga moving states, with five shared player tuples.
-This also found the next synchronization requirement rather than a palette guess: the first shared
-tuple differs in only 46 lower-right pixels, but later tuples differ in dashboard and scene regions
-even though the player record agrees. Relative tick positions differ, so the player tuple is not a
-complete game state—dashboard phase and traffic/collision state can legitimately be different.
-Those fields must be added to the key, or seeded through a complete diagnostic checkpoint, before
-the larger pixel deltas can be called port defects. The stationary RPM-11/RPM-23 exact regression
+The first run produced 37 Macintosh and 40 Amiga moving states, with several shared rendered-player
+tuples. This found the next synchronization requirement rather than a palette guess: the first
+shared tuple differed in only 46 lower-right pixels, while later tuples differed in dashboard and
+scene regions. The key now also includes the separate physics position at car+$6E/+$72, and the
+harness saves the complete 31,272-byte A5-global block beside every frame for source-state diagnosis.
+
+At a state where RPM, gear, speed, rendered position, physics position and heading all agree, the
+remaining delta is 970 pixels at `(385,227)-(479,275)`. The A5 blocks identify the actual input:
+the Macintosh has zero at A5-$2EA4..-$2E9E while the Amiga has `$01,$01,$00,$01,$01,$00`.
+`Traffic+$5F04/$5F70` derives those six traffic-control flags and `Traffic+$6282` selects the
+right-dashboard raster from them. The two naturally sampled runs therefore have different traffic
+signal state; this is not evidence of a CopyBits, palette, or C2P defect. Relative tick positions
+differ because the oracle is 60 Hz and the target is 50 Hz, so a player tuple cannot synchronize
+independent traffic state. The next differential needs an equivalent complete-state checkpoint,
+not ever more coincidental natural-frame matches. The stationary RPM-11/RPM-23 exact regression
 remains separate and unchanged.
 
 The 26-record sightseeing table used by `Main+$3456` was also decoded as a possible source-native

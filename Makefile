@@ -57,7 +57,7 @@ driving-sequence-compare:
 		$(if $(REQUIRE_EXACT),--require-exact,)
 
 driving-motion-capture:
-	@rm -f tmp/driving-motion-sequence.tsv tmp/driving-motion-source-*.raw
+	@rm -f tmp/driving-motion-sequence.tsv tmp/driving-motion-source-*.raw tmp/driving-motion-globals-*.bin
 	@cd amiga && . ./env.sh && $(MAKE) clean && \
 	  $(MAKE) -j4 SKIP_INTRO=1 GARAGE_CLICK=1 && \
 	  GDBTAIL=160 EXTRA_ARGS="--warp_mode=1" GDBSCRIPT=driving_motion_sequence.gdb \
@@ -69,6 +69,7 @@ driving-motion-compare:
 		--reference-manifest ref/mame/driving-motion-sequence.tsv \
 		--amiga-manifest tmp/driving-motion-sequence.tsv \
 		--match-state \
+		--state-field physics_x --state-field physics_y \
 		$(if $(REQUIRE_EXACT),--require-exact,)
 
 # The measurement freezes in target time after 300 PAL fields; 60 seconds is
