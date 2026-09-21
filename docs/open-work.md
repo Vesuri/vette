@@ -176,6 +176,10 @@ Each entry is ONE line: what was tried, what it measured, and the doc that has t
 - **Pipeline C2P chip writes between table lookups** — byte-exact across 2,684,832 output bytes,
   but Kalms-style two-pairs scheduling lowered the controlled C/assembly ratio from 2.521 to 2.315;
   the extra loop structure made the kernel slower, so it was removed. `docs/perf-method.md`.
+- **Unroll the C2P kernel from 32 to 64 pixels** — byte-exact across 2,684,832 output bytes, but
+  the controlled C/assembly ratio fell from 2.927 to 2.711; doubled inner-loop code and extra tail
+  dispatch cost more than the halved branch count, so the 32-pixel loop was restored.
+  `docs/perf-method.md`.
 
 - **68020-only instructions in the game** — none. Flow-following sweep of all 509/507 jump-table
   entries in both builds, 67.9 %/63.1 % of code bytes reached, **0** found; the unreached bytes are

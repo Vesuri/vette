@@ -304,6 +304,12 @@ standard 300-field profile records 9,384,319 C2P ticks over 36 updates, about 26
 versus 279,053 before the change, a supporting 6.6% reduction. C2P occupies 39.097% of the fully
 accounted window.
 
+A subsequent 64-pixel unroll targeted the full-width outside-view rectangle by expanding the
+32-pixel body twice per loop and retaining 32- and 16-pixel tails. It remained exact across
+2,684,832 output bytes, but the controlled C/assembly ratio regressed from 2.927 to 2.711. The
+doubled body and additional tail dispatch outweighed the saved loop branches, so the experiment
+was removed and the 32-pixel loop restored.
+
 ## Lessons — measurement
 
 - **Compare FPS row vectors, never a `total painted` line.** A total spans a partial trailing row
