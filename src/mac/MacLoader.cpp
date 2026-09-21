@@ -48,6 +48,7 @@ volatile uint16_t g_blockMoveCount = 0;
 volatile uint16_t g_stageCDepth = 1;       // _BlockMove is row 1
 volatile uint32_t g_macTicks = 0;
 volatile uint32_t* g_macTicksAddress = 0;
+volatile uint32_t* g_macRndSeedAddress = 0;
 volatile uint32_t g_macVBLCallbackEntry = 0;
 volatile uint32_t g_macVBLCallbackTask = 0;
 volatile uint32_t g_macVBLCallbackA5 = 0;
@@ -141,6 +142,9 @@ static uint8_t* s_textEditScrapMaster;
 static uint8_t s_trapTokens[4096];
 static uint8_t* s_trapAddresses[4096];
 static uint8_t* s_qdThePort;
+#ifdef VETTE_PROBE
+static volatile uint32_t s_randomTrapPC;
+#endif
 static uint8_t* s_currentA5;
 static uint16_t s_currentResourceFork = 0;  // application resource file at process launch
 static bool s_mouseInitialized;
@@ -672,12 +676,13 @@ static bool redirectLowMemoryGlobals(uint8_t* a5)
     write16(vette_code_6 + 0x6d24, 0x4a2d);
     write16(vette_code_6 + 0x6d26, (uint16_t)kShadowMBState);
 
-    write32(a5 + 4, 1);
+    write32(a5 + 4, g_macTicks ? g_macTicks - 1 : 0);
     write32(a5 + 8, 0);
     write32(a5 + 12, 0);
     write32(a5 + 0, g_macTicks);
     for (uint16_t i = 0; i < 16; ++i) a5[16 + i] = 0;
     g_macTicksAddress = (volatile uint32_t*)(a5 + 0);
+    g_macRndSeedAddress = (volatile uint32_t*)(a5 + 4);
     return true;
 }
 
@@ -2977,7 +2982,9 @@ static bool getVolumeInfo(uint8_t* parameterBlock)
 
 static int16_t quickDrawRandom()
 {
-    uint32_t seed = read32(s_currentA5 + 4); // Page-0 RndSeed shadow
+    if (!s_qdThePort) return 0;
+    uint8_t* randSeed = s_qdThePort - 126;
+    uint32_t seed = read32(randSeed);
     uint16_t low = (uint16_t)seed;
     uint16_t high = (uint16_t)(seed >> 16);
     uint32_t lowProduct = multiplyUnsigned16(16807, low);
@@ -2985,7 +2992,7 @@ static int16_t quickDrawRandom()
     seed = ((folded & 0x7fffUL) << 16)
          + ((folded >> 15) & 0xffffUL)
          + (lowProduct & 0xffffUL);
-    write32(s_currentA5 + 4, seed);
+    write32(randSeed, seed);
     uint16_t result = (uint16_t)seed;
     return result == 0x8000 ? 0 : (int16_t)result;
 }
@@ -5127,6 +5134,9 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
         }
     }
     if (trap == 0xa861) {                    // Random() -> signed Integer
+#ifdef VETTE_PROBE
+        s_randomTrapPC = pc;
+#endif
         write16(userStack, (uint16_t)quickDrawRandom());
         if (g_stageCDepth < 90) g_stageCDepth = 90;
         return 1;

@@ -41,9 +41,13 @@ is consequently renumbered.
    flags, not drawing or palette code. The target now dispatches a distinct Vertical Retrace
    Manager pass for every 60 Hz Macintosh tick, including both virtual ticks on every fifth PAL
    field; the roster mismatch survives that correction and therefore begins before the moving
-   driving loop. Trace the pre-driving random/traffic initialization, establish a shared traffic
-   phase, then extend the same state-keyed checkpoint to alternate views before making the complete
-   moving frame an exact gate.
+   driving loop. The pre-driving trace found and fixed a genuine boundary error: QuickDraw
+   `Random` had advanced the redirected Page-0 system `RndSeed`, rather than the application
+   `randSeed` at `thePort-126` that Vette seeds and QuickDraw owns. Both machines now show the same
+   one setup plus three traffic calls, but their volatile initial seed and elapsed selector route
+   still differ. Give the differential harnesses the same diagnostic entropy input and equivalent
+   traffic phase, then extend the same state-keyed checkpoint to alternate views before making the
+   complete moving frame an exact gate.
 2. **Establish the performance target.** The full-accounting target-A1200 profile is now in place
    and identified presentation as 80.353% of the first moving-driving baseline. After removing a
    fully overwritten synchronization copy, adding the packed word-write C2P kernel, and deriving a

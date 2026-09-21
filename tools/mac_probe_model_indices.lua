@@ -25,6 +25,8 @@ local driving_capture_armed = false
 local driving_sequence_manifest = nil
 local driving_motion = os.getenv("VETTE_DRIVING_MOTION") == "1"
 local driving_capture_limit = driving_motion and 40 or 4
+local trace_random = os.getenv("VETTE_RANDOM_TRACE") == "1"
+local random_calls = 0
 local driving_capture_stem = driving_motion and "driving-motion-source" or "driving-copy-source"
 local driving_manifest_path = driving_motion and
 	"ref/mame/driving-motion-sequence.tsv" or "ref/mame/driving-sequence.tsv"
@@ -52,6 +54,7 @@ local trace_dashboard_writer = os.getenv("VETTE_DASHBOARD_WRITER") == "1"
 local dashboard_write_count = 0
 local traffic_raster_dumped = false
 local mirror_source_write_count = 0
+local selector_car_ready = false
 
 local function a24(v) return v & 0x00FFFFFF end
 local function u16(a) return prog:read_u16(a24(a)) end
@@ -368,6 +371,13 @@ local function on_trap()
 	local pc = u32(sp + 2)
 	local trap = u16(pc)
 	local pb = a24(sp + 8)                     -- 68020 exception frame is eight bytes
+	if trace_random and trap == 0xA861 then
+		random_calls = random_calls + 1
+		local a5 = a24(cpu.state["A5"].value)
+		print(string.format("VP RANDOM #%u frame=%u ticks=%u stage=%s pc=%06X systemSeed=%08X qdSeed=%08X",
+			random_calls, mac.frames(), u32(0x016A), stage, a24(pc), u32(0x0156),
+			a5 ~= 0 and u32(a5 - 23034) or 0))
+	end
 	if pending_selector_pixmap ~= 0 and trap == 0xA9BC then
 		local pixmap = pending_selector_pixmap
 		pending_selector_pixmap = 0
@@ -378,8 +388,10 @@ local function on_trap()
 	if trap == 0xA8EC then on_copybits(pb); return end
 	if trap == 0xA97C then protection_prompt = true end -- GetNewDialog
 	if trap == 0xA9BC then
+		local picture_id = s16(u16(pb))
 		print(string.format("VP GetPicture frame=%u stage=%s id=%d",
-			mac.frames(), stage, s16(u16(pb))))
+			mac.frames(), stage, picture_id))
+		if stage == "corvette" and picture_id == 15679 then selector_car_ready = true end
 		return
 	end
 	if trap == 0xA8F6 then
@@ -483,22 +495,32 @@ mac.run(function()
 	click(357, 252, 240)     -- garage ACCEPT
 	mac.step("after garage accept"); mac.shot()
 	stage = "porsche"
-	click(477, 160, 600)     -- upper vehicle plate; retain a complete Porsche rotation
+	click(477, 160, 600)     -- upper vehicle plate; wait for selector construction
 	mac.step("after upper plate"); mac.shot()
-	mac.mouse_to(508, 215)
-	stage = "f40"            -- label the state changed by this click, not its approach
-	mac.click(1); mac.wait(480) -- F40 car image
-	mac.step("after F40"); mac.shot()
 	local screen = main_device_pixmap()
-	if screen ~= 0 then
-		local top, _, bottom, _ = rect(screen + 6)
-		dump_bus_bytes("ref/mame/selector-f40-screen.raw", u32(screen),
-			(u16(screen + 4) & 0x3FFF) * (bottom - top))
+	if not driving_motion then
+		-- Palette/model work deliberately retains complete Porsche and F40
+		-- rotations.  The moving differential must instead follow the Amiga
+		-- harness's direct top-plate -> Corvette route without consuming random
+		-- numbers in selector-only animation frames.
+		mac.mouse_to(508, 215)
+		stage = "f40"          -- label the state changed by this click, not its approach
+		mac.click(1); mac.wait(480) -- F40 car image
+		mac.step("after F40"); mac.shot()
+		screen = main_device_pixmap()
+		if screen ~= 0 then
+			local top, _, bottom, _ = rect(screen + 6)
+			dump_bus_bytes("ref/mame/selector-f40-screen.raw", u32(screen),
+				(u16(screen + 4) & 0x3FFF) * (bottom - top))
+		end
 	end
 	stage = "corvette"
-	click(508, 247, 480)     -- Corvette ZR-1, matching VETTE_GARAGE_CLICK
+	click(508, 247, driving_motion and 0 or 480) -- Corvette ZR-1
+	if driving_motion and not mac.wait_for("Corvette selector redraw", function()
+		return selector_car_ready
+	end, 600) then return end
 	mac.step("after Corvette"); mac.shot()
-	click(276, 245, 360)     -- vehicle selector ACCEPT
+	click(276, 245, 360)     -- vehicle selector ACCEPT; wait for course controls
 	mac.step("after vehicle accept"); mac.shot()
 	click(509, 399, 180)     -- Course One ACCEPT; first drive opens copy protection
 	stage = "driving"

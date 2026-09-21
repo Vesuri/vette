@@ -404,7 +404,7 @@ validated against its shipped opcode, then rewritten at the same width to an A5-
 | Mac global | Macintosh address | shadow | first consumer |
 |---|---:|---:|---|
 | `Ticks` | `$016A` | `0(A5)` | `Main+$1EEC` |
-| `RndSeed` | `$0156` | `4(A5)` | `Main+$0570` |
+| system `RndSeed` | `$0156` | `4(A5)` | `Main+$0570` |
 | `WMgrPort` | `$09DE` | `8(A5)` | `Main+$08A6` |
 | `GrayRgn` | `$09EE` | `12(A5)` | `Initialize+$08C4` |
 | `KeyMap` | `$0174` | `16(A5)` | `Main+$2B54` |
@@ -651,9 +651,19 @@ bridge returns `$D51CFD76`, measured directly from the master directory block of
 preserves the game's derivation of its `DATE` resource key. Execution then reaches QuickDraw
 `Random` (`$A861`) in road setup.
 
-`Random` uses the original QuickDraw recurrence (`RndSeed * 16807 mod $7FFFFFFF`), returns its
-signed low word with `$8000` mapped to zero, and updates the Page-0 `RndSeed` shadow. No host
-entropy enters the sequence. The next call is `GetDItem` for item 2 of the copy-protection dialog;
+The application has two distinct random-seed locations. `InitGraf` initializes the first field of
+the application's QuickDraw globals, `randSeed` at `thePort-126`, while Page 0 `$0156` is the
+system `RndSeed`. Vette's `Main+$0570` deliberately copies the latter into the former immediately
+after `InitCursor`, following the assembly-language seeding pattern documented by Inside
+Macintosh. The redirected Page-0 shadow therefore receives a live tick-derived value at that exact
+boundary; the VBI keeps it at `Ticks-1`, matching the System 6 oracle. It is not the state advanced
+by subsequent `Random` calls.
+
+`Random` uses the original QuickDraw recurrence (`randSeed * 16807 mod $7FFFFFFF`), returns its
+signed low word with `$8000` mapped to zero, and updates only the application QuickDraw seed. An
+earlier bridge version incorrectly advanced the Page-0 shadow instead, leaving the seed actually
+owned by QuickDraw unchanged. A probe-only GDB trace and the MAME oracle now report both seed
+locations independently. The next call is `GetDItem` for item 2 of the copy-protection dialog;
 that UI intentionally remains unsupported while the registered `DATE` resource state is resolved.
 
 The port deliberately removes that manual challenge at its application-code boundary. After an
@@ -1399,10 +1409,13 @@ Callbacks remain user-mode and are still delivered one at a time at safe trap bo
 The corrected moving capture reaches 40 distinct states and three naturally identical complete
 player tuples. The later of those differs by only 13 pixels, but all three still have different
 active traffic objects. The initial roster is therefore already divergent before the moving VBL
-loop, rather than being caused solely by its former 50/60 Hz callback loss. The next differential
-must trace the pre-driving random and Traffic initialization and obtain an equivalent complete-state
-checkpoint, not rely on coincidental player tuples. The stationary RPM-11 checkpoint remains
-pixel-exact after the scheduler change.
+loop, rather than being caused solely by its former 50/60 Hz callback loss. The pre-driving trace
+then exposed the system/QuickDraw seed ownership error above. With that fixed, both machines make
+one setup `Random` call and three traffic calls before their first driving frame, but begin from
+different volatile system-seed values because their harness routes and elapsed setup time differ.
+The remaining differential therefore needs a shared diagnostic entropy input and equivalent
+traffic phase, not rendering changes or a vehicle-specific colour/traffic hack. The stationary
+RPM-11 checkpoint remains pixel-exact after the scheduler change.
 
 One input discrepancy was then removed at its source boundary. The Macintosh harness already holds
 keypad 8 before pulsing top-row `+`, but the Amiga harness had waited until the car record showed

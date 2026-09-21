@@ -211,9 +211,11 @@ it is needed: a named, loud report, never a silent absorb (`docs/faithfulness-se
 - `A5` points into the application's own globals (negative offsets) and its jump table (positive).
   ⚠ **A global here is an A5 offset, not an address.** The Amiga cannot host Mac Page 0 because
   those addresses are its vector table and OS state. Stage C validates and rewrites each executed
-  absolute-short access to a same-width A5-relative semantic shadow. `RndSeed`, `WMgrPort`,
-  `GrayRgn`, `CurrentA5`, the mouse-coordinate family, and `MBState` are live so far; see
-  `docs/stage-c.md` for the exact patches.
+  absolute-short access to a same-width A5-relative semantic shadow. The Page-0 system `RndSeed`,
+  `WMgrPort`, `GrayRgn`, `CurrentA5`, the mouse-coordinate family, and `MBState` are live so far;
+  see `docs/stage-c.md` for the exact patches. The system seed is distinct from the first field of
+  the application's QuickDraw globals (`randSeed` at `thePort-126`): Vette copies the former into
+  the latter once after `InitCursor`, and later `Random` traps advance only the QuickDraw field.
 
 ## Open questions this file exists to have answers written into
 

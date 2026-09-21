@@ -45,6 +45,7 @@ volatile uint16_t g_longFields    = 0;   // ...of which long; ~half if LACE took
 volatile uint16_t g_lofSamples[8];       // those fields' raw VPOSR, for the parity check
 extern volatile uint32_t g_macTicks;
 extern volatile uint32_t* g_macTicksAddress;
+extern volatile uint32_t* g_macRndSeedAddress;
 }
 
 /* ⚠⚠ THE FIELD-PARITY RATIO HAS TO BE MEASURED FROM WHEN THE MODE IS SET, NOT FROM BOOT,
@@ -113,6 +114,10 @@ static uint32_t vbiHandler()
     if (++s_macTickRemainder == 5) { s_macTickRemainder = 0; tickDelta = 2; }
     g_macTicks += tickDelta;
     if (g_macTicksAddress) *g_macTicksAddress = g_macTicks;
+    // System 6 keeps its low-memory random seed live independently of each
+    // application's QuickDraw randSeed.  MAME shows it one tick behind Ticks;
+    // Vette copies it into qd.randSeed once during startup.
+    if (g_macRndSeedAddress) *g_macRndSeedAddress = g_macTicks - 1;
 
     if (s_screen) {                    // non-null only once the mode registers are set
         if (g_laceFields < 8) g_lofSamples[g_laceFields] = vp;
