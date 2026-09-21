@@ -189,6 +189,8 @@ static uint8_t** s_activePalette;
 static bool s_screenDirty = true;
 static bool s_pixelsDirty = false;
 static int16_t s_dirtyTop, s_dirtyLeft, s_dirtyBottom, s_dirtyRight;
+static VetteScreen::DirtyRect s_dirtyRects[VetteScreen::kMaxDirtyRects];
+static uint16_t s_dirtyRectCount;
 static bool s_drivingFrameStarted;
 static volatile uint8_t s_unsupportedPictureOpcode;
 static volatile uint32_t s_unsupportedPictureOffset;
@@ -206,6 +208,33 @@ static void markDirtyBounds(int16_t top, int16_t left, int16_t bottom, int16_t r
         if (left < s_dirtyLeft) s_dirtyLeft = left;
         if (bottom > s_dirtyBottom) s_dirtyBottom = bottom;
         if (right > s_dirtyRight) s_dirtyRight = right;
+    }
+    VetteScreen::DirtyRect rectangle = { top, left, bottom, right };
+    bool merged;
+    do {
+        merged = false;
+        for (uint16_t i = 0; i < s_dirtyRectCount; ++i) {
+            VetteScreen::DirtyRect& existing = s_dirtyRects[i];
+            if (rectangle.top >= existing.bottom || rectangle.bottom <= existing.top
+                || rectangle.left >= existing.right || rectangle.right <= existing.left)
+                continue;
+            if (existing.top < rectangle.top) rectangle.top = existing.top;
+            if (existing.left < rectangle.left) rectangle.left = existing.left;
+            if (existing.bottom > rectangle.bottom) rectangle.bottom = existing.bottom;
+            if (existing.right > rectangle.right) rectangle.right = existing.right;
+            existing = s_dirtyRects[--s_dirtyRectCount];
+            merged = true;
+            break;
+        }
+    } while (merged);
+    if (s_dirtyRectCount < VetteScreen::kMaxDirtyRects)
+        s_dirtyRects[s_dirtyRectCount++] = rectangle;
+    else {
+        // Correctness fallback for an unexpectedly fragmented frame.  Ordinary
+        // game drawing stays below this fixed capacity; overflowing falls back
+        // to the old union rectangle, never to untracked pixels.
+        s_dirtyRects[0] = { s_dirtyTop, s_dirtyLeft, s_dirtyBottom, s_dirtyRight };
+        s_dirtyRectCount = 1;
     }
     s_screenDirty = true;
 }
@@ -4258,13 +4287,12 @@ static void presentMacRuntime()
     if (!s_screenDirty || !s_loudStopScreen) return;
     bool cursor = compositeCursor();
     bool presented = s_loudStopScreen->presentMacFrame(
-        s_colorScreen, s_windowManagerColors,
-        s_pixelsDirty ? s_dirtyTop : 0, s_pixelsDirty ? s_dirtyLeft : 0,
-        s_pixelsDirty ? s_dirtyBottom : 0, s_pixelsDirty ? s_dirtyRight : 0);
+        s_colorScreen, s_windowManagerColors, s_dirtyRects, s_dirtyRectCount);
     if (cursor) restoreCursor();
     if (presented) {
         s_screenDirty = false;
         s_pixelsDirty = false;
+        s_dirtyRectCount = 0;
     }
 }
 

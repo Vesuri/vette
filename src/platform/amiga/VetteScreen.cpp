@@ -362,9 +362,22 @@ static uint8_t gammaToOcs(uint16_t component)
     return result;
 }
 
+static bool rectanglesOverlap(const VetteScreen::DirtyRect& a,
+                              const VetteScreen::DirtyRect& b)
+{
+    return a.top < b.bottom && a.bottom > b.top
+        && a.left < b.right && a.right > b.left;
+}
+
+static bool rectangleContains(const VetteScreen::DirtyRect& outer,
+                              const VetteScreen::DirtyRect& inner)
+{
+    return outer.top <= inner.top && outer.left <= inner.left
+        && outer.bottom >= inner.bottom && outer.right >= inner.right;
+}
+
 bool VetteScreen::presentMacFrame(const uint8_t* chunky, const uint8_t* colorTable,
-                                  int16_t dirtyTop, int16_t dirtyLeft,
-                                  int16_t dirtyBottom, int16_t dirtyRight)
+                                  const DirtyRect* dirtyRects, uint16_t dirtyRectCount)
 {
     if (!chunky || !colorTable || !m_back) return false;
     if (m_framePending) {
@@ -388,80 +401,111 @@ bool VetteScreen::presentMacFrame(const uint8_t* chunky, const uint8_t* colorTab
     return true;
 #endif
 
-    if (dirtyTop < 0) dirtyTop = 0;
-    if (dirtyLeft < 0) dirtyLeft = 0;
-    if (dirtyBottom > (int16_t)kMacHeight) dirtyBottom = kMacHeight;
-    if (dirtyRight > (int16_t)kWidth) dirtyRight = kWidth;
-    dirtyLeft &= (int16_t)~15;
-    dirtyRight = (int16_t)((dirtyRight + 15) & ~15);
-    bool pixelsDirty = dirtyTop < dirtyBottom && dirtyLeft < dirtyRight;
+    DirtyRect normalized[kMaxDirtyRects];
+    uint16_t normalizedCount = 0;
+    for (uint16_t i = 0; i < dirtyRectCount && i < kMaxDirtyRects; ++i) {
+        DirtyRect rectangle = dirtyRects[i];
+        if (rectangle.top < 0) rectangle.top = 0;
+        if (rectangle.left < 0) rectangle.left = 0;
+        if (rectangle.bottom > (int16_t)kMacHeight) rectangle.bottom = kMacHeight;
+        if (rectangle.right > (int16_t)kWidth) rectangle.right = kWidth;
+        rectangle.left &= (int16_t)~15;
+        rectangle.right = (int16_t)((rectangle.right + 15) & ~15);
+        if (rectangle.top >= rectangle.bottom || rectangle.left >= rectangle.right) continue;
+
+        // Horizontal C2P alignment can make two source rectangles overlap.
+        // Fold those together here so no plane span is converted twice.
+        bool merged;
+        do {
+            merged = false;
+            for (uint16_t j = 0; j < normalizedCount; ++j) {
+                if (!rectanglesOverlap(rectangle, normalized[j])) continue;
+                if (normalized[j].top < rectangle.top) rectangle.top = normalized[j].top;
+                if (normalized[j].left < rectangle.left) rectangle.left = normalized[j].left;
+                if (normalized[j].bottom > rectangle.bottom)
+                    rectangle.bottom = normalized[j].bottom;
+                if (normalized[j].right > rectangle.right) rectangle.right = normalized[j].right;
+                normalized[j] = normalized[--normalizedCount];
+                merged = true;
+                break;
+            }
+        } while (merged);
+        normalized[normalizedCount++] = rectangle;
+    }
+    bool pixelsDirty = normalizedCount != 0;
 
     // After the previous swap m_back is the frame from two updates ago. Bring
-    // forward the rectangle changed last time unless this conversion replaces
-    // every one of those bytes anyway. Driving marks the complete 512x320
-    // surface: copying its old 81,920 planar bytes immediately before fully
-    // overwriting them consumed 39.7% of the measured update window.
-    bool replacesSync = pixelsDirty && m_syncPending
-        && dirtyTop <= m_syncTop && dirtyLeft <= m_syncLeft
-        && dirtyBottom >= m_syncBottom && dirtyRight >= m_syncRight;
-    if (m_syncPending && !replacesSync) {
+    // forward each rectangle changed last time unless one of this frame's
+    // conversions replaces it completely.
+    if (m_syncRectCount) {
 #ifdef VETTE_PROBE
         VetteProfileScope profileSync(kProfileSync);
 #endif
-        uint16_t byteLeft = (uint16_t)m_syncLeft / 8;
-        uint16_t byteRight = (uint16_t)m_syncRight / 8;
-        for (int16_t y = m_syncTop; y < m_syncBottom; ++y) {
-            uint32_t row = (uint32_t)(y + kMacTop) * kRowStride;
-            for (uint16_t plane = 0; plane < kPlanes; ++plane) {
-                uint32_t offset = row + (uint32_t)plane * kBytesPerRow + byteLeft;
-                for (uint16_t x = byteLeft; x < byteRight; ++x, ++offset)
-                    m_back[offset] = m_chip[offset];
+        for (uint16_t i = 0; i < m_syncRectCount; ++i) {
+            bool replaced = false;
+            for (uint16_t j = 0; j < normalizedCount; ++j)
+                if (rectangleContains(normalized[j], m_syncRects[i])) {
+                    replaced = true;
+                    break;
+                }
+            if (replaced) continue;
+            uint16_t byteLeft = (uint16_t)m_syncRects[i].left / 8;
+            uint16_t byteRight = (uint16_t)m_syncRects[i].right / 8;
+            for (int16_t y = m_syncRects[i].top; y < m_syncRects[i].bottom; ++y) {
+                uint32_t row = (uint32_t)(y + kMacTop) * kRowStride;
+                for (uint16_t plane = 0; plane < kPlanes; ++plane) {
+                    uint32_t offset = row + (uint32_t)plane * kBytesPerRow + byteLeft;
+                    for (uint16_t x = byteLeft; x < byteRight; ++x, ++offset)
+                        m_back[offset] = m_chip[offset];
+                }
             }
         }
     }
-    m_syncPending = false;
+    m_syncRectCount = 0;
 
     if (pixelsDirty) {
 #ifdef VETTE_PROBE
         VetteProfileScope profileC2P(kProfileC2P);
 #endif
-        uint16_t firstWord = (uint16_t)dirtyLeft / 16;
-        uint16_t finalWord = (uint16_t)dirtyRight / 16;
-        uint16_t groups = (uint16_t)((finalWord - firstWord) * 2);
-        for (int16_t y = dirtyTop; y < dirtyBottom; ++y) {
-            const uint8_t* source = chunky + (uint32_t)y * (kWidth / 2)
-                                  + (uint16_t)dirtyLeft / 2;
-            uint8_t* destination = m_back + (uint32_t)(y + kMacTop) * kRowStride
-                                 + firstWord * 2;
+        for (uint16_t rectangle = 0; rectangle < normalizedCount; ++rectangle) {
+            const DirtyRect& dirty = normalized[rectangle];
+            uint16_t firstWord = (uint16_t)dirty.left / 16;
+            uint16_t finalWord = (uint16_t)dirty.right / 16;
+            uint16_t groups = (uint16_t)((finalWord - firstWord) * 2);
+            for (int16_t y = dirty.top; y < dirty.bottom; ++y) {
+                const uint8_t* source = chunky + (uint32_t)y * (kWidth / 2)
+                                      + (uint16_t)dirty.left / 2;
+                uint8_t* destination = m_back + (uint32_t)(y + kMacTop) * kRowStride
+                                     + firstWord * 2;
 #ifdef VETTE_C2P_ASM
 #ifdef VETTE_C2P_VERIFY
-            uint32_t start = vetteProfileBeamEpoch();
+                uint32_t start = vetteProfileBeamEpoch();
 #endif
-            vetteC2PSpanAsm(source, destination, &s_pairToPlanes[0][0], groups);
+                vetteC2PSpanAsm(source, destination, &s_pairToPlanes[0][0], groups);
 #ifdef VETTE_C2P_VERIFY
-            g_c2pAsmTicks += vetteProfileBeamEpoch() - start;
-            for (uint16_t plane = 0; plane < kPlanes; ++plane)
-                for (uint16_t x = 0; x < groups; ++x)
-                    s_c2pVerifyBytes[plane * kBytesPerRow + x]
-                        = destination[plane * kBytesPerRow + x];
-            start = vetteProfileBeamEpoch();
-            convertC2PSpanC(source, destination, groups);
-            g_c2pCTicks += vetteProfileBeamEpoch() - start;
-            ++g_c2pVerifyCalls;
-            g_c2pVerifyBytes += (uint32_t)groups * kPlanes;
-            for (uint16_t plane = 0; plane < kPlanes; ++plane)
-                for (uint16_t x = 0; x < groups; ++x)
-                    if (s_c2pVerifyBytes[plane * kBytesPerRow + x]
-                        != destination[plane * kBytesPerRow + x])
-                        ++g_c2pVerifyFailures;
+                g_c2pAsmTicks += vetteProfileBeamEpoch() - start;
+                for (uint16_t plane = 0; plane < kPlanes; ++plane)
+                    for (uint16_t x = 0; x < groups; ++x)
+                        s_c2pVerifyBytes[plane * kBytesPerRow + x]
+                            = destination[plane * kBytesPerRow + x];
+                start = vetteProfileBeamEpoch();
+                convertC2PSpanC(source, destination, groups);
+                g_c2pCTicks += vetteProfileBeamEpoch() - start;
+                ++g_c2pVerifyCalls;
+                g_c2pVerifyBytes += (uint32_t)groups * kPlanes;
+                for (uint16_t plane = 0; plane < kPlanes; ++plane)
+                    for (uint16_t x = 0; x < groups; ++x)
+                        if (s_c2pVerifyBytes[plane * kBytesPerRow + x]
+                            != destination[plane * kBytesPerRow + x])
+                            ++g_c2pVerifyFailures;
 #endif
 #else
-            convertC2PSpanC(source, destination, groups);
+                convertC2PSpanC(source, destination, groups);
 #endif
+            }
         }
-        m_syncTop = dirtyTop; m_syncLeft = dirtyLeft;
-        m_syncBottom = dirtyBottom; m_syncRight = dirtyRight;
-        m_syncPending = true;
+        for (uint16_t i = 0; i < normalizedCount; ++i) m_syncRects[i] = normalized[i];
+        m_syncRectCount = normalizedCount;
     }
 
 #ifdef VETTE_PROBE

@@ -28,6 +28,11 @@
 
 class VetteScreen {
 public:
+    struct DirtyRect {
+        int16_t top, left, bottom, right;
+    };
+    static const uint16_t kMaxDirtyRects = 16;
+
     // The Macintosh surface the port has to reproduce, [MEASURED] (docs/mac-hardware.md).
     static const uint16_t kWidth  = 512;
     static const uint16_t kHeight = 384;
@@ -55,8 +60,7 @@ public:
     // interleaved planes.  The completed frame is swapped in by vbiUpdate(), so
     // the copper never scans a half-converted picture.
     bool presentMacFrame(const uint8_t* chunky, const uint8_t* colorTable,
-                         int16_t dirtyTop, int16_t dirtyLeft,
-                         int16_t dirtyBottom, int16_t dirtyRight);
+                         const DirtyRect* dirtyRects, uint16_t dirtyRectCount);
 
     // Stage B's fail-loud surface.  It replaces the captured frame with a diagnostic
     // generated on the Amiga, so an unknown Mac trap cannot masquerade as a freeze.
@@ -81,8 +85,8 @@ private:
     uint16_t  m_ptrIndex = 0;      // copper-list index of the first BPLxPT move
     uint16_t  m_nextPalette[16] = {0};
     volatile bool m_framePending = false;
-    bool m_syncPending = false;
-    int16_t m_syncTop = 0, m_syncLeft = 0, m_syncBottom = 0, m_syncRight = 0;
+    DirtyRect m_syncRects[kMaxDirtyRects] = {};
+    uint16_t m_syncRectCount = 0;
 };
 
 #endif

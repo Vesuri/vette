@@ -56,12 +56,14 @@ destination and writes into the 512×320 window. A capture of offscreen rows 320
 simply outside the rectangle copied to the window. The port therefore correctly displays 320 rows
 without changing or clipping the original 323-row composition surface.
 
-Animation presentation uses a bounds-only dirty rectangle. `DrawPicture`, `CopyBits`, `EraseRect`,
-and `FrameRect` union their destination bounds only when their resolved destination pixels are the
-visible screen; GWorld composition must not dirty the display. C2P expands the horizontal bounds to
-16 pixels and converts only that area. Double-buffer coherence is maintained by copying the
-previous frame's dirty planar rectangle from front to back before applying the next one. The hot
-path no longer computes a whole-frame diagnostic checksum.
+Animation presentation uses a fixed list of ordinary dirty rectangles. `DrawPicture`, `CopyBits`,
+`EraseRect`, and `FrameRect` add their destination bounds only when their resolved destination
+pixels are the visible screen; GWorld composition must not dirty the display. Overlapping entries
+are merged, a capacity overflow conservatively falls back to their union, and C2P expands each
+horizontal span to 16 pixels. Double-buffer coherence is maintained by copying each preceding
+planar rectangle from front to back unless a new conversion completely replaces it. The rolling
+`FILLWATCH` audit decoded all 163,840 pixels after this change with zero mismatches. No framebuffer
+comparison, shadow buffer, or tile map participates in normal presentation.
 
 The intro's aligned `srcCopy`, `srcOr`, and `srcBic` operations stay in packed 4-bpp form. The
 clipped path intersects both source and destination bounds before copying and retains memmove
