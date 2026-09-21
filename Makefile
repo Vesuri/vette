@@ -84,6 +84,7 @@ driving-motion-compare:
 		--reference-object-prefix ref/mame/driving-motion-object \
 		--amiga-object-prefix tmp/driving-motion-object \
 		--match-state \
+		--match-objects \
 		--state-field physics_x --state-field physics_y \
 		$(if $(REQUIRE_EXACT),--require-exact,)
 

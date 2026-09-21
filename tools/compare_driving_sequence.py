@@ -99,6 +99,9 @@ def main() -> None:
         "--match-state", action="store_true",
         help="pair frames by the complete state tuple instead of capture ordinal")
     parser.add_argument(
+        "--match-objects", action="store_true",
+        help="include the complete captured Traffic roster in the state match key")
+    parser.add_argument(
         "--state-field", action="append", default=[],
         help="append a manifest column to the base player-state match key")
     parser.add_argument(
@@ -108,9 +111,11 @@ def main() -> None:
     state_fields = BASE_STATE_FIELDS + tuple(args.state_field)
     match_fields = tuple(args.match_field) or state_fields
     manifest_fields = tuple(dict.fromkeys(state_fields + match_fields))
-    match_state = args.match_state or bool(args.match_field)
+    match_state = args.match_state or bool(args.match_field) or args.match_objects
     if bool(args.reference_object_prefix) != bool(args.amiga_object_prefix):
         raise SystemExit("object prefixes must be present for both sequences or neither")
+    if args.match_objects and not args.reference_object_prefix:
+        raise SystemExit("--match-objects requires both object prefixes")
 
     reference = numbered_frames(args.reference_prefix)
     amiga = numbered_frames(args.amiga_prefix)
@@ -144,15 +149,18 @@ def main() -> None:
         if not reference_manifest or not amiga_manifest:
             raise SystemExit("--match-state requires both state manifests")
 
-        def index_states(frames, manifest, label):
+        def index_states(frames, manifest, object_prefix):
             result = {}
             for capture in sorted(frames.keys() & manifest.keys()):
                 state = tuple(manifest[capture][field] for field in match_fields)
+                if args.match_objects:
+                    state += (read_objects(object_prefix, capture),)
                 result.setdefault(state, []).append(capture)
             return result
 
-        reference_states = index_states(reference, reference_manifest, "reference")
-        amiga_states = index_states(amiga, amiga_manifest, "Amiga")
+        reference_states = index_states(
+            reference, reference_manifest, args.reference_object_prefix)
+        amiga_states = index_states(amiga, amiga_manifest, args.amiga_object_prefix)
         common_states = reference_states.keys() & amiga_states.keys()
         pairs = []
         for state in sorted(common_states, key=lambda state: reference_states[state][0]):
@@ -246,6 +254,8 @@ def main() -> None:
         if match_state:
             state_label = ", ".join(
                 f"{field}={value}" for field, value in zip(match_fields, matched_state))
+            if args.match_objects:
+                state_label += f", objects={len(matched_state[-1])}"
             print(
                 f"reference frame {reference_frame} / Amiga frame {amiga_frame} "
                 f"({state_label}): {status}")

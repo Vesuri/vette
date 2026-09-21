@@ -1521,8 +1521,13 @@ player state had three Macintosh objects (`VETT`, `OPPO`, `TAXI`) but four Amiga
 `OPPO`, `AMBU`, `LOVE`), which explained the lower-dashboard delta. The synchronized road seed now
 proves that the two original Traffic initializers select the same three-object roster. `make
 driving-motion-reference` and `driving-motion-capture` supply that fixture only to their diagnostic
-builds; `driving-motion-compare` still keys completed frames by full player state and correctly
-refuses to compare the new sequences until an equivalent phase checkpoint exists.
+builds. `driving-motion-compare` now keys completed frames by the full player state and the complete
+captured Traffic roster, including every object's type, position, speed, and heading. The current
+37 Macintosh and 40 Amiga frames contain no equivalent complete game state, so the comparator
+correctly refuses to turn their timing difference into a pixel-fidelity result. A self-comparison
+finds all 37 reference states and reports 6,478,848 exact pixels, proving the complete-state key and
+comparison path. The next differential needs a short equivalent-phase checkpoint rather than a
+faster presentation path.
 
 The phase investigation now records two source-level ordinals beside every moving frame. The
 Macintosh harness locates `Main+$1FD2` from the unique, byte-verified original TST/BEQ sequence in
@@ -1590,8 +1595,10 @@ than VBL cadence: TAXI's `$18EC`/`$0BB2` physics path runs from the ordinary Tra
 completed main-loop iteration. The Macintosh reaches the first moving player state at iteration 45
 after roughly 6–7 ticks per frame; the target reaches it at iteration 26 after roughly 11–12 ticks
 per frame. Both have allowed about the same wall-clock interval since TAXI was initialized, but the
-Macintosh has executed about fourteen more TAXI updates. The remaining phase gap therefore belongs
-to the A1200 performance target, not a clock, random, resource, or initializer compatibility hack.
+Macintosh has executed about fourteen more TAXI updates. This is the expected completed-frame
+cadence difference between machines of different effective speed, not a clock, random, resource,
+initializer, or rendering compatibility failure. Further C2P tuning is deferred; fidelity work
+continues from an equivalent complete-state checkpoint instead.
 
 The 26-record sightseeing table used by `Main+$3456` was also decoded as a possible source-native
 shortcut. Record 4 is cell `(6,26)`, only six cells from the export-221 transition at `(6,32)`, but
