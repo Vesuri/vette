@@ -116,7 +116,9 @@ is consequently renumbered.
    reload registers and direct effects use their declared source rates. The driver also proves its
    three inputs are fixed voices mixed to identical left/right bytes, so the two observed gameplay
    contexts now occupy centred Paula pairs and each new context-2 load replaces its predecessor.
-   Next compare the result to
+   Command `$08` also proves that Vette's `BogasPurge(300)` builds a mix table with 100/128 gain per
+   input; its exact Paula equivalent is volume 50 and replaces the earlier guessed levels. Next
+   compare the result to
    reference audio, then drive real pause/exit paths to establish Stop/Deactivate/Dispose behavior
    (the ordinary intro calls Close/Purge during initialization and Start/Set at its exit), then
    cover gear changes, collisions, skids, horns, police, environment, and result audio, including

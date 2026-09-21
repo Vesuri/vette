@@ -276,6 +276,10 @@ PCM length, source rate, and optional loop bounds. Direct effect contexts conver
 PAL Paula period. Context 0 instead matches Bogas's fixed 11.127 kHz software-mixer output and uses
 the original 16.16 phase step supplied by Load/Play. The bridge plays the attack once, then changes
 Paula's reload registers to the declared sustain range.
+BGAS command `$08`, reached through the resident `BogasPurge` wrapper with Vette's value 300,
+constructs the driver's 768-byte clipping table with a per-input coefficient of
+`floor(300/3)/128`. Paula volume 50 reproduces that pre-clipping 100/128 gain; the earlier 40, 48,
+and 64 values were approximations rather than properties of the resources or driver.
 This is still an
 incremental Bogas backend: intro mixing remains on its proven flag-driven path, and Stop/Purge plus
 all later gameplay cues still require scenario verification. → `docs/source-inventory.md` §Audio.

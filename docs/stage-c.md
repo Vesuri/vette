@@ -1065,6 +1065,14 @@ pair: AUD0/1 for the engine and AUD2/3 for the current direct effect. Its earlie
 AUD2/AUD3 allocation incorrectly made successive effects hard-left and hard-right and allowed a
 kind of overlap the original fixed context cannot represent.
 
+The apparent `BogasPurge(300)` lifecycle call is also audio state, not a disposable administrative
+no-op. BGAS command `$08` passes its word to resource offset `$2738`, which rebuilds the 768-entry
+mix table. For each possible sum it applies `floor(level/3)/128` to the distance from unsigned
+silence at 384, then clamps to one output byte. Vette's level 300 therefore gives every input a
+100/128 gain. Paula volume 50 is the exact hardware-scale equivalent before clipping, so all intro
+and gameplay voices now derive the same level from that call instead of using guessed values 40,
+48, and 64.
+
 Short INST resources are parsed structurally as four header words (loop start, loop end, source
 sample rate, PCM byte count). This corrects the earlier zero-loop-only test, which left the Engine
 header in its PCM stream. Direct gameplay effects use the header's 6.4 or 9.472 kHz source rate.
