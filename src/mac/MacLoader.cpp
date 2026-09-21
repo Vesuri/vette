@@ -5067,12 +5067,28 @@ static void refreshDrivingKeyMap()
 #endif
         }
     }
-    // Present the documented keypad-8 accelerator in the same GetKeys sample
+    // Present a documented accelerator in the same GetKeys sample
     // as the upshift.  The Macintosh oracle has accelerator held before the
     // original scanner observes Gear 1; waiting for the changed record here
     // would put the Amiga one physics update behind.  Physical keys remain
     // ORed into this diagnostic state above.
-    if (s_garageGearPhase >= 1) keyMap[0x5b >> 3] |= 1u << (0x5b & 7);
+    if (s_garageGearPhase >= 1) {
+#ifdef VETTE_FOLLOW_ROAD
+        // Course One starts immediately before a right-hand bend.  The game's
+        // accelerate-right control increases the heading from roughly $3000
+        // on a $0000..$3fff circle.  Release it near $3c00, before the wrap,
+        // then continue with its ordinary straight accelerator.  This
+        // is a normal-road fidelity workload; the old straight-to-water line
+        // remains available by omitting FOLLOW_ROAD.
+        static bool initialRightTurnComplete;
+        uint8_t* car = (uint8_t*)read32(s_currentA5 - 13944);
+        if (car && read16(car + 0x66) >= 0x3c00) initialRightTurnComplete = true;
+        uint16_t accelerator = initialRightTurnComplete ? 0x5b : 0x5c; // keypad 8 / 9
+        keyMap[accelerator >> 3] |= 1u << (accelerator & 7);
+#else
+        keyMap[0x5b >> 3] |= 1u << (0x5b & 7); // keypad 8: accelerate
+#endif
+    }
 #ifdef VETTE_FREEWAY_ROUTE
     // Course Two begins at cell (2,24), one cell north of an FWTP key.  Reach
     // it through the original drivetrain: use keypad steering to settle on a

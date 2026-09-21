@@ -9,6 +9,7 @@
 #   make GARAGE_CLICK=1  script the garage and vehicle selectors through real mouse events
 #   make GARAGE_CLICK=1 GARAGE_COURSE=2  select Course Two through its real UI before ACCEPT
 #   make GARAGE_CLICK=1 FREEWAY_ROUTE=1  steer by normal KeyMap input toward the Course Two freeway
+#   make GARAGE_CLICK=1 FOLLOW_ROAD=1    turn right at the Course One start, then follow the road
 #   make GARAGE_CLICK=1 FREEWAY_ROUTE=1 FREEWAY_START=11  fast-start at freeway cell (11,36)
 #   add FREEWAY_START_U=n FREEWAY_START_V=n to choose a source-derived local point in that cell
 #   add MAIN_START=n to hand off at Main Map cell (n,39) after a real freeway-exit response
@@ -204,6 +205,10 @@ endif
 
 ifeq ($(FREEWAY_ROUTE),1)
 EXTRA_DEFINES += -DVETTE_FREEWAY_ROUTE
+endif
+
+ifeq ($(FOLLOW_ROAD),1)
+EXTRA_DEFINES += -DVETTE_FOLLOW_ROAD
 endif
 
 # Diagnostic-only configurable fast start for freeway work.  Pass the desired

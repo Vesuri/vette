@@ -24,6 +24,7 @@ local driving_copy_captures = 0
 local driving_capture_armed = false
 local driving_sequence_manifest = nil
 local driving_motion = os.getenv("VETTE_DRIVING_MOTION") == "1"
+local follow_road = os.getenv("VETTE_FOLLOW_ROAD") == "1"
 local driving_capture_limit = driving_motion and 40 or 4
 local trace_random = os.getenv("VETTE_RANDOM_TRACE") == "1"
 local trace_traffic_position = os.getenv("VETTE_TRAFFIC_POSITION_TRACE") == "1"
@@ -709,7 +710,8 @@ mac.run(function()
 		-- first observes gear 1.  Have it waiting before the shift so MAME cannot
 		-- lose one physics iteration to its once-per-video-frame Lua poll.
 		driving_capture_armed = true
-		mac.key_down("Keypad 8")
+		local accelerator = follow_road and "Keypad 9" or "Keypad 8"
+		mac.key_down(accelerator)
 		-- GetKeys is sampled by the driving loop, not the Event Manager.  Keep the
 		-- bit down until that scanner observes it; a short ADB press can begin and
 		-- end while the slow renderer owns the CPU and is therefore not an input.
@@ -720,8 +722,16 @@ mac.run(function()
 		end, 600)
 		mac.key_up("=  +")
 		if not shifted then return end
+		if follow_road then
+			if not mac.wait_for("initial right turn", function()
+				local car = car_address()
+				return car ~= 0 and u16(car + 0x66) >= 0x3c00
+			end, 1200) then return end
+			mac.key_up("Keypad 9")
+			mac.key_down("Keypad 8")
+		end
 	end
-	mac.key_down("Keypad 8")
+	if not follow_road then mac.key_down("Keypad 8") end
 	driving_capture_armed = true
 	arm_mirror_source_writer()
 	mac.wait(driving_motion and 500 or 1200)

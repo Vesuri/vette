@@ -26,6 +26,11 @@ the next unknown behavior must be reached by a short, reproducible checkpoint ru
 Main Map cell `(18,39)` and the natural-route class-2 `VETT`/`GGRY` collision at `(6,36)` are
 compatibility debt, not blockers for fidelity or performance work.
 
+For bounded driving runs that need continued motion rather than the lake collision, build with
+`GARAGE_CLICK=1 FOLLOW_ROAD=1`. The harness uses the shipped keypad-9 accelerate/right input from
+the Course One start, releases it near heading `$3C00`, and continues on keypad 8. Omitting
+`FOLLOW_ROAD` retains the straight-to-water collision checkpoint.
+
 ⚠ **Refer to an item by its TITLE, not its number.** Entries are deleted when closed and the list
 is consequently renumbered.
 
@@ -119,8 +124,8 @@ is consequently renumbered.
    Command `$08` proves that Vette's `BogasPurge(300)` builds the Macintosh software mix table, but
    an exhaustive INST scan proves ten samples already reach signed full scale. The Amiga bridge
    therefore maps that absolute maximum directly to Paula volume 64, retaining quieter samples'
-   authored headroom and avoiding Paula's below-64 resampling artifacts. Next
-   Both the shipped P pause/options transition and the ordinary Escape transition have now been
+   authored headroom and avoiding Paula's below-64 resampling artifacts. Both the shipped P
+   pause/options transition and the ordinary Escape transition have now been
    traced: neither calls Stop, Deactivate, Dispose, or Close during the following two Macintosh
    seconds, and Bogas remains started across the waiting state. The shipped BGAS dispatcher proves
    that Stop/Deactivate preserve voice records while Dispose tears them down; the Paula bridge now
