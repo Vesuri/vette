@@ -920,6 +920,15 @@ first synchronized frame is consequently exact. Captures two through four differ
 are beyond the single named-frame synchronization boundary. `amiga/driving_fred_state.gdb`,
 `driving_raster_source.gdb`, and `driving_mirror_picture.gdb` retain the correction trail.
 
+`make driving-sequence-compare` now turns those four paired captures into one repeatable sequence
+report rather than four manual invocations. It compares active pixels while ignoring each PixMap's
+four padding bytes, rejects missing or mismatched frame sets, identifies the first divergent frame,
+and accepts `REQUIRE_EXACT=1` when used as a regression gate. The saved sequence compares 700,416
+pixels: frame one is exact; frames two through four contain 18, 62, and 68 differences, for 148
+total (0.021130%). Their union remains confined to the animated lower cockpit/driver region and the
+first divergence is frame two. This is the next fidelity boundary; it is not evidence of a palette,
+mirror, or whole-frame timing failure.
+
 Resolving the remaining resident-code samples shows that they are not compatibility overhead:
 `Main+$5208/$5246/$5266` are perspective division and clipping, `Main+$5A34/$5A92/$5D6A` are
 line/polygon construction, and `Traffic+$68B4..$68BA` enters an original byte raster loop while

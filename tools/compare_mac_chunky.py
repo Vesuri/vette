@@ -3,12 +3,80 @@
 
 import argparse
 from collections import Counter
+from dataclasses import dataclass
 from pathlib import Path
 
 
 def pixel(data: bytes, row_bytes: int, x: int, y: int) -> int:
     value = data[y * row_bytes + x // 2]
     return value & 15 if x & 1 else value >> 4
+
+
+@dataclass(frozen=True)
+class Comparison:
+    changed: int
+    total: int
+    bounds: tuple[int, int, int, int] | None
+    transitions: Counter[tuple[int, int]]
+
+
+def compare_surfaces(
+    left: bytes,
+    right: bytes,
+    *,
+    width: int,
+    height: int,
+    left_row_bytes: int,
+    right_row_bytes: int,
+) -> Comparison:
+    """Compare two packed surfaces and return active-pixel differences."""
+    if width <= 0 or height <= 0:
+        raise ValueError("surface dimensions must be positive")
+    active_bytes = (width + 1) // 2
+    if left_row_bytes < active_bytes or right_row_bytes < active_bytes:
+        raise ValueError("rowBytes is too small for the requested width")
+
+    left_needed = left_row_bytes * height
+    right_needed = right_row_bytes * height
+    if len(left) < left_needed or len(right) < right_needed:
+        raise ValueError(
+            f"surface is truncated (need {left_needed} and {right_needed} bytes, "
+            f"got {len(left)} and {len(right)})")
+
+    changed = 0
+    bounds = [width, height, -1, -1]
+    transitions: Counter[tuple[int, int]] = Counter()
+    for y in range(height):
+        for x in range(width):
+            a = pixel(left, left_row_bytes, x, y)
+            b = pixel(right, right_row_bytes, x, y)
+            if a == b:
+                continue
+            changed += 1
+            bounds[0] = min(bounds[0], x)
+            bounds[1] = min(bounds[1], y)
+            bounds[2] = max(bounds[2], x)
+            bounds[3] = max(bounds[3], y)
+            transitions[(a, b)] += 1
+
+    result_bounds = tuple(bounds) if changed else None
+    return Comparison(changed, width * height, result_bounds, transitions)
+
+
+def format_bounds(bounds: tuple[int, int, int, int] | None) -> str:
+    if bounds is None:
+        return "empty"
+    left, top, right, bottom = bounds
+    return f"({left},{top})-({right + 1},{bottom + 1})"
+
+
+def print_comparison(comparison: Comparison) -> None:
+    print(
+        f"differing pixels: {comparison.changed} / {comparison.total} "
+        f"({comparison.changed * 100 / comparison.total:.6f}%)")
+    print(f"difference bounds: {format_bounds(comparison.bounds)}")
+    for (a, b), count in comparison.transitions.most_common(16):
+        print(f"  {a:X}->{b:X}: {count}")
 
 
 def main() -> None:
@@ -21,46 +89,20 @@ def main() -> None:
     parser.add_argument("--right-row-bytes", type=int, required=True)
     args = parser.parse_args()
 
-    if args.width <= 0 or args.height <= 0:
-        raise SystemExit("surface dimensions must be positive")
-    active_bytes = (args.width + 1) // 2
-    if args.left_row_bytes < active_bytes or args.right_row_bytes < active_bytes:
-        raise SystemExit("rowBytes is too small for the requested width")
-
     left = args.left.read_bytes()
     right = args.right.read_bytes()
-    left_needed = args.left_row_bytes * args.height
-    right_needed = args.right_row_bytes * args.height
-    if len(left) < left_needed or len(right) < right_needed:
-        raise SystemExit(
-            f"surface is truncated (need {left_needed} and {right_needed} bytes, "
-            f"got {len(left)} and {len(right)})")
-
-    changed = 0
-    bounds = [args.width, args.height, -1, -1]
-    transitions: Counter[tuple[int, int]] = Counter()
-    for y in range(args.height):
-        for x in range(args.width):
-            a = pixel(left, args.left_row_bytes, x, y)
-            b = pixel(right, args.right_row_bytes, x, y)
-            if a == b:
-                continue
-            changed += 1
-            bounds[0] = min(bounds[0], x)
-            bounds[1] = min(bounds[1], y)
-            bounds[2] = max(bounds[2], x)
-            bounds[3] = max(bounds[3], y)
-            transitions[(a, b)] += 1
-
-    total = args.width * args.height
-    if changed:
-        bbox = f"({bounds[0]},{bounds[1]})-({bounds[2] + 1},{bounds[3] + 1})"
-    else:
-        bbox = "empty"
-    print(f"differing pixels: {changed} / {total} ({changed * 100 / total:.6f}%)")
-    print(f"difference bounds: {bbox}")
-    for (a, b), count in transitions.most_common(16):
-        print(f"  {a:X}->{b:X}: {count}")
+    try:
+        comparison = compare_surfaces(
+            left,
+            right,
+            width=args.width,
+            height=args.height,
+            left_row_bytes=args.left_row_bytes,
+            right_row_bytes=args.right_row_bytes,
+        )
+    except ValueError as error:
+        raise SystemExit(str(error)) from error
+    print_comparison(comparison)
 
 
 if __name__ == "__main__":

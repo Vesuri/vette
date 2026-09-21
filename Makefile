@@ -8,7 +8,7 @@
 #
 # The Amiga build is in amiga/ and is the real target: `cd amiga && . ./env.sh && make`.
 
-.PHONY: all todo help
+.PHONY: all todo driving-sequence-compare help
 
 all: help
 
@@ -16,6 +16,7 @@ help:
 	@echo "Vette! — Macintosh 68000 -> Amiga port"
 	@echo
 	@echo "  make todo     what is open (docs/open-work.md + a live marker sweep)"
+	@echo "  make driving-sequence-compare  compare saved MAME/Amiga driving frames"
 	@echo
 	@echo "There is no host build yet — see PROJECT.md 'Open decisions' #6."
 	@echo "The Amiga build:  cd amiga && . ./env.sh && make"
@@ -34,3 +35,11 @@ todo:
 	            ':!src/platform/amiga/framework' ':!docs' 2>/dev/null); \
 	  if [ -n "$$hits" ]; then echo "$$hits"; else echo "none"; fi; \
 	else echo "(not a git repo)"; fi
+
+# The captures are local evidence under ignored ref/ and tmp/ trees.  This target deliberately
+# reports differences by default: after the exact named first frame, the first useful output is
+# the earliest divergence to investigate.  Pass REQUIRE_EXACT=1 to turn it into a regression gate.
+driving-sequence-compare:
+	@python3 tools/compare_driving_sequence.py \
+		ref/mame/driving-copy-source tmp/driving-copy-source \
+		$(if $(REQUIRE_EXACT),--require-exact,)
