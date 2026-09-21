@@ -73,9 +73,12 @@ is consequently renumbered.
    555,388. The kernel now walks each whole dirty rectangle per call instead of saving registers
    once per row. Its verifier covers another 3,068,576 plane bytes with zero failures; the current
    300-field profile averages about 287,054 C2P ticks per update, a further 5.4% reduction. A nested
-   bracket now proves CopyBits itself owns 2,914,419 of 2,957,204 drawing ticks over 32 calls:
-   98.6% of that row. The current 300-field window is 38.014% C2P, 45.742% original game/callback
-   work, 12.342% drawing traps, and below 2.9% for every other exclusive row.
+   bracket proved generic CopyBits itself owned 2,914,419 of 2,957,204 drawing ticks over 32 calls:
+   98.6% of that row. The fixed 260-to-256-byte driving publish now has a byte-exact 68000 assembly
+   path. Its in-process oracle compared 2,048,000 bytes over 25 calls with zero failures and measured
+   it at 2.366 times the C path's speed. The following 300-field profile records about 38,036 ticks
+   per publish and reduces the complete drawing row from 12.342% to 5.554%; C2P is again the largest
+   port-owned row at 41.385%.
    Measure the same synchronized workload on the original Macintosh and set the target from both
    results.
 3. **Fix measured visual discrepancies.** Trace wrong pixels and geometry to their source data or
@@ -84,10 +87,11 @@ is consequently renumbered.
    list cut conversion per update by about 24.4%; moving its register-bound capture ahead of the
    general dispatcher removed 432 dispatches, the four-pixel lookup cut another 12.2% from C2P per
    update, A1200 scaled indexing then cut 18.0%, and rectangle-wide traversal removed another 5.4%
-   per update. CopyBits is now isolated as 98.6% of the 12.342% drawing row. Its source has a
-   260-byte stride while the logical screen has a 256-byte stride, so the proven full publish is a
-   320-row copy rather than one contiguous move. Optimize that measured transfer or its
-   representation next; do not reintroduce the slower rectangle-list publisher.
+   per update. The fixed 320-row CopyBits publisher is now 2.366 times as fast as its generic-C
+   oracle and byte-exact across 25 moving calls; the complete drawing row has fallen from 12.342%
+   to 5.554%. Do not reintroduce the slower rectangle-list publisher. Return to the 41.385% C2P
+   row and measure whether its remaining cost is the transpose kernel, chip-RAM writes, or dirty
+   coverage before choosing the next change.
    Prefer representation and algorithm changes before more assembly; verify every optimization
    against the reference differential and preserve game behavior.
 5. **Finish control fidelity.** Verify keyboard aliases, throttle, brake, steering, gears, mouse

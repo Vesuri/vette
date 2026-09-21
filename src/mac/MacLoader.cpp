@@ -33,6 +33,9 @@ void vetteMappedCopyRowsAsm(const uint8_t* source, uint8_t* destination,
                             const uint8_t* map, uint32_t rowBytes, uint32_t height,
                             uint32_t sourceModulo, uint32_t destinationModulo);
 #endif
+#ifdef VETTE_DRIVING_COPY_ASM
+void vetteDrivingCopyAsm(const uint8_t* source, uint8_t* destination);
+#endif
 
 volatile uint16_t g_stageBState = 0;
 volatile uint16_t g_trapWord = 0;
@@ -81,6 +84,13 @@ volatile uint32_t g_mappedCopyVerifyCalls = 0;
 volatile uint32_t g_mappedCopyVerifyBytes = 0;
 volatile uint32_t g_mappedCopyVerifyFailures = 0;
 #endif
+#ifdef VETTE_DRIVING_COPY_VERIFY
+volatile uint32_t g_drivingCopyAsmTicks = 0;
+volatile uint32_t g_drivingCopyCTicks = 0;
+volatile uint32_t g_drivingCopyVerifyCalls = 0;
+volatile uint32_t g_drivingCopyVerifyBytes = 0;
+volatile uint32_t g_drivingCopyVerifyFailures = 0;
+#endif
 char g_trapManager[24] = "";
 char g_trapRoutine[24] = "";
 }
@@ -123,6 +133,9 @@ static uint8_t s_colorScreen[(512 / 2) * 320];
 static uint8_t s_indexedPictureScratch[512 * 24];
 #ifdef VETTE_MAPPED_COPY_VERIFY
 static uint8_t s_mappedCopyVerify[512 * 342 / 2];
+#endif
+#ifdef VETTE_DRIVING_COPY_VERIFY
+static uint8_t s_drivingCopyVerify[sizeof(s_colorScreen)];
 #endif
 static uint8_t s_windowManagerPort[108];
 static uint8_t s_windowManagerPixMap[50];
@@ -3632,6 +3645,64 @@ static bool copyBits(const uint8_t* sourceBitmap, const uint8_t* destinationBitm
     return true;
 }
 
+#ifdef VETTE_DRIVING_COPY_ASM
+static bool copyDrivingPublishAsm(const uint8_t* sourceBitmap,
+                                  const uint8_t* destinationBitmap,
+                                  const uint8_t* sourceRect,
+                                  const uint8_t* destinationRect,
+                                  uint16_t mode, const uint8_t* maskRegion)
+{
+    if (!sourceRect || !destinationRect || mode != 0 || maskRegion
+        || (int16_t)read16(sourceRect) != 0 || (int16_t)read16(sourceRect + 2) != 0
+        || (int16_t)read16(sourceRect + 4) != 342
+        || (int16_t)read16(sourceRect + 6) != 512
+        || (int16_t)read16(destinationRect) != 0
+        || (int16_t)read16(destinationRect + 2) != 0
+        || (int16_t)read16(destinationRect + 4) != 342
+        || (int16_t)read16(destinationRect + 6) != 512) return false;
+
+    uint8_t *sourcePixels, *destinationPixels;
+    uint16_t sourceRowBytes, destinationRowBytes;
+    int16_t sourceTop, sourceLeft, sourceBottom, sourceRight;
+    int16_t destinationTop, destinationLeft, destinationBottom, destinationRight;
+    if (!bitmapPixels(sourceBitmap, sourcePixels, sourceRowBytes,
+                      sourceTop, sourceLeft, sourceBottom, sourceRight)
+        || !bitmapPixels(destinationBitmap, destinationPixels, destinationRowBytes,
+                         destinationTop, destinationLeft, destinationBottom, destinationRight)
+        || destinationPixels != s_colorScreen
+        || sourceRowBytes != 260 || destinationRowBytes != 256
+        || sourceTop != 0 || sourceLeft != 0 || sourceBottom < 320 || sourceRight != 512
+        || destinationTop != 0 || destinationLeft != 0
+        || destinationBottom != 320 || destinationRight != 512) return false;
+
+    const uint8_t* sourceColors = bitmapColorTable(sourceBitmap);
+    const uint8_t* destinationColors = bitmapColorTable(destinationBitmap);
+    if (!sourceColors || !destinationColors
+        || read32(sourceColors) != read32(destinationColors)) return false;
+
+#ifdef VETTE_DRIVING_COPY_VERIFY
+    uint32_t before = vetteProfileBeamEpoch();
+    if (!copyBits(sourceBitmap, destinationBitmap, sourceRect, destinationRect,
+                  mode, maskRegion)) return false;
+    g_drivingCopyCTicks += vetteProfileBeamEpoch() - before;
+    blockMove(destinationPixels, s_drivingCopyVerify, sizeof(s_colorScreen));
+    before = vetteProfileBeamEpoch();
+    vetteDrivingCopyAsm(sourcePixels, destinationPixels);
+    g_drivingCopyAsmTicks += vetteProfileBeamEpoch() - before;
+    ++g_drivingCopyVerifyCalls;
+    g_drivingCopyVerifyBytes += sizeof(s_colorScreen);
+    for (uint32_t i = 0; i < sizeof(s_colorScreen); ++i)
+        if (destinationPixels[i] != s_drivingCopyVerify[i]) {
+            ++g_drivingCopyVerifyFailures;
+            break;
+        }
+#else
+    vetteDrivingCopyAsm(sourcePixels, destinationPixels);
+#endif
+    return true;
+}
+#endif
+
 static bool clipRect(const uint8_t* rectangle)
 {
     uint8_t* port = (uint8_t*)read32(s_qdThePort);
@@ -5969,8 +6040,16 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
 #ifdef VETTE_PROBE
             VetteProfileScope profileCopyBits(kProfileCopyBits);
 #endif
-            copied = copyBits(sourceBitmap, destinationBitmap, sourceRect,
-                              destinationRect, mode, maskRegion);
+            copied = false;
+#ifdef VETTE_DRIVING_COPY_ASM
+            if (fullDrivingPublish)
+                copied = copyDrivingPublishAsm(sourceBitmap, destinationBitmap,
+                                               sourceRect, destinationRect,
+                                               mode, maskRegion);
+#endif
+            if (!copied)
+                copied = copyBits(sourceBitmap, destinationBitmap, sourceRect,
+                                  destinationRect, mode, maskRegion);
         }
         s_suppressDirectScreenDirty = false;
         if (copied) {

@@ -1414,6 +1414,16 @@ transferred about 63.3 KiB in 14 rectangles per update, but its row walks cost a
 per call—16.7% more than the generic full copy. It was removed. Dirty rectangles remain the right
 representation for the expensive C2P into chip RAM, not for this fast-RAM-to-fast-RAM publish.
 
+The production publisher therefore keeps the full 512×320 transfer but specializes its proven
+shape. A 68000 assembly routine copies 256 bytes with unrolled longword moves, skips the source
+GWorld's four padding bytes, and repeats for 320 rows. Strict dispatch guards preserve the generic
+CopyBits path for every other shape, mode, mask, stride, destination, or ColorTable relationship.
+The in-process C/assembly differential compared 2,048,000 bytes over 25 moving calls with zero
+failures and measured a 2.366 speed ratio. The display guard then verified 40 frames and every one
+of their 320 rows with zero bad pixels. In the next 300-field profile the CopyBits core is 1,293,230
+ticks over 34 calls, about 38,036 per publish, and the complete drawing row is 5.554% rather than
+12.342%. C2P is now the largest remaining port-owned row at 41.385%.
+
 The differential now has a real moving checkpoint rather than a neutral car with a held
 accelerator. `VETTE_DRIVING_MOTION=1` makes the Macintosh harness wait for a valid full-window
 CopyBits from Vette, latch the application A5 at that trap boundary, wait for countdown state 3,

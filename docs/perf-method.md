@@ -236,6 +236,22 @@ short row spans outweighed the byte saving in fast RAM, so the implementation wa
 a closed negative result; the retained CopyBits bracket will price a representation or transfer
 change without reopening that design on intuition.
 
+### 2026-09-21 — Fixed-stride driving publisher
+
+The retained full publish has one stable shape: copy 256 visible bytes from each of 320 source
+rows, advancing the source by its four-byte QuickDraw padding. A 68000 assembly twin performs that
+transfer as eight unrolled longword moves per 32-byte group. Eligibility remains strict—matching
+rectangles, `srcCopy`, no mask, 260/256-byte strides, the logical-screen destination, and matching
+ColorTable seeds—so every other CopyBits operation still takes the generic implementation.
+
+The in-process verifier ran the generic C oracle and assembly path on the same 25 moving publishes,
+compared all 2,048,000 destination bytes, and found zero failures. It measured 2,205,266 C ticks
+against 932,036 assembly ticks, a 2.366 ratio. `FILLWATCH=1` then checked 40 consecutive frames and
+all 320 displayed rows with zero bad frames or pixels. In the standardized 300-field profile the
+CopyBits core is 1,293,230 ticks over 34 calls, about 38,036 per publish versus the previous 91,076;
+the complete drawing row falls from 12.342% to 5.554%. C2P is now again the largest port-owned row
+at 41.385%, so it is the next measurement target.
+
 ## Lessons — measurement
 
 - **Compare FPS row vectors, never a `total painted` line.** A total spans a partial trailing row

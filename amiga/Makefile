@@ -130,6 +130,14 @@ EXTRA_DEFINES += -DVETTE_C2P_VERIFY
 endif
 endif
 
+# Exact 260-byte GWorld to 256-byte logical-screen driving publication copy.
+ifneq ($(DRIVING_COPY_C),1)
+EXTRA_DEFINES += -DVETTE_DRIVING_COPY_ASM
+ifdef VERIFY
+EXTRA_DEFINES += -DVETTE_DRIVING_COPY_VERIFY
+endif
+endif
+
 # `make PROBES=1` — the sub-frame timing accumulators, read via the gdb stub (amiga/diag_run.sh).
 # OFF by default: the probes read chip registers several times per iteration, which is exactly
 # what a framerate build must not do.  ⚠ NEVER quote a framerate from a PROBES build.
@@ -335,6 +343,12 @@ ifneq ($(C2P_C),1)
 ifdef VERIFY
 PROBE_SYMS += g_c2pAsmTicks g_c2pCTicks g_c2pVerifyCalls g_c2pVerifyBytes \
               g_c2pVerifyFailures
+endif
+endif
+ifneq ($(DRIVING_COPY_C),1)
+ifdef VERIFY
+PROBE_SYMS += g_drivingCopyAsmTicks g_drivingCopyCTicks g_drivingCopyVerifyCalls \
+              g_drivingCopyVerifyBytes g_drivingCopyVerifyFailures
 endif
 endif
 ifdef PROBES
