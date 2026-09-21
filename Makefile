@@ -8,7 +8,7 @@
 #
 # The Amiga build is in amiga/ and is the real target: `cd amiga && . ./env.sh && make`.
 
-.PHONY: all todo driving-sequence-compare driving-profile help
+.PHONY: all todo driving-sequence-capture driving-sequence-compare driving-profile help
 
 all: help
 
@@ -17,6 +17,7 @@ help:
 	@echo
 	@echo "  make todo     what is open (docs/open-work.md + a live marker sweep)"
 	@echo "  make driving-sequence-compare  compare saved MAME/Amiga driving frames"
+	@echo "  make driving-sequence-capture  capture Amiga frames at saved Macintosh game states"
 	@echo "  make driving-profile  build and measure 300 PAL fields of target-A1200 driving"
 	@echo
 	@echo "There is no host build yet — see PROJECT.md 'Open decisions' #6."
@@ -37,12 +38,20 @@ todo:
 	  if [ -n "$$hits" ]; then echo "$$hits"; else echo "none"; fi; \
 	else echo "(not a git repo)"; fi
 
-# The captures are local evidence under ignored ref/ and tmp/ trees.  This target deliberately
-# reports differences by default: after the exact named first frame, the first useful output is
-# the earliest divergence to investigate.  Pass REQUIRE_EXACT=1 to turn it into a regression gate.
+# The captures are local evidence under ignored ref/ and tmp/ trees. Capture by complete game state,
+# not ordinal: different machine speeds need not publish the same intermediate states. The comparison
+# reports one-sided coverage and the earliest shared-state divergence. REQUIRE_EXACT=1 gates pixels
+# and state alignment for every paired state without pretending one-sided states are comparable.
+driving-sequence-capture:
+	@cd amiga && . ./env.sh && $(MAKE) clean && \
+	  $(MAKE) -j4 SKIP_INTRO=1 GARAGE_CLICK=1 INPUT_PROBE_RAW_KEY=62 && \
+	  EXTRA_ARGS="--warp_mode=1" GDBSCRIPT=driving_state_sequence.gdb \
+	  ./diag_run.sh 150
+
 driving-sequence-compare:
 	@python3 tools/compare_driving_sequence.py \
 		ref/mame/driving-copy-source tmp/driving-copy-source \
+		--match-state \
 		$(if $(REQUIRE_EXACT),--require-exact,)
 
 # The measurement freezes in target time after 300 PAL fields; 60 seconds is

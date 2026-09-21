@@ -939,20 +939,21 @@ establish another fidelity boundary. `amiga/driving_fred_state.gdb`,
 
 `make driving-sequence-compare` now turns the paired captures into one state-aware sequence report
 rather than four manual invocations. Both harnesses emit ticks, engine RPM, gear, speed, position,
-and heading beside every surface. The comparison ignores each PixMap's four padding bytes, rejects
-missing or mismatched frame sets, identifies the first *state-aligned* divergence, and accepts
-`REQUIRE_EXACT=1` as a regression gate. Pixel differences from unequal game states are printed for
-diagnosis but explicitly rejected as fidelity evidence.
+and heading beside every surface. With `--match-state`, the comparison pairs the complete six-field
+state tuple rather than capture ordinal, ignores each PixMap's four padding bytes, reports states
+seen on only one machine, identifies the first state-aligned divergence, and accepts
+`REQUIRE_EXACT=1` as a regression gate. `make driving-sequence-capture` rebuilds the deterministic
+Amiga entry with the reference keypad-8 input and captures the corresponding states.
 
-That safeguard corrected the earlier interpretation. The saved Macintosh captures have RPM state
-11, 15, 18, and 23; the first four Amiga captures remain at 11. Static and live traces identify the
-small changing dashboard shape as digits drawn from the current car's `+$44` engine-RPM word by
-the shipped `Traffic+$67A4` byte raster—not a driver animation and not compatibility rendering.
-Only the first pair is state-aligned, and all 175,104 active pixels in it match. The following
-ordinal pairs are not renderer comparisons. They are useful performance evidence instead: the
-Macintosh completes those updates 6–7 of its 60 Hz ticks apart, while this A1200 run takes 21–36
-of its 50 Hz ticks. The next action is a phase-share profile of this exact workload, not a pixel
-patch or a claim that unequal simulation states should look alike.
+That safeguard corrected the earlier interpretation. The saved Macintosh captures have RPM states
+11, 15, 18, and 23. On the port, completed publications jump from 11 to 23; states 15 and 18 occur
+inside the Macintosh frame's repeated publication construction but are not separate completed Amiga
+frames. Static and live traces identify the small changing dashboard shape as digits drawn from the
+current car's `+$44` engine-RPM word by the shipped `Traffic+$67A4` byte raster—not a driver
+animation and not compatibility rendering. The two complete states shared by both machines, RPM 11
+and RPM 23 with identical gear, speed, position and heading, each match all 175,104 active pixels:
+350,208 compared pixels and zero differences. The comparator reports RPM 15 and 18 explicitly as
+reference-only coverage rather than pretending their ordinals are comparable.
 
 Resolving the remaining resident-code samples shows that they are not compatibility overhead:
 `Main+$5208/$5246/$5266` are perspective division and clipping, `Main+$5A34/$5A92/$5D6A` are

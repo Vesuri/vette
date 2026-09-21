@@ -27,7 +27,9 @@ is consequently renumbered.
 
 1. **Build the representative driving differential.** Compare synchronized original and Amiga
    sequences for geometry, object placement, palettes, surface heights, clipping, mirrors, traffic,
-   animation, and the principal view modes—not merely one exact initial frame.
+   animation, and the principal view modes—not merely one exact initial frame. State-keyed capture
+   now proves two shared stationary-render states (RPM 11 and 23) exact across 350,208 active pixels;
+   extend the same method to actual motion, traffic, and alternate views.
 2. **Establish the performance target.** The full-accounting target-A1200 profile is now in place
    and identified presentation as 80.353% of the first moving-driving baseline. After removing a
    fully overwritten synchronization copy, adding the packed word-write C2P kernel, and deriving a
