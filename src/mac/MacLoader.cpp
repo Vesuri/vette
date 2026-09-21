@@ -294,7 +294,10 @@ static void markDirty(const uint8_t* rectangle)
 // would give Line-A traps the wrong exception/USP context.
 static uint8_t* s_vblTasks[8];
 static uint16_t s_vblTaskCount;
-static uint16_t s_vblNextTask;
+static uint16_t s_vblPassIndex;
+static uint16_t s_vblPassLimit;
+static uint32_t s_vblPendingTicks;
+static bool s_vblPassActive;
 static uint32_t s_vblLastTick;
 
 #ifdef VETTE_PROBE
@@ -4267,11 +4270,18 @@ static int16_t installVBLTask(uint8_t* task)
     if (s_vblTaskCount == sizeof(s_vblTasks) / sizeof(s_vblTasks[0]))
         return -94;
 
+    bool firstTask = s_vblTaskCount == 0;
     write16(task + 4, 1);                    // vType
     write32(task, 0);
     if (s_vblTaskCount) write32(s_vblTasks[s_vblTaskCount - 1], (uint32_t)task);
     s_vblTasks[s_vblTaskCount++] = task;
-    s_vblLastTick = g_macTicks;
+    if (firstTask) {
+        s_vblPassIndex = 0;
+        s_vblPassLimit = 0;
+        s_vblPendingTicks = 0;
+        s_vblPassActive = false;
+        s_vblLastTick = g_macTicks;
+    }
     return 0;
 }
 
@@ -4297,47 +4307,72 @@ static int16_t removeVBLTask(uint8_t* task)
         write32(s_vblTasks[i], i + 1 < s_vblTaskCount ? (uint32_t)s_vblTasks[i + 1] : 0);
     write32(task, 0);
 
-    if (s_vblNextTask > index) --s_vblNextTask;
-    if (s_vblNextTask >= s_vblTaskCount) s_vblNextTask = 0;
+    if (s_vblPassActive) {
+        if (s_vblPassIndex > index) --s_vblPassIndex;
+        if (s_vblPassLimit > index) --s_vblPassLimit;
+        if (s_vblPassIndex >= s_vblPassLimit) s_vblPassActive = false;
+    }
+    if (!s_vblTaskCount) {
+        s_vblPassIndex = 0;
+        s_vblPassLimit = 0;
+        s_vblPendingTicks = 0;
+        s_vblPassActive = false;
+        s_vblLastTick = g_macTicks;
+    }
     return 0;
 }
 
 static void scheduleVBLTask()
 {
-    if (!s_vblTaskCount || g_macVBLCallbackEntry || g_macVBLCallbackActive) return;
     uint32_t now = g_macTicks;
     uint32_t elapsed = now - s_vblLastTick;
     if (elapsed) {
         s_vblLastTick = now;
-        // A Macintosh VBL pass ages every queue entry before invoking the due
-        // callbacks.  Returning as soon as task 0 became due left every later
-        // record frozen forever when task 0 rearmed itself for one tick.
-        for (uint16_t i = 0; i < s_vblTaskCount; ++i) {
-            uint8_t* task = s_vblTasks[i];
-            int32_t count = (int16_t)read16(task + 10);
-            if (count > 0) {
-                count -= (int32_t)elapsed;
-                write16(task + 10, (uint16_t)(count > 0 ? count : 0));
-            }
-        }
+        uint32_t room = 0xffffffffu - s_vblPendingTicks;
+        s_vblPendingTicks += elapsed < room ? elapsed : room;
     }
-    // Deliver at most one callback at this user-mode safe point, but rotate
-    // the search so a one-tick task cannot starve the three-tick driving task.
-    for (uint16_t step = 0; step < s_vblTaskCount; ++step) {
-        uint16_t i = (uint16_t)(s_vblNextTask + step);
-        if (i >= s_vblTaskCount) i -= s_vblTaskCount;
-        uint8_t* task = s_vblTasks[i];
-        if ((int16_t)read16(task + 10) > 0) continue;
-        // MacEntry.s substitutes a user-mode trampoline for the normal trap
-        // return PC.  The pending flag is cleared before the callback executes,
-        // so any Line-A traps made by the driver nest normally.
-        write16(task + 10, 0);
-        s_vblNextTask = (uint16_t)(i + 1);
-        if (s_vblNextTask >= s_vblTaskCount) s_vblNextTask = 0;
-        g_macVBLCallbackTask = (uint32_t)task;
-        g_macVBLCallbackA5 = (uint32_t)s_currentA5;
-        g_macVBLCallbackEntry = read32(task + 6);
+
+    if (!s_vblTaskCount) {
+        s_vblPendingTicks = 0;
+        s_vblPassActive = false;
         return;
+    }
+    if (g_macVBLCallbackEntry || g_macVBLCallbackActive) return;
+
+    for (;;) {
+        if (!s_vblPassActive) {
+            if (!s_vblPendingTicks) return;
+            --s_vblPendingTicks;
+
+            // A real Macintosh ages every queue entry once per vertical-retrace
+            // pass, then calls each entry which became due in queue order.  PAL
+            // fields sometimes advance g_macTicks by two, so preserve those as
+            // two distinct passes: a one-tick task may rearm and run in both.
+            s_vblPassIndex = 0;
+            s_vblPassLimit = s_vblTaskCount;
+            for (uint16_t i = 0; i < s_vblPassLimit; ++i) {
+                uint8_t* task = s_vblTasks[i];
+                int16_t count = (int16_t)read16(task + 10);
+                if (count > 0) write16(task + 10, (uint16_t)(count - 1));
+            }
+            s_vblPassActive = true;
+        }
+
+        while (s_vblPassIndex < s_vblPassLimit) {
+            uint8_t* task = s_vblTasks[s_vblPassIndex++];
+            if ((int16_t)read16(task + 10) > 0) continue;
+
+            // MacEntry.s substitutes a user-mode trampoline for the normal
+            // trap return PC.  Only one callback is dispatched at this safe
+            // point; the next trap resumes this same virtual VBL pass.
+            write16(task + 10, 0);
+            g_macVBLCallbackTask = (uint32_t)task;
+            g_macVBLCallbackA5 = (uint32_t)s_currentA5;
+            g_macVBLCallbackEntry = read32(task + 6);
+            return;
+        }
+
+        s_vblPassActive = false;
     }
 }
 

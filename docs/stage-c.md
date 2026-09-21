@@ -1386,11 +1386,23 @@ remaining delta is 970 pixels at `(385,227)-(479,275)`. The A5 blocks identify t
 the Macintosh has zero at A5-$2EA4..-$2E9E while the Amiga has `$01,$01,$00,$01,$01,$00`.
 `Traffic+$5F04/$5F70` derives those six traffic-control flags and `Traffic+$6282` selects the
 right-dashboard raster from them. The two naturally sampled runs therefore have different traffic
-signal state; this is not evidence of a CopyBits, palette, or C2P defect. Relative tick positions
-differ because the oracle is 60 Hz and the target is 50 Hz, so a player tuple cannot synchronize
-independent traffic state. The next differential needs an equivalent complete-state checkpoint,
-not ever more coincidental natural-frame matches. The stationary RPM-11/RPM-23 exact regression
-remains separate and unchanged.
+signal state; this is not evidence of a CopyBits, palette, or C2P defect.
+
+Relative callback positions originally differed for a concrete compatibility reason: the PAL VBI
+advanced `Ticks` at the Macintosh 60 Hz rate, but the scheduler bulk-aged each record and could
+dispatch a one-tick task only once per 50 Hz field. Every fifth field therefore represented two
+Macintosh ticks while losing the second callback. The scheduler now queues elapsed virtual ticks
+and executes each as a separate Vertical Retrace Manager pass: all records age once, all due tasks
+run in queue order, and a task rearmed to one tick may correctly run again in the second pass.
+Callbacks remain user-mode and are still delivered one at a time at safe trap boundaries.
+
+The corrected moving capture reaches 40 distinct states and three naturally identical complete
+player tuples. The later of those differs by only 13 pixels, but all three still have different
+active traffic objects. The initial roster is therefore already divergent before the moving VBL
+loop, rather than being caused solely by its former 50/60 Hz callback loss. The next differential
+must trace the pre-driving random and Traffic initialization and obtain an equivalent complete-state
+checkpoint, not rely on coincidental player tuples. The stationary RPM-11 checkpoint remains
+pixel-exact after the scheduler change.
 
 One input discrepancy was then removed at its source boundary. The Macintosh harness already holds
 keypad 8 before pulsing top-row `+`, but the Amiga harness had waited until the car record showed
@@ -1409,9 +1421,10 @@ A5-$367C and increments the count at A5-$3696. At the shared state above, the Ma
 three (`VETT`, `OPPO`, `TAXI`) and the Amiga count is four (`VETT`, `OPPO`, `AMBU`, `LOVE`). The
 player records agree in all renderer-visible state; their only non-pointer difference is the
 fixed-point division remainder at car+$50. The extra traffic is outside the exact forward viewport
-but appears in the lower dashboard/rear presentation, accounting for the residual pixels. This is
-another original traffic-phase mismatch caused by comparing natural 60 Hz and 50 Hz histories,
-not a port drawing defect. `make driving-motion-reference` now regenerates the Macintosh side with
+but appears in the lower dashboard/rear presentation, accounting for the residual pixels. This
+remains an original traffic-phase mismatch rather than a port drawing defect, but the corrected
+60 Hz target scheduler proves that its root precedes the moving driving loop. `make
+driving-motion-reference` now regenerates the Macintosh side with
 the exact checked command, alongside `driving-motion-capture` and `driving-motion-compare` for the
 Amiga side and report. The report prints each paired active-object tag, position, speed, and heading,
 and refuses an exact gate when those original inputs differ.

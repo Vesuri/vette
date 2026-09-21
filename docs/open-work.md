@@ -38,8 +38,12 @@ is consequently renumbered.
    `OPPO`, `TAXI`, while the Amiga has `VETT`, `OPPO`, `AMBU`, `LOVE`; the latter two are offscreen
    in the forward view but contribute to the rear/dashboard presentation. Earlier paired A5 dumps
    likewise proved that a larger dashboard delta came from different original Traffic signal
-   flags, not drawing or palette code. Establish a shared traffic phase, then extend the same
-   state-keyed checkpoint to alternate views before making the complete moving frame an exact gate.
+   flags, not drawing or palette code. The target now dispatches a distinct Vertical Retrace
+   Manager pass for every 60 Hz Macintosh tick, including both virtual ticks on every fifth PAL
+   field; the roster mismatch survives that correction and therefore begins before the moving
+   driving loop. Trace the pre-driving random/traffic initialization, establish a shared traffic
+   phase, then extend the same state-keyed checkpoint to alternate views before making the complete
+   moving frame an exact gate.
 2. **Establish the performance target.** The full-accounting target-A1200 profile is now in place
    and identified presentation as 80.353% of the first moving-driving baseline. After removing a
    fully overwritten synchronization copy, adding the packed word-write C2P kernel, and deriving a
