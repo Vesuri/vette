@@ -1171,6 +1171,14 @@ are therefore reported but deliberately not required to match: completed-frame c
 machine-speed effect, while event identity, duration, ordering and pitch progression are fidelity
 contracts. Run `make driving-audio-compare` after the two capture targets.
 
+The separate straight-to-water fixture remains useful for one bounded adverse cue. With
+`FOLLOW_ROAD` omitted, `amiga/driving_audio_next_effect.gdb` stops at the first context-2 Load
+outside beep1/beep2/thud. It reaches instrument 8 (`crash`) at tick 2,137 / driving iteration 48
+with the source arguments duration 120 and options 1, and no loud stop. This verifies the ordinary
+collision path drives the already-generic Paula backend; it is not a port-authored collision sound
+trigger. Broader traffic-effect coverage should use Course Two's bridge/freeway traffic rather than
+repeatedly forcing the lake outcome.
+
 The corrected route reaches the Lake Merced water collision and displays the game's own tow-truck
 recovery artwork. A probe on the actual `_GetPicture` trap records PICT 140 at the resident wrapper
 `Traffic+$663C`; that wrapper's saved return identifies the dynamic request at `Main+$0FD6`, with

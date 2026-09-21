@@ -135,11 +135,13 @@ is consequently renumbered.
    `make driving-audio-capture` records the matching target wrapper timeline: the current
    100-iteration road run has one Start, six Loads, 99 engine Play updates, and no lifecycle stop or
    loud stop. Its reconstructed four-voice waveform proves engine-period error stays within
-   -3.100..+0.710 cents and direct effects within +2.133 cents of their source rates. Compare
-   `make driving-audio-compare` now proves all six Load context/duration/options/instrument
+   -3.100..+0.710 cents and direct effects within +2.133 cents of their source rates.
+   `make driving-audio-compare` proves all six Load context/duration/options/instrument
    signatures exact and the target engine pitches a source-ordered subsequence of the faster
    Macintosh run. Verify authored level and additional overlap cases, then cover gear changes,
-   collisions, skids, horns, police, environment, and result audio,
+   collision `crash` now has a bounded original-call regression as well. Use Course Two's
+   traffic-dense bridge/freeway workload next to cover skids, horns, police, environment, and
+   result audio,
    including concurrent playback and transitions.
 6. **Automate fidelity regressions.** Keep intro and driving framebuffer differentials, palette
    checks, clean-build audits, and eventually basic audio comparisons reproducible.
