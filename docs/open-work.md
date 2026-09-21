@@ -120,10 +120,11 @@ is consequently renumbered.
    an exhaustive INST scan proves ten samples already reach signed full scale. The Amiga bridge
    therefore maps that absolute maximum directly to Paula volume 64, retaining quieter samples'
    authored headroom and avoiding Paula's below-64 resampling artifacts. Next
-   compare the result to
-   reference audio, then drive real pause/exit paths to establish Stop/Deactivate/Dispose behavior
-   (the ordinary intro calls Close/Purge during initialization and Start/Set at its exit), then
-   cover gear changes, collisions, skids, horns, police, environment, and result audio, including
+   Both the shipped P pause/options transition and the ordinary Escape transition have now been
+   traced: neither calls Stop, Deactivate, Dispose, or Close during the following two Macintosh
+   seconds, and Bogas remains started across the waiting state. Compare the result to reference
+   audio, derive the unused lifecycle commands from the shipped BGAS implementation, then cover
+   gear changes, collisions, skids, horns, police, environment, and result audio, including
    concurrent playback and transitions.
 6. **Automate fidelity regressions.** Keep intro and driving framebuffer differentials, palette
    checks, clean-build audits, and eventually basic audio comparisons reproducible.

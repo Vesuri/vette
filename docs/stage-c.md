@@ -1108,14 +1108,17 @@ would be Paula period 554 for a direct context, while context 0 correctly uses t
 base before applying the phase step. Instruments with zero loop bounds naturally repeat their complete
 body until the original Bogas Load duration expires.
 
-`amiga/bogas_lifecycle.gdb` now covers the administrative wrappers separately. An ordinary,
-unskipped intro reaches `BogasClose` and `BogasPurge(300)` together at tick 90 during initialization,
-then `BogasStart` followed by `BogasSet` at tick 3,630 on the transition out of the intro. No Stop,
-Deactivate, or Dispose occurs before the tick-4,000 / 325-frame ceiling. This keeps those operations
-out of the hot gameplay implementation until a real pause/exit caller establishes the intended
-transition. Their wrapper stack contracts are present and the current conservative Paula behavior
-silences active voices, but resume/preserve semantics remain explicitly unverified rather than
-being inferred from the English names.
+`amiga/bogas_lifecycle.gdb` covers the administrative wrappers separately. An ordinary, unskipped
+intro reaches `BogasClose` and `BogasPurge(300)` together at tick 90 during initialization, then
+`BogasStart` followed by `BogasSet` on the transition out of the intro. The deterministic real-key
+harness now also covers both ways out of live driving. P reaches the shipped
+`Initialize+$1862` pause/options transition and Escape reaches the ordinary menu transition; both
+clear the driving state at tick 1,708 in the matched diagnostic build and settle at depth 94. For
+the following 120 Macintosh ticks neither path calls Stop, Deactivate, Dispose, or Close, and the
+Bogas started state remains set. Audio continuing into this waiting state is therefore original
+game behavior, not a missing port-side pause hook. Stop and Deactivate remain unused by these real
+paths; their eventual behavior must follow the shipped BGAS command implementation rather than
+their English names.
 
 The corrected route reaches the Lake Merced water collision and displays the game's own tow-truck
 recovery artwork. A probe on the actual `_GetPicture` trap records PICT 140 at the resident wrapper

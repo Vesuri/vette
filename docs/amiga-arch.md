@@ -284,9 +284,10 @@ attenuation. An exhaustive scan of all sixteen signed PCM bodies finds a global 
 ten instruments reaching full scale and the quieter samples retaining their authored headroom.
 They therefore play at Paula volume 64: this maps the game's absolute peak directly to full scale
 and avoids the audible resampling behavior that Paula applies below 64.
-This is still an
-incremental Bogas backend: intro mixing remains on its proven flag-driven path, and Stop/Purge plus
-all later gameplay cues still require scenario verification. → `docs/source-inventory.md` §Audio.
+This is still an incremental Bogas backend: intro mixing remains on its proven flag-driven path,
+and later gameplay cues still require scenario verification. Real P and Escape transitions have
+now established that leaving live driving does not call Stop, Deactivate, Dispose, or Close; the
+driver remains started across the resulting waiting state. → `docs/source-inventory.md` §Audio.
 ⚠ Inherited placement rule that will apply whatever the backend is: audio work goes **AFTER** the
 copper work in the handler, because a Paula DMA restart busy-waits on the beam and nothing that
 waits on the beam may precede the copper writes.
