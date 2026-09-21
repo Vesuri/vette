@@ -4985,6 +4985,25 @@ extern "C" void vetteMacRawKeyChanged(uint8_t rawKey, bool down)
 
 static void updateDrivingInputProbe()
 {
+#ifdef VETTE_HORN_PROBE
+    // A real keyboard edge after the countdown has reached race state 3 and
+    // the car has had time to accelerate. Keep Z down through one complete
+    // original iteration, then release it through the same CIA state/edge
+    // path. The horn latch is not driven by a transient GetKeys bitmap alone.
+    static uint8_t hornProbePhase;
+    static uint32_t hornProbeIteration;
+    bool raceUnderway = s_currentA5
+        && (int16_t)read16(s_currentA5 - 13296) >= 3
+        && g_macDrivingIterations >= 30;
+    if (s_drivingFrameStarted && raceUnderway && hornProbePhase == 0) {
+        hornProbeIteration = g_macDrivingIterations;
+        vetteInputInjectProbeKey(0x31, true);  // physical Z
+        hornProbePhase = 1;
+    } else if (hornProbePhase == 1 && g_macDrivingIterations > hornProbeIteration) {
+        vetteInputInjectProbeKey(0x31, false);
+        hornProbePhase = 2;
+    }
+#endif
 #ifdef VETTE_INPUT_PROBE_EVENT_RAW_KEY
     // Diagnostic-only physical edge: press before the first driven iteration,
     // then release at the boundary where that key has cleared the game's

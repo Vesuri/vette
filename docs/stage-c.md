@@ -1190,6 +1190,16 @@ engine remains on AUD0/1. The 900-iteration ceiling records instruments 7, 8, 10
 effect Loads, no loud stop, and eventual collision-bound motion at speed 8. The probe now reports
 only each first-seen ordinal plus the final counts/mask, avoiding hundreds of repeated crash lines.
 
+`amiga/driving_audio_horn.gdb` covers the documented Z horn without confusing selector/countdown
+input with a racing control. Its diagnostic physical-key edge waits for the game's own start state
+3 and 30 completed driving iterations, holds Z across one original KeyMap scan, then releases it
+through the ordinary CIA input path. At iteration 32 the source loads instrument 6 on context 1
+with duration `$7FFFFFFF` and options 2. The release produces no Bogas Play, Pitch, Stop,
+Deactivate, Set, or Purge call. This is consistent with the `horn` INST's authored sustain loop
+1428..4989: the original call requests a continuing horn voice until another context-1 effect
+replaces it. The observed run did exactly that when instrument 9 replaced it at iteration 57; no
+port-authored horn trigger or stop is required.
+
 The corrected route reaches the Lake Merced water collision and displays the game's own tow-truck
 recovery artwork. A probe on the actual `_GetPicture` trap records PICT 140 at the resident wrapper
 `Traffic+$663C`; that wrapper's saved return identifies the dynamic request at `Main+$0FD6`, with

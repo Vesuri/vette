@@ -142,7 +142,9 @@ is consequently renumbered.
    collision `crash` now has a bounded original-call regression as well. The full-view/full-sound
    Course Two bridge workload proves concurrent original `skid` on context 1 and `crash` on context
    2 while the engine remains centred; it reaches instruments 7, 8, 10 and 11 without a loud stop.
-   Continue that traffic-dense workload or use short source checkpoints for horns, police,
+   A real Z-key edge after race state 3 now covers `horn`: the source loads instrument 6 indefinitely
+   on context 1, its INST declares the sustain loop 1428..4989, and key release makes no second
+   Bogas call. Continue that traffic-dense workload or use short source checkpoints for police,
    environment, and result audio,
    including concurrent playback and transitions.
 6. **Automate fidelity regressions.** Keep intro and driving framebuffer differentials, palette

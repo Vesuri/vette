@@ -176,6 +176,13 @@ ifdef INPUT_PROBE_EVENT_RAW_KEY
 EXTRA_DEFINES += -DVETTE_INPUT_PROBE_EVENT_RAW_KEY=$(INPUT_PROBE_EVENT_RAW_KEY)
 endif
 
+# Diagnostic only: pulse the documented Z horn control for one driving KeyMap
+# scan after the countdown and initial acceleration, then release it through
+# the next ordinary scan.
+ifdef HORN_PROBE
+EXTRA_DEFINES += -DVETTE_HORN_PROBE
+endif
+
 # `make FPSCOUNT=1` — the honest framerate build: one increment per painted frame and the
 # headless auto-run, no instrumentation.  docs/perf-method.md Rule 1.
 ifdef FPSCOUNT
