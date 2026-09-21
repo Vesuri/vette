@@ -76,6 +76,7 @@ break VetteScreen::presentMacFrame if s_drivingFrameStarted && g_macFramesPresen
 commands 7
   silent
   printf "Bogas context ceiling: opens=%u loads=%u plays=%u pitches=%u stops=%u kills=%u tick=%u frames=%u\n", $opens, $loads, $plays, $pitches, $stops, $kills, g_macTicks, g_macFramesPresented
+  printf "Paula bridge: started=%u instruments=%u engine-playing=%u engine-instrument=%u engine-pitch=$%x engine-base-period=%u effect2-end=%u effect3-end=%u\n", s_bogasStarted, s_bogasInstrumentCount, s_bogasContexts[0].playing, s_bogasContexts[0].instrument, s_bogasContexts[0].pitch, s_bogasInstruments[4].basePeriod, s_bogasVoiceEndTick[2], s_bogasVoiceEndTick[3]
   detach
   quit
 end

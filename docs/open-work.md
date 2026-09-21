@@ -103,15 +103,18 @@ is consequently renumbered.
    steering and buttons, pause/options controls, and a reproducible FS-UAE configuration that does
    not capture the keyboard as a joystick.
 5. **Finish gameplay audio fidelity.** Implement the measured Bogas wrapper surface over Paula,
-   beginning with the engine context: live driving calls `BogasPlay` from `Traffic+$3762` about
+   The complete wrapper surface now has a Pascal-compatible private-trap bridge. Live driving calls
+   `BogasPlay` from `Traffic+$3762` about
    once per completed frame, with its long argument following RPM from 27,000 upward while the word
    argument remains zero. Initialization opens contexts 0, 1, and 2; the engine is loaded into
    context 0, while bounded driving loads effects into context 2. The original sixteen-name
    initialization now resolves the complete ordinal table; the first observed effects are beep1,
    beep2, and crash, and they begin on `BogasLoad` rather than a later `BogasPlay`. Preserve the
-   source wrapper's Pascal arguments/results rather than adding scene-specific triggers,
-   then verify engine pitch/load, gear changes, collisions, skids, horns, police, environment, and
-   result audio, including concurrent playback and transitions.
+   source wrapper's Pascal arguments/results rather than adding scene-specific triggers. Engine,
+   beep1, beep2, and crash now reach Paula from those calls using the INST source rates. Next verify
+   the pitch multiplier against reference audio, exact loop points and Load-duration semantics, then
+   cover gear changes, collisions, skids, horns, police, environment, and result audio, including
+   concurrent playback and transitions.
 6. **Automate fidelity regressions.** Keep intro and driving framebuffer differentials, palette
    checks, clean-build audits, and eventually basic audio comparisons reproducible.
 

@@ -1048,6 +1048,26 @@ color/sample association is involved. In that same run there were 68 engine `Bog
 no nonzero-context `BogasPlay` calls: the context-2 effects begin at `BogasLoad`, while the engine's
 repeated context-0 `BogasPlay` updates its running pitch.
 
+The first gameplay backend now replaces all twelve verified CODE 9 wrapper prologues with private
+Line-A calls. The dispatcher emulates each wrapper's Pascal return address, argument cleanup, and
+reserved long-result slot, so callers remain original code. `BogasKill` resolves the actual Pascal
+name through the Resource Manager and returns the resulting ordinal; `BogasOpen`, `BogasLoad`,
+`BogasPlay`, `BogasPitch`, `BogasPurge`, Set/Start/Stop, Close/Dispose, and Deactivate all have their
+measured entry contracts. The indefinitely loaded context 0 starts `Engine` on a centred Paula pair;
+each original context-0 Play changes only its period. Context-2 Load starts beep/crash effects on
+alternating Paula voices, so a new effect need not cut off the other one.
+
+Short INST resources are parsed structurally as four header words (loop start, loop end, source
+sample rate, PCM byte count). This corrects the earlier zero-loop-only test, which left the Engine
+header in its PCM stream. Gameplay samples use the header's 6.4 or 9.472 kHz source rate rather than
+the 11.127 kHz rate of the headerless music, and the live engine multiplier is converted with the
+68000's hardware `DIVU`; the mandatory link audit confirms that no software 32-bit divide entered
+the build. A bounded target-A1200 run reached 120 presented driving frames with no loud stop,
+registered all 16 named instruments, retained engine ordinal 4 in a playing context 0, followed the
+original pitch from `$6978` through `$88B8`, and started/expired the observed beep1, beep2, and crash
+loads. A separate ordinary-build intro run reached tick 2,638 / 295 presented frames at Stage C
+depth 64 with its original ordinal globals 0..4 and no loud stop.
+
 The corrected route reaches the Lake Merced water collision and displays the game's own tow-truck
 recovery artwork. A probe on the actual `_GetPicture` trap records PICT 140 at the resident wrapper
 `Traffic+$663C`; that wrapper's saved return identifies the dynamic request at `Main+$0FD6`, with

@@ -264,8 +264,14 @@ and sets one-shot globals immediately after each load. The current Paula seam fo
 flags for `Opening song`, `cable car bell`, `Engine`, `mic`, and `Signature`, so cues stay synchronized
 with the original animation state. The opening music occupies a centred pair and loops until the logo;
 the one-shot `Signature` replaces it there, while the remaining pair layers the earlier effects over
-the opening. This is intentionally the measured intro surface, not yet a claim that every Bogas
-command needed by the driving game has been reproduced. → `docs/source-inventory.md` §Audio.
+the opening. For gameplay, all twelve resident Bogas wrapper entries now route through private
+Line-A calls which preserve their Pascal stack/results contract. Initialize's actual named-resource
+calls build the sixteen-entry instrument table. An indefinite context-0 load starts the centred
+engine pair, subsequent context-0 plays apply the game's live 16.16 pitch stream, and context-2
+loads use the remaining Paula voices for overlapping effects. Short INST headers provide their own
+PCM length and source rate; the bridge converts the latter to a PAL Paula period. This is still an
+incremental Bogas backend: intro mixing remains on its proven flag-driven path, and Stop/Purge plus
+all later gameplay cues still require scenario verification. → `docs/source-inventory.md` §Audio.
 ⚠ Inherited placement rule that will apply whatever the backend is: audio work goes **AFTER** the
 copper work in the handler, because a Paula DMA restart busy-waits on the beam and nothing that
 waits on the beam may precede the copper writes.

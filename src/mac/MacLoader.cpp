@@ -8,6 +8,7 @@
 #include "platform/amiga/MacInput.h"
 #include "platform/amiga/PerfProbe.h"
 #include "platform/amiga/framework/AmigaHardware.h"
+#include "../m68k_math.h"
 
 extern "C" {
 extern uint8_t vette_code_0[],  vette_code_0_end[];
@@ -114,6 +115,21 @@ static const int16_t kShadowMouseV = -31276;
 static const int16_t kShadowMouseH = -31274;
 static const uint16_t kDrivingBoundaryTrap = 0xafff;
 static const uint16_t kDrivingRasterTrap = 0xaffd;
+// CODE 9's twelve Pascal Bogas wrappers are replaced at their public entry
+// points.  Keep a distinct trap for each wrapper so no caller or scene needs
+// to know that Paula owns the implementation.
+static const uint16_t kBogasDisposeTrap = 0xaff0;
+static const uint16_t kBogasCloseTrap = 0xaff1;
+static const uint16_t kBogasOpenTrap = 0xaff2;
+static const uint16_t kBogasKillTrap = 0xaff3;
+static const uint16_t kBogasLoadTrap = 0xaff4;
+static const uint16_t kBogasPlayTrap = 0xaff5;
+static const uint16_t kBogasPitchTrap = 0xaff6;
+static const uint16_t kBogasPurgeTrap = 0xaff7;
+static const uint16_t kBogasSetTrap = 0xaff8;
+static const uint16_t kBogasStartTrap = 0xaff9;
+static const uint16_t kBogasStopTrap = 0xaffa;
+static const uint16_t kBogasDeactivateTrap = 0xaffb;
 #ifdef VETTE_PROBE
 static const uint16_t kStaticCollisionProbeTrap = 0xaffe;
 #endif
@@ -354,6 +370,27 @@ static bool s_introLogoHeld;
 static bool s_introLogoParked;
 static uint16_t s_introLogoFrames;
 static uint32_t s_introLastLogoDeadline;
+
+struct BogasInstrument {
+    uint8_t** resource;
+    uint8_t* chipData;
+    uint32_t size;
+    uint16_t basePeriod;
+};
+static BogasInstrument s_bogasInstruments[16];
+static uint16_t s_bogasInstrumentCount;
+
+struct BogasContext {
+    bool open;
+    bool playing;
+    uint16_t instrument;
+    uint16_t channel;
+    uint32_t duration;
+    uint32_t pitch;
+    uint32_t endTick;
+};
+static BogasContext s_bogasContexts[3];
+static bool s_bogasStarted;
 
 struct GWorldSlot {
     uint8_t port[108];
@@ -770,6 +807,25 @@ static bool installDrivingRasterTraps()
         uint8_t* entry = s_segments[6].begin + offsets[i];
         if (read16(entry) != 0xe582) return false;
         write16(entry, kDrivingRasterTrap);
+    }
+    return true;
+}
+
+static bool installBogasTraps()
+{
+    static const uint16_t offsets[] = {
+        0x05c, 0x08c, 0x0ba, 0x0ee, 0x12a, 0x174,
+        0x1b0, 0x1e6, 0x21c, 0x24c, 0x27c, 0x2ac
+    };
+    static const uint16_t traps[] = {
+        kBogasDisposeTrap, kBogasCloseTrap, kBogasOpenTrap, kBogasKillTrap,
+        kBogasLoadTrap, kBogasPlayTrap, kBogasPitchTrap, kBogasPurgeTrap,
+        kBogasSetTrap, kBogasStartTrap, kBogasStopTrap, kBogasDeactivateTrap
+    };
+    for (uint16_t i = 0; i < sizeof(offsets) / sizeof(offsets[0]); ++i) {
+        uint8_t* entry = s_segments[9].begin + offsets[i];
+        if (read16(entry) != 0x4e56) return false; // LINK.W A6,#0
+        write16(entry, traps[i]);
     }
     return true;
 }
@@ -1217,6 +1273,181 @@ static uint8_t** getNamedResource(uint32_t type, const uint8_t* name)
         }
     }
     return 0;
+}
+
+static BogasInstrument* bogasInstrument(uint16_t ordinal)
+{
+    if (ordinal >= s_bogasInstrumentCount) return 0;
+    BogasInstrument& instrument = s_bogasInstruments[ordinal];
+    if (instrument.chipData) return &instrument;
+    if (!instrument.resource) return 0;
+
+    ResourceArchive::Item item;
+    bool found = false;
+    for (uint32_t i = 0; i < s_resourceArchive.resourceCount(); ++i) {
+        if (&s_resourceMasters[i] != instrument.resource) continue;
+        if (!s_resourceArchive.item(i, item) || item.type != 0x494e5354UL) return 0;
+        found = true;
+        break;
+    }
+    if (!found || !item.size) return 0;
+
+    const uint8_t* source = item.data;
+    uint32_t size = item.size;
+    uint16_t sampleRate = 0;
+    // Short INST resources have a four-word Bogas header: loop start/end,
+    // source sample rate, PCM byte count. Looped samples legitimately have
+    // nonzero first words, so the byte-count field is the structural test.
+    if (size > 8 && read16(source + 6) == size - 8) {
+        sampleRate = read16(source + 4);
+        source += 8;
+        size -= 8;
+    }
+    uint32_t allocated = (size + 1) & ~1UL;
+    if (!size || allocated > 131070UL) return 0;
+    instrument.chipData = (uint8_t*)AllocMem(allocated, MEMF_CHIP);
+    if (!instrument.chipData) return 0;
+    instrument.size = size;
+    instrument.basePeriod = sampleRate ? vette_divu16(3546895UL, sampleRate) : 319;
+    for (uint32_t i = 0; i < size; ++i) instrument.chipData[i] = source[i] ^ 0x80;
+    if (allocated != size) instrument.chipData[size] = 0;
+    return &instrument;
+}
+
+static uint16_t bogasRegisterInstrument(const uint8_t* name)
+{
+    if (s_bogasInstrumentCount >= sizeof(s_bogasInstruments) / sizeof(s_bogasInstruments[0]))
+        return 0xffff;
+    uint8_t** resource = getNamedResource(0x494e5354UL, name); // 'INST'
+    if (!resource) return 0xffff;
+    uint16_t ordinal = s_bogasInstrumentCount++;
+    s_bogasInstruments[ordinal].resource = resource;
+    return ordinal;
+}
+
+static void stopBogasVoice(uint16_t channel)
+{
+    if (channel > 3) return;
+    uint16_t dma = (uint16_t)(DMAF_AUD0 << channel);
+    volatile uint8_t* audio = (volatile uint8_t*)(0xdff0a0UL + channel * 16);
+    *dmaconPointer = dma;
+    *(volatile uint16_t*)(audio + 8) = 0;
+}
+
+static void startBogasVoice(uint16_t ordinal, uint16_t channel,
+                            uint16_t period, uint16_t volume)
+{
+    BogasInstrument* instrument = bogasInstrument(ordinal);
+    if (!instrument || channel > 3) return;
+    uint16_t dma = (uint16_t)(DMAF_AUD0 << channel);
+    volatile uint8_t* audio = (volatile uint8_t*)(0xdff0a0UL + channel * 16);
+    *dmaconPointer = dma;
+    *(volatile uint32_t*)(audio + 0) = (uint32_t)instrument->chipData;
+    *(volatile uint16_t*)(audio + 4) = (uint16_t)((instrument->size + 1) / 2);
+    *(volatile uint16_t*)(audio + 6) = period;
+    *(volatile uint16_t*)(audio + 8) = volume;
+    *dmaconPointer = (uint16_t)(DMAF_SETCLR | DMAF_MASTER | dma);
+}
+
+static uint16_t bogasPeriod(uint16_t basePeriod, uint32_t pitch)
+{
+    // The live engine values behave as a 16.16 playback-rate multiplier;
+    // 0x10000 therefore preserves the source rate carried by the INST header.
+    if (!pitch) pitch = 0x10000UL;
+    if (pitch < basePeriod) return 65535;
+    uint32_t numerator = (uint32_t)basePeriod << 16;
+    while (pitch > 65535) {
+        pitch = (pitch + 1) >> 1;
+        numerator = (numerator + 1) >> 1;
+    }
+    uint16_t period = vette_divu16(numerator + (pitch >> 1), (uint16_t)pitch);
+    return period < 124 ? 124 : period;
+}
+
+static uint32_t s_bogasVoiceEndTick[4];
+static uint16_t s_bogasEffectVoice;
+
+static void stopBogasAudio()
+{
+    for (uint16_t channel = 0; channel < 4; ++channel) {
+        stopBogasVoice(channel);
+        s_bogasVoiceEndTick[channel] = 0;
+    }
+    for (uint16_t i = 0; i < 3; ++i) s_bogasContexts[i].playing = false;
+    s_bogasStarted = false;
+}
+
+static void serviceBogasAudio()
+{
+    if (!s_bogasStarted) return;
+    for (uint16_t channel = 2; channel < 4; ++channel) {
+        if (!s_bogasVoiceEndTick[channel]
+            || (int32_t)(g_macTicks - s_bogasVoiceEndTick[channel]) < 0) continue;
+        stopBogasVoice(channel);
+        s_bogasVoiceEndTick[channel] = 0;
+    }
+}
+
+static void bogasLoad(uint16_t contextIndex, uint32_t duration,
+                      uint32_t options, uint16_t instrument)
+{
+    if (contextIndex >= sizeof(s_bogasContexts) / sizeof(s_bogasContexts[0])) return;
+    BogasContext& context = s_bogasContexts[contextIndex];
+    context.instrument = instrument;
+    context.duration = duration;
+    context.pitch = 0x10000UL;
+
+    // The source's indefinitely loaded context 0 is the gameplay engine.
+    // Intro cues continue through the already-proven one-shot bridge until
+    // the rest of Bogas mixing is reproduced; no screen or vehicle test is
+    // involved in this transition.
+    if (contextIndex == 0 && duration == 0x7fffffffUL && options == 0x8000UL)
+        s_bogasStarted = true;
+    if (!s_bogasStarted) return;
+
+    if (contextIndex == 0) {
+        context.channel = 0;
+        context.playing = true;
+        BogasInstrument* sample = bogasInstrument(instrument);
+        uint16_t period = sample ? sample->basePeriod : 319;
+        startBogasVoice(instrument, 0, period, 48);
+        startBogasVoice(instrument, 1, period, 48);
+        return;
+    }
+
+    uint16_t channel = (uint16_t)(2 + (s_bogasEffectVoice++ & 1));
+    context.channel = channel;
+    context.playing = true;
+    BogasInstrument* sample = bogasInstrument(instrument);
+    startBogasVoice(instrument, channel, sample ? sample->basePeriod : 319, 64);
+    s_bogasVoiceEndTick[channel] = duration == 0x7fffffffUL ? 0 : g_macTicks + duration;
+}
+
+static void bogasPlay(uint32_t pitch, uint16_t contextIndex)
+{
+    if (!s_bogasStarted || contextIndex >= 3) return;
+    BogasContext& context = s_bogasContexts[contextIndex];
+    context.pitch = pitch;
+    if (!context.playing) return;
+    BogasInstrument* sample = bogasInstrument(context.instrument);
+    uint16_t period = bogasPeriod(sample ? sample->basePeriod : 319, pitch);
+    if (contextIndex == 0) {
+        *(volatile uint16_t*)0xdff0a6 = period;
+        *(volatile uint16_t*)0xdff0b6 = period;
+    } else {
+        volatile uint8_t* audio = (volatile uint8_t*)(0xdff0a0UL + context.channel * 16);
+        *(volatile uint16_t*)(audio + 6) = period;
+    }
+}
+
+static uint32_t returnFromBogasTrap(uint8_t* frame, uint8_t* userStack,
+                                    uint16_t argumentBytes)
+{
+    // These are patched subroutine entries, not inline Toolbox traps. Emulate
+    // the wrapper's Pascal epilogue: pop JSR return + arguments and resume at
+    // the caller. MacEntry adds the normal two-byte trap advance after return.
+    write32(frame + 2, read32(userStack) - 2);
+    return (uint32_t)argumentBytes + 5;
 }
 
 static bool pascalEquals(const uint8_t* value, const char* expected)
@@ -5069,6 +5300,61 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
     // waiting for an EventRecord, so refresh its redirected shadows at every
     // safe Line-A boundary while keyboard polling remains independent.
     pollMacMouse();
+    serviceBogasAudio();
+
+    uint8_t* sound = s_segments[9].begin;
+    if (trap == kBogasDisposeTrap && pc == (uint32_t)(sound + 0x05c)) {
+        if (s_bogasStarted) stopBogasAudio();
+        return returnFromBogasTrap(frame, userStack, 0);
+    }
+    if (trap == kBogasCloseTrap && pc == (uint32_t)(sound + 0x08c)) {
+        if (s_bogasStarted) stopBogasAudio();
+        return returnFromBogasTrap(frame, userStack, 0);
+    }
+    if (trap == kBogasOpenTrap && pc == (uint32_t)(sound + 0x0ba)) {
+        uint16_t context = read16(userStack + 4);
+        if (context < 3) {
+            s_bogasContexts[context].open = true;
+            s_bogasContexts[context].channel = context;
+        }
+        return returnFromBogasTrap(frame, userStack, 2);
+    }
+    if (trap == kBogasKillTrap && pc == (uint32_t)(sound + 0x0ee)) {
+        uint16_t ordinal = bogasRegisterInstrument((const uint8_t*)read32(userStack + 6));
+        write32(userStack + 10, ordinal == 0xffff ? 0xffffffffUL : ordinal);
+        return returnFromBogasTrap(frame, userStack, 6);
+    }
+    if (trap == kBogasLoadTrap && pc == (uint32_t)(sound + 0x12a)) {
+        bogasLoad(read16(userStack + 4), read32(userStack + 6),
+                  read32(userStack + 10), read16(userStack + 14));
+        write32(userStack + 16, 0);           // Bogas noErr
+        return returnFromBogasTrap(frame, userStack, 12);
+    }
+    if (trap == kBogasPlayTrap && pc == (uint32_t)(sound + 0x174)) {
+        bogasPlay(read32(userStack + 4), read16(userStack + 8));
+        write32(userStack + 10, 0);
+        return returnFromBogasTrap(frame, userStack, 6);
+    }
+    if (trap == kBogasPitchTrap && pc == (uint32_t)(sound + 0x1b0)) {
+        write32(userStack + 6, 0x10000UL);    // INST nominal 16.16 rate
+        return returnFromBogasTrap(frame, userStack, 2);
+    }
+    if (trap == kBogasPurgeTrap && pc == (uint32_t)(sound + 0x1e6)) {
+        write32(userStack + 6, 0);
+        return returnFromBogasTrap(frame, userStack, 2);
+    }
+    if (trap == kBogasSetTrap && pc == (uint32_t)(sound + 0x21c))
+        return returnFromBogasTrap(frame, userStack, 0);
+    if (trap == kBogasStartTrap && pc == (uint32_t)(sound + 0x24c))
+        return returnFromBogasTrap(frame, userStack, 0);
+    if (trap == kBogasStopTrap && pc == (uint32_t)(sound + 0x27c)) {
+        if (s_bogasStarted) stopBogasAudio();
+        return returnFromBogasTrap(frame, userStack, 0);
+    }
+    if (trap == kBogasDeactivateTrap && pc == (uint32_t)(sound + 0x2ac)) {
+        if (s_bogasStarted) stopBogasAudio();
+        return returnFromBogasTrap(frame, userStack, 0);
+    }
 #ifdef VETTE_PROBE
     if (trap == kStaticCollisionProbeTrap
         && pc == (uint32_t)(s_segments[6].begin + 0x3ffe)) {
@@ -6158,7 +6444,7 @@ bool MacLoader::run(VetteScreen* screen)
     s_currentA5 = a5;
     if (!redirectLowMemoryGlobals(a5) || !disableCopyProtection()
         || !installDrivingBoundaryTrap() || !installDrivingRasterTraps()
-        || !installStaticCollisionProbe()) return false;
+        || !installStaticCollisionProbe() || !installBogasTraps()) return false;
 
     Disable();
     *(void (**)())0x28 = vette_line_a_handler;
