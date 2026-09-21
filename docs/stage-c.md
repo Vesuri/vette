@@ -1215,6 +1215,15 @@ context 1 with duration `$7FFFFFFF` and options 1 at iteration 32, while both pr
 words remain `-1`. The `police` INST's authored 2384..6344 sustain loop then maps normally to AUD3.
 Production builds retain the verified successful-protection patch and never define either fixture.
 
+Letting that diagnostic path continue first exposed `$AA93 DisposePalette` at `Main+$0F22`.
+This is Palette Manager ownership cleanup, not requester UI: the bridge now detaches the disposed
+palette from windows and GWorlds, clears the active association, and releases the `pltt` resource
+master. The next trace reaches the original `ExitToShell` at tick 2472 with exit state 3 and then
+returns to Amiga teardown with state 4, implemented depth 96. It makes zero post-cue PICT requests.
+The visible Macintosh message (“caught driving a stolen Vette”) is the protection-failure modal
+requester and remains intentionally unimplemented under the project's unnecessary-UI rule; this
+diagnostic exists to cover the real police sound and cleanup/exit logic, not to recreate the gate.
+
 The corrected route reaches the Lake Merced water collision and displays the game's own tow-truck
 recovery artwork. A probe on the actual `_GetPicture` trap records PICT 140 at the resident wrapper
 `Traffic+$663C`; that wrapper's saved return identifies the dynamic request at `Main+$0FD6`, with

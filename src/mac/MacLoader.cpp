@@ -552,7 +552,8 @@ static const TrapName s_trapNames[] = {
     {0xa915,"WINDOW MANAGER","SHOWWINDOW"}, {0xa916,"WINDOW MANAGER","HIDEWINDOW"},
     {0xa924,"WINDOW MANAGER","FRONTWINDOW"}, {0xa925,"WINDOW MANAGER","DRAGWINDOW"},
     {0xa92c,"WINDOW MANAGER","FINDWINDOW"},
-    {0xaa92,"PALETTE MANAGER","GETNEWPALETTE"}, {0xa873,"QUICKDRAW","SETPORT"},
+    {0xaa92,"PALETTE MANAGER","GETNEWPALETTE"}, {0xaa93,"PALETTE MANAGER","DISPOSEPALETTE"},
+    {0xa873,"QUICKDRAW","SETPORT"},
     {0xaa28,"COLOR MANAGER","GETCTSEED"}, {0xaa39,"COLOR MANAGER","MAKEITABLE"},
     {0xa91f,"WINDOW MANAGER","SELECTWINDOW"},
     {0xa922,"WINDOW MANAGER","BEGINUPDATE"}, {0xa923,"WINDOW MANAGER","ENDUPDATE"},
@@ -6176,6 +6177,24 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
                 (uint32_t)getResource(0x706c7474UL, (int16_t)read16(userStack))); // 'pltt'
         if (g_stageCDepth < 27) g_stageCDepth = 27;
         return 3;
+    }
+    if (trap == 0xaa93) {                    // DisposePalette(palette)
+        uint8_t** palette = (uint8_t**)read32(userStack);
+        for (uint16_t i = 0; i < sizeof(s_windows) / sizeof(s_windows[0]); ++i) {
+            if (!s_windows[i].used || s_windows[i].palette != palette) continue;
+            s_windows[i].palette = 0;
+            s_windows[i].paletteUpdates = false;
+        }
+        for (uint16_t i = 0; i < sizeof(s_gworlds) / sizeof(s_gworlds[0]); ++i)
+            if (s_gworlds[i].used && s_gworlds[i].palette == palette)
+                s_gworlds[i].palette = 0;
+        if (s_activePalette == palette) s_activePalette = 0;
+        // GetNewPalette is represented by the corresponding 'pltt' resource
+        // master. Releasing it provides the Palette Manager ownership boundary;
+        // a later request can materialize the same resource again.
+        releaseResource(palette);
+        if (g_stageCDepth < 96) g_stageCDepth = 96;
+        return 5;
     }
     if (trap == 0xaa28) {                    // GetCTSeed() -> unique long seed
         write32(userStack, s_colorSeed++);
