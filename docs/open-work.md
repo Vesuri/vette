@@ -53,10 +53,15 @@ is consequently renumbered.
    pool record. Its `Traffic+$24DE` caller assigns the type and runs the real initializer before
    converging at `$2528`. With the synchronized seed both machines test `COP!`, `GGRY`, then `TAXI`
    and initialize TAXI to exactly `(0x3060,0x2800)`; their tests are also separated by the same
-   roughly 40 ticks. Over those first 80 ticks, however, the Mac delivers 26 driving-task callbacks
-   and the Amiga only six. Fix the safe-point VBL dispatcher so it drains all due queue work instead
-   of returning to the application after just one callback; then rerun the completed
-   raster/full-object gate and extend it to alternate views.
+   roughly 40 ticks. Over those first 80 ticks, however, the Mac delivered 26 driving-task
+   callbacks and the Amiga only six. The safe-point trampoline now drains every due queue pass
+   before resuming the game and presents each callback with its pass's historical `Ticks` value;
+   the same interval now delivers 25 callbacks on Amiga. A new motion capture reduces paired-frame
+   raster differences from 6,948 to 105 pixels, but TAXI remains behind because its physics pass is
+   driven by completed main-loop iterations: the Macintosh reaches the first moving state after 45
+   loops at roughly 6–7 ticks per frame, the A1200 after 26 loops at roughly 11–12. Treat the
+   remaining moving-object phase error as the measured performance gap, optimize that path, then
+   rerun the completed raster/full-object gate and extend it to alternate views.
 2. **Establish the performance target.** The full-accounting target-A1200 profile is now in place
    and identified presentation as 80.353% of the first moving-driving baseline. After removing a
    fully overwritten synchronization copy, adding the packed word-write C2P kernel, and deriving a

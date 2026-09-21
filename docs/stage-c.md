@@ -1510,13 +1510,29 @@ cached and physics coordinates exactly `(0x3060,0x2800)`. The Mac reaches those 
 Traffic+$25CC is behaving faithfully, and neither the resource data, random choice, nor position
 initializer causes the later discrepancy.
 
-The trace exposes the actual scheduling defect. From the first candidate through TAXI—80 or 81
-ticks on either machine—the Macintosh driving task advances by 26 callbacks, while the Amiga task
-advances by only six. The target scheduler accumulates every elapsed virtual VBL tick correctly,
-but currently releases only one due callback at a trap safe point before resuming application code.
-When more than one task/pass is pending, this leaves physics work queued behind rendering. The next
-fidelity change is to drain due VBL queue work between safe points while preserving callback order,
-registers, A5, and task self-removal semantics, then repeat the motion/object comparison.
+The trace exposed a real scheduling defect. From the first candidate through TAXI—80 or 81 ticks
+on either machine—the Macintosh driving task advanced by 26 callbacks, while the Amiga task
+advanced by only six. The target scheduler accumulated every elapsed virtual VBL tick correctly,
+but released only one due callback at a trap safe point before resuming application code. When
+more than one task/pass was pending, work remained queued behind rendering.
+
+The user-mode trampoline now leaves the interrupted application's register image parked and drains
+all due VBL queue work before returning. It reloads that image for every callback, installs the
+record's A0 and saved A5, and asks the same queue scheduler for the next task after each return, so
+callback order and task self-removal retain their original contracts. The dispatcher also tracks
+the tick represented by each queued VBL pass. Direct `Ticks` reads see that historical value during
+the callback and the live value is restored before application code resumes; a backlog is no
+longer collapsed onto one present-day time sample. The first 76 target ticks now deliver 25 driving
+callbacks versus 26 in the first 80 Macintosh ticks.
+
+This repair reduces the three state-paired motion captures from 6,948 differing pixels to 105.
+It does not erase the traffic-coordinate difference, which is now proven to be frame cadence rather
+than VBL cadence: TAXI's `$18EC`/`$0BB2` physics path runs from the ordinary Traffic pass in each
+completed main-loop iteration. The Macintosh reaches the first moving player state at iteration 45
+after roughly 6–7 ticks per frame; the target reaches it at iteration 26 after roughly 11–12 ticks
+per frame. Both have allowed about the same wall-clock interval since TAXI was initialized, but the
+Macintosh has executed about fourteen more TAXI updates. The remaining phase gap therefore belongs
+to the A1200 performance target, not a clock, random, resource, or initializer compatibility hack.
 
 The 26-record sightseeing table used by `Main+$3456` was also decoded as a possible source-native
 shortcut. Record 4 is cell `(6,26)`, only six cells from the export-221 transition at `(6,32)`, but

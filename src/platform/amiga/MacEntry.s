@@ -94,11 +94,15 @@ vette_line_a_handler:
 	bra.s 1b
 
 | Entered by RTE in user mode, with the original application's registers and
-| USP restored.  Run one due Macintosh VBLTask and resume at the instruction
-| following the trap that provided this safe scheduling point.
+| USP restored.  Keep those registers parked while draining all Macintosh
+| VBLTasks already due at this safe scheduling point, then resume after the
+| trap.  Reload the parked image before each callback so one VBLTask cannot
+| leak scratch registers into the next.
 	.globl vette_user_vbl_trampoline
 vette_user_vbl_trampoline:
 	movem.l d0-d7/a0-a6,-(sp)
+1:
+	movem.l (sp),d0-d7/a0-a6
 	move.l g_macVBLCallbackEntry,a1
 	clr.l g_macVBLCallbackEntry
 	move.l g_macVBLCallbackTask,a0
@@ -106,6 +110,9 @@ vette_user_vbl_trampoline:
 	move.w #1,g_macVBLCallbackActive
 	jsr (a1)
 	clr.w g_macVBLCallbackActive
+	jsr vetteVBLCallbackComplete
+	tst.l g_macVBLCallbackEntry
+	bne.s 1b
 	movem.l (sp)+,d0-d7/a0-a6
 	move.l g_macVBLCallbackReturn,-(sp)
 	rts

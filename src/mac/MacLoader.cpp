@@ -311,6 +311,7 @@ static uint16_t s_vblPassLimit;
 static uint32_t s_vblPendingTicks;
 static bool s_vblPassActive;
 static uint32_t s_vblLastTick;
+static uint32_t s_vblDispatchTick;
 
 #ifdef VETTE_PROBE
 static uint32_t probeNonzeroBytes(const uint8_t* data, uint16_t bytes)
@@ -4306,6 +4307,7 @@ static int16_t installVBLTask(uint8_t* task)
         s_vblPendingTicks = 0;
         s_vblPassActive = false;
         s_vblLastTick = g_macTicks;
+        s_vblDispatchTick = g_macTicks;
     }
     return 0;
 }
@@ -4343,6 +4345,7 @@ static int16_t removeVBLTask(uint8_t* task)
         s_vblPendingTicks = 0;
         s_vblPassActive = false;
         s_vblLastTick = g_macTicks;
+        s_vblDispatchTick = g_macTicks;
     }
     return 0;
 }
@@ -4360,6 +4363,7 @@ static void scheduleVBLTask()
     if (!s_vblTaskCount) {
         s_vblPendingTicks = 0;
         s_vblPassActive = false;
+        if (g_macTicksAddress) write32((uint8_t*)g_macTicksAddress, g_macTicks);
         return;
     }
     if (g_macVBLCallbackEntry || g_macVBLCallbackActive) return;
@@ -4368,6 +4372,7 @@ static void scheduleVBLTask()
         if (!s_vblPassActive) {
             if (!s_vblPendingTicks) return;
             --s_vblPendingTicks;
+            ++s_vblDispatchTick;
 
             // A real Macintosh ages every queue entry once per vertical-retrace
             // pass, then calls each entry which became due in queue order.  PAL
@@ -4396,11 +4401,28 @@ static void scheduleVBLTask()
             g_macVBLCallbackTask = (uint32_t)task;
             g_macVBLCallbackA5 = (uint32_t)s_currentA5;
             g_macVBLCallbackEntry = read32(task + 6);
+            // Direct Ticks reads were redirected to this A5 shadow.  A queued
+            // callback must observe the tick of its virtual VBL pass, not the
+            // later wall-clock tick at which a safe point finally drains it.
+            if (g_macTicksAddress)
+                write32((uint8_t*)g_macTicksAddress, s_vblDispatchTick);
             return;
         }
 
         s_vblPassActive = false;
     }
+}
+
+// Called in user mode after a Macintosh VBL callback returns.  A renderer can
+// spend several virtual ticks between safe trap boundaries, so one boundary
+// may have multiple queue passes waiting.  Keep selecting the next due task;
+// MacEntry.s preserves the interrupted application registers until the queue
+// is caught up, just as the Macintosh VBL interrupt dispatcher does.
+extern "C" void vetteVBLCallbackComplete()
+{
+    scheduleVBLTask();
+    if (!g_macVBLCallbackEntry && g_macTicksAddress)
+        write32((uint8_t*)g_macTicksAddress, g_macTicks);
 }
 
 static void presentMacRuntime()
