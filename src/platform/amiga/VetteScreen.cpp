@@ -70,8 +70,9 @@ static uint32_t s_pairToPlanes[4][256];
 static bool s_pairToPlanesReady = false;
 #ifdef VETTE_C2P_ASM
 // Four packed pixels -> four plane nibbles. The first 256 KiB table places
-// them in each byte's high half; the second is pre-shifted into the low half,
-// removing one long shift from every eight converted pixels.
+// them in each byte's high half; the second is pre-shifted into the low half.
+// Entries are rotated by half the table so the assembly can use the 68020's
+// sign-extended word index directly from a base at the physical midpoint.
 static uint32_t s_quadToPlanes[2][65536];
 #endif
 
@@ -115,8 +116,10 @@ static void initializePairToPlanes()
     for (uint32_t high = 0; high < 256; ++high) {
         for (uint32_t low = 0; low < 256; ++low) {
             uint32_t packed = s_pairToPlanes[0][high] | s_pairToPlanes[1][low];
-            s_quadToPlanes[0][(high << 8) | low] = packed;
-            s_quadToPlanes[1][(high << 8) | low] = packed >> 4;
+            uint16_t logicalIndex = (uint16_t)((high << 8) | low);
+            uint16_t physicalIndex = (uint16_t)(logicalIndex ^ 0x8000u);
+            s_quadToPlanes[0][physicalIndex] = packed;
+            s_quadToPlanes[1][physicalIndex] = packed >> 4;
         }
     }
 #endif

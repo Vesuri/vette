@@ -289,6 +289,21 @@ pixels. In the standard 300-field driving profile C2P uses 9,766,871 ticks over 
 C2P remains the largest port-owned row at 40.647%; the complete profile still accounts for exactly
 100% of elapsed beam time.
 
+### 2026-09-21 — signed C2P table indexing
+
+The 68020 sign-extends a scaled word index, while the logical lookup index is unsigned. The prior
+kernel therefore cleared its index register before all eight table reads in every 32-pixel batch.
+Both 65,536-entry tables are now physically rotated by 32,768 entries and addressed from their
+midpoints. The signed range then covers the complete table directly, removing those eight clears
+without adding storage or changing the converted pixels, dirty rectangles, or chip writes.
+
+The C oracle compares 2,685,632 output bytes with zero failures. Its controlled C/assembly ratio
+rises from 2.798 to 2.927, equivalent to another 4.4% reduction in kernel time. The framebuffer
+guard again checks 40 frames and every one of their 320 rows with zero bad frames or pixels. The
+standard 300-field profile records 9,384,319 C2P ticks over 36 updates, about 260,675 per update
+versus 279,053 before the change, a supporting 6.6% reduction. C2P occupies 39.097% of the fully
+accounted window.
+
 ## Lessons — measurement
 
 - **Compare FPS row vectors, never a `total painted` line.** A total spans a partial trailing row

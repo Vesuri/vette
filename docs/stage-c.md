@@ -1442,6 +1442,15 @@ In the standard 300-field A1200 profile C2P uses 9,766,871 ticks over 35 updates
 update versus 292,221 immediately before the change, and occupies 40.647% of the accounted window.
 The additional table costs 256 KiB of the configured 8 MiB fast RAM.
 
+The next instruction-count reduction needs no additional table memory. Both lookup tables are
+physically rotated by 32,768 entries and their assembly bases point at the physical midpoint. The
+68020's sign-extended scaled word index can then address every logical entry directly, eliminating
+eight index-register clears per 32 converted pixels. The oracle compares 2,685,632 bytes with zero
+failures and the controlled C/assembly ratio rises from 2.798 to 2.927, another 4.4% less kernel
+time. The 40-frame/all-row display guard remains exact. In the standard 300-field profile C2P uses
+9,384,319 ticks over 36 updates, about 260,675 each versus 279,053 before the change, and falls to
+39.097% of the fully accounted window.
+
 The differential now has a real moving checkpoint rather than a neutral car with a held
 accelerator. `VETTE_DRIVING_MOTION=1` makes the Macintosh harness wait for a valid full-window
 CopyBits from Vette, latch the application A5 at that trap boundary, wait for countdown state 3,
