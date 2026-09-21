@@ -18,8 +18,8 @@ of every session, so nothing dated, no measurement history, no "X now works" ach
 over, makes all 11 Color-build `CODE` resources resident, builds and patches the A5 world, runs the
 game's `%A5Init`, and stops visibly at the first unimplemented trap: Segment Manager `_UnLoadSeg`,
 `Main+$1EE6` (`docs/stage-b.md`).  The Resource Manager and the other Stage C traps do not exist yet.
-⛔ **Never report the captured Stage A frame as "the intro screen works"**: the game's code has not
-painted it (`docs/open-work.md` §TARGET 1).
+⛔ **Never report the captured Stage A frame as "the intro screen works"**: the game's code did not
+paint that Stage A artifact (`docs/stage-c.md`).
 **Do not read an inherited doc's confident present tense as a description of this repo** — every ⚑
 doc describes the prior ports.
 ⭐ What else runs: the **Macintosh reference loop** (MAME boots and launches the game unattended,
@@ -117,10 +117,10 @@ project.** RoF replaced the Atari OS wholesale; Revs serviced a closed MOS surfa
 the Segment Loader and the Sound Manager. **Inventory it from the binary before estimating
 anything, and treat the inventory as a FLOOR** — Revs's looked closed after a static sweep and three
 more calls were found by *running* it.
-⭐⭐ **The RUN-TIME inventory exists and is the work list: `docs/trap-log.md`, 63 traps through
-one bounded driving path, first-use ordered — and the first 36 paint the intro screen, which is
-Target 1.** Implement only the rows reached by the current loud-stop path: the later Event, Menu,
-Window and Palette Manager calls are outside Target 1 (`docs/open-work.md`).
+⭐⭐ **The RUN-TIME inventory exists: `docs/trap-log.md`, 63 traps through one bounded driving path,
+first-use ordered; its first 36 paint the intro screen.** Implement only the rows demanded by a
+real path in the current `docs/open-work.md` queue. Keep unobserved manager operations loud rather
+than speculatively building more of classic Mac OS.
 Two rules come out of how the log was measured, and each produced a *quiet* wrong answer first:
 ⚠⚠ **"Called from RAM" is NOT "called by the game"** — the System's ROM-patch block at `$7Cxxxx` and
 the low system heap call traps *on the game's behalf*, and counting those put three traps on the

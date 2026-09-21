@@ -7,84 +7,88 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — current compatibility boundary
 
-⭐ **HEAD OF QUEUE: probe Main Map cell `(18,39)`, where the proved post-export checkpoint changes
-from QUAD 136 / selector 106 to QUAD 165 / selector 54.** `MAIN_START=17` now runs both real map
-transitions, synchronizes the complete player history after export 230, and reaches `(17,39)` at
-tick 1,960. Selector 54 contains thirteen small shipped obstacle rectangles rather than another
-full-width lane wall; identify the first material gameplay boundary from the source and runtime,
-then stop at the first real unimplemented trap or demonstrable compatibility failure and fix that
-cause. The checkpoint remains diagnostic only: the confirmed natural-route class-2 `VETT`/`GGRY`
-collision at `(6,36)` is recorded compatibility debt, not a claim of successful avoidance. Do not
-add host-authored UI merely to manufacture coverage.
+⭐ **HEAD OF QUEUE: establish a representative moving-driving fidelity/performance workload, then
+fix what it measures.** Use a short deterministic checkpoint to capture the same moving scene on
+the Macintosh reference and the target A1200 configuration (2 MiB chip, 8 MiB fast). Extend the
+already exact named first-frame differential across motion, traffic, and the principal views while
+measuring time separately in game logic, drawing, resource decoding, C2P, audio, and waiting. Fix
+the highest measured visual discrepancy and performance cost in small, independently verified
+commits. Do not infer either from an unsynchronised screenshot or emulator wall-clock time.
 
-## ⭐⭐ TARGET 1 — the complete intro, run by the game's own code — COMPLETE
+Long route traces are no longer the discovery mechanism. They are useful later as regressions, but
+the next unknown behavior must be reached by a short, reproducible checkpoint run. In particular,
+Main Map cell `(18,39)` and the natural-route class-2 `VETT`/`GGRY` collision at `(6,36)` are
+compatibility debt, not blockers for fidelity or performance work.
 
-The MAME capture proves that its first 36 logged traps suffice to paint the reference intro at
-frame 1758. Stage C's own loud-stop loop is now the implementation order and has already found
-additional setup calls. The visual acceptance boundary is unchanged; the exact trap count is not.
-⚠ `GetNextEvent` is still outside the intro path: the intro polls `Button`.
+⚠ **Refer to an item by its TITLE, not its number.** Entries are deleted when closed and the list
+is consequently renumbered.
 
-**Acceptance criterion, and it is a pixel diff, not a look:** the Amiga paints the Golden Gate /
-San Francisco title art with "© 1991 SPHERE, INC", produced by the game's own `CODE` segments
-calling our trap layer, and it matches the MAME reference capture of frame 1758 under the Stage A
-differential.
+## Fidelity and performance — active queue
 
-⭐ **Passed:** at the first `Button` poll, all 163,840 displayed colors match the Macintosh
-frame, the game-produced chunky surface converts into the centred 512×384 display (32 black rows,
-81,920 bytes of image, 32 black rows), and the next VBI installs those exact bytes and all 16
-game-derived colors into the copper display. No captured framebuffer is linked into the runtime.
-Reproduce
-with `amiga/stage_c_capture.gdb` followed by `tools/verify_stage_c_intro.py`. The matching source
-crop is `(64,91,512,320)`; the offscreen 323-row composition and the following 320-row window copy
-are recorded in `docs/stage-c.md`.
+1. **Build the representative driving differential.** Compare synchronized original and Amiga
+   sequences for geometry, object placement, palettes, surface heights, clipping, mirrors, traffic,
+   animation, and the principal view modes—not merely one exact initial frame.
+2. **Profile the target A1200 workload.** Attribute frame time to game logic, drawing, resource
+   decoding, C2P, audio, and waiting, then establish an evidence-based performance target.
+3. **Fix measured visual discrepancies.** Trace wrong pixels and geometry to their source data or
+   implementation; do not add scene-, car-, or color-specific patches.
+4. **Optimize measured bottlenecks.** Prefer representation and algorithm changes before assembly;
+   verify every optimization against the reference differential and preserve game behavior.
+5. **Finish control fidelity.** Verify keyboard aliases, throttle, brake, steering, gears, mouse
+   steering and buttons, pause/options controls, and a reproducible FS-UAE configuration that does
+   not capture the keyboard as a joystick.
+6. **Finish gameplay audio fidelity.** Verify engine pitch/load, gear changes, collisions, skids,
+   horns, police, environment, and result audio, including concurrent playback and transitions.
+7. **Automate fidelity regressions.** Keep intro and driving framebuffer differentials, palette
+   checks, clean-build audits, and eventually basic audio comparisons reproducible.
 
-⭐ **The complete animated intro also passes on the target A1200 configuration** (2 MiB chip,
-8 MiB fast): the tram rings at the summit and parks at `(310,0)-(440,134)`, the Corvette/singer/mic
-sequence completes, and the original `CopyBits` composition produces the striped VETTE logo. The
-opening piano and the bell/engine/mic cues come from the converted `INST` resources; `Signature`
-replaces the piano at the logo, plays once, and then stops. The final A1200 and A4000 chunky captures
-are byte-identical. Execution then disposes the intro window. Post-intro bring-up can synthesize
-only the first `Button` result with `make SKIP_INTRO=1`; the default build still runs the complete
-sequence.
+## Core game completion — after the fidelity/performance pass
 
-⚠⚠ **Read the honesty rule before starting any of these: each stage states what it PROVES, and a
-stage that shows the right picture for the wrong reason is a failure, not a milestone.** Displaying
-a converted Mac screenshot is a display-path proof and nothing more — it must never be reported as
-"the intro screen works".
+1. **Complete one race lifecycle.** Prove garage → choices → countdown → driving → finish →
+   win/loss → garage using short checkpoints and the original game code.
+2. **Complete adverse gameplay outcomes.** Exercise ordinary and severe collisions, cumulative
+   damage, repair, tow, water/lake recovery, police tickets/arrest, and terminal outcomes. Existing
+   isolated damage and recovery proofs do not prove every enclosing game-state transition.
+3. **Cover every course and materially different mode.** Check representative starts, junctions,
+   map boundaries, freeway transitions, and finishes for every course, then cars, opponents,
+   difficulty levels, and practice/qualifying/race variants. Do not drive for hours to reach a
+   state that can be entered faithfully with a checkpoint.
+4. **Finish necessary game UI paths.** Cover the garage, dynamometer, car/opponent/course/difficulty
+   choices, options, pause, quit, results, and return paths. Leave unnecessary classic Mac desktop
+   UI unimplemented so an erroneous fallback remains a loud failure.
+5. **Implement only traps demanded by real paths.** Every unknown trap reached by the scenarios
+   above must either be implemented faithfully or remain a named loud stop. Recheck all resource
+   types the game actually consumes; do not implement unused managers speculatively.
+6. **Verify resources and persistence.** Determine from code whether preferences, high scores,
+   saved settings, or other writable state are required, then implement only what is used.
+7. **Decide communications scope.** Either support the original head-to-head/communication mode
+   for the fidelity target or record its explicit deferral from the first packaged release.
 
-⛔ **Deferred until execution asks for them:** the Event Manager (`GetNextEvent`, `SystemTask`)
-and unobserved late manager operations. `PaintBehind`, `PurgeMem`, `CompactMem`, `DisableItem`,
-`NewMenu`, `AppendMenu`, and the empty-`DRVR` `AddResMenu` case are now implemented because the
-post-intro path reached them. Do not defer a trap that the loud-stop loop actually reaches.
+## Structural verification and release — after core game completion
 
-⚠ **Refer to an item by its TITLE, not its number.** The list is renumbered every time an entry is
-closed and deleted, so a `#N` written in another doc goes quietly wrong — three of them already had.
+1. **Finish the formal static map.** Close the remaining trap-site, low-memory, A5-global,
+   entry-point, symbol-naming, and static-coverage gates in `docs/phases.md`.
+2. **Build the gameplay coverage matrix.** Record the courses, modes, scenarios, traps, resources,
+   and endings actually exercised, with short reproducible commands for each.
+3. **Add gameplay regressions.** Automate checkpoint scenarios and the production trap audits.
+4. **Resolve route-faithfulness debt.** Once the state paths work, revisit the `(6,36)` collision,
+   `(18,39)` boundary, and other failures found only during natural traversal. Passing a checkpoint
+   does not excuse a broken route in the final game.
+5. **Decode additional `VETTE!.Data` formats only when demanded.** `OBJS`, `QUAD`, `MAPS`, `COLL`,
+   the used `PERF` prefix, road/bounds data, and the currently exercised response families are
+   already understood. Base further decoding on the load-segment disassembly, never visual guesses.
+6. **Harden production builds.** Repeated clean builds and long runs must survive without resource
+   leaks, stale diagnostic state, or broken quit/restart behavior.
+7. **Package the game.** Deliver the executable/disk or WHDLoad-style package, Amiga-readable data
+   conversion flow, launch configuration, user instructions, and measured machine requirements.
 
-## Phase 0 — scaffolding — COMPLETE (see `docs/phases.md`)
+## Deferred until a real caller exists
 
-⚠ One dormant framework link trap remains intentionally deferred: `Bitmap::patternWithMask()`
-pulls in `__mulsi3`, so the mandatory `muldiv-audit` rejects any caller. Nothing uses it. Fix the
-implementation when a real path needs it, rather than weakening the audit or speculating. →
-`src/platform/amiga/framework/UPSTREAM.md` §Two latent link traps.
-
-## Phase 1+ — carried forward, not yet actionable
-
-1. **Decode the `VETTE!.Data` record formats.** The *inventory* is done
-    (`docs/source-inventory.md`); the formats are not. `PERF` now has a proved 37-word race-template
-    prefix; its remaining 17 words are unreferenced dead data in both v1.02 executables.
-    `OBJS`, `QUAD`, the outer `MAPS` grids, and `COLL` are now decoded; the QUAD-selected static
-    bounds, packed road word, Lake Merced response, other static response families, and moving-object
-    separation, traffic response, damage, repair and terminal recovery are closed. ⚠ Do this against
-    the `load` segment's disassembly, not by pattern-guessing — RoF's postmortem §1.2 is about
-    exactly this.
-2. ~~**Explain `FRED`.**~~ **COMPLETE.** The 270-entry QUAD command/factory table references 241
-    of its exports; the remaining export is the directly-called per-frame background-band fill.
-    It is the world-construction callback library for fixed scenery and placed objects, not generic
-    maths. → `docs/data-formats.md` §QUAD dispatch.
-3. ~~**Settle the OCS / 68000 fallback.**~~ **COMPLETE.** The exact 512×384 display is legal on
-    OCS, so crop and squeeze modes buy nothing. The supported package target is the user-selected
-    A1200 with 2 MiB chip and 8 MiB fast; there is no separate OCS support promise. The code keeps
-    68000 generation and legacy-correct window arithmetic. → `PROJECT.md` §Closed decisions.
+- `Bitmap::patternWithMask()` pulls in `__mulsi3`, so the mandatory `muldiv-audit` rejects any
+  caller. Nothing uses it. Fix it if a real path needs it rather than weakening the audit.
+- Unobserved manager operations remain loud. A dialog or window request reached only because an
+  allocator or earlier subsystem failed is evidence to fix that subsystem, not authority to build
+  a windowing system.
 
 ## ⛔ CLOSED — measured dead ends
 
