@@ -27,6 +27,7 @@ local driving_motion = os.getenv("VETTE_DRIVING_MOTION") == "1"
 local driving_capture_limit = driving_motion and 40 or 4
 local trace_random = os.getenv("VETTE_RANDOM_TRACE") == "1"
 local trace_traffic_position = os.getenv("VETTE_TRAFFIC_POSITION_TRACE") == "1"
+local trace_traffic_init = os.getenv("VETTE_TRAFFIC_INIT_TRACE") == "1"
 local random_calls = 0
 local random_seed_text = os.getenv("VETTE_FIDELITY_RANDOM_SEED")
 local fidelity_random_seed = random_seed_text and
@@ -65,6 +66,10 @@ local mirror_source_write_count = 0
 local selector_car_ready = false
 local traffic_position_armed = false
 local traffic_position_writes = 0
+local traffic_init_armed = false
+local traffic_init_appends = 0
+local traffic_init_pending = 0
+local traffic_init_pending_index = 0
 
 local function a24(v) return v & 0x00FFFFFF end
 local function u16(a) return prog:read_u16(a24(a)) end
@@ -277,6 +282,68 @@ local function arm_traffic_position_writer(record)
 	print(string.format("VP armed TAXI PHYS-Y writer record=%06X address=%06X", record, address))
 end
 
+local function arm_traffic_initializer()
+	if not trace_traffic_init or traffic_init_armed then return end
+	local entry = 0
+	local matches = 0
+	for address = 0x040000, 0x7FFFE8, 2 do
+		if u32(address) == 0x4E560000 and u32(address + 4) == 0x526DC96A
+			and u32(address + 8) == 0x226DC984 and u32(address + 12) == 0x2149009E then
+			if address < 0x100000 then
+				entry = address
+				matches = matches + 1
+			end
+		end
+	end
+	if matches ~= 1 then
+		print(string.format("VP refused Traffic+$2006 signature: matches=%u last=%06X",
+			matches, entry))
+		return
+	end
+	local boundary = entry + (0x2018 - 0x2002)
+	local ready_boundary = entry + (0x2528 - 0x2002)
+	traffic_init_armed = true
+	keep[#keep + 1] = prog:install_read_tap(boundary & ~3, (boundary & ~3) + 3,
+		"traffic_init_append", function(_, data, _)
+			if a24(cpu.state["PC"].value) == boundary then
+				local return_address = u32(a24(cpu.state["A6"].value) + 4)
+				if return_address ~= ready_boundary then return data end
+				traffic_init_appends = traffic_init_appends + 1
+				local record = a24(cpu.state["A0"].value)
+				traffic_init_pending = record
+				traffic_init_pending_index = traffic_init_appends
+				print(string.format(
+					"VP TRAFFIC APPEND #%u ticks=%u iteration=%u phase=%u count=%u record=%06X tag=%08X return=%06X pos=%08X/%08X physics=%08X/%08X",
+					traffic_init_appends, u32(0x016A), driving_iterations,
+					driving_callbacks, u16(a24(cpu.state["A5"].value) - 0x3696),
+					record, u32(record + 0x54), return_address,
+					u32(record), u32(record + 8),
+					u32(record + 0x6E), u32(record + 0x72)))
+				dump_bytes(string.format("ref/mame/traffic-init-%u.bin",
+					traffic_init_appends), record, 0xC8)
+			end
+			return data
+		end)
+	keep[#keep + 1] = prog:install_read_tap(ready_boundary & ~3,
+		(ready_boundary & ~3) + 3, "traffic_init_ready", function(_, data, _)
+			if a24(cpu.state["PC"].value) == ready_boundary and traffic_init_pending ~= 0 then
+				local record = traffic_init_pending
+				print(string.format(
+					"VP TRAFFIC READY #%u ticks=%u iteration=%u phase=%u record=%06X tag=%08X type=%u pos=%08X/%08X physics=%08X/%08X",
+					traffic_init_pending_index, u32(0x016A), driving_iterations,
+					driving_callbacks, record, u32(record + 0x54), u16(record + 0x28),
+					u32(record), u32(record + 8),
+					u32(record + 0x6E), u32(record + 0x72)))
+				dump_bytes(string.format("ref/mame/traffic-ready-%u.bin",
+					traffic_init_pending_index), record, 0xC8)
+				traffic_init_pending = 0
+			end
+			return data
+		end)
+	print(string.format("VP armed Traffic link/ready at %06X/%06X",
+		boundary, ready_boundary))
+end
+
 local function on_copybits(pb)
 	local destination_rect = a24(u32(pb + 6))
 	local top, left, bottom, right = rect(destination_rect)
@@ -422,6 +489,7 @@ local function on_trap()
 		-- Intro, sound, then the driving task.  The intro record has been
 		-- removed by this point, so the third installation is queue entry one.
 		if vbl_install_count == 3 and entry ~= 0 then
+			arm_traffic_initializer()
 			keep[#keep + 1] = prog:install_read_tap(entry & ~3, (entry & ~3) + 3,
 				"driving_vbl_callback", function(_, data, _)
 					if a24(cpu.state["PC"].value) == entry then
@@ -436,6 +504,7 @@ local function on_trap()
 		if fidelity_random_seed_pending and stage == "driving" and a5 ~= 0 then
 			prog:write_u32(a24(a5 - 23034), fidelity_random_seed)
 			fidelity_random_seed_pending = false
+			arm_traffic_initializer()
 			-- Main is relocatable in the Macintosh heap.  Locate its already
 			-- proven $1FD2 TST/BEQ boundary by the exact eight original bytes,
 			-- and refuse an ambiguous match rather than assuming a load address.

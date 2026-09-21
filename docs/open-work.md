@@ -48,10 +48,15 @@ is consequently renumbered.
    by copying cached position to physics position, and `Traffic+$0BB2` advances TAXI by the measured
    motion delta; the extra pre-motion loop passes therefore explain its accumulated offset. A
    loop-45 target experiment brought TAXI to within one update but had already changed the spawn
-   roster, proving that spawn/deadline phase is independent. Instrument `Traffic+$2006`'s original
-   active-list append/initializer boundary and capture the initial records before either schedule
-   diverges; use that checkpoint for the completed raster/full-object gate, then extend it to
-   alternate views.
+   roster, proving that spawn/deadline phase is independent. The new source-level initialization
+   trace corrects the earlier interpretation of `Traffic+$2006`: it only links a zeroed, pre-tagged
+   pool record. Its `Traffic+$24DE` caller assigns the type and runs the real initializer before
+   converging at `$2528`. With the synchronized seed both machines test `COP!`, `GGRY`, then `TAXI`
+   and initialize TAXI to exactly `(0x3060,0x2800)`; their tests are also separated by the same
+   roughly 40 ticks. Over those first 80 ticks, however, the Mac delivers 26 driving-task callbacks
+   and the Amiga only six. Fix the safe-point VBL dispatcher so it drains all due queue work instead
+   of returning to the application after just one callback; then rerun the completed
+   raster/full-object gate and extend it to alternate views.
 2. **Establish the performance target.** The full-accounting target-A1200 profile is now in place
    and identified presentation as 80.353% of the first moving-driving baseline. After removing a
    fully overwritten synchronization copy, adding the packed word-write C2P kernel, and deriving a

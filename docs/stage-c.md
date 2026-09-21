@@ -1453,8 +1453,11 @@ This proves moving 3D scene fidelity at a real shared state without transplantin
 patching renderer data; dashboard phase and additional traffic/view coverage remain open.
 
 The capture saves the current 200-byte car record and every 200-byte record in Traffic's active
-object list. That list is source-derived: Traffic+$2006 appends one record pointer through
-A5-$367C and increments the count at A5-$3696. Before the road-seed fixture, a naturally shared
+object list. That list is source-derived. The routine at Traffic+$2002 increments the pool cursor,
+links the zeroed record through A5-$367C, and returns it; it is not by itself an active-object
+initializer. Its Traffic+$24DE caller then assigns the type at record+$28 and conditionally runs
+one of the position initializers before converging at Traffic+$2528. The active count at A5-$3696
+only rises for records accepted by that later work. Before the road-seed fixture, a naturally shared
 player state had three Macintosh objects (`VETT`, `OPPO`, `TAXI`) but four Amiga objects (`VETT`,
 `OPPO`, `AMBU`, `LOVE`), which explained the lower-dashboard delta. The synchronized road seed now
 proves that the two original Traffic initializers select the same three-object roster. `make
@@ -1496,9 +1499,24 @@ diagnostic-only experiment left the target car neutral until iteration 45 and br
 within one 39-unit update, confirming that the accumulated coordinate difference is main-loop
 phase. It did not synchronize Traffic as a whole: LOVE and then GRED had already spawned on the
 target while the Macintosh roster was still shorter. The long input delay is therefore not
-retained. Object motion and spawn/deadline scheduling are separate phase inputs; the next useful
-checkpoint is the original `Traffic+$2006` active-list append/initialization edge, before either can
-diverge.
+retained. Object motion and spawn/deadline scheduling are separate phase inputs.
+
+The paired initialization trace now observes both Traffic+$2018 (immediately after the link) and
+Traffic+$2528 (after the caller's initializer). It filters out two earlier users of the same pool
+allocator (`VETT` and `OPPO`) by the verified return address Traffic+$2508. On both machines the
+candidate sequence begins `COP!`, `GGRY`, `TAXI`, and the first accepted TAXI has type 6 with both
+cached and physics coordinates exactly `(0x3060,0x2800)`. The Mac reaches those candidates at ticks
+4105, 4145, and 4185; the target reaches them at 1735, 1773, and 1816. Thus the 35-tick gate at
+Traffic+$25CC is behaving faithfully, and neither the resource data, random choice, nor position
+initializer causes the later discrepancy.
+
+The trace exposes the actual scheduling defect. From the first candidate through TAXI—80 or 81
+ticks on either machine—the Macintosh driving task advances by 26 callbacks, while the Amiga task
+advances by only six. The target scheduler accumulates every elapsed virtual VBL tick correctly,
+but currently releases only one due callback at a trap safe point before resuming application code.
+When more than one task/pass is pending, this leaves physics work queued behind rendering. The next
+fidelity change is to drain due VBL queue work between safe points while preserving callback order,
+registers, A5, and task self-removal semantics, then repeat the motion/object comparison.
 
 The 26-record sightseeing table used by `Main+$3456` was also decoded as a possible source-native
 shortcut. Record 4 is cell `(6,26)`, only six cells from the export-221 transition at `(6,32)`, but
