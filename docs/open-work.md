@@ -30,16 +30,19 @@ is consequently renumbered.
    animation, and the principal view modes—not merely one exact initial frame.
 2. **Establish the performance target.** The full-accounting target-A1200 profile is now in place
    and identified presentation as 80.353% of the first moving-driving baseline. After removing a
-   fully overwritten synchronization copy and adding the packed word-write C2P kernel, the focused
-   100-field window attributes 55.955% to C2P, 0.240% to palette, and zero to synchronization.
+   fully overwritten synchronization copy, adding the packed word-write C2P kernel, and deriving a
+   dirty list from the driving renderer, the warmed 100-field window averages about 419,939 C2P
+   ticks per update versus 555,388 for full-frame conversion. C2P is 47.429% of the new window,
+   synchronization 0.100%, and palette 0.239%.
    Measure the same synchronized workload on the original Macintosh and set the target from both
    results.
 3. **Fix measured visual discrepancies.** Trace wrong pixels and geometry to their source data or
    implementation; do not add scene-, car-, or color-specific patches.
-4. **Optimize measured bottlenecks.** Start with the measured C2P/back-buffer/palette presentation
-   path, now narrowed specifically to conversion rather than palette or buffer synchronization.
-   Prefer representation and algorithm changes before assembly; verify every optimization against
-   the reference differential and preserve game behavior.
+4. **Optimize measured bottlenecks.** Continue with the measured C2P presentation path and the
+   renderer-bound hook overhead. The dirty list cut conversion per update by about 24.4%, while its
+   register-bound hooks now contribute to the 4.569% compatibility row. Prefer representation and
+   algorithm changes before more assembly; verify every optimization against the reference
+   differential and preserve game behavior.
 5. **Finish control fidelity.** Verify keyboard aliases, throttle, brake, steering, gears, mouse
    steering and buttons, pause/options controls, and a reproducible FS-UAE configuration that does
    not capture the keyboard as a joystick.

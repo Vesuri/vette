@@ -31,7 +31,7 @@ public:
     struct DirtyRect {
         int16_t top, left, bottom, right;
     };
-    static const uint16_t kMaxDirtyRects = 16;
+    static const uint16_t kMaxDirtyRects = 32;
 
     // The Macintosh surface the port has to reproduce, [MEASURED] (docs/mac-hardware.md).
     static const uint16_t kWidth  = 512;

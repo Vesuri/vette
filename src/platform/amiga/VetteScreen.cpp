@@ -362,18 +362,22 @@ static uint8_t gammaToOcs(uint16_t component)
     return result;
 }
 
-static bool rectanglesOverlap(const VetteScreen::DirtyRect& a,
-                              const VetteScreen::DirtyRect& b)
-{
-    return a.top < b.bottom && a.bottom > b.top
-        && a.left < b.right && a.right > b.left;
-}
-
 static bool rectangleContains(const VetteScreen::DirtyRect& outer,
                               const VetteScreen::DirtyRect& inner)
 {
     return outer.top <= inner.top && outer.left <= inner.left
         && outer.bottom >= inner.bottom && outer.right >= inner.right;
+}
+
+static bool rectanglesMergeLosslessly(const VetteScreen::DirtyRect& a,
+                                      const VetteScreen::DirtyRect& b)
+{
+    if (rectangleContains(a, b) || rectangleContains(b, a)) return true;
+    bool sameColumns = a.left == b.left && a.right == b.right
+        && a.top <= b.bottom && a.bottom >= b.top;
+    bool sameRows = a.top == b.top && a.bottom == b.bottom
+        && a.left <= b.right && a.right >= b.left;
+    return sameColumns || sameRows;
 }
 
 bool VetteScreen::presentMacFrame(const uint8_t* chunky, const uint8_t* colorTable,
@@ -419,7 +423,7 @@ bool VetteScreen::presentMacFrame(const uint8_t* chunky, const uint8_t* colorTab
         do {
             merged = false;
             for (uint16_t j = 0; j < normalizedCount; ++j) {
-                if (!rectanglesOverlap(rectangle, normalized[j])) continue;
+                if (!rectanglesMergeLosslessly(rectangle, normalized[j])) continue;
                 if (normalized[j].top < rectangle.top) rectangle.top = normalized[j].top;
                 if (normalized[j].left < rectangle.left) rectangle.left = normalized[j].left;
                 if (normalized[j].bottom > rectangle.bottom)

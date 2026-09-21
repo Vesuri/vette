@@ -98,6 +98,7 @@ static const int16_t kShadowRawMouseH = -31278;
 static const int16_t kShadowMouseV = -31276;
 static const int16_t kShadowMouseH = -31274;
 static const uint16_t kDrivingBoundaryTrap = 0xafff;
+static const uint16_t kDrivingRasterTrap = 0xaffd;
 #ifdef VETTE_PROBE
 static const uint16_t kStaticCollisionProbeTrap = 0xaffe;
 #endif
@@ -191,10 +192,66 @@ static bool s_pixelsDirty = false;
 static int16_t s_dirtyTop, s_dirtyLeft, s_dirtyBottom, s_dirtyRight;
 static VetteScreen::DirtyRect s_dirtyRects[VetteScreen::kMaxDirtyRects];
 static uint16_t s_dirtyRectCount;
+static VetteScreen::DirtyRect s_drivingDirtyRects[VetteScreen::kMaxDirtyRects];
+static uint16_t s_drivingDirtyRectCount;
 static bool s_drivingFrameStarted;
+static bool s_drivingFrameSeeded;
+static bool s_suppressDirectScreenDirty;
 static volatile uint8_t s_unsupportedPictureOpcode;
 static volatile uint32_t s_unsupportedPictureOffset;
 static uint16_t read16(const uint8_t* p);
+
+static bool dirtyRectContains(const VetteScreen::DirtyRect& outer,
+                              const VetteScreen::DirtyRect& inner)
+{
+    return outer.top <= inner.top && outer.left <= inner.left
+        && outer.bottom >= inner.bottom && outer.right >= inner.right;
+}
+
+static bool dirtyRectsMergeLosslessly(const VetteScreen::DirtyRect& a,
+                                      const VetteScreen::DirtyRect& b)
+{
+    if (dirtyRectContains(a, b) || dirtyRectContains(b, a)) return true;
+    bool sameColumns = a.left == b.left && a.right == b.right
+        && a.top <= b.bottom && a.bottom >= b.top;
+    bool sameRows = a.top == b.top && a.bottom == b.bottom
+        && a.left <= b.right && a.right >= b.left;
+    return sameColumns || sameRows;
+}
+
+static void appendDirtyBounds(VetteScreen::DirtyRect* rectangles, uint16_t& count,
+                              int16_t top, int16_t left, int16_t bottom, int16_t right)
+{
+    VetteScreen::DirtyRect rectangle = { top, left, bottom, right };
+    bool merged;
+    do {
+        merged = false;
+        for (uint16_t i = 0; i < count; ++i) {
+            VetteScreen::DirtyRect& existing = rectangles[i];
+            if (!dirtyRectsMergeLosslessly(rectangle, existing)) continue;
+            if (existing.top < rectangle.top) rectangle.top = existing.top;
+            if (existing.left < rectangle.left) rectangle.left = existing.left;
+            if (existing.bottom > rectangle.bottom) rectangle.bottom = existing.bottom;
+            if (existing.right > rectangle.right) rectangle.right = existing.right;
+            existing = rectangles[--count];
+            merged = true;
+            break;
+        }
+    } while (merged);
+    if (count < VetteScreen::kMaxDirtyRects) rectangles[count++] = rectangle;
+    else {
+        // Correctness fallback: retain every touched pixel when a scene is
+        // more fragmented than the fixed list can represent.
+        for (uint16_t i = 0; i < count; ++i) {
+            if (rectangles[i].top < rectangle.top) rectangle.top = rectangles[i].top;
+            if (rectangles[i].left < rectangle.left) rectangle.left = rectangles[i].left;
+            if (rectangles[i].bottom > rectangle.bottom) rectangle.bottom = rectangles[i].bottom;
+            if (rectangles[i].right > rectangle.right) rectangle.right = rectangles[i].right;
+        }
+        rectangles[0] = rectangle;
+        count = 1;
+    }
+}
 
 static void markDirtyBounds(int16_t top, int16_t left, int16_t bottom, int16_t right)
 {
@@ -209,34 +266,16 @@ static void markDirtyBounds(int16_t top, int16_t left, int16_t bottom, int16_t r
         if (bottom > s_dirtyBottom) s_dirtyBottom = bottom;
         if (right > s_dirtyRight) s_dirtyRight = right;
     }
-    VetteScreen::DirtyRect rectangle = { top, left, bottom, right };
-    bool merged;
-    do {
-        merged = false;
-        for (uint16_t i = 0; i < s_dirtyRectCount; ++i) {
-            VetteScreen::DirtyRect& existing = s_dirtyRects[i];
-            if (rectangle.top >= existing.bottom || rectangle.bottom <= existing.top
-                || rectangle.left >= existing.right || rectangle.right <= existing.left)
-                continue;
-            if (existing.top < rectangle.top) rectangle.top = existing.top;
-            if (existing.left < rectangle.left) rectangle.left = existing.left;
-            if (existing.bottom > rectangle.bottom) rectangle.bottom = existing.bottom;
-            if (existing.right > rectangle.right) rectangle.right = existing.right;
-            existing = s_dirtyRects[--s_dirtyRectCount];
-            merged = true;
-            break;
-        }
-    } while (merged);
-    if (s_dirtyRectCount < VetteScreen::kMaxDirtyRects)
-        s_dirtyRects[s_dirtyRectCount++] = rectangle;
-    else {
-        // Correctness fallback for an unexpectedly fragmented frame.  Ordinary
-        // game drawing stays below this fixed capacity; overflowing falls back
-        // to the old union rectangle, never to untracked pixels.
-        s_dirtyRects[0] = { s_dirtyTop, s_dirtyLeft, s_dirtyBottom, s_dirtyRight };
-        s_dirtyRectCount = 1;
-    }
+    appendDirtyBounds(s_dirtyRects, s_dirtyRectCount, top, left, bottom, right);
     s_screenDirty = true;
+}
+
+static void markDrivingDirtyBounds(int16_t top, int16_t left,
+                                   int16_t bottom, int16_t right)
+{
+    if (top >= bottom || left >= right) return;
+    appendDirtyBounds(s_drivingDirtyRects, s_drivingDirtyRectCount,
+                      top, left, bottom, right);
 }
 
 static void markDirty(const uint8_t* rectangle)
@@ -687,6 +726,22 @@ static bool installDrivingBoundaryTrap()
     return true;
 }
 
+static bool installDrivingRasterTraps()
+{
+    // Traffic+$67A4 and +$67FA are the game's two packed-byte rectangle
+    // writers (copy and OR). Their entry registers are the destination X/Y,
+    // width and height, so these are the authoritative dirty bounds for the
+    // independently changing dashboard pieces. Replace their common first
+    // ASL.L #2,D2 and emulate it in the dispatcher.
+    static const uint32_t offsets[] = { 0x67a4, 0x67fa };
+    for (uint16_t i = 0; i < sizeof(offsets) / sizeof(offsets[0]); ++i) {
+        uint8_t* entry = s_segments[6].begin + offsets[i];
+        if (read16(entry) != 0xe582) return false;
+        write16(entry, kDrivingRasterTrap);
+    }
+    return true;
+}
+
 static bool installStaticCollisionProbe()
 {
 #ifdef VETTE_PROBE
@@ -708,7 +763,8 @@ static void blockMove(const uint8_t* source, uint8_t* destination, uint32_t coun
     // a conservative screen-space dirty rectangle before the pointers move.
     uint8_t* screenEnd = s_colorScreen + sizeof(s_colorScreen);
     uint8_t* moveEnd = destination + count;
-    if (destination < screenEnd && moveEnd > s_colorScreen) {
+    if (!s_suppressDirectScreenDirty
+        && destination < screenEnd && moveEnd > s_colorScreen) {
         uint8_t* first = destination > s_colorScreen ? destination : s_colorScreen;
         uint8_t* final = moveEnd < screenEnd ? moveEnd : screenEnd;
         uint32_t firstOffset = (uint32_t)(first - s_colorScreen);
@@ -1772,7 +1828,8 @@ static void markCursorDirtyAt(int16_t x, int16_t y, const uint8_t* cursor)
     if (!cursor) return;
     int16_t top, left, bottom, right;
     cursorBounds(x, y, cursor, top, left, bottom, right);
-    markDirtyBounds(top, left, bottom, right);
+    if (s_drivingFrameStarted) markDrivingDirtyBounds(top, left, bottom, right);
+    else markDirtyBounds(top, left, bottom, right);
 }
 
 static void markCurrentCursorDirty()
@@ -4913,8 +4970,26 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
     }
 #endif
     bool drivingFrameComplete = false;
+    bool drivingSteadyFrame = false;
     bool drivingBoundary = trap == kDrivingBoundaryTrap
         && pc == (uint32_t)(s_segments[1].begin + 0x1fd2);
+    bool drivingRaster = trap == kDrivingRasterTrap
+        && (pc == (uint32_t)(s_segments[6].begin + 0x67a4)
+            || pc == (uint32_t)(s_segments[6].begin + 0x67fa));
+    if (drivingRaster) {
+        // Entry contract recovered from the shipped callers and loops:
+        // D4=y, D3=x in pixels, D1=rows, D2=groups of eight pixels.
+        int16_t top = (int16_t)regs[4];
+        if (top < 0) top = 0;
+        else if (top > 340) top = 340;
+        uint16_t height = (uint16_t)regs[1];
+        uint32_t left = regs[3];
+        uint32_t right = left + ((uint16_t)regs[2] << 3);
+        if (s_drivingFrameStarted && left < 512 && right > left)
+            markDrivingDirtyBounds(top, (int16_t)left, (int16_t)(top + height),
+                                   (int16_t)(right > 512 ? 512 : right));
+        regs[2] <<= 2;                       // original ASL.L #2,D2
+    }
     // Emulate Main+$1FD2's original TST.W -21316(A5) / BEQ.W $29DA pair.
     // The handler adds two to the saved PC, hence each stored target is -2.
     if (drivingBoundary) {
@@ -4923,17 +4998,48 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
         bool driving = read16(s_currentA5 - 21316) != 0;
         if (driving) {
             if (s_drivingFrameStarted) {
-                markDirtyBounds(0, 0, 320, 512);
+                // The original 3D renderer rebuilds the complete exterior
+                // viewport. Dashboard writers contribute separate rectangles
+                // through the Traffic hooks above.
+                // Include a stationary cursor in this completed frame before
+                // transferring the driving list to the presentation list.
+                markCurrentCursorDirty();
+                s_pixelsDirty = false;
+                s_dirtyRectCount = 0;
+                if (!s_drivingFrameSeeded) {
+                    // Seed one complete frame. The other planar buffer is then
+                    // brought forward by VetteScreen's covered synchronization
+                    // on the following partial update.
+                    markDirtyBounds(0, 0, 320, 512);
+                    s_drivingFrameSeeded = true;
+                } else {
+                    markDirtyBounds(0, 0, 198, 512);
+                    for (uint16_t i = 0; i < s_drivingDirtyRectCount; ++i) {
+                        const VetteScreen::DirtyRect& rectangle = s_drivingDirtyRects[i];
+                        markDirtyBounds(rectangle.top, rectangle.left,
+                                        rectangle.bottom, rectangle.right);
+                    }
+                    drivingSteadyFrame = true;
+                }
+                s_drivingDirtyRectCount = 0;
                 drivingFrameComplete = true;
             }
-            else s_drivingFrameStarted = true;
+            else {
+                s_drivingDirtyRectCount = 0;
+                s_drivingFrameSeeded = false;
+                s_drivingFrameStarted = true;
+            }
             write32(frame + 2, (uint32_t)(s_segments[1].begin + 0x1fd8));
         } else {
             s_drivingFrameStarted = false;
+            s_drivingFrameSeeded = false;
+            s_drivingDirtyRectCount = 0;
             write32(frame + 2, (uint32_t)(s_segments[1].begin + 0x29d8));
         }
-    } else if (trap == 0xa9b4 && pc == (uint32_t)(s_segments[1].begin + 0x29e6))
-        s_drivingFrameStarted = false;
+    } else if (trap == 0xa9b4 && pc == (uint32_t)(s_segments[1].begin + 0x29e6)) {
+        s_drivingFrameStarted = s_drivingFrameSeeded = false;
+        s_drivingDirtyRectCount = 0;
+    }
     // Every handled trap return is a user-mode-safe opportunity to deliver
     // due VBL work.  Restricting this to SystemTask left callbacks frozen while
     // the road renderer made only QuickDraw/BlockMove calls.
@@ -4946,11 +5052,12 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
     // Begin only after a complete driving iteration has been handed to the
     // display.  This excludes selectors and first-frame construction and puts
     // the fixed-field window on the representative moving workload.
-    if (drivingFrameComplete) vetteProfileStart();
+    if (drivingSteadyFrame) vetteProfileStart();
     if (drivingBoundary) {
         if (exitChordPressed()) requestExitAfterTrap(frame);
         return 1;
     }
+    if (drivingRaster) return 1;
     if (routePatchedTrap(trap, frame)) return 1;
     if (trap == 0xa9f4) {                    // original ExitToShell after patch cleanup
         g_macVBLCallbackEntry = 0;
@@ -5710,6 +5817,13 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
     }
     if (trap == 0xa8ec) {                    // CopyBits(src, dst, srcRect, dstRect, mode, mask)
         const uint8_t* destinationRect = (const uint8_t*)read32(userStack + 6);
+        const uint8_t* destinationBitmap = (const uint8_t*)read32(userStack + 14);
+        bool fullDrivingPublish = s_drivingFrameStarted && destinationRect
+            && bitmapIsScreen(destinationBitmap)
+            && (int16_t)read16(destinationRect) == 0
+            && (int16_t)read16(destinationRect + 2) == 0
+            && (int16_t)read16(destinationRect + 4) == 342
+            && (int16_t)read16(destinationRect + 6) == 512;
 #ifdef VETTE_PROBE
         if (g_probeIntroGeometry[0] && !g_probeIntroGeometry[22]) {
             const uint8_t* sourceRect = (const uint8_t*)read32(userStack + 10);
@@ -5758,13 +5872,23 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
             }
         }
 #endif
-        if (copyBits((const uint8_t*)read32(userStack + 18),
-                     (const uint8_t*)read32(userStack + 14),
-                     (const uint8_t*)read32(userStack + 10),
-                     destinationRect, read16(userStack + 4),
-                     (const uint8_t*)read32(userStack))) {
-            if (bitmapIsScreen((const uint8_t*)read32(userStack + 14)))
-                markDirty(destinationRect);
+        s_suppressDirectScreenDirty = fullDrivingPublish;
+        bool copied = copyBits((const uint8_t*)read32(userStack + 18),
+                               destinationBitmap,
+                               (const uint8_t*)read32(userStack + 10),
+                               destinationRect, read16(userStack + 4),
+                               (const uint8_t*)read32(userStack));
+        s_suppressDirectScreenDirty = false;
+        if (copied) {
+            if (bitmapIsScreen(destinationBitmap)) {
+                // During driving the shipped renderer publishes a complete
+                // 512x342 GWorld repeatedly while constructing one frame.
+                // Its exterior and dashboard writers have already supplied
+                // the actual changed bounds; treating this final transport as
+                // drawing would erase that information with a full-screen
+                // dirty rectangle.
+                if (!fullDrivingPublish) markDirty(destinationRect);
+            }
             if (g_stageCDepth < 61) g_stageCDepth = 61;
             return 23;
         }
@@ -5860,7 +5984,8 @@ bool MacLoader::run(VetteScreen* screen)
     if (!buildA5World(a5)) return false;
     s_currentA5 = a5;
     if (!redirectLowMemoryGlobals(a5) || !disableCopyProtection()
-        || !installDrivingBoundaryTrap() || !installStaticCollisionProbe()) return false;
+        || !installDrivingBoundaryTrap() || !installDrivingRasterTraps()
+        || !installStaticCollisionProbe()) return false;
 
     Disable();
     *(void (**)())0x28 = vette_line_a_handler;

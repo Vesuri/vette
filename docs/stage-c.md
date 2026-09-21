@@ -58,12 +58,25 @@ without changing or clipping the original 323-row composition surface.
 
 Animation presentation uses a fixed list of ordinary dirty rectangles. `DrawPicture`, `CopyBits`,
 `EraseRect`, and `FrameRect` add their destination bounds only when their resolved destination
-pixels are the visible screen; GWorld composition must not dirty the display. Overlapping entries
-are merged, a capacity overflow conservatively falls back to their union, and C2P expands each
-horizontal span to 16 pixels. Double-buffer coherence is maintained by copying each preceding
-planar rectangle from front to back unless a new conversion completely replaces it. The rolling
-`FILLWATCH` audit decoded all 163,840 pixels after this change with zero mismatches. No framebuffer
-comparison, shadow buffer, or tile map participates in normal presentation.
+pixels are the visible screen; GWorld composition must not dirty the display. Contained rectangles
+and rectangles that form an exact larger rectangle are merged, but an arbitrary overlap is not
+allowed to grow into untouched space. A capacity overflow conservatively falls back to their union,
+and C2P expands each horizontal span to 16 pixels. Double-buffer coherence is maintained by copying
+each preceding planar rectangle from front to back unless a new conversion completely replaces it.
+The rolling `FILLWATCH` audit decoded all 163,840 pixels after this change with zero mismatches. No
+framebuffer comparison, shadow buffer, or tile map participates in normal presentation.
+
+Driving uses the same list with source-derived bounds. The final 512x342 `_CopyBits` is the game's
+GWorld publication transport, not evidence that every destination pixel changed, and the intervening
+`GrayRgn` over `(20,0)-(320,512)` is likewise construction rather than a completed frame. The 3D
+renderer redraws the outside view `(0,0)-(198,512)`. Traffic's two packed rectangle writers receive
+dashboard and mirror bounds in D4/D3/D1/D2; their original `ASL.L #2,D2` entry instructions are
+replaced by a private Line-A hook that records those bounds and then performs the displaced shift.
+A typical completed frame is consequently the outside view plus thirteen small dashboard/mirror
+rectangles, rather than one nearly full-screen union. The first completed driving frame is converted
+in full to seed double-buffer history. The second partial conversion and its simultaneous chunky
+source compared equal at all 163,840 pixels, and a 40-frame rolling audit checked every row with
+zero bad pixels.
 
 The intro's aligned `srcCopy`, `srcOr`, and `srcBic` operations stay in packed 4-bpp form. The
 clipped path intersects both source and destination bounds before copying and retains memmove
@@ -1333,11 +1346,17 @@ from 1.462 to 1.718, a further 14.9% kernel reduction normalized through the ora
 supporting profile uses 4,474,820 ticks for eight full conversions, or 559,353 per call (also 14.9%
 below 657,557), and attributes 55.945% of the 100-field window to C2P plus palette.
 
-A nested profile split then identifies that combined row precisely: C2P itself is 4,443,105 ticks
-(55.955% of the fixed 100-field window), palette construction is 19,084 (0.240%), and remaining
-presentation overhead is 3,249 (0.041%); synchronization and back-pressure are both zero. The
-exclusive rows still total exactly 100%. Further presentation work therefore targets conversion
-or buffer representation, not palette caching.
+A nested profile split then identified the full-frame combined row precisely: C2P itself was
+4,443,105 ticks (55.955% of the fixed 100-field window), palette construction 19,084 (0.240%), and
+remaining presentation overhead 3,249 (0.041%); synchronization and back-pressure were both zero.
+
+The renderer-derived driving dirty list reduces the warmed 100-field window to 3,779,452 C2P ticks
+for nine calls, about 419,939 per call versus roughly 555,388 in the preceding eight-call full-frame
+profile (24.4% less per call). Back-buffer synchronization is 7,933 ticks (0.100%). The added raster
+hooks appear in the broader compatibility row, which is 364,116 ticks for 457 calls; this is the
+cost of recovering exact bounds from the shipped renderer and remains an optimization candidate.
+The exclusive rows still total exactly 100%. Further presentation work therefore targets conversion
+and the hook path, not palette caching.
 
 The 26-record sightseeing table used by `Main+$3456` was also decoded as a possible source-native
 shortcut. Record 4 is cell `(6,26)`, only six cells from the export-221 transition at `(6,32)`, but

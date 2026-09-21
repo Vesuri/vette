@@ -143,6 +143,30 @@ and zero to both synchronization and back-pressure. Accounting remains exactly 1
 presentation experiment therefore belongs in conversion or its source/destination representation;
 palette caching cannot materially change this workload.
 
+### 2026-09-21 — renderer-derived driving dirty rectangles
+
+The game's completed driving frame is not the full 512x342 GWorld transport that `_CopyBits`
+publishes. The outside view occupies `(0,0)-(198,512)`, while two Traffic segment packed-rectangle
+writers receive the independently changing dashboard and mirror bounds in registers. Private Line-A
+entry hooks record those bounds and emulate the displaced shift. A typical completed frame contains
+the outside view plus thirteen dashboard/mirror rectangles. Only containment or exact rectangular
+adjacency is coalesced; arbitrary overlaps cannot inflate into a larger bounding box. There is no
+shadow framebuffer and no tile map.
+
+The first completed driving frame remains full-size so both-buffer history has a defined base. The
+profile begins after the following partial update has paid that one-time synchronization cost. In
+the warmed 100-field target-A1200 window, nine calls used 3,779,452 C2P ticks (47.429%), or about
+419,939 per call. The preceding full-frame profile used 4,443,105 ticks over eight calls, about
+555,388 per call, so the advancing-state evidence shows 24.4% less conversion time per call.
+Synchronization used 7,933 ticks (0.100%); palette used 19,056 (0.239%); presentation overhead used
+20,438 (0.256%). The hooks increase the broad compatibility row to 364,116 ticks (4.569%, 457 calls),
+so reducing their dispatch cost is a possible follow-up. Accounting is exactly 100%.
+
+This optimization has two independent correctness checks. `amiga/driving_planar_check.gdb` captures
+the second conversion and `tools/verify_driving_planar.py` compares all 163,840 pixels with zero
+differences. `FILLWATCH=1` then samples eight rows per update; 40 frames covered all 320 rows with
+zero bad frames and zero bad pixels.
+
 ## Lessons — measurement
 
 - **Compare FPS row vectors, never a `total painted` line.** A total spans a partial trailing row
