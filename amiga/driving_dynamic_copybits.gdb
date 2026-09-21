@@ -5,6 +5,14 @@ set pagination off
 set confirm off
 set $calls = 0
 
+set logging file ../tmp/driving-sequence.tsv
+set logging overwrite on
+set logging redirect on
+set logging enabled on
+printf "capture\tticks\trpm\tgear\tspeed\tx\ty\theading\n"
+set logging enabled off
+set logging overwrite off
+
 break *(s_segments[1].begin+0x286a)
 commands 1
   silent
@@ -17,7 +25,13 @@ break copyBits
 commands 2
   silent
   set $calls = $calls+1
-  printf "dynamic CopyBits[%u] tick=%u active=%u mode=%u sameBitmap=%u src=$%08x dst=$%08x mask=$%08x\n", $calls, g_macTicks, g_macVBLCallbackActive, mode, sourceBitmap==destinationBitmap, sourceBitmap, destinationBitmap, maskRegion
+  set $car = *(unsigned int*)(s_currentA5-0x3678)
+  printf "dynamic CopyBits[%u] tick=%u active=%u rpm=%d mode=%u sameBitmap=%u src=$%08x dst=$%08x mask=$%08x\n", $calls, g_macTicks, g_macVBLCallbackActive, *(short*)($car+0x44), mode, sourceBitmap==destinationBitmap, sourceBitmap, destinationBitmap, maskRegion
+  if $calls <= 4
+    set logging enabled on
+    printf "%u\t%u\t%d\t%d\t%d\t%08x\t%08x\t%u\n", $calls, g_macTicks, *(short*)($car+0x44), *(short*)($car+0x1c), *(short*)($car+0x1a), *(unsigned int*)$car, *(unsigned int*)($car+8), *(unsigned short*)($car+0x66)
+    set logging enabled off
+  end
   printf "  source=(%d,%d)-(%d,%d) target=(%d,%d)-(%d,%d)\n", *(short*)sourceRect, *(short*)(sourceRect+2), *(short*)(sourceRect+4), *(short*)(sourceRect+6), *(short*)destinationRect, *(short*)(destinationRect+2), *(short*)(destinationRect+4), *(short*)(destinationRect+6)
   if $calls == 1
     set $i = 0

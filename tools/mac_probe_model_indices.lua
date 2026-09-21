@@ -22,11 +22,15 @@ local protection_prompt = false
 local driving_ports = {}
 local driving_copy_captures = 0
 local driving_capture_armed = false
+local driving_sequence_manifest = nil
 local palette_for_window = {}
 local last_activate_window = 0
 local mirror_write_armed = false
 local trace_mirror_writer = os.getenv("VETTE_MIRROR_WRITER") == "1"
 local mirror_write_count = 0
+local dashboard_write_armed = false
+local trace_dashboard_writer = os.getenv("VETTE_DASHBOARD_WRITER") == "1"
+local dashboard_write_count = 0
 local traffic_raster_dumped = false
 local mirror_source_write_count = 0
 
@@ -126,6 +130,36 @@ local function arm_mirror_writer(pixmap)
 	print(string.format("VP armed mirror writer byte=%06X frame=%u", byte, mac.frames()))
 end
 
+local function arm_dashboard_writer(pixmap)
+	if not trace_dashboard_writer or dashboard_write_armed or pixmap == 0
+		or (u16(pixmap + 4) & 0x8000) == 0 or u16(pixmap + 32) ~= 4 then return end
+	local top, left, bottom, right = rect(pixmap + 6)
+	if top ~= 0 or left ~= 0 or bottom < 342 or right ~= 512 then return end
+	local stride = u16(pixmap + 4) & 0x3FFF
+	local byte = a24(u32(pixmap)) + 310 * stride + 162
+	local aligned = byte & ~3
+	dashboard_write_armed = true
+	keep[#keep + 1] = prog:install_write_tap(aligned, aligned + 3,
+		"driving_dashboard_writer", function(_, data, mask)
+			dashboard_write_count = dashboard_write_count + 1
+			if dashboard_write_count <= 32 then
+				local sp = a24(cpu.state["SP"].value)
+				local return_pc = a24(u32(sp))
+				local a5 = a24(cpu.state["A5"].value)
+				print(string.format(
+					"VP DASHBOARD WRITE #%u frame=%u ticks=%u pc=%06X return=%06X state[-340C]=%d byte=%06X data=%08X mask=%08X old=%08X d0=%08X d1=%08X d2=%08X d3=%08X d4=%08X a0=%06X a1=%06X a2=%06X",
+					dashboard_write_count, mac.frames(), u32(0x016A),
+					a24(cpu.state["PC"].value), return_pc, s16(u16(a5 - 0x340C)),
+					byte, data, mask, prog:read_u32(aligned), cpu.state["D0"].value,
+					cpu.state["D1"].value, cpu.state["D2"].value,
+					cpu.state["D3"].value, cpu.state["D4"].value,
+					a24(cpu.state["A0"].value), a24(cpu.state["A1"].value),
+					a24(cpu.state["A2"].value)))
+			end
+		end)
+	print(string.format("VP armed dashboard writer byte=%06X frame=%u", byte, mac.frames()))
+end
+
 local function arm_mirror_source_writer()
 	if not trace_mirror_writer then return end
 	local a5 = a24(cpu.state["A5"].value)
@@ -217,11 +251,24 @@ local function on_copybits(pb)
 		driving_copy_captures = driving_copy_captures + 1
 		print(string.format("VP DRIVING COPY #%u frame=%u mode=%u",
 			driving_copy_captures, mac.frames(), u16(pb + 4)))
+		if driving_sequence_manifest == nil then
+			driving_sequence_manifest = assert(io.open("ref/mame/driving-sequence.tsv", "w"))
+			driving_sequence_manifest:write("capture\tticks\trpm\tgear\tspeed\tx\ty\theading\n")
+		end
+		local a5 = a24(cpu.state["A5"].value)
+		local car = a24(u32(a5 - 0x3678))
+		driving_sequence_manifest:write(string.format(
+			"%u\t%u\t%d\t%d\t%d\t%08X\t%08X\t%u\n",
+			driving_copy_captures, u32(0x016A), s16(u16(car + 0x44)),
+			s16(u16(car + 0x1C)), s16(u16(car + 0x1A)), u32(car),
+			u32(car + 8), u16(car + 0x66)))
+		driving_sequence_manifest:flush()
 		local source_top, _, source_bottom, _ = rect(source + 6)
 		dump_bytes(string.format("ref/mame/driving-copy-source-%u.raw", driving_copy_captures),
 			a24(u32(source)),
 			(u16(source + 4) & 0x3FFF) * (source_bottom - source_top))
 		if driving_copy_captures == 1 then
+			arm_dashboard_writer(source)
 			dump_pixmap("DRIVING-SRC", source)
 			dump_pixmap("DRIVING-DST", destination)
 			dump_bytes("ref/mame/driving-copy-source.raw", a24(u32(source)),

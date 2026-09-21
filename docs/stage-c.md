@@ -915,19 +915,27 @@ frame is `(0,0)-(77,168)`, split into 60-row and 17-row indexed PackBits rasters
 77 source rows into 78 destination rows by sampling pixel centres. The port instead used leading-
 edge integer division, duplicating row zero at destination row one and shifting the visible top
 edge. `drawIndexedPictureBits` now applies centre sampling to scaled indexed PICT coordinates. The
-first synchronized frame is consequently exact. Captures two through four differ by 18, 62, and
-68 pixels respectively, all in the moving lower cockpit/driver area rather than the mirror; they
-are beyond the single named-frame synchronization boundary. `amiga/driving_fred_state.gdb`,
-`driving_raster_source.gdb`, and `driving_mirror_picture.gdb` retain the correction trail.
+first synchronized frame is consequently exact. The initial ordinal captures two through four
+showed small changes in the lower dashboard, but had no game-state record and therefore could not
+establish another fidelity boundary. `amiga/driving_fred_state.gdb`,
+`driving_raster_source.gdb`, and `driving_mirror_picture.gdb` retain the mirror correction trail.
 
-`make driving-sequence-compare` now turns those four paired captures into one repeatable sequence
-report rather than four manual invocations. It compares active pixels while ignoring each PixMap's
-four padding bytes, rejects missing or mismatched frame sets, identifies the first divergent frame,
-and accepts `REQUIRE_EXACT=1` when used as a regression gate. The saved sequence compares 700,416
-pixels: frame one is exact; frames two through four contain 18, 62, and 68 differences, for 148
-total (0.021130%). Their union remains confined to the animated lower cockpit/driver region and the
-first divergence is frame two. This is the next fidelity boundary; it is not evidence of a palette,
-mirror, or whole-frame timing failure.
+`make driving-sequence-compare` now turns the paired captures into one state-aware sequence report
+rather than four manual invocations. Both harnesses emit ticks, engine RPM, gear, speed, position,
+and heading beside every surface. The comparison ignores each PixMap's four padding bytes, rejects
+missing or mismatched frame sets, identifies the first *state-aligned* divergence, and accepts
+`REQUIRE_EXACT=1` as a regression gate. Pixel differences from unequal game states are printed for
+diagnosis but explicitly rejected as fidelity evidence.
+
+That safeguard corrected the earlier interpretation. The saved Macintosh captures have RPM state
+11, 15, 18, and 23; the first four Amiga captures remain at 11. Static and live traces identify the
+small changing dashboard shape as digits drawn from the current car's `+$44` engine-RPM word by
+the shipped `Traffic+$67A4` byte raster—not a driver animation and not compatibility rendering.
+Only the first pair is state-aligned, and all 175,104 active pixels in it match. The following
+ordinal pairs are not renderer comparisons. They are useful performance evidence instead: the
+Macintosh completes those updates 6–7 of its 60 Hz ticks apart, while this A1200 run takes 21–36
+of its 50 Hz ticks. The next action is a phase-share profile of this exact workload, not a pixel
+patch or a claim that unequal simulation states should look alike.
 
 Resolving the remaining resident-code samples shows that they are not compatibility overhead:
 `Main+$5208/$5246/$5266` are perspective division and clipping, `Main+$5A34/$5A92/$5D6A` are
