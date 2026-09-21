@@ -8,7 +8,7 @@
 #
 # The Amiga build is in amiga/ and is the real target: `cd amiga && . ./env.sh && make`.
 
-.PHONY: all todo driving-sequence-capture driving-sequence-compare driving-motion-reference driving-motion-capture driving-motion-compare driving-profile help
+.PHONY: all todo driving-sequence-capture driving-sequence-compare driving-motion-reference driving-audio-reference driving-motion-capture driving-motion-compare driving-profile help
 
 all: help
 
@@ -20,6 +20,7 @@ help:
 	@echo "  make driving-sequence-capture  capture Amiga frames at saved Macintosh game states"
 	@echo "  make driving-motion-compare    compare saved moving-driving frames by game state"
 	@echo "  make driving-motion-reference  capture distinct moving frames on the Macintosh oracle"
+	@echo "  make driving-audio-reference   capture/report Macintosh intro and moving-driving audio"
 	@echo "  make driving-motion-capture    capture distinct completed moving Amiga frames"
 	@echo "  make driving-profile  build and measure 300 PAL fields of target-A1200 driving"
 	@echo
@@ -68,6 +69,20 @@ driving-motion-reference:
 		-seconds_to_run 150 -snapshot_directory ref/mame/snap \
 		-cfg_directory ref/mame/cfg -nvram_directory ref/mame/nvram \
 		-autoboot_script tools/mac_probe_model_indices.lua > tmp/mame-motion.log 2>&1
+
+driving-audio-reference:
+	@mkdir -p tmp
+	@timeout -k 5 360 env SDL_VIDEODRIVER=dummy VETTE_DRIVING_MOTION=1 \
+		VETTE_FOLLOW_ROAD=1 VETTE_FIDELITY_RANDOM_SEED=3BD90000 \
+		mame mac2fdhd -rompath ref/mame/roms -nb9 mdc48 \
+		-ramsize 8M -hard ref/mame/hd/608_2GB_drive.hd \
+		-video none -sound none -window -skip_gameinfo -nothrottle \
+		-seconds_to_run 150 -samplerate 48000 \
+		-wavwrite tmp/vette-reference-driving.wav \
+		-snapshot_directory ref/mame/snap -cfg_directory ref/mame/cfg \
+		-nvram_directory ref/mame/nvram \
+		-autoboot_script tools/mac_probe_model_indices.lua > tmp/mame-driving-audio.log 2>&1
+	@python3 tools/audio_reference_report.py tmp/vette-reference-driving.wav
 
 driving-motion-capture:
 	@rm -f tmp/driving-motion-sequence.tsv tmp/driving-motion-source-*.raw tmp/driving-motion-globals-*.bin tmp/driving-motion-car-*.bin tmp/driving-motion-object-*.bin

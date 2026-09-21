@@ -129,8 +129,11 @@ is consequently renumbered.
    traced: neither calls Stop, Deactivate, Dispose, or Close during the following two Macintosh
    seconds, and Bogas remains started across the waiting state. The shipped BGAS dispatcher proves
    that Stop/Deactivate preserve voice records while Dispose tears them down; the Paula bridge now
-   preserves contexts and freezes finite deadlines accordingly. Compare the result to reference
-   audio, then cover gear changes, collisions, skids, horns, police, environment, and result audio,
+   preserves contexts and freezes finite deadlines accordingly. `make driving-audio-reference`
+   now records the synchronized Macintosh run as 48 kHz PCM and reports its real active passages;
+   the moving-driving passage begins at 75.500 seconds in the present capture. Capture or
+   reconstruct the matching Paula interval and compare pitch, duration, cue timing and overlap,
+   then cover gear changes, collisions, skids, horns, police, environment, and result audio,
    including concurrent playback and transitions.
 6. **Automate fidelity regressions.** Keep intro and driving framebuffer differentials, palette
    checks, clean-build audits, and eventually basic audio comparisons reproducible.

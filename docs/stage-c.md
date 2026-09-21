@@ -1127,6 +1127,16 @@ pointer, so a future real suspend/resume caller would restart a retained sample 
 attack rather than the BGAS software mixer's exact byte phase; neither measured P nor Escape path
 uses that unverified edge.
 
+The Macintosh audio oracle is now reproducible with `make driving-audio-reference`. It runs the
+same synchronized moving workload with the normal-road input, asks MAME to write its mixer output
+directly, and reports waveform activity without treating the sound device's constant DC level as
+audio. The current capture is 89.320 seconds at 48 kHz, 16-bit: Macintosh mono is duplicated in
+MAME channels 1 and 2 while channels 3 and 4 are silent. The moving-driving passage begins at
+75.500 seconds and continues through the end of the capture. The WAV and verbose emulator log stay
+under `tmp/`; `tools/audio_reference_report.py` makes the channel and activity measurement
+repeatable. This establishes the reference half of the audio differential; the next comparison
+must capture or reconstruct the Paula voices over the same Bogas-call interval.
+
 The corrected route reaches the Lake Merced water collision and displays the game's own tow-truck
 recovery artwork. A probe on the actual `_GetPicture` trap records PICT 140 at the resident wrapper
 `Traffic+$663C`; that wrapper's saved return identifies the dynamic request at `Main+$0FD6`, with
