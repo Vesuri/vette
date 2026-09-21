@@ -4597,10 +4597,12 @@ static void refreshDrivingKeyMap()
 #endif
         }
     }
-    // Once Gear 1 is visible in the original record, hold the documented
-    // keypad-8 accelerator.  Physical keys remain ORed into this diagnostic
-    // state above.
-    if (s_garageGearPhase >= 2) keyMap[0x5b >> 3] |= 1u << (0x5b & 7);
+    // Present the documented keypad-8 accelerator in the same GetKeys sample
+    // as the upshift.  The Macintosh oracle has accelerator held before the
+    // original scanner observes Gear 1; waiting for the changed record here
+    // would put the Amiga one physics update behind.  Physical keys remain
+    // ORed into this diagnostic state above.
+    if (s_garageGearPhase >= 1) keyMap[0x5b >> 3] |= 1u << (0x5b & 7);
 #ifdef VETTE_FREEWAY_ROUTE
     // Course Two begins at cell (2,24), one cell north of an FWTP key.  Reach
     // it through the original drivetrain: use keypad steering to settle on a

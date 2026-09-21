@@ -30,12 +30,14 @@ is consequently renumbered.
    animation, and the principal view modes—not merely one exact initial frame. State-keyed capture
    now proves two shared stationary-render states (RPM 11 and 23) exact across 350,208 active pixels.
    The moving harness reaches gear 1 through the original shift scanner and captures 37 Macintosh
-   and 40 Amiga source frames at the same full-window CopyBits boundary. The key now includes both
-   rendered and physics position. A paired A5-global dump traced the remaining 970-pixel dashboard
-   delta to different original Traffic signal flags at A5-$2EA4..-$2E9E, not drawing or palette
-   code. Natural 60/50 Hz runs rarely share player coordinates and do not share that independent
-   traffic phase, so establish an equivalent complete-state checkpoint before classifying pixels
-   as renderer defects; then extend the same checkpoint to traffic and alternate views.
+   and 40 Amiga source frames at the same full-window CopyBits boundary. The key includes both
+   rendered and physics position, and both harnesses now present accelerator with the upshift at
+   the same original `GetKeys` boundary. They share a complete moving-player state whose entire
+   512x198 exterior viewport is exact; only 46 pixels differ, all below it in the time-dependent
+   lower-right dashboard. Earlier paired A5 dumps also proved that a larger dashboard delta came
+   from different original Traffic signal flags, not drawing or palette code. Extend this
+   state-keyed checkpoint to traffic and alternate views, and identify the remaining dashboard
+   phase before making the complete moving-frame comparison an exact gate.
 2. **Establish the performance target.** The full-accounting target-A1200 profile is now in place
    and identified presentation as 80.353% of the first moving-driving baseline. After removing a
    fully overwritten synchronization copy, adding the packed word-write C2P kernel, and deriving a

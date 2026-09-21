@@ -1392,6 +1392,17 @@ independent traffic state. The next differential needs an equivalent complete-st
 not ever more coincidental natural-frame matches. The stationary RPM-11/RPM-23 exact regression
 remains separate and unchanged.
 
+One input discrepancy was then removed at its source boundary. The Macintosh harness already holds
+keypad 8 before pulsing top-row `+`, but the Amiga harness had waited until the car record showed
+Gear 1 before asserting the accelerator. It now presents both documented inputs in the same
+`GetKeys` sample while still allowing the shipped scanner and drivetrain to perform the shift.
+Both sides consequently reach RPM 13, Gear 1, speed 10, position `(12589,6112)`, heading 12288, with
+identical rendered and physics coordinates. At that state all six traffic-control flags agree and
+the complete 512x198 exterior viewport is pixel-exact. The only 46 differences in the 512x342
+composition surface lie at `(394,298)-(490,341)`, in the time-dependent lower-right dashboard.
+This proves moving 3D scene fidelity at a real shared state without transplanting game state or
+patching renderer data; dashboard phase and additional traffic/view coverage remain open.
+
 The 26-record sightseeing table used by `Main+$3456` was also decoded as a possible source-native
 shortcut. Record 4 is cell `(6,26)`, only six cells from the export-221 transition at `(6,32)`, but
 the documented T command is conditional on Tour Mode. Five ordinary T down/up scans during the
