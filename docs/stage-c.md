@@ -1274,9 +1274,10 @@ the graphics library in the established reverse order.
 
 `make PROBES=1 QUIT_PROBE=1` plus `amiga/quit_path.gdb` exercises the same deferred request without
 headless input. On the target A1200 configuration it prints state 3 at the original trap with a
-nonzero saved host stack, then state 4 in `vetteInputShutdown` with that stack cleared. This proves
-the whole game-cleanup-to-Amiga-restoration chain; the old unreachable bare-left-button wait has
-been removed.
+nonzero saved host stack, then state 4 in `vetteInputShutdown` with that stack cleared. It finally
+stops after the restored OS copper/view have run for two fields and reports saved versus actual
+DMA/interrupt masks plus the active-View match. This proves the whole
+game-cleanup-to-Amiga-restoration chain; the old unreachable bare-left-button wait has been removed.
 
 ### Physical garage clicks use `FindWindow`
 

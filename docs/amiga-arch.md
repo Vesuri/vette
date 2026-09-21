@@ -12,8 +12,11 @@
 - Our own copper list pointed at by `COP1LC` directly (not `MakeScreen`/`LoadRGB4`).
 - `*dmaconPointer = DMAF_SETCLR | DMAF_MASTER | DMAF_COPPER | …` — copper DMA only at first;
   bitplane/blitter DMA enabled as needed.
-- On exit: restore the saved DMA/interrupt masks, `LoadView(savedView)`, `WaitTOF()` × 2, close
-  libraries.
+- On exit: stop VERTB and display DMA; restore and run `GfxBase->copinit`; drain the blitter;
+  only then free Vette's copper/bitplanes; restore the original VERTB vector and the exact saved
+  DMA/interrupt masks; `Permit()`; `LoadView(savedView)`; `WaitTOF()` × 2; close libraries. This is
+  the measured Rescue on Fractalus handback order. `LoadView` alone does not restore COP1LC or DMA,
+  and the former free-before-disable sequence could return to a live but all-white Workbench.
 
 **Why takeover:** a port like this needs per-scanline copper rewrites (colour splits, sprite
 pointer patches) every frame.  The OS-friendly route (`OpenScreen CUSTOMBITMAP` +

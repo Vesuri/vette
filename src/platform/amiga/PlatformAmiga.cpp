@@ -20,6 +20,7 @@
 #include <hardware/intbits.h>
 
 #include "framework/AmigaHardware.h"
+#include "framework/CopperList.h"
 #include "PlatformAmiga.h"
 #include "MacInput.h"
 #include "VetteScreen.h"
@@ -46,7 +47,23 @@ volatile uint16_t g_lofSamples[8];       // those fields' raw VPOSR, for the par
 extern volatile uint32_t g_macTicks;
 extern volatile uint32_t* g_macTicksAddress;
 extern volatile uint32_t* g_macRndSeedAddress;
+#ifdef VETTE_PROBE
+volatile uint16_t g_restoreSavedDmacon = 0;
+volatile uint16_t g_restoreActualDmacon = 0;
+volatile uint16_t g_restoreSavedIntena = 0;
+volatile uint16_t g_restoreActualIntena = 0;
+volatile uint16_t g_restoreViewMatches = 0;
+#endif
 }
+
+#ifdef VETTE_PROBE
+// A stable post-WaitTOF breakpoint for quit_path.gdb. The values are sampled
+// before entry, so its first instruction observes the completed handback.
+extern "C" __attribute__((noinline)) void vetteRestoreComplete()
+{
+    __asm__ volatile ("" ::: "memory");
+}
+#endif
 
 /* ⚠⚠ THE FIELD-PARITY RATIO HAS TO BE MEASURED FROM WHEN THE MODE IS SET, NOT FROM BOOT,
  * and getting that wrong produced a confident wrong answer twice in a row.
@@ -73,6 +90,7 @@ static VetteScreen* s_screen = 0;
 static struct Interrupt s_vbiServer;
 static struct IntVector s_savedVertb;
 static bool     s_vertbTaken  = false;
+static uint16_t s_savedDmacon = 0;
 static uint16_t s_savedIntena = 0;
 static uint16_t s_macTickRemainder = 0;
 
@@ -140,6 +158,15 @@ bool PlatformAmiga::run()
 
     // --- takeover -----------------------------------------------------------
     struct View* savedView = GfxBase->ActiView;
+    const CopperList osCopperList((uint32_t*)GfxBase->copinit); // non-owning
+    // Rescue on Fractalus established that LoadView restores neither COP1LC
+    // nor the DMA/interrupt masks. Capture all three before the first write.
+    s_savedDmacon = AmigaHardware::enabledDMAChannels();
+    s_savedIntena = AmigaHardware::enabledInterrupts();
+#ifdef VETTE_PROBE
+    g_restoreSavedDmacon = s_savedDmacon;
+    g_restoreSavedIntena = s_savedIntena;
+#endif
     LoadView(NULL);
     WaitTOF();
     WaitTOF();
@@ -150,7 +177,6 @@ bool PlatformAmiga::run()
 
     // Mask blit-done: nothing here consumes it and every armed one is a pointless level-3
     // dispatch into graphics.library's queue handler.  INTENA is restored verbatim.
-    s_savedIntena = (uint16_t)(*intenarPointer);
     *intenaPointer = (uint16_t)INTF_BLIT;    // no SETCLR = disable
     *intreqPointer = (uint16_t)INTF_BLIT;
 
@@ -212,29 +238,58 @@ bool PlatformAmiga::run()
     static MacLoader loader;
     if (ok) ok = loader.run(&screen);
 
-    Permit();
-
+    // Keep multitasking forbidden through the Wait()-free hardware handback.
+    // Permit belongs immediately before LoadView/WaitTOF, after exec's VERTB
+    // vector and the saved interrupt mask are live again.
     vetteInputShutdown();
 
     // --- restore, in reverse --------------------------------------------------
-    // VERTB goes back BEFORE the LoadView/WaitTOF restore: WaitTOF() is signalled by
-    // graphics.library's VERTB server, which only runs once exec's walker is back.
+    // Stop our VBI and display before changing or freeing anything they read.
+    AmigaHardware::setInterrupts(INTF_VERTB, false);
+    AmigaHardware::clearInterruptRequests(INTF_VERTB);
+    AmigaHardware::setDMAChannels(DMAF_COPPER | DMAF_RASTER | DMAF_SPRITE, false);
+
+    // LoadView publishes the View through COP2LC but does not restore COP1LC.
+    // Put graphics.library's startup list back, run it, and undo ECS border
+    // blanking before releasing our copper list and bitplanes.
+    AmigaHardware::setCopperList(osCopperList, true);
+    *bplcon3Pointer = 0x0c00;
+    AmigaHardware::setDMAChannels(DMAF_COPPER, true);
+    AmigaHardware::blitterDrain();
+    s_screen = 0;
+    screen.shutdown();
+
+    // VERTB goes back before its saved enable bit and before WaitTOF: the wait
+    // is signalled by graphics.library's server behind exec's original vector.
     if (s_vertbTaken) {
         Disable();
         SysBase->IntVects[INTB_VERTB] = s_savedVertb;
         Enable();
         s_vertbTaken = false;
     }
-    s_screen = 0;
-    screen.shutdown();
 
-    *dmaconPointer = (uint16_t)(DMAF_COPPER | DMAF_RASTER | DMAF_SPRITE);
-    *intreqPointer = (uint16_t)INTF_BLIT;
-    *intenaPointer = (uint16_t)(INTF_SETCLR | (s_savedIntena & 0x7FFFu));
+    // Clear every channel/enable the game may have changed, then reproduce
+    // the exact writable masks captured at takeover. In particular this stops
+    // Paula voices and restores the OS copper/raster/master bits rather than
+    // assuming a fixed Workbench configuration.
+    AmigaHardware::clearInterruptRequests(INTF_BLIT);
+    const uint16_t dmaMask = DMAF_ALL | DMAF_MASTER | DMAF_BLITHOG;
+    AmigaHardware::setDMAChannels(dmaMask, false);
+    AmigaHardware::setInterrupts(0x7fffu, false);
+    AmigaHardware::setDMAChannels((uint16_t)(s_savedDmacon & dmaMask), true);
+    AmigaHardware::setInterrupts(
+        (uint16_t)((s_savedIntena & (uint16_t)~INTF_SETCLR) | INTF_INTEN), true);
 
+    Permit();
     LoadView(savedView);
     WaitTOF();
     WaitTOF();
+#ifdef VETTE_PROBE
+    g_restoreActualDmacon = (uint16_t)(AmigaHardware::enabledDMAChannels() & dmaMask);
+    g_restoreActualIntena = AmigaHardware::enabledInterrupts();
+    g_restoreViewMatches = (uint16_t)(GfxBase->ActiView == savedView);
+    vetteRestoreComplete();
+#endif
 
     // Closed here rather than in a destructor -- see the note in PlatformAmiga.h.  ⚠ AFTER
     // the LoadView restore, which needs GfxBase.
