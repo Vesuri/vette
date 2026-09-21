@@ -7,8 +7,9 @@ plus a live sweep for TODO/FIXME/HACK markers in the tracked, non-vendored tree.
 
 ## Blocking — current compatibility boundary
 
-⭐ **HEAD OF QUEUE: continue the input-only Course Two route east through the selector-81 freeway
-straight from cell `(6,36)`.** The route passes the real city traffic blockers and export 212;
+⭐ **HEAD OF QUEUE: resolve the confirmed class-2 `VETT`/`GGRY` moving-object collision at Freeway
+Map cell `(6,36)`, then continue east through the selector-81 straight.** The route passes the
+real city traffic blockers and export 212;
 source-aligned ordinary keypad steering now follows the complete response-197 chain through QUAD
 221, 220, 251, 219 and 218, then enters selector 81 inside its shipped open band without patching
 game state. Continue to the next material gameplay boundary, then stop at the first real

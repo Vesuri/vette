@@ -1230,6 +1230,21 @@ selector 8's solid bound beginning at U=384. Ending the pass after cell 8 lets t
 southwest correction move the hull off that wall; the successful run then reached the freeway
 and selector 81 without altering traffic or collision state.
 
+The first repeatable stop inside selector 81 is a moving-object collision, not another static
+edge. `amiga/driving_freeway_x6_collision.gdb` breaks on the shipped player response at
+`Traffic+$0202` and preserves A3/A2 from the bilateral `COLL` test. At tick 30,825 it captured the
+class-2 player at world `($3099,$124E1)`, local `(153,1249)`, and class-2 traffic tag `GGRY` at
+`($30CB,$1242B)`, local `(203,1067)`: only 50 units ahead and 182 units across. The collision
+vertex was zero and both objects were in their ordinary zero state before the original response.
+This is inside `Traffic+$0600`'s 170-unit Manhattan prefilter once the centres converge; no static
+response or missing Toolbox operation is involved.
+
+Two tempting workarounds are disproved. Braking on traffic proximity stopped the player at x=6
+with speed zero, but the obstruction did not clear. Steering the row-36 approach toward heading
+`$1400` instead overshot to local V=771 in QUAD 218, against the opposite selector-81 band. Both
+experiments were removed; the collision observer is read-only and the route still uses only
+ordinary keypad input.
+
 The 26-record sightseeing table used by `Main+$3456` was also decoded as a possible source-native
 shortcut. Record 4 is cell `(6,26)`, only six cells from the export-221 transition at `(6,32)`, but
 the documented T command is conditional on Tour Mode. Five ordinary T down/up scans during the
