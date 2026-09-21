@@ -101,8 +101,14 @@ def main() -> None:
     parser.add_argument(
         "--state-field", action="append", default=[],
         help="append a manifest column to the base player-state match key")
+    parser.add_argument(
+        "--match-field", action="append", default=[],
+        help="pair by only this manifest column (repeat for a composite checkpoint)")
     args = parser.parse_args()
     state_fields = BASE_STATE_FIELDS + tuple(args.state_field)
+    match_fields = tuple(args.match_field) or state_fields
+    manifest_fields = tuple(dict.fromkeys(state_fields + match_fields))
+    match_state = args.match_state or bool(args.match_field)
     if bool(args.reference_object_prefix) != bool(args.amiga_object_prefix):
         raise SystemExit("object prefixes must be present for both sequences or neither")
 
@@ -114,8 +120,8 @@ def main() -> None:
     amiga_manifest_path = (
         args.amiga_manifest
         or args.amiga_prefix.parent / "driving-sequence.tsv")
-    reference_manifest = read_manifest(reference_manifest_path, state_fields)
-    amiga_manifest = read_manifest(amiga_manifest_path, state_fields)
+    reference_manifest = read_manifest(reference_manifest_path, manifest_fields)
+    amiga_manifest = read_manifest(amiga_manifest_path, manifest_fields)
     if bool(reference_manifest) != bool(amiga_manifest):
         raise SystemExit(
             "state manifests must be present for both sequences or neither: "
@@ -124,7 +130,7 @@ def main() -> None:
         raise SystemExit(f"no frames match {args.reference_prefix}-N.raw")
     if not amiga:
         raise SystemExit(f"no frames match {args.amiga_prefix}-N.raw")
-    if not args.match_state and reference.keys() != amiga.keys():
+    if not match_state and reference.keys() != amiga.keys():
         missing_amiga = sorted(reference.keys() - amiga.keys())
         missing_reference = sorted(amiga.keys() - reference.keys())
         details = []
@@ -134,44 +140,50 @@ def main() -> None:
             details.append(f"missing reference frames {missing_reference}")
         raise SystemExit("sequence frame sets differ: " + "; ".join(details))
 
-    if args.match_state:
+    if match_state:
         if not reference_manifest or not amiga_manifest:
             raise SystemExit("--match-state requires both state manifests")
 
         def index_states(frames, manifest, label):
             result = {}
             for capture in sorted(frames.keys() & manifest.keys()):
-                state = tuple(manifest[capture][field] for field in state_fields)
-                if state in result:
-                    raise SystemExit(
-                        f"{label}: duplicate state in captures "
-                        f"{result[state]} and {capture}: {state}")
-                result[state] = capture
+                state = tuple(manifest[capture][field] for field in match_fields)
+                result.setdefault(state, []).append(capture)
             return result
 
         reference_states = index_states(reference, reference_manifest, "reference")
         amiga_states = index_states(amiga, amiga_manifest, "Amiga")
         common_states = reference_states.keys() & amiga_states.keys()
-        pairs = [
-            (reference_states[state], amiga_states[state], state)
-            for state in sorted(common_states, key=lambda state: reference_states[state])
-        ]
+        pairs = []
+        for state in sorted(common_states, key=lambda state: reference_states[state][0]):
+            pairs.extend(
+                (reference_capture, amiga_capture, state)
+                for reference_capture, amiga_capture in zip(
+                    reference_states[state], amiga_states[state]))
         if not pairs:
             raise SystemExit("no complete game states occur in both sequences")
-        missing_amiga_states = reference_states.keys() - amiga_states.keys()
-        missing_reference_states = amiga_states.keys() - reference_states.keys()
+        missing_amiga_states = [
+            (state, capture)
+            for state, captures in reference_states.items()
+            for capture in captures[len(amiga_states.get(state, [])):]
+        ]
+        missing_reference_states = [
+            (state, capture)
+            for state, captures in amiga_states.items()
+            for capture in captures[len(reference_states.get(state, [])):]
+        ]
         print(
             f"state coverage: {len(pairs)} common, "
             f"{len(missing_amiga_states)} reference-only, "
             f"{len(missing_reference_states)} Amiga-only")
-        for state in sorted(missing_amiga_states, key=lambda item: reference_states[item]):
+        for state, capture in sorted(missing_amiga_states, key=lambda item: item[1]):
             print(
-                f"  reference-only frame {reference_states[state]}: "
-                + ", ".join(f"{field}={value}" for field, value in zip(state_fields, state)))
-        for state in sorted(missing_reference_states, key=lambda item: amiga_states[item]):
+                f"  reference-only frame {capture}: "
+                + ", ".join(f"{field}={value}" for field, value in zip(match_fields, state)))
+        for state, capture in sorted(missing_reference_states, key=lambda item: item[1]):
             print(
-                f"  Amiga-only frame {amiga_states[state]}: "
-                + ", ".join(f"{field}={value}" for field, value in zip(state_fields, state)))
+                f"  Amiga-only frame {capture}: "
+                + ", ".join(f"{field}={value}" for field, value in zip(match_fields, state)))
     else:
         pairs = [(frame, frame, None) for frame in sorted(reference)]
 
@@ -202,7 +214,7 @@ def main() -> None:
         pixel_total += comparison.total
         all_transitions.update(comparison.transitions)
         state_differences = []
-        if reference_manifest and not args.match_state:
+        if reference_manifest:
             if reference_frame not in reference_manifest or amiga_frame not in amiga_manifest:
                 raise SystemExit(f"frame {reference_frame}: missing state-manifest row")
             for field in state_fields:
@@ -231,9 +243,9 @@ def main() -> None:
                 status += format_objects(reference_objects)
                 status += ", Amiga " + format_objects(amiga_objects)
                 status += " [pixel result is not a complete-state fidelity comparison]"
-        if args.match_state:
+        if match_state:
             state_label = ", ".join(
-                f"{field}={value}" for field, value in zip(state_fields, matched_state))
+                f"{field}={value}" for field, value in zip(match_fields, matched_state))
             print(
                 f"reference frame {reference_frame} / Amiga frame {amiga_frame} "
                 f"({state_label}): {status}")

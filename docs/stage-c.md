@@ -1462,6 +1462,25 @@ driving-motion-reference` and `driving-motion-capture` supply that fixture only 
 builds; `driving-motion-compare` still keys completed frames by full player state and correctly
 refuses to compare the new sequences until an equivalent phase checkpoint exists.
 
+The phase investigation now records two source-level ordinals beside every moving frame. The
+Macintosh harness locates `Main+$1FD2` from the unique, byte-verified original TST/BEQ sequence in
+the relocatable CODE image; the port increments the corresponding counter in its existing private
+boundary handler. Both also count the driving VBL task (the third task installed on the Mac after
+intro and sound, and the second live queue record after intro retires). These counters are
+diagnostic observations only. The sequence comparator can pair on an explicit manifest field and
+can pair repeated values in capture order, which matters when two main-loop frames complete during
+one traffic callback.
+
+That measurement rejects the driving-task callback as the missing Traffic phase clock. The first
+exact player state is loop iteration zero on both systems, but it follows callback 333 on the
+Macintosh and 109 on the Amiga because original road construction consumes very different emulated
+time. More importantly, experimental equal-callback captures still did not align the traffic
+records. The clean unmodified captures retain the same `VETT`, `OPPO`, `TAXI` roster and exact
+player/opponent records at their first shared player state, while TAXI is at `(12384,9026)` on the
+Macintosh and `(12384,9639)` on Amiga. The 46 changed pixels remain confined to the lower-right
+dashboard. No timing freeze or state transplant is retained; the next trace follows the original
+write which establishes TAXI's first coordinate to its real time/phase input.
+
 The 26-record sightseeing table used by `Main+$3456` was also decoded as a possible source-native
 shortcut. Record 4 is cell `(6,26)`, only six cells from the export-221 transition at `(6,32)`, but
 the documented T command is conditional on Tour Mode. Five ordinary T down/up scans during the

@@ -41,10 +41,14 @@ is consequently renumbered.
    accelerated Amiga harness intentionally skips. Both first captures consequently contain the
    same `VETT`, `OPPO`, `TAXI` roster. After the C2P work, completed-frame cadence improves from
    about thirteen to ten or eleven Amiga ticks versus roughly seven on the Mac, and three complete
-   player tuples now align naturally. The best differs by only 13 dashboard pixels, but traffic has
-   advanced and spawned at different phases. Establish a simulation-phase checkpoint independent
-   of presentation cadence, compare its completed raster and full object records, then extend that
-   gate to alternate views.
+   player tuples now align naturally. The capture records both the verified `Main+$1FD2` driving
+   iteration and the absolute second-live-VBL-task callback phase. It proves the Macintosh reaches
+   its first moving frame after 333 driving-task callbacks versus 109 on the faster Amiga setup,
+   but equalizing or merely pairing that callback count does not align Traffic: at the first exact
+   player state TAXI is `(12384,9026)` versus `(12384,9639)`. Trace the original write which
+   establishes that first TAXI position and identify its actual clock/input; use that source value
+   for the simulation checkpoint, then compare its completed raster and full object records and
+   extend the gate to alternate views.
 2. **Establish the performance target.** The full-accounting target-A1200 profile is now in place
    and identified presentation as 80.353% of the first moving-driving baseline. After removing a
    fully overwritten synchronization copy, adding the packed word-write C2P kernel, and deriving a

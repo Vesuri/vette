@@ -37,6 +37,10 @@ local driving_manifest_path = driving_motion and
 local last_driving_state = nil
 local driving_frame_ready = false
 local driving_a5 = 0
+local driving_iterations = 0
+local driving_iteration_origin = nil
+local vbl_install_count = 0
+local driving_callbacks = 0
 if driving_motion then
 	os.remove(driving_manifest_path)
 	for i = 1, driving_capture_limit do
@@ -286,6 +290,8 @@ local function on_copybits(pb)
 		and st == 0 and sl == 0 and sb == 342 and sr == 512
 		and top == 0 and left == 0 and bottom == 342 and right == 512
 		and viewport_sample ~= 0x00 and viewport_sample ~= 0xFF
+		and (not driving_motion or (car ~= 0 and s16(u16(car + 0x1C)) == 1
+			and s16(u16(car + 0x1A)) > 0))
 		and (not driving_motion or state_key ~= last_driving_state) then
 		driving_copy_captures = driving_copy_captures + 1
 		last_driving_state = state_key
@@ -294,7 +300,7 @@ local function on_copybits(pb)
 		if driving_sequence_manifest == nil then
 			driving_sequence_manifest = assert(io.open(driving_manifest_path, "w"))
 			driving_sequence_manifest:write(driving_motion and
-				"capture\tticks\trpm\tgear\tspeed\tx\ty\theading\tphysics_x\tphysics_y\tobjects\n" or
+				"capture\tticks\titeration\ttraffic_phase\trpm\tgear\tspeed\tx\ty\theading\tphysics_x\tphysics_y\tobjects\n" or
 				"capture\tticks\trpm\tgear\tspeed\tx\ty\theading\n")
 		end
 		local row = string.format(
@@ -303,6 +309,10 @@ local function on_copybits(pb)
 			s16(u16(car + 0x1C)), s16(u16(car + 0x1A)), u32(car),
 			u32(car + 8), u16(car + 0x66))
 		if driving_motion then
+			if driving_iteration_origin == nil then driving_iteration_origin = driving_iterations end
+			row = string.format("%u\t%u\t%u\t%u", driving_copy_captures, u32(0x016A),
+				driving_iterations - driving_iteration_origin, driving_callbacks)
+				.. row:match("^[^\t]+\t[^\t]+(.*)$")
 			row = row .. string.format("\t%08X\t%08X\t%u",
 				u32(car + 0x6E), u32(car + 0x72), object_count)
 		end
@@ -375,11 +385,52 @@ local function on_trap()
 	local pc = u32(sp + 2)
 	local trap = u16(pc)
 	local pb = a24(sp + 8)                     -- 68020 exception frame is eight bytes
+	if driving_motion and trap == 0xA033 then -- VInstall
+		local task = a24(cpu.state["A0"].value)
+		local entry = task ~= 0 and a24(u32(task + 6)) or 0
+		vbl_install_count = vbl_install_count + 1
+		-- Intro, sound, then the driving task.  The intro record has been
+		-- removed by this point, so the third installation is queue entry one.
+		if vbl_install_count == 3 and entry ~= 0 then
+			keep[#keep + 1] = prog:install_read_tap(entry & ~3, (entry & ~3) + 3,
+				"driving_vbl_callback", function(_, data, _)
+					if a24(cpu.state["PC"].value) == entry then
+						driving_callbacks = driving_callbacks + 1
+					end
+					return data
+				end)
+		end
+	end
 	if trap == 0xA861 then
 		local a5 = a24(cpu.state["A5"].value)
 		if fidelity_random_seed_pending and stage == "driving" and a5 ~= 0 then
 			prog:write_u32(a24(a5 - 23034), fidelity_random_seed)
 			fidelity_random_seed_pending = false
+			-- Main is relocatable in the Macintosh heap.  Locate its already
+			-- proven $1FD2 TST/BEQ boundary by the exact eight original bytes,
+			-- and refuse an ambiguous match rather than assuming a load address.
+			local boundary = 0
+			local matches = 0
+			for address = 0x040000, 0x7FFFFE, 2 do
+				if u16(address) == 0x4A6D and u16(address + 2) == 0xACBC
+					and u16(address + 4) == 0x6700 and u16(address + 6) == 0x0A02 then
+					boundary = address
+					matches = matches + 1
+				end
+			end
+			if matches == 1 then
+				keep[#keep + 1] = prog:install_read_tap(boundary & ~3,
+					(boundary & ~3) + 3, "driving_loop_boundary", function(_, data, _)
+						if a24(cpu.state["PC"].value) == boundary then
+							driving_iterations = driving_iterations + 1
+						end
+						return data
+					end)
+				print(string.format("VP armed Main+$1FD2 at %06X", boundary))
+			else
+				print(string.format("VP refused Main+$1FD2 signature: matches=%u last=%06X",
+					matches, boundary))
+			end
 		end
 		if trace_random then
 			random_calls = random_calls + 1
@@ -558,6 +609,7 @@ mac.run(function()
 		-- The Amiga harness asserts accelerator in the same GetKeys refresh that
 		-- first observes gear 1.  Have it waiting before the shift so MAME cannot
 		-- lose one physics iteration to its once-per-video-frame Lua poll.
+		driving_capture_armed = true
 		mac.key_down("Keypad 8")
 		-- GetKeys is sampled by the driving loop, not the Event Manager.  Keep the
 		-- bit down until that scanner observes it; a short ADB press can begin and

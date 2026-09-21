@@ -317,6 +317,8 @@ PROBE_SYMS = g_vbiCount g_planeChecksum g_screenReady g_laceFields g_longFields 
              g_blockMoveCount g_trapManager g_trapRoutine
 PROBE_SYMS += g_stageCDepth
 PROBE_SYMS += g_macTicks
+PROBE_SYMS += g_macDrivingIterations
+PROBE_SYMS += g_macDrivingCallbacks
 PROBE_SYMS += g_macFramesQueued g_macFramesPresented
 PROBE_SYMS += g_beamPresentLine g_beamPresentMin g_beamPresentMax \
               g_beamPresents g_beamPresentsLate

@@ -47,6 +47,8 @@ volatile uint16_t g_jumpEntryCount = 0;
 volatile uint16_t g_blockMoveCount = 0;
 volatile uint16_t g_stageCDepth = 1;       // _BlockMove is row 1
 volatile uint32_t g_macTicks = 0;
+volatile uint32_t g_macDrivingIterations = 0;
+volatile uint32_t g_macDrivingCallbacks = 0;
 volatile uint32_t* g_macTicksAddress = 0;
 volatile uint32_t* g_macRndSeedAddress = 0;
 volatile uint32_t g_macVBLCallbackEntry = 0;
@@ -4389,6 +4391,8 @@ static void scheduleVBLTask()
             // trap return PC.  Only one callback is dispatched at this safe
             // point; the next trap resumes this same virtual VBL pass.
             write16(task + 10, 0);
+            if (s_vblTaskCount > 1 && task == s_vblTasks[1])
+                ++g_macDrivingCallbacks;
             g_macVBLCallbackTask = (uint32_t)task;
             g_macVBLCallbackA5 = (uint32_t)s_currentA5;
             g_macVBLCallbackEntry = read32(task + 6);
@@ -5042,6 +5046,7 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
         refreshDrivingKeyMap();
         bool driving = read16(s_currentA5 - 21316) != 0;
         if (driving) {
+            ++g_macDrivingIterations;
             if (s_drivingFrameStarted) {
                 uint16_t rasterBoundCount = g_drivingRasterBoundCount;
                 bool rasterBoundsOverflowed = rasterBoundCount == 0xffff;

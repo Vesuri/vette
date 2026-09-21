@@ -14,12 +14,13 @@ set $last_heading = 0xffff
 set $last_physics_x = 0xffffffff
 set $last_physics_y = 0xffffffff
 set $last_objects = 0xffff
+set $simulation_origin = -1
 
 set logging file ../tmp/driving-motion-sequence.tsv
 set logging overwrite on
 set logging redirect on
 set logging enabled on
-printf "capture\tticks\trpm\tgear\tspeed\tx\ty\theading\tphysics_x\tphysics_y\tobjects\n"
+printf "capture\tticks\titeration\ttraffic_phase\trpm\tgear\tspeed\tx\ty\theading\tphysics_x\tphysics_y\tobjects\n"
 set logging enabled off
 set logging overwrite off
 
@@ -45,6 +46,9 @@ commands
     set $i = 0
     while $i < 8
       if s_gworlds[$i].used && sourceBitmap == &s_gworlds[$i].port[2]
+        if $simulation_origin < 0
+          set $simulation_origin = g_macDrivingIterations
+        end
         set $captures = $captures+1
         set $last_rpm = $rpm
         set $last_gear = $gear
@@ -56,7 +60,7 @@ commands
         set $last_physics_y = $physics_y
         set $last_objects = $objects
         set logging enabled on
-        printf "%u\t%u\t%d\t%d\t%d\t%08x\t%08x\t%u\t%08x\t%08x\t%u\n", $captures, g_macTicks, $rpm, $gear, $speed, $x, $y, $heading, $physics_x, $physics_y, $objects
+        printf "%u\t%u\t%u\t%u\t%d\t%d\t%d\t%08x\t%08x\t%u\t%08x\t%08x\t%u\n", $captures, g_macTicks, g_macDrivingIterations-$simulation_origin, g_macDrivingCallbacks, $rpm, $gear, $speed, $x, $y, $heading, $physics_x, $physics_y, $objects
         set logging enabled off
         set $rows = *(short*)(&s_gworlds[$i].pixMap[10])-*(short*)(&s_gworlds[$i].pixMap[6])
         set $stride = *(unsigned short*)(&s_gworlds[$i].pixMap[4])&0x3fff
