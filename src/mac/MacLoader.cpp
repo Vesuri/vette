@@ -1476,6 +1476,17 @@ static void serviceBogasAudio()
         s_bogasPendingReloadData[channel] = 0;
         s_bogasPendingReloadWords[channel] = 0;
     }
+    // Context 0 owns the centred AUD0/1 pair. Most engine/view loads are
+    // indefinite, but result cues such as splash use a finite countdown and
+    // must retire both hardware voices together just like a BGAS voice.
+    if (s_bogasVoiceEndTick[0]
+        && (int32_t)(g_macTicks - s_bogasVoiceEndTick[0]) >= 0) {
+        stopBogasVoice(0);
+        stopBogasVoice(1);
+        s_bogasVoiceEndTick[0] = 0;
+        s_bogasVoiceEndTick[1] = 0;
+        s_bogasContexts[0].playing = false;
+    }
     for (uint16_t contextIndex = 1; contextIndex < 3; ++contextIndex) {
         BogasContext& context = s_bogasContexts[contextIndex];
         uint16_t channel = contextIndex == 1 ? 3 : 2;
@@ -1513,6 +1524,14 @@ static void bogasLoad(uint16_t contextIndex, uint32_t duration,
         uint16_t period = bogasPeriod(319, options);
         startBogasVoice(instrument, 0, period, 64);
         startBogasVoice(instrument, 1, period, 64);
+        uint32_t endTick = duration == 0x7fffffffUL ? 0 : g_macTicks + duration;
+#ifdef VETTE_FINITE_CONTEXT0_AUDIO_PROBE
+        // The wrapper call retains its real duration for observation; only
+        // the resulting finite countdown is shortened for the lifecycle test.
+        if (endTick) endTick = g_macTicks + 2;
+#endif
+        s_bogasVoiceEndTick[0] = endTick;
+        s_bogasVoiceEndTick[1] = endTick;
         return;
     }
 

@@ -148,8 +148,10 @@ is consequently renumbered.
    answer state reaches Traffic's source-defined two-minute threshold and loads looping instrument
    12 indefinitely on context 1. The documented F4/F2 view transition now proves `heli` replaces
    `engine` in context 0 and the forward view restores the centred engine voice, while both effect
-   contexts remain independent. Continue with short source checkpoints for result audio and the
-   remaining environment cues, including concurrent playback and transitions.
+   contexts remain independent. The lake checkpoint now proves `splash` is a finite 360-tick
+   context-0 result cue; AUD0/1 and its logical voice now expire together instead of leaving a
+   silent context active forever. Continue with short source checkpoints for the remaining result
+   and environment cues, including concurrent playback and transitions.
 6. **Automate fidelity regressions.** Keep intro and driving framebuffer differentials, palette
    checks, clean-build audits, and eventually basic audio comparisons reproducible.
 

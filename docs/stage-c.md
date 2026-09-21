@@ -1213,6 +1213,17 @@ and engine sound are mutually exclusive users of the source's context 0, while c
 remain available for overlapping effects. The regression reaches both calls by driving iterations
 2 and 4 and does not patch a view, instrument, or audio context.
 
+The bounded straight-to-lake recovery now has its own result-audio regression in
+`amiga/driving_audio_splash.gdb`. The original caller at `Traffic+$5B06` loads instrument 15
+(`splash`) into context 0 for 360 ticks at nominal pitch `$00010000`, replacing the engine. This
+exposed a distinction hidden by the earlier silent-reload fix: the sample no longer repeated
+audibly, but finite deadlines were only serviced for effect contexts 1 and 2, so context 0 remained
+logically active forever. Context 0 now schedules the same deadline on both centred channels and
+retires AUD0/1 and its playing flag together. `FINITE_AUDIO_PROBE=1` preserves and records the real
+wrapper arguments, then shortens only the resulting finite countdown to two ticks; the regression
+proves both deadlines become zero and context 0 becomes inactive. Indefinite engine and helicopter
+loads retain their existing zero deadline.
+
 The protection-failure police path is covered without restoring the deliberately unsupported modal
 requester. The diagnostic `FAIL_PROTECTION=1` replacement reproduces the two words left by the
 original second-wrong-answer branch at `Main+$0868`: both the processed flag at A5-$58FE and failed

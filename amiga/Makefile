@@ -182,6 +182,12 @@ ifeq ($(VIEW_AUDIO_PROBE),1)
 EXTRA_DEFINES += -DVETTE_VIEW_AUDIO_PROBE
 endif
 
+# Diagnostic only: preserve a finite context-0 Load's source arguments but
+# shorten its Paula expiry to two ticks so the lifecycle can be bounded.
+ifeq ($(FINITE_AUDIO_PROBE),1)
+EXTRA_DEFINES += -DVETTE_FINITE_CONTEXT0_AUDIO_PROBE
+endif
+
 # Diagnostic only: pulse the documented Z horn control for one driving KeyMap
 # scan after the countdown and initial acceleration, then release it through
 # the next ordinary scan.
