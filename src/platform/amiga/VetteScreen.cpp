@@ -61,6 +61,12 @@ static uint16_t beamLine()
 // inner loop that was too slow to keep up with the intro on a 68000.
 static uint32_t s_pairToPlanes[4][256];
 static bool s_pairToPlanesReady = false;
+#ifdef VETTE_C2P_ASM
+// Four packed pixels -> four plane nibbles in the high half of each byte.
+// This 256 KiB fast-RAM table halves lookup traffic in the target kernel;
+// chip-RAM output remains the same four wide writes per 32 pixels.
+static uint32_t s_quadToPlanes[65536];
+#endif
 
 static void convertC2PSpanC(const uint8_t* source, uint8_t* destination, uint16_t groups)
 {
@@ -95,6 +101,12 @@ static void initializePairToPlanes()
             s_pairToPlanes[position][value] = packed;
         }
     }
+#ifdef VETTE_C2P_ASM
+    for (uint32_t high = 0; high < 256; ++high)
+        for (uint32_t low = 0; low < 256; ++low)
+            s_quadToPlanes[(high << 8) | low]
+                = s_pairToPlanes[0][high] | s_pairToPlanes[1][low];
+#endif
     s_pairToPlanesReady = true;
 }
 
@@ -485,7 +497,7 @@ bool VetteScreen::presentMacFrame(const uint8_t* chunky, const uint8_t* colorTab
 #ifdef VETTE_C2P_VERIFY
                 uint32_t start = vetteProfileBeamEpoch();
 #endif
-                vetteC2PSpanAsm(source, destination, &s_pairToPlanes[0][0], groups);
+                vetteC2PSpanAsm(source, destination, s_quadToPlanes, groups);
 #ifdef VETTE_C2P_VERIFY
                 g_c2pAsmTicks += vetteProfileBeamEpoch() - start;
                 for (uint16_t plane = 0; plane < kPlanes; ++plane)

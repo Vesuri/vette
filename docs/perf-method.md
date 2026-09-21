@@ -182,6 +182,23 @@ falls from 364,116 ticks (4.569%) to 192,036 (2.418%). The two advancing runs pe
 amounts of C2P work, so their total elapsed times are not treated as a controlled speed comparison;
 the removed dispatcher call count and within-run accounting are the defensible evidence.
 
+### 2026-09-21 — four-pixel C2P lookup
+
+The packed-input kernel formerly performed sixteen 32-bit fast-RAM table reads for every 32
+pixels: four positional byte lookups for each eight-pixel result. A 256 KiB fast-RAM table now
+maps four packed pixels to four plane nibbles, so two lookups plus one shift/OR produce the same
+eight-pixel result. The source remains Vette's packed-nibble surface, dirty bounds remain aligned
+to 16 pixels, and the destination remains the same interleaved four-plane chip buffer. No shadow
+surface or tile representation was added.
+
+The in-process verifier compared 2,748,000 output bytes with zero failures. Against the same C
+oracle, the new kernel's ratio is 1.976 versus 1.718 for the preceding 32-pixel longword version;
+normalizing through the oracle gives about 13.1% less kernel time. In the warmed 100-field A1200
+profile, ten calls use 3,685,815 ticks, or about 368,582 per call, compared with the previous
+419,939. That supporting moving workload is a 12.2% reduction per call; C2P is now 46.297% of the
+window. The ordinary build pays no verifier or probe cost, but does reserve the 256 KiB table in
+the configured 8 MiB fast memory.
+
 ## Lessons — measurement
 
 - **Compare FPS row vectors, never a `total painted` line.** A total spans a partial trailing row

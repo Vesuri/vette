@@ -4,21 +4,19 @@
 
 	.macro load8 result
 	moveq	#0,d0
-	move.b	(a0)+,d0
-	lsl.w	#2,d0
-	move.l	0(a2,d0.w),\result
+	move.w	(a0)+,d0
+	lsl.l	#2,d0
+	move.l	a2,a3
+	adda.l	d0,a3
+	move.l	(a3),\result
 	moveq	#0,d0
-	move.b	(a0)+,d0
-	lsl.w	#2,d0
-	or.l	0(a3,d0.w),\result
-	moveq	#0,d0
-	move.b	(a0)+,d0
-	lsl.w	#2,d0
-	or.l	0(a4,d0.w),\result
-	moveq	#0,d0
-	move.b	(a0)+,d0
-	lsl.w	#2,d0
-	or.l	0(a5,d0.w),\result
+	move.w	(a0)+,d0
+	lsl.l	#2,d0
+	move.l	a2,a3
+	adda.l	d0,a3
+	move.l	(a3),d4
+	lsr.l	#4,d4
+	or.l	d4,\result
 	.endm
 
 	.macro interleave2 first, second
@@ -37,24 +35,23 @@
 | Four groups are 16 packed Macintosh bytes (32 pixels) and produce one long
 | in each of the four Amiga planes.  A final two-group/16-pixel tail uses word
 | writes, so callers retain their natural 16-pixel dirty-rectangle alignment.
-| The four 1 KiB table quarters encode the pixel-pair positions.  This keeps
-| Vette's native packed-nibble source while extending the wide-write strategy
-| of Mikael Kalms' public-domain c2p1x1_4_c5_word.
+| The 256 KiB fast-RAM table maps four packed pixels to the high nibble of four
+| plane bytes. Two lookups and one shift/OR therefore transpose eight pixels,
+| halving the former 8-bit table's lookup traffic. This keeps Vette's native
+| packed-nibble source while extending the wide-write strategy of Mikael
+| Kalms' public-domain c2p1x1_4_c5_word.
 vetteC2PSpanAsm:
-	movem.l	d2-d7/a2-a5,-(sp)
-	move.l	44(sp),a0
-	move.l	48(sp),a1
-	move.l	52(sp),a2
+	movem.l	d2-d7/a2-a3,-(sp)
+	move.l	36(sp),a0
+	move.l	40(sp),a1
+	move.l	44(sp),a2
 	| GCC reserves a four-byte argument slot for uint16_t; on big-endian 68k
 	| the value occupies its low word. Dirty spans make it an even number.
-	move.w	58(sp),d3
+	move.w	50(sp),d3
 	beq	9f
 	move.w	d3,d7
 	and.w	#2,d3			| one 16-pixel tail after 32-pixel batches?
 	lsr.w	#2,d7			| number of 32-pixel batches
-	lea	1024(a2),a3
-	lea	2048(a2),a4
-	lea	3072(a2),a5
 	tst.w	d7
 	beq	5f
 	subq.w	#1,d7
@@ -97,5 +94,5 @@ vetteC2PSpanAsm:
 	move.w	d2,64(a1)
 	move.w	d1,(a1)
 9:
-	movem.l	(sp)+,d2-d7/a2-a5
+	movem.l	(sp)+,d2-d7/a2-a3
 	rts

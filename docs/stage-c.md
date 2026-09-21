@@ -1377,6 +1377,14 @@ whole-window difference is not presented as a controlled speed ratio. The exclus
 total exactly 100%. Further presentation work therefore targets conversion, not palette caching or
 the now-lightweight bound capture.
 
+The next representation step combines four packed pixels per fast-RAM lookup instead of two. A
+256 KiB table halves lookup traffic while retaining the packed chunky source, the interleaved
+four-plane destination, 16-pixel dirty alignment, and the four longword chip writes per 32 pixels.
+The assembly/C differential compares 2,748,000 bytes with zero failures; its controlled C/assembly
+ratio rises from 1.718 to 1.976, about 13.1% less kernel time. A warmed 100-field A1200 profile uses
+3,685,815 C2P ticks over ten calls (about 368,582 each), 12.2% below the preceding 419,939-per-call
+dirty-list measurement. C2P now accounts for 46.297% of that window.
+
 The differential now has a real moving checkpoint rather than a neutral car with a held
 accelerator. `VETTE_DRIVING_MOTION=1` makes the Macintosh harness wait for a valid full-window
 CopyBits from Vette, latch the application A5 at that trap boundary, wait for countdown state 3,
