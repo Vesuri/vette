@@ -16,14 +16,15 @@
 
 ## The target machine
 
-**A500, 7 MHz 68000, PAL.** A frame is 20 ms. Spending 10 ms on *anything* is half the budget.
-Units: 1 raster scanline = 63.56 µs; a PAL frame = 313 lines. Be conscious of absolute
-milliseconds, always — a percentage of an unknown total is not a measurement.
+**A1200, 14 MHz 68020, PAL, 2 MiB chip RAM and 8 MiB fast RAM.** A field is 20 ms. The display is
+interlaced, so two fields make one complete 512×384 raster. Units: one PAL raster scanline is about
+64 µs and a field is approximately 313 lines. Be conscious of absolute milliseconds, always — a
+percentage of an unknown total is not a measurement.
 
 ⚠ **This project starts from a 68000 original, which is new and cuts both ways.** The Mac Plus/SE
-the game targeted is a 7.83 MHz 68000 — within 12% of an A500's 7.09 MHz — so unlike the two prior
-ports there is a *real* performance reference: whatever framerate the original gets on a Mac Plus is
-roughly what the same instructions should get here. That makes a large shortfall diagnosable
+the game targeted is a 7.83 MHz 68000, while the package target is a faster 68020. Unlike the two
+prior ports there is therefore a *real* performance reference: the original's measured cadence
+provides a lower-bound expectation for the resident instructions. That makes a large shortfall diagnosable
 (it is the seam, the display conversion or the trap layer, not "the algorithm") and it makes the
 target arguable rather than a pure scope call. It does **not** license quoting a Mac number as an
 Amiga measurement: the Mac's 1-bit 512×342 display and the Amiga's planar bitmap are different
@@ -37,6 +38,33 @@ slow end-to-end skeleton on real hardware *before* committing to an approach. Ro
 "50 FPS is impossible without an algorithm change" was disproven by hand-asm — the ceiling was GCC,
 not the algorithm. That cuts both ways: don't declare it impossible from reasoning, and don't
 declare it reached from optimism.
+
+## Vette measurements
+
+### 2026-09-21 — first full-accounting moving-driving profile
+
+`make driving-profile` starts its counters immediately after the first completed driving update and
+freezes them after 300 PAL fields. It has no debugger stop inside the window. The timer combines the
+VBI field epoch with VPOSR/VHPOSR at 1/256-scanline resolution; the empty bracket runs at the same
+rate as trap classification.
+
+On the target A1200 configuration, the six-second window contained ten presentation calls and eleven
+published-frame boundaries. The exclusive shares were:
+
+| Phase | Beam ticks | Share | Approx. ms per presentation call |
+|---|---:|---:|---:|
+| Resident game and callbacks | 3,269,061 | 13.603% | 81.7 |
+| Drawing traps | 1,362,931 | 5.671% | 34.1 |
+| Resource traps | 33,724 | 0.140% | 0.8 |
+| Audio shim | 0 | 0.000% | 0.0 |
+| Other compatibility work | 55,892 | 0.233% | 1.4 |
+| C2P, back-buffer synchronization and palette | 19,310,267 | 80.353% | 482.8 |
+| Display back-pressure | 0 | 0.000% | 0.0 |
+| **Accounting** | **24,031,875** | **100.000%** | **600.8** |
+
+The nested VBI diagnostic is 0.322%; the empty-bracket control is 0.035%. The first optimization
+target is therefore the presentation path, not resident road logic or PICT decoding. These are
+probe-build attribution numbers, not shipping-build framerate numbers.
 
 ## Lessons — measurement
 

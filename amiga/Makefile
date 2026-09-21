@@ -310,7 +310,10 @@ ifdef PROBES
 PROBE_SYMS += g_probePicture140TrapPC g_probePicture140Return \
               g_probePicture140Ticks g_probePicture140Frames g_probeIntroGeometry \
               g_probeStaticCollision g_probeLakeCollision \
-              g_macExitState g_macHostReturnSP
+              g_macExitState g_macHostReturnSP \
+              g_profileState g_profileGeneration g_profileStartEpoch g_profileStopEpoch \
+              g_profileStartField g_profileStopField g_profileStartFrames g_profileStopFrames \
+              g_profileTicks g_profileCalls
 endif
 ifdef FPSCOUNT
 PROBE_SYMS +=

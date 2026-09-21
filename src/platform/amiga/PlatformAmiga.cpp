@@ -23,6 +23,7 @@
 #include "PlatformAmiga.h"
 #include "MacInput.h"
 #include "VetteScreen.h"
+#include "PerfProbe.h"
 #include "mac/MacLoader.h"
 
 extern struct GfxBase* GfxBase;         // opened below; the global lives in GCCRuntime.cpp
@@ -86,6 +87,14 @@ static uint32_t vbiHandler()
     // to do it and we replaced it.  Miss it and level 3 re-triggers forever.
     *intreqPointer = (uint16_t)INTF_VERTB;
 
+    // Advance the monotonic profiling epoch before opening the VBI bracket.  A
+    // bracket around this increment appears one whole field long even when the
+    // handler used only a few scanlines.
+    g_vbiCount++;
+#ifdef VETTE_PROBE
+    VetteProfileScope profileVBI(kProfileVBI);
+#endif
+
     // ⭐⭐ THE COPPER BITPLANE POINTERS GO FIRST, before any other ISR work.  "In the VBI
     // ISR" is not "in the vblank": anything behind another 100+ scanlines of handler lands
     // inside the displayed picture, and a torn pointer garbages the whole field.
@@ -97,7 +106,6 @@ static uint32_t vbiHandler()
     // The raw words separate them: a non-interlaced display reads a constant high byte with
     // LOF set, a working interlaced one alternates it, and a bad ADDRESS reads 0xFFFF.
     uint16_t vp = *vposrPointer;
-    g_vbiCount++;
 
     // Macintosh Ticks advances at ~60 Hz; PAL VERTB is 50 Hz.  Four fields add
     // one tick and every fifth adds two, preserving real-time animation speed.
@@ -111,6 +119,7 @@ static uint32_t vbiHandler()
         g_laceFields++;
         if (vp & 0x8000) g_longFields++;   // LOF; see VetteScreen::vbiUpdate()
     }
+    vetteProfileOnVBI();
     return 0;
 }
 

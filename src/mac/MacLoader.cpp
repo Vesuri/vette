@@ -6,6 +6,7 @@
 #include "ResourceArchive.h"
 #include "platform/amiga/VetteScreen.h"
 #include "platform/amiga/MacInput.h"
+#include "platform/amiga/PerfProbe.h"
 #include "platform/amiga/framework/AmigaHardware.h"
 
 extern "C" {
@@ -952,6 +953,9 @@ static void stabilizeIntroAnimation()
 
 static void updateIntroAudio()
 {
+#ifdef VETTE_PROBE
+    VetteProfileScope profileAudio(kProfileAudio);
+#endif
     if (!s_currentA5) return;
 
     // Follow the original intro's own one-shot flags.  The Mac code sets each
@@ -4808,6 +4812,12 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
 {
     uint32_t pc = read32(frame + 2);
     uint16_t trap = read16((const uint8_t*)pc);
+#ifdef VETTE_PROBE
+    // Empty same-rate bracket: its total bounds the profiler's per-dispatch
+    // observer cost and catches a timer whose apparent resolution is fiction.
+    { VetteProfileScope profileControl(kProfileControl); }
+    VetteProfileScope profileTrap(vetteProfileTrapCategory(trap));
+#endif
 #ifdef VETTE_MOUSE_CONTROL_PROBE
     selectMouseSteeringForProbe();
 #endif
@@ -4905,6 +4915,10 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
     // and convert only at the proven loop boundary above.  Other scenes keep
     // the ordinary trap-return presentation cadence.
     if (!s_drivingFrameStarted || drivingFrameComplete) presentMacRuntime();
+    // Begin only after a complete driving iteration has been handed to the
+    // display.  This excludes selectors and first-frame construction and puts
+    // the fixed-field window on the representative moving workload.
+    if (drivingFrameComplete) vetteProfileStart();
     if (drivingBoundary) {
         if (exitChordPressed()) requestExitAfterTrap(frame);
         return 1;

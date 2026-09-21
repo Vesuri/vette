@@ -1295,6 +1295,14 @@ physics position `($8C00,$13C00)`, cell `(17,39)`, local `(1024,1024)`, heading 
 tick 1,960. That cell is the shipped QUAD 136 / selector 106 descriptor. The read-only observer is
 `amiga/driving_main_return.gdb`; ordinary builds do not define `MAIN_START`.
 
+The first no-stop phase profiler now brackets a fixed 300-field moving-driving window entirely in
+the target program. On the target A1200 it accounts for exactly 100% of 24,031,875 beam ticks: C2P,
+back-buffer synchronization and palette publication consume 80.353%; resident game/callback work
+13.603%; drawing traps 5.671%; and all remaining exclusive categories below 0.4% together. The
+nested VBI diagnostic is 0.322% and the same-rate empty bracket only 0.035%, so presentation—not
+road logic or PICT decoding—is the first measured optimization target. The reproducible entry point
+is `make driving-profile`; detailed numbers and measurement rules are in `docs/perf-method.md`.
+
 The 26-record sightseeing table used by `Main+$3456` was also decoded as a possible source-native
 shortcut. Record 4 is cell `(6,26)`, only six cells from the export-221 transition at `(6,32)`, but
 the documented T command is conditional on Tour Mode. Five ordinary T down/up scans during the

@@ -28,12 +28,14 @@ is consequently renumbered.
 1. **Build the representative driving differential.** Compare synchronized original and Amiga
    sequences for geometry, object placement, palettes, surface heights, clipping, mirrors, traffic,
    animation, and the principal view modes—not merely one exact initial frame.
-2. **Profile the target A1200 workload.** Attribute frame time to game logic, drawing, resource
-   decoding, C2P, audio, and waiting, then establish an evidence-based performance target.
+2. **Establish the performance target.** The full-accounting target-A1200 profile is now in place
+   and identifies presentation as 80.353% of the first moving-driving window. Measure the same
+   synchronized workload on the original Macintosh and set the target from both results.
 3. **Fix measured visual discrepancies.** Trace wrong pixels and geometry to their source data or
    implementation; do not add scene-, car-, or color-specific patches.
-4. **Optimize measured bottlenecks.** Prefer representation and algorithm changes before assembly;
-   verify every optimization against the reference differential and preserve game behavior.
+4. **Optimize measured bottlenecks.** Start with the measured C2P/back-buffer/palette presentation
+   path. Prefer representation and algorithm changes before assembly; verify every optimization
+   against the reference differential and preserve game behavior.
 5. **Finish control fidelity.** Verify keyboard aliases, throttle, brake, steering, gears, mouse
    steering and buttons, pause/options controls, and a reproducible FS-UAE configuration that does
    not capture the keyboard as a joystick.

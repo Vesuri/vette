@@ -12,6 +12,7 @@
 #include "framework/AmigaHardware.h"
 #include "framework/CopperList.h"   /* copperMove() -- the list entries, nothing else */
 #include "VetteScreen.h"
+#include "PerfProbe.h"
 
 extern "C" {
 volatile uint16_t g_macFramesQueued = 0;
@@ -338,7 +339,17 @@ bool VetteScreen::presentMacFrame(const uint8_t* chunky, const uint8_t* colorTab
                                   int16_t dirtyTop, int16_t dirtyLeft,
                                   int16_t dirtyBottom, int16_t dirtyRight)
 {
-    if (!chunky || !colorTable || !m_back || m_framePending) return false;
+    if (!chunky || !colorTable || !m_back) return false;
+    if (m_framePending) {
+#ifdef VETTE_PROBE
+        VetteProfileScope profileWait(kProfileWait);
+#endif
+        return false;
+    }
+
+#ifdef VETTE_PROBE
+    VetteProfileScope profilePresent(kProfilePresent);
+#endif
 
 #ifdef VETTE_FREEWAY_ROUTE
     // The freeway-route build observes original game physics and collision,

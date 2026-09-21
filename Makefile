@@ -8,7 +8,7 @@
 #
 # The Amiga build is in amiga/ and is the real target: `cd amiga && . ./env.sh && make`.
 
-.PHONY: all todo driving-sequence-compare help
+.PHONY: all todo driving-sequence-compare driving-profile help
 
 all: help
 
@@ -17,6 +17,7 @@ help:
 	@echo
 	@echo "  make todo     what is open (docs/open-work.md + a live marker sweep)"
 	@echo "  make driving-sequence-compare  compare saved MAME/Amiga driving frames"
+	@echo "  make driving-profile  build and measure 300 PAL fields of target-A1200 driving"
 	@echo
 	@echo "There is no host build yet — see PROJECT.md 'Open decisions' #6."
 	@echo "The Amiga build:  cd amiga && . ./env.sh && make"
@@ -43,3 +44,11 @@ driving-sequence-compare:
 	@python3 tools/compare_driving_sequence.py \
 		ref/mame/driving-copy-source tmp/driving-copy-source \
 		$(if $(REQUIRE_EXACT),--require-exact,)
+
+# The measurement freezes in target time after 300 PAL fields; 60 seconds is
+# only a host-side safety ceiling for reaching and reading that frozen window.
+driving-profile:
+	@cd amiga && . ./env.sh && $(MAKE) clean && \
+	  $(MAKE) -j4 PROBES=1 PROBEFIELDS=300 SKIP_INTRO=1 GARAGE_CLICK=1 && \
+	  EXTRA_ARGS="--warp_mode=1" GDBSCRIPT=driving_phase_profile.gdb \
+	  ./diag_run.sh 60

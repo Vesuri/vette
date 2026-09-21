@@ -116,7 +116,9 @@ The phase with no counterpart in either prior port at this size. **Exit criteria
 
 - [x] The game reaches its first real frame on the Amiga. The original resident code now repeatedly
       presents complete moving driving frames on the target A1200 configuration.
-- [ ] A phase-share profile with its accounting check printing ~100% every run.
+- [x] A phase-share profile with its accounting check printing ~100% every run. The first target-
+      A1200 moving-driving window accounts exactly 100%; presentation is 80.353% and the same-rate
+      empty bracket is 0.035% (`docs/perf-method.md`).
 - [ ] **Only then**: a performance target, argued from that profile and from the original's own
       framerate under the reference loop.
 
