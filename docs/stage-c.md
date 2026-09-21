@@ -1086,6 +1086,15 @@ would be Paula period 554 for a direct context, while context 0 correctly uses t
 base before applying the phase step. Instruments with zero loop bounds naturally repeat their complete
 body until the original Bogas Load duration expires.
 
+`amiga/bogas_lifecycle.gdb` now covers the administrative wrappers separately. An ordinary,
+unskipped intro reaches `BogasClose` and `BogasPurge(300)` together at tick 90 during initialization,
+then `BogasStart` followed by `BogasSet` at tick 3,630 on the transition out of the intro. No Stop,
+Deactivate, or Dispose occurs before the tick-4,000 / 325-frame ceiling. This keeps those operations
+out of the hot gameplay implementation until a real pause/exit caller establishes the intended
+transition. Their wrapper stack contracts are present and the current conservative Paula behavior
+silences active voices, but resume/preserve semantics remain explicitly unverified rather than
+being inferred from the English names.
+
 The corrected route reaches the Lake Merced water collision and displays the game's own tow-truck
 recovery artwork. A probe on the actual `_GetPicture` trap records PICT 140 at the resident wrapper
 `Traffic+$663C`; that wrapper's saved return identifies the dynamic request at `Main+$0FD6`, with

@@ -114,7 +114,8 @@ is consequently renumbered.
    beep1, beep2, and crash now reach Paula from those calls. Shipped BGAS code confirms the Load
    countdown and context-0 16.16 mixer-step semantics; INST loop points are programmed into Paula's
    reload registers and direct effects use their declared source rates. Next compare the result to
-   reference audio, verify Stop/Purge transitions, then
+   reference audio, then drive real pause/exit paths to establish Stop/Deactivate/Dispose behavior
+   (the ordinary intro calls Close/Purge during initialization and Start/Set at its exit), then
    cover gear changes, collisions, skids, horns, police, environment, and result audio, including
    concurrent playback and transitions.
 6. **Automate fidelity regressions.** Keep intro and driving framebuffer differentials, palette
