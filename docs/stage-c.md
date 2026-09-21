@@ -1039,6 +1039,15 @@ epilogues leave long results in the caller's reserved result slot where applicab
 boundary the Paula implementation will replace. Instrument ordinals still need to be joined to
 the original named-resource initialization order before effect names are assigned.
 
+The same trace reads the Pascal names passed by Initialize to all sixteen `BogasKill` calls. The
+returned ordinals are therefore fully source-mapped: 0 `opening song`, 1 `mic`, 2 `signature`,
+3 `cable car bell`, 4 `engine`, 5 `heli`, 6 `horn`, 7 `skid`, 8 `crash`, 9 `kill`, 10 `beep1`,
+11 `beep2`, 12 `police`, 13 `thud`, 14 `joel`, and 15 `splash`. The first bounded driving effects
+are consequently `beep1`, `beep2`, and `crash`. No visual state, vehicle identity, or guessed
+color/sample association is involved. In that same run there were 68 engine `BogasPlay` calls and
+no nonzero-context `BogasPlay` calls: the context-2 effects begin at `BogasLoad`, while the engine's
+repeated context-0 `BogasPlay` updates its running pitch.
+
 The corrected route reaches the Lake Merced water collision and displays the game's own tow-truck
 recovery artwork. A probe on the actual `_GetPicture` trap records PICT 140 at the resident wrapper
 `Traffic+$663C`; that wrapper's saved return identifies the dynamic request at `Main+$0FD6`, with

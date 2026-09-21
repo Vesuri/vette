@@ -7,6 +7,7 @@ set confirm off
 set $opens = 0
 set $loads = 0
 set $plays = 0
+set $enginePlays = 0
 set $pitches = 0
 set $stops = 0
 set $kills = 0
@@ -29,11 +30,19 @@ commands 2
   continue
 end
 
-break *(s_segments[9].begin+0x174) if s_drivingFrameStarted && $plays < 12
+break *(s_segments[9].begin+0x174) if s_drivingFrameStarted
 commands 3
   silent
   set $plays = $plays+1
-  printf "BogasPlay %u: tick=%u caller=$%x long0=$%x word0=$%x\n", $plays, g_macTicks, *(unsigned int*)$sp, *(unsigned int*)($sp+4), *(unsigned short*)($sp+8)
+  set $playContext = *(unsigned short*)($sp+8)
+  if $playContext != 0
+    printf "BogasPlay effect %u: tick=%u caller=$%x long0=$%x word0=$%x\n", $plays, g_macTicks, *(unsigned int*)$sp, *(unsigned int*)($sp+4), $playContext
+  else
+    if $enginePlays < 12
+      set $enginePlays = $enginePlays+1
+      printf "BogasPlay engine %u: tick=%u caller=$%x long0=$%x word0=$%x\n", $enginePlays, g_macTicks, *(unsigned int*)$sp, *(unsigned int*)($sp+4), $playContext
+    end
+  end
   continue
 end
 
@@ -57,7 +66,9 @@ break *(s_segments[9].begin+0x0ee)
 commands 6
   silent
   set $kills = $kills+1
-  printf "BogasKill %u: tick=%u caller=$%x word0=$%x long0=$%x\n", $kills, g_macTicks, *(unsigned int*)$sp, *(unsigned short*)($sp+4), *(unsigned int*)($sp+6)
+  set $killName = *(unsigned int*)($sp+6)
+  printf "BogasKill %u: tick=%u caller=$%x word0=$%x long0=$%x name-length=%u\n", $kills, g_macTicks, *(unsigned int*)$sp, *(unsigned short*)($sp+4), $killName, *(unsigned char*)$killName
+  x/20bx $killName
   continue
 end
 

@@ -106,9 +106,10 @@ is consequently renumbered.
    beginning with the engine context: live driving calls `BogasPlay` from `Traffic+$3762` about
    once per completed frame, with its long argument following RPM from 27,000 upward while the word
    argument remains zero. Initialization opens contexts 0, 1, and 2; the engine is loaded into
-   context 0, while bounded driving loads effects into context 2. Resolve instrument ordinals
-   through the original named-resource initialization order and preserve the source wrapper's
-   Pascal arguments/results rather than adding scene-specific triggers,
+   context 0, while bounded driving loads effects into context 2. The original sixteen-name
+   initialization now resolves the complete ordinal table; the first observed effects are beep1,
+   beep2, and crash, and they begin on `BogasLoad` rather than a later `BogasPlay`. Preserve the
+   source wrapper's Pascal arguments/results rather than adding scene-specific triggers,
    then verify engine pitch/load, gear changes, collisions, skids, horns, police, environment, and
    result audio, including concurrent playback and transitions.
 6. **Automate fidelity regressions.** Keep intro and driving framebuffer differentials, palette
