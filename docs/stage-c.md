@@ -1407,15 +1407,22 @@ run in queue order, and a task rearmed to one tick may correctly run again in th
 Callbacks remain user-mode and are still delivered one at a time at safe trap boundaries.
 
 The corrected moving capture reaches 40 distinct states and three naturally identical complete
-player tuples. The later of those differs by only 13 pixels, but all three still have different
-active traffic objects. The initial roster is therefore already divergent before the moving VBL
+player tuples. The later of those differs by only 13 pixels, but all three originally had different
+active traffic objects. The initial roster was therefore already divergent before the moving VBL
 loop, rather than being caused solely by its former 50/60 Hz callback loss. The pre-driving trace
-then exposed the system/QuickDraw seed ownership error above. With that fixed, both machines make
-one setup `Random` call and three traffic calls before their first driving frame, but begin from
-different volatile system-seed values because their harness routes and elapsed setup time differ.
-The remaining differential therefore needs a shared diagnostic entropy input and equivalent
-traffic phase, not rendering changes or a vehicle-specific colour/traffic hack. The stationary
-RPM-11 checkpoint remains pixel-exact after the scheduler change.
+then exposed the system/QuickDraw seed ownership error above. It also showed why merely sharing the
+application's initial seed was insufficient: MAME consumes three values while the selector model
+rotates, whereas the accelerated Amiga click harness deliberately skips those animation frames.
+
+The motion differential now applies the same `$3BD90000` seed at the first road-setup `Random`
+call on both machines. This is a diagnostic-only input fixture selected by the original route
+state (`stage == driving` in MAME, final ACCEPT phase on Amiga); normal builds remain clock-seeded.
+Both first captured active lists are consequently `VETT`, `OPPO`, `TAXI`. Their records have
+already advanced by different amounts because completed frames occur about every seven Macintosh
+ticks and every thirteen Amiga ticks, and the regenerated sequences contain no identical complete
+player tuple by chance. The next gate must therefore establish an equivalent simulation-phase
+checkpoint independently of presentation cadence. The stationary RPM-11 checkpoint remains
+pixel-exact after the scheduler change.
 
 One input discrepancy was then removed at its source boundary. The Macintosh harness already holds
 keypad 8 before pulsing top-row `+`, but the Amiga harness had waited until the car record showed
@@ -1428,19 +1435,15 @@ composition surface lie at `(394,298)-(490,341)`, in the time-dependent lower-ri
 This proves moving 3D scene fidelity at a real shared state without transplanting game state or
 patching renderer data; dashboard phase and additional traffic/view coverage remain open.
 
-The capture now saves the current 200-byte car record and every 200-byte record in Traffic's active
+The capture saves the current 200-byte car record and every 200-byte record in Traffic's active
 object list. That list is source-derived: Traffic+$2006 appends one record pointer through
-A5-$367C and increments the count at A5-$3696. At the shared state above, the Macintosh count is
-three (`VETT`, `OPPO`, `TAXI`) and the Amiga count is four (`VETT`, `OPPO`, `AMBU`, `LOVE`). The
-player records agree in all renderer-visible state; their only non-pointer difference is the
-fixed-point division remainder at car+$50. The extra traffic is outside the exact forward viewport
-but appears in the lower dashboard/rear presentation, accounting for the residual pixels. This
-remains an original traffic-phase mismatch rather than a port drawing defect, but the corrected
-60 Hz target scheduler proves that its root precedes the moving driving loop. `make
-driving-motion-reference` now regenerates the Macintosh side with
-the exact checked command, alongside `driving-motion-capture` and `driving-motion-compare` for the
-Amiga side and report. The report prints each paired active-object tag, position, speed, and heading,
-and refuses an exact gate when those original inputs differ.
+A5-$367C and increments the count at A5-$3696. Before the road-seed fixture, a naturally shared
+player state had three Macintosh objects (`VETT`, `OPPO`, `TAXI`) but four Amiga objects (`VETT`,
+`OPPO`, `AMBU`, `LOVE`), which explained the lower-dashboard delta. The synchronized road seed now
+proves that the two original Traffic initializers select the same three-object roster. `make
+driving-motion-reference` and `driving-motion-capture` supply that fixture only to their diagnostic
+builds; `driving-motion-compare` still keys completed frames by full player state and correctly
+refuses to compare the new sequences until an equivalent phase checkpoint exists.
 
 The 26-record sightseeing table used by `Main+$3456` was also decoded as a possible source-native
 shortcut. Record 4 is cell `(6,26)`, only six cells from the export-221 transition at `(6,32)`, but

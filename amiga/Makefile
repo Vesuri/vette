@@ -137,6 +137,12 @@ ifdef PROBES
 EXTRA_DEFINES += -DVETTE_PROBE
 endif
 
+# Differential fixture only: replace the application QuickDraw randSeed at
+# the first Random trap.  Ordinary builds retain Vette's clock-seeded value.
+ifdef FIDELITY_RANDOM_SEED
+EXTRA_DEFINES += -DVETTE_FIDELITY_RANDOM_SEED=$(FIDELITY_RANDOM_SEED)
+endif
+
 # Diagnostic only: report one Amiga raw key as held without consuming or
 # fabricating an EventRecord.  Normal and playable builds leave this undefined.
 ifdef INPUT_PROBE_RAW_KEY

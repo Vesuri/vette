@@ -27,6 +27,10 @@ local driving_motion = os.getenv("VETTE_DRIVING_MOTION") == "1"
 local driving_capture_limit = driving_motion and 40 or 4
 local trace_random = os.getenv("VETTE_RANDOM_TRACE") == "1"
 local random_calls = 0
+local random_seed_text = os.getenv("VETTE_FIDELITY_RANDOM_SEED")
+local fidelity_random_seed = random_seed_text and
+	tonumber(random_seed_text:gsub("^0[xX]", ""), 16) or nil
+local fidelity_random_seed_pending = fidelity_random_seed ~= nil
 local driving_capture_stem = driving_motion and "driving-motion-source" or "driving-copy-source"
 local driving_manifest_path = driving_motion and
 	"ref/mame/driving-motion-sequence.tsv" or "ref/mame/driving-sequence.tsv"
@@ -371,12 +375,18 @@ local function on_trap()
 	local pc = u32(sp + 2)
 	local trap = u16(pc)
 	local pb = a24(sp + 8)                     -- 68020 exception frame is eight bytes
-	if trace_random and trap == 0xA861 then
-		random_calls = random_calls + 1
+	if trap == 0xA861 then
 		local a5 = a24(cpu.state["A5"].value)
-		print(string.format("VP RANDOM #%u frame=%u ticks=%u stage=%s pc=%06X systemSeed=%08X qdSeed=%08X",
-			random_calls, mac.frames(), u32(0x016A), stage, a24(pc), u32(0x0156),
-			a5 ~= 0 and u32(a5 - 23034) or 0))
+		if fidelity_random_seed_pending and stage == "driving" and a5 ~= 0 then
+			prog:write_u32(a24(a5 - 23034), fidelity_random_seed)
+			fidelity_random_seed_pending = false
+		end
+		if trace_random then
+			random_calls = random_calls + 1
+			print(string.format("VP RANDOM #%u frame=%u ticks=%u stage=%s pc=%06X systemSeed=%08X qdSeed=%08X",
+				random_calls, mac.frames(), u32(0x016A), stage, a24(pc), u32(0x0156),
+				a5 ~= 0 and u32(a5 - 23034) or 0))
+		end
 	end
 	if pending_selector_pixmap ~= 0 and trap == 0xA9BC then
 		local pixmap = pending_selector_pixmap

@@ -145,6 +145,12 @@ static uint8_t* s_qdThePort;
 #ifdef VETTE_PROBE
 static volatile uint32_t s_randomTrapPC;
 #endif
+#ifdef VETTE_FIDELITY_RANDOM_SEED
+static bool s_fidelityRandomSeedPending = true;
+#ifndef VETTE_GARAGE_CLICK
+#error VETTE_FIDELITY_RANDOM_SEED requires the deterministic GARAGE_CLICK route
+#endif
+#endif
 static uint8_t* s_currentA5;
 static uint16_t s_currentResourceFork = 0;  // application resource file at process launch
 static bool s_mouseInitialized;
@@ -2984,6 +2990,16 @@ static int16_t quickDrawRandom()
 {
     if (!s_qdThePort) return 0;
     uint8_t* randSeed = s_qdThePort - 126;
+#ifdef VETTE_FIDELITY_RANDOM_SEED
+    // The Macintosh oracle consumes three values while its selector model
+    // rotates; the accelerated Amiga harness deliberately skips those frames.
+    // Synchronize at the first road-setup call, after the final ACCEPT event,
+    // so this fixture controls traffic without changing either UI route.
+    if (s_fidelityRandomSeedPending && s_garageClickPhase >= kGarageDrivingPhase) {
+        write32(randSeed, (uint32_t)VETTE_FIDELITY_RANDOM_SEED);
+        s_fidelityRandomSeedPending = false;
+    }
+#endif
     uint32_t seed = read32(randSeed);
     uint16_t low = (uint16_t)seed;
     uint16_t high = (uint16_t)(seed >> 16);

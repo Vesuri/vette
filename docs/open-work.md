@@ -30,24 +30,19 @@ is consequently renumbered.
    animation, and the principal view modes—not merely one exact initial frame. State-keyed capture
    now proves two shared stationary-render states (RPM 11 and 23) exact across 350,208 active pixels.
    The moving harness reaches gear 1 through the original shift scanner and captures 37 Macintosh
-   and 40 Amiga source frames at the same full-window CopyBits boundary. The key includes both
-   rendered and physics position, and both harnesses now present accelerator with the upshift at
-   the same original `GetKeys` boundary. They share a complete moving-player state whose entire
-   512x198 exterior viewport is exact; only 46 pixels differ, all below it in the time-dependent
-   lower-right dashboard. Active-list capture explains those pixels: the Macintosh has `VETT`,
-   `OPPO`, `TAXI`, while the Amiga has `VETT`, `OPPO`, `AMBU`, `LOVE`; the latter two are offscreen
-   in the forward view but contribute to the rear/dashboard presentation. Earlier paired A5 dumps
-   likewise proved that a larger dashboard delta came from different original Traffic signal
-   flags, not drawing or palette code. The target now dispatches a distinct Vertical Retrace
+   and 40 Amiga source frames at the same full-window CopyBits boundary. Earlier naturally shared
+   states proved the 512x198 exterior viewport exact and traced residual dashboard pixels to
+   different original Traffic state. The target now dispatches a distinct Vertical Retrace
    Manager pass for every 60 Hz Macintosh tick, including both virtual ticks on every fifth PAL
-   field; the roster mismatch survives that correction and therefore begins before the moving
-   driving loop. The pre-driving trace found and fixed a genuine boundary error: QuickDraw
-   `Random` had advanced the redirected Page-0 system `RndSeed`, rather than the application
-   `randSeed` at `thePort-126` that Vette seeds and QuickDraw owns. Both machines now show the same
-   one setup plus three traffic calls, but their volatile initial seed and elapsed selector route
-   still differ. Give the differential harnesses the same diagnostic entropy input and equivalent
-   traffic phase, then extend the same state-keyed checkpoint to alternate views before making the
-   complete moving frame an exact gate.
+   field. The pre-driving trace then found and fixed a genuine boundary error: QuickDraw `Random`
+   had advanced the redirected Page-0 system `RndSeed`, rather than the application `randSeed` at
+   `thePort-126` that Vette seeds and QuickDraw owns. A diagnostic-only `$3BD90000` fixture now
+   synchronizes the first road-setup call after MAME's three selector-animation calls, which the
+   accelerated Amiga harness intentionally skips. Both first captures consequently contain the
+   same `VETT`, `OPPO`, `TAXI` roster. Completed-frame cadence is about seven Mac ticks versus
+   thirteen Amiga ticks, so the regenerated sequences have no identical complete player tuple.
+   Establish a simulation-phase checkpoint independent of presentation cadence, compare its
+   completed raster and full object records, then extend that gate to alternate views.
 2. **Establish the performance target.** The full-accounting target-A1200 profile is now in place
    and identified presentation as 80.353% of the first moving-driving baseline. After removing a
    fully overwritten synchronization copy, adding the packed word-write C2P kernel, and deriving a

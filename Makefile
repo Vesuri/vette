@@ -59,6 +59,7 @@ driving-sequence-compare:
 
 driving-motion-reference:
 	@timeout -k 5 300 env SDL_VIDEODRIVER=dummy VETTE_DRIVING_MOTION=1 \
+		VETTE_FIDELITY_RANDOM_SEED=3BD90000 \
 		mame mac2fdhd -rompath ref/mame/roms -nb9 mdc48 \
 		-ramsize 8M -hard ref/mame/hd/608_2GB_drive.hd \
 		-video none -sound none -window -skip_gameinfo -nothrottle \
@@ -69,7 +70,7 @@ driving-motion-reference:
 driving-motion-capture:
 	@rm -f tmp/driving-motion-sequence.tsv tmp/driving-motion-source-*.raw tmp/driving-motion-globals-*.bin tmp/driving-motion-car-*.bin tmp/driving-motion-object-*.bin
 	@cd amiga && . ./env.sh && $(MAKE) clean && \
-	  $(MAKE) -j4 SKIP_INTRO=1 GARAGE_CLICK=1 && \
+	  $(MAKE) -j4 SKIP_INTRO=1 GARAGE_CLICK=1 FIDELITY_RANDOM_SEED=0x3BD90000 && \
 	  GDBTAIL=160 EXTRA_ARGS="--warp_mode=1" GDBSCRIPT=driving_motion_sequence.gdb \
 	  ./diag_run.sh 150
 
