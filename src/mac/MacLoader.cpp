@@ -393,7 +393,7 @@ struct BogasContext {
 };
 static BogasContext s_bogasContexts[3];
 static bool s_bogasStarted;
-static uint16_t s_bogasMixLevel = 300;
+static volatile uint16_t s_bogasMixLevel = 300;
 
 struct GWorldSlot {
     uint8_t port[108];
@@ -1067,16 +1067,6 @@ static void playIntroSample(uint16_t sampleIndex, uint16_t channel, uint16_t vol
     *dmaconPointer = (uint16_t)(DMAF_SETCLR | DMAF_MASTER | dma);
 }
 
-static uint16_t bogasPaulaVolume()
-{
-    // BGAS builds its mix table with floor(level / 3) / 128 gain for each
-    // of three inputs. Paula's 0..64 volume scale represents the same gain
-    // at half that integer coefficient. Vette initializes level to 300.
-    uint16_t coefficient = (uint16_t)(s_bogasMixLevel / 3);
-    if (coefficient >= 128) return 64;
-    return (uint16_t)((coefficient + 1) / 2);
-}
-
 static void stopIntroChannel(uint16_t channel)
 {
     uint16_t dma = (uint16_t)(DMAF_AUD0 << channel);
@@ -1148,26 +1138,25 @@ static void updateIntroAudio()
     // immediately after its BogasLoad call, so animation and sound remain tied
     // to the same state transitions even when drawing falls behind real time.
     if (!s_introSoundStarted[0] && read16(s_currentA5 - 0x5a)) {
-        uint16_t volume = bogasPaulaVolume();
-        playIntroSample(0, 0, volume);
-        playIntroSample(0, 1, volume);        // centred music
+        playIntroSample(0, 0, 64);
+        playIntroSample(0, 1, 64);            // centred music
         s_introSoundStarted[0] = true;
         g_introAudioBytes = s_introSamples[0].size;
         g_introAudioPeriod = 319;
         if (g_introAudioState != 3) g_introAudioState = 1;
     }
     if (!s_introSoundStarted[1] && read16(s_currentA5 - 0x58)) {
-        playIntroSample(1, 2, bogasPaulaVolume());
+        playIntroSample(1, 2, 64);
         s_introEffectEndTick[0] = g_macTicks + 54;
         s_introSoundStarted[1] = true;
     }
     if (!s_introSoundStarted[2] && read16(s_currentA5 - 0x56)) {
-        playIntroSample(2, 2, bogasPaulaVolume()); // engine loops until the logo sting
+        playIntroSample(2, 2, 64);            // engine loops until the logo sting
         s_introEffectEndTick[0] = 0;
         s_introSoundStarted[2] = true;
     }
     if (!s_introSoundStarted[3] && read16(s_currentA5 - 0x52)) {
-        playIntroSample(3, 3, bogasPaulaVolume());
+        playIntroSample(3, 3, 64);
         s_introEffectEndTick[1] = g_macTicks + 241;
         s_introSoundStarted[3] = true;
     }
@@ -1178,9 +1167,8 @@ static void updateIntroAudio()
         stopIntroChannel(0);
         stopIntroChannel(1);
         stopIntroChannel(2);
-        uint16_t volume = bogasPaulaVolume();
-        playIntroSample(4, 0, volume);
-        playIntroSample(4, 1, volume);
+        playIntroSample(4, 0, 64);
+        playIntroSample(4, 1, 64);
         s_introMusicEndTick = g_macTicks + 243;
         s_introEffectEndTick[0] = 0;
         s_introSoundStarted[4] = true;
@@ -1401,7 +1389,6 @@ static uint16_t bogasPeriod(uint16_t basePeriod, uint32_t pitch)
 }
 
 static uint32_t s_bogasVoiceEndTick[4];
-static uint16_t s_bogasEffectContext = 0xffff;
 
 static void stopBogasAudio()
 {
@@ -1412,7 +1399,6 @@ static void stopBogasAudio()
         s_bogasPendingLoopWords[channel] = 0;
     }
     for (uint16_t i = 0; i < 3; ++i) s_bogasContexts[i].playing = false;
-    s_bogasEffectContext = 0xffff;
     s_bogasStarted = false;
 }
 
@@ -1427,15 +1413,14 @@ static void serviceBogasAudio()
         s_bogasPendingLoopData[channel] = 0;
         s_bogasPendingLoopWords[channel] = 0;
     }
-    if (s_bogasVoiceEndTick[2]
-        && (int32_t)(g_macTicks - s_bogasVoiceEndTick[2]) >= 0) {
-        stopBogasVoice(2);
-        stopBogasVoice(3);
-        s_bogasVoiceEndTick[2] = 0;
-        s_bogasVoiceEndTick[3] = 0;
-        if (s_bogasEffectContext < 3)
-            s_bogasContexts[s_bogasEffectContext].playing = false;
-        s_bogasEffectContext = 0xffff;
+    for (uint16_t contextIndex = 1; contextIndex < 3; ++contextIndex) {
+        BogasContext& context = s_bogasContexts[contextIndex];
+        uint16_t channel = contextIndex == 1 ? 3 : 2;
+        if (!s_bogasVoiceEndTick[channel]
+            || (int32_t)(g_macTicks - s_bogasVoiceEndTick[channel]) < 0) continue;
+        stopBogasVoice(channel);
+        s_bogasVoiceEndTick[channel] = 0;
+        context.playing = false;
     }
 }
 
@@ -1463,30 +1448,21 @@ static void bogasLoad(uint16_t contextIndex, uint32_t duration,
         // the source by the Load/Play 16.16 step. The INST header rate belongs
         // to the direct effect contexts, not to this software-mixer clock.
         uint16_t period = bogasPeriod(319, options);
-        uint16_t volume = bogasPaulaVolume();
-        startBogasVoice(instrument, 0, period, volume);
-        startBogasVoice(instrument, 1, period, volume);
+        startBogasVoice(instrument, 0, period, 64);
+        startBogasVoice(instrument, 1, period, 64);
         return;
     }
 
-    // BGAS owns three fixed inputs, mixes them to one mono byte, then writes
-    // that same byte to both Macintosh output channels. Driving has so far
-    // used context 0 for the engine and context 2 for every direct effect.
-    // Preserve that fixed-voice replacement and centering with Paula pairs:
-    // AUD0/1 for context 0, AUD2/3 for the active direct-effect context.
-    if (s_bogasEffectContext < 3)
-        s_bogasContexts[s_bogasEffectContext].playing = false;
-    s_bogasEffectContext = contextIndex;
-    context.channel = 2;
+    // Preserve all three fixed Bogas inputs in Paula hardware without a
+    // software mixer. Context 0 consumes AUD0/1 for a centred engine;
+    // contexts 1 and 2 use the remaining left/right voices independently.
+    uint16_t channel = contextIndex == 1 ? 3 : 2;
+    context.channel = channel;
     context.playing = true;
     BogasInstrument* sample = bogasInstrument(instrument);
     uint16_t period = sample ? sample->basePeriod : 319;
-    uint16_t volume = bogasPaulaVolume();
-    startBogasVoice(instrument, 2, period, volume);
-    startBogasVoice(instrument, 3, period, volume);
-    uint32_t endTick = duration == 0x7fffffffUL ? 0 : g_macTicks + duration;
-    s_bogasVoiceEndTick[2] = endTick;
-    s_bogasVoiceEndTick[3] = endTick;
+    startBogasVoice(instrument, channel, period, 64);
+    s_bogasVoiceEndTick[channel] = duration == 0x7fffffffUL ? 0 : g_macTicks + duration;
 }
 
 static void bogasPlay(uint32_t pitch, uint16_t contextIndex)
@@ -1500,8 +1476,8 @@ static void bogasPlay(uint32_t pitch, uint16_t contextIndex)
         *(volatile uint16_t*)0xdff0a6 = period;
         *(volatile uint16_t*)0xdff0b6 = period;
     } else {
-        *(volatile uint16_t*)0xdff0c6 = period;
-        *(volatile uint16_t*)0xdff0d6 = period;
+        volatile uint8_t* audio = (volatile uint8_t*)(0xdff0a0UL + context.channel * 16);
+        *(volatile uint16_t*)(audio + 6) = period;
     }
 }
 
@@ -5380,7 +5356,7 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
         uint16_t context = read16(userStack + 4);
         if (context < 3) {
             s_bogasContexts[context].open = true;
-            s_bogasContexts[context].channel = context;
+            s_bogasContexts[context].channel = context == 0 ? 0 : (context == 1 ? 3 : 2);
         }
         return returnFromBogasTrap(frame, userStack, 2);
     }
@@ -5405,16 +5381,11 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
         return returnFromBogasTrap(frame, userStack, 2);
     }
     if (trap == kBogasPurgeTrap && pc == (uint32_t)(sound + 0x1e6)) {
+        // Retain the source level as observable Bogas state. Paula plays the
+        // original signed samples at volume 64: the shipped resources already
+        // carry their intended relative amplitudes, and lower Paula volumes
+        // engage its audibly different resampling path.
         s_bogasMixLevel = read16(userStack + 4);
-        uint16_t volume = bogasPaulaVolume();
-        if (s_bogasStarted && s_bogasContexts[0].playing) {
-            *(volatile uint16_t*)0xdff0a8 = volume;
-            *(volatile uint16_t*)0xdff0b8 = volume;
-        }
-        if (s_bogasStarted && s_bogasEffectContext < 3) {
-            *(volatile uint16_t*)0xdff0c8 = volume;
-            *(volatile uint16_t*)0xdff0d8 = volume;
-        }
         write32(userStack + 6, 0);
         return returnFromBogasTrap(frame, userStack, 2);
     }

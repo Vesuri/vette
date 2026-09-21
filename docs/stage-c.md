@@ -1055,23 +1055,29 @@ name through the Resource Manager and returns the resulting ordinal; `BogasOpen`
 `BogasPlay`, `BogasPitch`, `BogasPurge`, Set/Start/Stop, Close/Dispose, and Deactivate all have their
 measured entry contracts. The indefinitely loaded context 0 starts `Engine` on a centred Paula pair;
 each original context-0 Play changes only its period. Context-2 Load starts beep/crash effects on
-the other centred Paula pair, replacing the previous direct effect in that fixed context.
+AUD2, replacing the previous direct effect in that fixed context; context 1 independently owns
+AUD3. Along with the centred AUD0/1 engine, this preserves all three Bogas inputs simultaneously
+using Paula DMA and deliberately gives incidental effects fixed left/right placement.
 
 Disassembly of BGAS's mixer at resource offset `$1F4A` establishes the channel model rather than
 leaving it to an audible guess. It advances three fixed sample pointers from three phase increments,
 adds their bytes through the driver's mix table, and writes the same result to both output bytes.
-The Paula bridge therefore duplicates each of the two observed live contexts across a left/right
-pair: AUD0/1 for the engine and AUD2/3 for the current direct effect. Its earlier alternating
-AUD2/AUD3 allocation incorrectly made successive effects hard-left and hard-right and allowed a
-kind of overlap the original fixed context cannot represent.
+That explains the Macintosh result, but porting this loop would waste the Amiga's four DMA voices.
+Three independently centred sources would require six Paula channels. The bridge instead keeps the
+important continuous engine centred and assigns the two remaining fixed inputs one hardware voice
+each; no audio sample is mixed by the 68020.
 
 The apparent `BogasPurge(300)` lifecycle call is also audio state, not a disposable administrative
 no-op. BGAS command `$08` passes its word to resource offset `$2738`, which rebuilds the 768-entry
 mix table. For each possible sum it applies `floor(level/3)/128` to the distance from unsigned
 silence at 384, then clamps to one output byte. Vette's level 300 therefore gives every input a
-100/128 gain. Paula volume 50 is the exact hardware-scale equivalent before clipping, so all intro
-and gameplay voices now derive the same level from that call instead of using guessed values 40,
-48, and 64.
+100/128 gain in the original software mixer. The Amiga bridge records the call as Bogas state but
+does not apply that attenuation to Paula. Scanning every header-stripped INST byte proves the game
+already uses the complete signed range: `thud`, `skid`, `crash`, `horn`, `Engine`, `joel`, `heli`,
+`cable car bell`, `police`, and `mic` reach -128, while authored quieter samples retain their own
+headroom (`Opening song` peaks at 104 and `splash` at 81). Volume 64 therefore maps the game's
+absolute maximum directly to Paula's maximum without normalizing individual samples, and avoids
+Paula's lower-volume resampling artifacts.
 
 Short INST resources are parsed structurally as four header words (loop start, loop end, source
 sample rate, PCM byte count). This corrects the earlier zero-loop-only test, which left the Engine

@@ -113,11 +113,13 @@ is consequently renumbered.
    source wrapper's Pascal arguments/results rather than adding scene-specific triggers. Engine,
    beep1, beep2, and crash now reach Paula from those calls. Shipped BGAS code confirms the Load
    countdown and context-0 16.16 mixer-step semantics; INST loop points are programmed into Paula's
-   reload registers and direct effects use their declared source rates. The driver also proves its
-   three inputs are fixed voices mixed to identical left/right bytes, so the two observed gameplay
-   contexts now occupy centred Paula pairs and each new context-2 load replaces its predecessor.
-   Command `$08` also proves that Vette's `BogasPurge(300)` builds a mix table with 100/128 gain per
-   input; its exact Paula equivalent is volume 50 and replaces the earlier guessed levels. Next
+   reload registers and direct effects use their declared source rates. The driver proves its three
+   inputs are fixed voices. Paula now preserves all three without software mixing: the engine is
+   centred on AUD0/1 and contexts 1/2 occupy AUD3/AUD2. Each load replaces only its own context.
+   Command `$08` proves that Vette's `BogasPurge(300)` builds the Macintosh software mix table, but
+   an exhaustive INST scan proves ten samples already reach signed full scale. The Amiga bridge
+   therefore maps that absolute maximum directly to Paula volume 64, retaining quieter samples'
+   authored headroom and avoiding Paula's below-64 resampling artifacts. Next
    compare the result to
    reference audio, then drive real pause/exit paths to establish Stop/Deactivate/Dispose behavior
    (the ordinary intro calls Close/Purge during initialization and Start/Set at its exit), then

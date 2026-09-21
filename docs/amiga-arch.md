@@ -268,18 +268,22 @@ the opening. For gameplay, all twelve resident Bogas wrapper entries now route t
 Line-A calls which preserve their Pascal stack/results contract. Initialize's actual named-resource
 calls build the sixteen-entry instrument table. An indefinite context-0 load starts the centred
 engine pair, subsequent context-0 plays apply the game's live 16.16 pitch stream, and context-2
-loads replace the direct-effect context on the remaining centred Paula pair. The shipped driver
+loads replace that fixed effect voice on AUD2. Context 1 independently owns AUD3, preserving all
+three Bogas inputs in hardware; incidental effects accept Paula's fixed left/right placement rather
+than spending six channels that the machine does not have or adding a software mixer. The shipped driver
 advances three fixed inputs, combines them through its mix table, and writes the same mixed byte to
-both Macintosh output channels; alternating effects between hard-left and hard-right was therefore
-not faithful. Short INST headers provide their own
+both Macintosh output channels. Short INST headers provide their own
 PCM length, source rate, and optional loop bounds. Direct effect contexts convert that rate to a
 PAL Paula period. Context 0 instead matches Bogas's fixed 11.127 kHz software-mixer output and uses
 the original 16.16 phase step supplied by Load/Play. The bridge plays the attack once, then changes
 Paula's reload registers to the declared sustain range.
 BGAS command `$08`, reached through the resident `BogasPurge` wrapper with Vette's value 300,
 constructs the driver's 768-byte clipping table with a per-input coefficient of
-`floor(300/3)/128`. Paula volume 50 reproduces that pre-clipping 100/128 gain; the earlier 40, 48,
-and 64 values were approximations rather than properties of the resources or driver.
+`floor(300/3)/128`. The bridge retains that state but does not reproduce the software mixer's
+attenuation. An exhaustive scan of all sixteen signed PCM bodies finds a global peak of -128, with
+ten instruments reaching full scale and the quieter samples retaining their authored headroom.
+They therefore play at Paula volume 64: this maps the game's absolute peak directly to full scale
+and avoids the audible resampling behavior that Paula applies below 64.
 This is still an
 incremental Bogas backend: intro mixing remains on its proven flag-driven path, and Stop/Purge plus
 all later gameplay cues still require scenario verification. → `docs/source-inventory.md` §Audio.
