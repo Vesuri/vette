@@ -1385,6 +1385,13 @@ ratio rises from 1.718 to 1.976, about 13.1% less kernel time. A warmed 100-fiel
 3,685,815 C2P ticks over ten calls (about 368,582 each), 12.2% below the preceding 419,939-per-call
 dirty-list measurement. C2P now accounts for 46.297% of that window.
 
+On the supported A1200 target, the table lookup now uses the 68020's scaled long-index effective
+address rather than a manual shift, base copy, and add. Only `C2P.s` is assembled for 68020; the
+resident Macintosh code and other port assembly retain their broader settings. The verifier covers
+3,243,112 bytes with zero failures and improves the controlled C/assembly ratio from 1.976 to 2.521
+(21.6% less kernel time). A warmed 100-field profile records 3,326,465 C2P ticks over eleven calls,
+about 302,406 each and 18.0% below the preceding version. C2P falls to 41.532% of that window.
+
 The differential now has a real moving checkpoint rather than a neutral car with a held
 accelerator. `VETTE_DRIVING_MOTION=1` makes the Macintosh harness wait for a valid full-window
 CopyBits from Vette, latch the application A5 at that trap boundary, wait for countdown state 3,

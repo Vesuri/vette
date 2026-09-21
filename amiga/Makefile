@@ -287,6 +287,10 @@ CPPFLAGS  = $(CCFLAGS) -fno-rtti -fno-exceptions -fno-use-cxa-atexit -std=gnu++1
             -I"$(REPO)/src/platform" \
             -I"$(CURDIR)"
 ASFLAGS   = -mcpu=68000 -g --register-prefix-optional -I"$(SDKDIR)" -I"$(CURDIR)"
+# The supported package target is an A1200.  Only the measured C2P hot loop
+# uses 68020 scaled indexing; resident Macintosh code and all other port
+# assembly retain the broader 68000 setting.
+obj/C2P.o: ASFLAGS := $(filter-out -mcpu=68000,$(ASFLAGS)) -mcpu=68020
 # vasm (Motorola syntax) for the framework *Assembler.s.  -m68010: the only >68000 instruction in
 # the vendored framework is `movec vbr,d0` in getVBR, which is behaviour-neutral on the A500.
 # ⚠ -no-opt is LOAD-BEARING (it keeps hand-written encodings exactly as written), which means

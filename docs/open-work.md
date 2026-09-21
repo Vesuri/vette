@@ -48,18 +48,21 @@ is consequently renumbered.
    fully overwritten synchronization copy, adding the packed word-write C2P kernel, and deriving a
    dirty list from the driving renderer, a four-pixel/256-KiB fast-RAM lookup now halves the
    kernel's table reads. Its assembly/C verifier covers 2,748,000 bytes with zero failures and the
-   warmed 100-field window averages about 368,582 C2P ticks per update, down 12.2% from the prior
-   419,939 and 33.6% from full-frame conversion's 555,388. C2P is 46.297% of the new window;
-   synchronization is 0.095%, palette 0.262%, and presentation overhead 0.297%.
+   A1200-scaled-index kernel is verified across 3,243,112 bytes with zero failures. The warmed
+   100-field window averages about 302,406 C2P ticks per update, down 18.0% from the prior 368,582,
+   28.0% from the first dirty-list kernel's 419,939, and 45.6% from full-frame conversion's
+   555,388. C2P is 41.532% of the new window; synchronization is 0.109%, palette 0.321%, and
+   presentation overhead 0.315%.
    Measure the same synchronized workload on the original Macintosh and set the target from both
    results.
 3. **Fix measured visual discrepancies.** Trace wrong pixels and geometry to their source data or
    implementation; do not add scene-, car-, or color-specific patches.
 4. **Optimize measured bottlenecks.** Continue with the measured C2P presentation path. The dirty
    list cut conversion per update by about 24.4%; moving its register-bound capture ahead of the
-   general dispatcher removed 432 dispatches, and the four-pixel lookup then cut another 12.2% from
-   C2P per update. Prefer representation and algorithm changes before more assembly; verify every
-   optimization against the reference differential and preserve game behavior.
+   general dispatcher removed 432 dispatches, the four-pixel lookup cut another 12.2% from C2P per
+   update, and A1200 scaled indexing then cut 18.0%. Prefer representation and algorithm changes
+   before more assembly; verify every optimization against the reference differential and preserve
+   game behavior.
 5. **Finish control fidelity.** Verify keyboard aliases, throttle, brake, steering, gears, mouse
    steering and buttons, pause/options controls, and a reproducible FS-UAE configuration that does
    not capture the keyboard as a joystick.

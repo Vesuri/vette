@@ -5,16 +5,10 @@
 	.macro load8 result
 	moveq	#0,d0
 	move.w	(a0)+,d0
-	lsl.l	#2,d0
-	move.l	a2,a3
-	adda.l	d0,a3
-	move.l	(a3),\result
+	move.l	0(a2,d0.l*4),\result
 	moveq	#0,d0
 	move.w	(a0)+,d0
-	lsl.l	#2,d0
-	move.l	a2,a3
-	adda.l	d0,a3
-	move.l	(a3),d4
+	move.l	0(a2,d0.l*4),d4
 	lsr.l	#4,d4
 	or.l	d4,\result
 	.endm
@@ -39,15 +33,17 @@
 | plane bytes. Two lookups and one shift/OR therefore transpose eight pixels,
 | halving the former 8-bit table's lookup traffic. This keeps Vette's native
 | packed-nibble source while extending the wide-write strategy of Mikael
-| Kalms' public-domain c2p1x1_4_c5_word.
+| Kalms' public-domain c2p1x1_4_c5_word. The supported A1200 target uses its
+| 68020 scaled long index here instead of shifting and adding each table
+| address by hand; this is the only 68020-only port assembly.
 vetteC2PSpanAsm:
-	movem.l	d2-d7/a2-a3,-(sp)
-	move.l	36(sp),a0
-	move.l	40(sp),a1
-	move.l	44(sp),a2
+	movem.l	d2-d7/a2,-(sp)
+	move.l	32(sp),a0
+	move.l	36(sp),a1
+	move.l	40(sp),a2
 	| GCC reserves a four-byte argument slot for uint16_t; on big-endian 68k
 	| the value occupies its low word. Dirty spans make it an even number.
-	move.w	50(sp),d3
+	move.w	46(sp),d3
 	beq	9f
 	move.w	d3,d7
 	and.w	#2,d3			| one 16-pixel tail after 32-pixel batches?
@@ -94,5 +90,5 @@ vetteC2PSpanAsm:
 	move.w	d2,64(a1)
 	move.w	d1,(a1)
 9:
-	movem.l	(sp)+,d2-d7/a2-a3
+	movem.l	(sp)+,d2-d7/a2
 	rts

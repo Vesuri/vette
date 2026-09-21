@@ -199,6 +199,21 @@ profile, ten calls use 3,685,815 ticks, or about 368,582 per call, compared with
 window. The ordinary build pays no verifier or probe cost, but does reserve the 256 KiB table in
 the configured 8 MiB fast memory.
 
+### 2026-09-21 — A1200 scaled C2P indexing
+
+The four-pixel table exposed one remaining address-generation cost: the 68000-compatible kernel
+shifted every 16-bit index, copied the table base, and added the offset before each lookup. The
+supported package target is the A1200, so `C2P.s` alone is now assembled for 68020 and uses its
+scaled long-index addressing. All Macintosh code and other port assembly retain their existing
+68000/68010 settings.
+
+The in-process verifier compares 3,243,112 bytes with zero failures. Its C/assembly ratio rises
+from 1.976 to 2.521, which normalizes to 21.6% less kernel time. The warmed 100-field A1200 profile
+records 3,326,465 C2P ticks over eleven calls, about 302,406 per call: 18.0% below the immediately
+preceding 368,582 measurement. C2P is now 41.532% of the window, and twelve completed frames fall
+inside it versus ten in the previous advancing-state run; only the verifier ratio and per-call C2P
+cost are treated as controlled evidence.
+
 ## Lessons — measurement
 
 - **Compare FPS row vectors, never a `total painted` line.** A total spans a partial trailing row

@@ -205,7 +205,8 @@ and the Amiga is planar. `https://github.com/Kalmalyzer/kalms-c2p` is the refere
 `c2p1x1_4_c5_gen(void *chunky in a0, void *bitplanes in a1)` after a `_init(chunkyx, chunkyy,
 scroffsy)`. ⚠ The collection targets **68020-68060**, CPU-only — consistent with the supported
 A1200 package target. There is no separate OCS display fallback; the port's own packed-nibble C2P
-retains 68000-compatible code generation for expanded-machine experiments.
+retains 68000-compatible code generation for expanded-machine experiments except for the measured
+C2P hot loop, whose scaled table index now explicitly targets the supported 68020-class machine.
 
 ⚠⚠ **But its input is ONE BYTE PER PIXEL, low nibble used — not our packed two-per-byte.** `[DERIVED]`
 from the source: `_init` computes `mulu.w d0,d1` (width × height, no halving) and stores that as a
