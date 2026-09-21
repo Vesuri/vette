@@ -1055,7 +1055,15 @@ name through the Resource Manager and returns the resulting ordinal; `BogasOpen`
 `BogasPlay`, `BogasPitch`, `BogasPurge`, Set/Start/Stop, Close/Dispose, and Deactivate all have their
 measured entry contracts. The indefinitely loaded context 0 starts `Engine` on a centred Paula pair;
 each original context-0 Play changes only its period. Context-2 Load starts beep/crash effects on
-alternating Paula voices, so a new effect need not cut off the other one.
+the other centred Paula pair, replacing the previous direct effect in that fixed context.
+
+Disassembly of BGAS's mixer at resource offset `$1F4A` establishes the channel model rather than
+leaving it to an audible guess. It advances three fixed sample pointers from three phase increments,
+adds their bytes through the driver's mix table, and writes the same result to both output bytes.
+The Paula bridge therefore duplicates each of the two observed live contexts across a left/right
+pair: AUD0/1 for the engine and AUD2/3 for the current direct effect. Its earlier alternating
+AUD2/AUD3 allocation incorrectly made successive effects hard-left and hard-right and allowed a
+kind of overlap the original fixed context cannot represent.
 
 Short INST resources are parsed structurally as four header words (loop start, loop end, source
 sample rate, PCM byte count). This corrects the earlier zero-loop-only test, which left the Engine

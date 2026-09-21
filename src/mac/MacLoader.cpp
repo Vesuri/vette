@@ -1388,7 +1388,7 @@ static uint16_t bogasPeriod(uint16_t basePeriod, uint32_t pitch)
 }
 
 static uint32_t s_bogasVoiceEndTick[4];
-static uint16_t s_bogasEffectVoice;
+static uint16_t s_bogasEffectContext = 0xffff;
 
 static void stopBogasAudio()
 {
@@ -1399,6 +1399,7 @@ static void stopBogasAudio()
         s_bogasPendingLoopWords[channel] = 0;
     }
     for (uint16_t i = 0; i < 3; ++i) s_bogasContexts[i].playing = false;
+    s_bogasEffectContext = 0xffff;
     s_bogasStarted = false;
 }
 
@@ -1413,11 +1414,15 @@ static void serviceBogasAudio()
         s_bogasPendingLoopData[channel] = 0;
         s_bogasPendingLoopWords[channel] = 0;
     }
-    for (uint16_t channel = 2; channel < 4; ++channel) {
-        if (!s_bogasVoiceEndTick[channel]
-            || (int32_t)(g_macTicks - s_bogasVoiceEndTick[channel]) < 0) continue;
-        stopBogasVoice(channel);
-        s_bogasVoiceEndTick[channel] = 0;
+    if (s_bogasVoiceEndTick[2]
+        && (int32_t)(g_macTicks - s_bogasVoiceEndTick[2]) >= 0) {
+        stopBogasVoice(2);
+        stopBogasVoice(3);
+        s_bogasVoiceEndTick[2] = 0;
+        s_bogasVoiceEndTick[3] = 0;
+        if (s_bogasEffectContext < 3)
+            s_bogasContexts[s_bogasEffectContext].playing = false;
+        s_bogasEffectContext = 0xffff;
     }
 }
 
@@ -1450,12 +1455,23 @@ static void bogasLoad(uint16_t contextIndex, uint32_t duration,
         return;
     }
 
-    uint16_t channel = (uint16_t)(2 + (s_bogasEffectVoice++ & 1));
-    context.channel = channel;
+    // BGAS owns three fixed inputs, mixes them to one mono byte, then writes
+    // that same byte to both Macintosh output channels. Driving has so far
+    // used context 0 for the engine and context 2 for every direct effect.
+    // Preserve that fixed-voice replacement and centering with Paula pairs:
+    // AUD0/1 for context 0, AUD2/3 for the active direct-effect context.
+    if (s_bogasEffectContext < 3)
+        s_bogasContexts[s_bogasEffectContext].playing = false;
+    s_bogasEffectContext = contextIndex;
+    context.channel = 2;
     context.playing = true;
     BogasInstrument* sample = bogasInstrument(instrument);
-    startBogasVoice(instrument, channel, sample ? sample->basePeriod : 319, 64);
-    s_bogasVoiceEndTick[channel] = duration == 0x7fffffffUL ? 0 : g_macTicks + duration;
+    uint16_t period = sample ? sample->basePeriod : 319;
+    startBogasVoice(instrument, 2, period, 64);
+    startBogasVoice(instrument, 3, period, 64);
+    uint32_t endTick = duration == 0x7fffffffUL ? 0 : g_macTicks + duration;
+    s_bogasVoiceEndTick[2] = endTick;
+    s_bogasVoiceEndTick[3] = endTick;
 }
 
 static void bogasPlay(uint32_t pitch, uint16_t contextIndex)
@@ -1469,8 +1485,8 @@ static void bogasPlay(uint32_t pitch, uint16_t contextIndex)
         *(volatile uint16_t*)0xdff0a6 = period;
         *(volatile uint16_t*)0xdff0b6 = period;
     } else {
-        volatile uint8_t* audio = (volatile uint8_t*)(0xdff0a0UL + context.channel * 16);
-        *(volatile uint16_t*)(audio + 6) = period;
+        *(volatile uint16_t*)0xdff0c6 = period;
+        *(volatile uint16_t*)0xdff0d6 = period;
     }
 }
 
