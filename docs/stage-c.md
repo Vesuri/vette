@@ -1203,6 +1203,18 @@ Deactivate, Set, or Purge call. This is consistent with the `horn` INST's author
 replaces it. The observed run did exactly that when instrument 9 replaced it at iteration 57; no
 port-authored horn trigger or stop is required.
 
+The protection-failure police path is covered without restoring the deliberately unsupported modal
+requester. The diagnostic `FAIL_PROTECTION=1` replacement reproduces the two words left by the
+original second-wrong-answer branch at `Main+$0868`: both the processed flag at A5-$58FE and failed
+flag at A5-$5900 are `-1`. Static Traffic disassembly then explains why the unaccelerated 400-
+iteration attempt saw no police cue: `Traffic+$0E40` requires `$1C20` ticks—exactly two minutes—
+since Main's race-start timestamp. `POLICE_PROBE=1` waits for start state 3 and 30 completed driving
+iterations, then ages only that timestamp to the original threshold. It does not call Bogas or
+create a traffic object. On the next original update Traffic loads instrument 12 (`police`) on
+context 1 with duration `$7FFFFFFF` and options 1 at iteration 32, while both protection result
+words remain `-1`. The `police` INST's authored 2384..6344 sustain loop then maps normally to AUD3.
+Production builds retain the verified successful-protection patch and never define either fixture.
+
 The corrected route reaches the Lake Merced water collision and displays the game's own tow-truck
 recovery artwork. A probe on the actual `_GetPicture` trap records PICT 140 at the resident wrapper
 `Traffic+$663C`; that wrapper's saved return identifies the dynamic request at `Main+$0FD6`, with

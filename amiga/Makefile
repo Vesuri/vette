@@ -196,6 +196,20 @@ ifeq ($(SKIP_INTRO),1)
 EXTRA_DEFINES += -DVETTE_SKIP_INTRO
 endif
 
+# Diagnostic only: take the original protection routine's two-wrong-answers
+# result without constructing its deliberately unsupported modal dialog. The
+# ordinary build still patches the protection to the verified success state.
+ifeq ($(FAIL_PROTECTION),1)
+EXTRA_DEFINES += -DVETTE_FAIL_COPY_PROTECTION
+endif
+
+# Diagnostic only: after live racing begins, age the original race-start tick
+# to its source-defined two-minute failed-protection police threshold. This
+# accelerates the wait but leaves Traffic to spawn and sound the police itself.
+ifeq ($(POLICE_PROBE),1)
+EXTRA_DEFINES += -DVETTE_POLICE_PROBE
+endif
+
 # Deterministic Stage-C stepping only.  GetNextEvent traverses the garage,
 # vehicle and course selectors with normal mouse events; Button skips the plate
 # animation through its shipped input branch.  After driving setup returns,

@@ -144,8 +144,9 @@ is consequently renumbered.
    2 while the engine remains centred; it reaches instruments 7, 8, 10 and 11 without a loud stop.
    A real Z-key edge after race state 3 now covers `horn`: the source loads instrument 6 indefinitely
    on context 1, its INST declares the sustain loop 1428..4989, and key release makes no second
-   Bogas call. Continue that traffic-dense workload or use short source checkpoints for police,
-   environment, and result audio,
+   Bogas call. The failed-protection checkpoint now covers `police`: the exact original two-wrong-
+   answer state reaches Traffic's source-defined two-minute threshold and loads looping instrument
+   12 indefinitely on context 1. Continue with short source checkpoints for environment and result audio,
    including concurrent playback and transitions.
 6. **Automate fidelity regressions.** Keep intro and driving framebuffer differentials, palette
    checks, clean-build audits, and eventually basic audio comparisons reproducible.

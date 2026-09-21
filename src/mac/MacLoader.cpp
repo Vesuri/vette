@@ -766,17 +766,29 @@ static void selectMouseSteeringForProbe()
 static bool disableCopyProtection()
 {
     // Main+$05FE is the entry to the manual challenge.  The successful-answer
-    // path leaves these two globals in exactly this state before returning.
-    // Patch only the original, byte-verified prologue so the requester never
+    // path leaves -22782 set and the failure flag at -22784 clear. After two
+    // wrong answers the original path instead sets both words to -1. Patch
+    // only the original, byte-verified prologue so the requester never
     // appears; unrelated Dialog Manager calls remain loud-stop boundaries.
     static const uint16_t original[6] = {
         0x4a6d, 0xa702, 0x6600, 0x0284, 0x4eba, 0x590a
     };
+#ifdef VETTE_FAIL_COPY_PROTECTION
+    // Diagnostic cue fixture: reproduce Main+$0868's failed result without
+    // reproducing the requester. D0 is scratch across the original routine.
+    static const uint16_t replacement[6] = {
+        0x70ff,                            // MOVEQ #-1,D0
+        0x3b40, 0xa702,                    // MOVE.W D0,-22782(A5): processed
+        0x3b40, 0xa700,                    // MOVE.W D0,-22784(A5): failed
+        0x4e75                             // RTS
+    };
+#else
     static const uint16_t replacement[6] = {
         0x3b7c, 0xffff, 0xa702,             // MOVE.W #-1,-22782(A5): passed
         0x426d, 0xa6fe,                     // CLR.W -22786(A5): no retry
         0x4e75                              // RTS
     };
+#endif
     for (uint16_t i = 0; i < 6; ++i)
         if (read16(vette_code_1 + 0x05fe + i * 2) != original[i]) return false;
     for (uint16_t i = 0; i < 6; ++i)
@@ -4992,6 +5004,18 @@ extern "C" void vetteMacRawKeyChanged(uint8_t rawKey, bool down)
 
 static void updateDrivingInputProbe()
 {
+#ifdef VETTE_POLICE_PROBE
+    // Traffic+$0E40 waits $1C20 ticks from Main's race-start timestamp before
+    // failed protection forces the cop path. Age only that timestamp once,
+    // after the same proven race-underway boundary used by the horn fixture.
+    static bool policeProbeAged;
+    if (!policeProbeAged && s_currentA5
+        && (int16_t)read16(s_currentA5 - 13296) >= 3
+        && g_macDrivingIterations >= 30) {
+        write32(s_currentA5 - 0x3408, g_macTicks - 0x1c20UL);
+        policeProbeAged = true;
+    }
+#endif
 #ifdef VETTE_HORN_PROBE
     // A real keyboard edge after the countdown has reached race state 3 and
     // the car has had time to accelerate. Keep Z down through one complete
