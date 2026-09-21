@@ -269,8 +269,10 @@ Line-A calls which preserve their Pascal stack/results contract. Initialize's ac
 calls build the sixteen-entry instrument table. An indefinite context-0 load starts the centred
 engine pair, subsequent context-0 plays apply the game's live 16.16 pitch stream, and context-2
 loads use the remaining Paula voices for overlapping effects. Short INST headers provide their own
-PCM length, source rate, and optional loop bounds; the bridge converts the rate to a PAL Paula
-period, plays the attack once, then changes Paula's reload registers to the declared sustain range.
+PCM length, source rate, and optional loop bounds. Direct effect contexts convert that rate to a
+PAL Paula period. Context 0 instead matches Bogas's fixed 11.127 kHz software-mixer output and uses
+the original 16.16 phase step supplied by Load/Play. The bridge plays the attack once, then changes
+Paula's reload registers to the declared sustain range.
 This is still an
 incremental Bogas backend: intro mixing remains on its proven flag-driven path, and Stop/Purge plus
 all later gameplay cues still require scenario verification. → `docs/source-inventory.md` §Audio.

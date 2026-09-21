@@ -1428,7 +1428,7 @@ static void bogasLoad(uint16_t contextIndex, uint32_t duration,
     BogasContext& context = s_bogasContexts[contextIndex];
     context.instrument = instrument;
     context.duration = duration;
-    context.pitch = 0x10000UL;
+    context.pitch = contextIndex == 0 ? options : 0x10000UL;
 
     // The source's indefinitely loaded context 0 is the gameplay engine.
     // Intro cues continue through the already-proven one-shot bridge until
@@ -1441,8 +1441,10 @@ static void bogasLoad(uint16_t contextIndex, uint32_t duration,
     if (contextIndex == 0) {
         context.channel = 0;
         context.playing = true;
-        BogasInstrument* sample = bogasInstrument(instrument);
-        uint16_t period = sample ? sample->basePeriod : 319;
+        // BGAS mixes context 0 into its fixed 11.127 kHz output and advances
+        // the source by the Load/Play 16.16 step. The INST header rate belongs
+        // to the direct effect contexts, not to this software-mixer clock.
+        uint16_t period = bogasPeriod(319, options);
         startBogasVoice(instrument, 0, period, 48);
         startBogasVoice(instrument, 1, period, 48);
         return;
@@ -1462,8 +1464,7 @@ static void bogasPlay(uint32_t pitch, uint16_t contextIndex)
     BogasContext& context = s_bogasContexts[contextIndex];
     context.pitch = pitch;
     if (!context.playing) return;
-    BogasInstrument* sample = bogasInstrument(context.instrument);
-    uint16_t period = bogasPeriod(sample ? sample->basePeriod : 319, pitch);
+    uint16_t period = bogasPeriod(319, pitch);
     if (contextIndex == 0) {
         *(volatile uint16_t*)0xdff0a6 = period;
         *(volatile uint16_t*)0xdff0b6 = period;

@@ -1059,20 +1059,31 @@ alternating Paula voices, so a new effect need not cut off the other one.
 
 Short INST resources are parsed structurally as four header words (loop start, loop end, source
 sample rate, PCM byte count). This corrects the earlier zero-loop-only test, which left the Engine
-header in its PCM stream. Gameplay samples use the header's 6.4 or 9.472 kHz source rate rather than
-the 11.127 kHz rate of the headerless music, and the live engine multiplier is converted with the
-68000's hardware `DIVU`; the mandatory link audit confirms that no software 32-bit divide entered
+header in its PCM stream. Direct gameplay effects use the header's 6.4 or 9.472 kHz source rate.
+The context-0 engine is different: Bogas software-mixes it into the fixed 11.127 kHz output and
+uses Load/Play's long value as a 16.16 source phase step. The Paula period is consequently
+`319 * $10000 / step`, converted with the 68000's hardware `DIVU`; the mandatory link audit
+confirms that no software 32-bit divide entered
 the build. A bounded target-A1200 run reached 120 presented driving frames with no loud stop,
 registered all 16 named instruments, retained engine ordinal 4 in a playing context 0, followed the
 original pitch from `$6978` through `$88B8`, and started/expired the observed beep1, beep2, and crash
 loads. A separate ordinary-build intro run reached tick 2,638 / 295 presented frames at Stage C
 depth 64 with its original ordinal globals 0..4 and no loud stop.
 
-The loop metadata is now honored as well. When an INST supplies nonempty loop bounds, Paula first
+The shipped BGAS 128 code removes the remaining Load ambiguity. Command `$18` copies record long
+`+20` into the selected voice's countdown at driver-state `+952`; its three service branches at
+`$25BA`, `$2616`, and `$2648` decrement that value once per pass and stop at zero. Record long `+24`
+is copied into the context-0 phase-increment array consumed by the software mixer at `$1F60`.
+Thus `$7fffffff/$8000` is an effectively indefinite engine at half-rate initially, later replaced
+by the measured 27,000-and-rising Play stream; 150 and 120 are the exact lifetimes of the beep and
+crash loads. These semantics now come from the shipped driver, not timing inference.
+
+The loop metadata is honored as well. When an INST supplies nonempty loop bounds, Paula first
 starts from the complete PCM body; at the next safe trap boundary the bridge changes only the DMA
 reload location and length. The attack therefore plays once and subsequent hardware reloads repeat
-the source-declared sustain region. The Engine resource verifies as bytes 370..5682 at base period
-554 in the bounded A1200 run. Instruments with zero loop bounds naturally repeat their complete
+the source-declared sustain region. The Engine resource verifies as bytes 370..5682; its INST rate
+would be Paula period 554 for a direct context, while context 0 correctly uses the 11.127 kHz mixer
+base before applying the phase step. Instruments with zero loop bounds naturally repeat their complete
 body until the original Bogas Load duration expires.
 
 The corrected route reaches the Lake Merced water collision and displays the game's own tow-truck
