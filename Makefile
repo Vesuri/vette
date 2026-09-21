@@ -60,6 +60,7 @@ driving-sequence-compare:
 driving-motion-reference:
 	@timeout -k 5 300 env SDL_VIDEODRIVER=dummy VETTE_DRIVING_MOTION=1 \
 		VETTE_FIDELITY_RANDOM_SEED=3BD90000 \
+		VETTE_TRAFFIC_POSITION_TRACE=$(VETTE_TRAFFIC_POSITION_TRACE) \
 		mame mac2fdhd -rompath ref/mame/roms -nb9 mdc48 \
 		-ramsize 8M -hard ref/mame/hd/608_2GB_drive.hd \
 		-video none -sound none -window -skip_gameinfo -nothrottle \

@@ -1471,15 +1471,34 @@ diagnostic observations only. The sequence comparator can pair on an explicit ma
 can pair repeated values in capture order, which matters when two main-loop frames complete during
 one traffic callback.
 
-That measurement rejects the driving-task callback as the missing Traffic phase clock. The first
-exact player state is loop iteration zero on both systems, but it follows callback 333 on the
-Macintosh and 109 on the Amiga because original road construction consumes very different emulated
-time. More importantly, experimental equal-callback captures still did not align the traffic
+That measurement rejects the driving-task callback as the only missing Traffic phase clock. The
+first exact player state follows callback 333 / absolute driving iteration 45 on the Macintosh and
+callback 109 / iteration 27 on the Amiga because original road construction consumes very
+different emulated time. Experimental equal-callback captures still did not align the traffic
 records. The clean unmodified captures retain the same `VETT`, `OPPO`, `TAXI` roster and exact
 player/opponent records at their first shared player state, while TAXI is at `(12384,9026)` on the
 Macintosh and `(12384,9639)` on Amiga. The 46 changed pixels remain confined to the lower-right
 dashboard. No timing freeze or state transplant is retained; the next trace follows the original
 write which establishes TAXI's first coordinate to its real time/phase input.
+
+That write trace separates cached rendering position from authoritative motion state. The first
+post-capture writer at Macintosh `$06301C` maps byte-for-byte to `Traffic+$1778`, immediately after
+`MOVE.L $72(A3),$08(A3)`: it only publishes physics Y to the renderer's cached Y. Watching the
+unaligned long at object `+$72` then maps the update chain to `Traffic+$18EC` (copy cached Y back to
+physics Y at the beginning of an object pass) and `Traffic+$0BB2` (add the current motion delta in
+D1). The measured TAXI delta is normally -39 per update. The other writes reported by the aligned
+68020 bus watch are adjacent hull/history fields sharing its two longword bus lanes, not additional
+Y updates.
+
+The manifest now retains the absolute `Main+$1FD2` count rather than normalizing it at the first
+capture. The Macintosh first moving frame is iteration 45; the A1200's is iteration 27. A
+diagnostic-only experiment left the target car neutral until iteration 45 and brought TAXI to
+within one 39-unit update, confirming that the accumulated coordinate difference is main-loop
+phase. It did not synchronize Traffic as a whole: LOVE and then GRED had already spawned on the
+target while the Macintosh roster was still shorter. The long input delay is therefore not
+retained. Object motion and spawn/deadline scheduling are separate phase inputs; the next useful
+checkpoint is the original `Traffic+$2006` active-list append/initialization edge, before either can
+diverge.
 
 The 26-record sightseeing table used by `Main+$3456` was also decoded as a possible source-native
 shortcut. Record 4 is cell `(6,26)`, only six cells from the export-221 transition at `(6,32)`, but

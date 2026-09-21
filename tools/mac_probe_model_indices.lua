@@ -26,6 +26,7 @@ local driving_sequence_manifest = nil
 local driving_motion = os.getenv("VETTE_DRIVING_MOTION") == "1"
 local driving_capture_limit = driving_motion and 40 or 4
 local trace_random = os.getenv("VETTE_RANDOM_TRACE") == "1"
+local trace_traffic_position = os.getenv("VETTE_TRAFFIC_POSITION_TRACE") == "1"
 local random_calls = 0
 local random_seed_text = os.getenv("VETTE_FIDELITY_RANDOM_SEED")
 local fidelity_random_seed = random_seed_text and
@@ -38,7 +39,6 @@ local last_driving_state = nil
 local driving_frame_ready = false
 local driving_a5 = 0
 local driving_iterations = 0
-local driving_iteration_origin = nil
 local vbl_install_count = 0
 local driving_callbacks = 0
 if driving_motion then
@@ -63,6 +63,8 @@ local dashboard_write_count = 0
 local traffic_raster_dumped = false
 local mirror_source_write_count = 0
 local selector_car_ready = false
+local traffic_position_armed = false
+local traffic_position_writes = 0
 
 local function a24(v) return v & 0x00FFFFFF end
 local function u16(a) return prog:read_u16(a24(a)) end
@@ -249,6 +251,32 @@ local function dump_bus_bytes(path, address, count)
 	out:close()
 end
 
+local function arm_traffic_position_writer(record)
+	if not trace_traffic_position or traffic_position_armed or record == 0 then return end
+	local address = record + 0x72
+	local aligned = address & ~3
+	traffic_position_armed = true
+	keep[#keep + 1] = prog:install_write_tap(aligned, aligned + 7,
+		"traffic_physics_position_writer", function(_, data, mask)
+			traffic_position_writes = traffic_position_writes + 1
+			if traffic_position_writes == 1 then
+				dump_bytes("ref/mame/traffic-position-writer.bin",
+					a24(cpu.state["PC"].value) - 64, 128)
+			end
+			if traffic_position_writes <= 16 then
+				print(string.format(
+					"VP TAXI PHYS-Y WRITE #%u frame=%u ticks=%u pc=%06X record=%06X old=%08X data=%08X mask=%08X d0=%08X d1=%08X d2=%08X d3=%08X a0=%06X a1=%06X a2=%06X a3=%06X",
+					traffic_position_writes, mac.frames(), u32(0x016A),
+					a24(cpu.state["PC"].value), record, u32(address), data, mask,
+					cpu.state["D0"].value, cpu.state["D1"].value,
+					cpu.state["D2"].value, cpu.state["D3"].value,
+					a24(cpu.state["A0"].value), a24(cpu.state["A1"].value),
+					a24(cpu.state["A2"].value), a24(cpu.state["A3"].value)))
+			end
+		end)
+	print(string.format("VP armed TAXI PHYS-Y writer record=%06X address=%06X", record, address))
+end
+
 local function on_copybits(pb)
 	local destination_rect = a24(u32(pb + 6))
 	local top, left, bottom, right = rect(destination_rect)
@@ -309,9 +337,8 @@ local function on_copybits(pb)
 			s16(u16(car + 0x1C)), s16(u16(car + 0x1A)), u32(car),
 			u32(car + 8), u16(car + 0x66))
 		if driving_motion then
-			if driving_iteration_origin == nil then driving_iteration_origin = driving_iterations end
 			row = string.format("%u\t%u\t%u\t%u", driving_copy_captures, u32(0x016A),
-				driving_iterations - driving_iteration_origin, driving_callbacks)
+				driving_iterations, driving_callbacks)
 				.. row:match("^[^\t]+\t[^\t]+(.*)$")
 			row = row .. string.format("\t%08X\t%08X\t%u",
 				u32(car + 0x6E), u32(car + 0x72), object_count)
@@ -331,6 +358,9 @@ local function on_copybits(pb)
 			local object_base = object_end - object_count * 4
 			for object = 0, math.min(object_count, 32) - 1 do
 				local record = a24(u32(object_base + object * 4))
+				if u32(record + 0x54) == 0x54415849 then
+					arm_traffic_position_writer(record)
+				end
 				dump_bytes(string.format("ref/mame/driving-motion-object-%u-%u.bin",
 					driving_copy_captures, object), record, 0xC8)
 			end

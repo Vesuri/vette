@@ -43,12 +43,15 @@ is consequently renumbered.
    about thirteen to ten or eleven Amiga ticks versus roughly seven on the Mac, and three complete
    player tuples now align naturally. The capture records both the verified `Main+$1FD2` driving
    iteration and the absolute second-live-VBL-task callback phase. It proves the Macintosh reaches
-   its first moving frame after 333 driving-task callbacks versus 109 on the faster Amiga setup,
-   but equalizing or merely pairing that callback count does not align Traffic: at the first exact
-   player state TAXI is `(12384,9026)` versus `(12384,9639)`. Trace the original write which
-   establishes that first TAXI position and identify its actual clock/input; use that source value
-   for the simulation checkpoint, then compare its completed raster and full object records and
-   extend the gate to alternate views.
+   its first moving frame after 333 driving-task callbacks and 45 original loop iterations versus
+   109 callbacks and 27 iterations on the faster Amiga setup. `Traffic+$18EC` begins an object pass
+   by copying cached position to physics position, and `Traffic+$0BB2` advances TAXI by the measured
+   motion delta; the extra pre-motion loop passes therefore explain its accumulated offset. A
+   loop-45 target experiment brought TAXI to within one update but had already changed the spawn
+   roster, proving that spawn/deadline phase is independent. Instrument `Traffic+$2006`'s original
+   active-list append/initializer boundary and capture the initial records before either schedule
+   diverges; use that checkpoint for the completed raster/full-object gate, then extend it to
+   alternate views.
 2. **Establish the performance target.** The full-accounting target-A1200 profile is now in place
    and identified presentation as 80.353% of the first moving-driving baseline. After removing a
    fully overwritten synchronization copy, adding the packed word-write C2P kernel, and deriving a
