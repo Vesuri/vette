@@ -25,6 +25,7 @@ set $control = g_profileTicks[7]
 set $vbi = g_profileTicks[8]
 set $c2p = g_profileTicks[9]
 set $palette = g_profileTicks[10]
+set $copyBits = g_profileTicks[11]
 set $other = $otherInclusive-$audio-$present-$wait
 set $resident = $elapsed-$drawing-$resource-$otherInclusive
 set $presentOverhead = $present-$sync-$c2p-$palette
@@ -32,6 +33,8 @@ set $accounted = $resident+$drawing+$resource+$audio+$other+$c2p+$palette+$prese
 printf "beamTicks=%u (256 ticks/scanline)\n", $elapsed
 printf "resident game / callbacks  ticks=%u share=%.3f%%\n", $resident, 100.0*$resident/$elapsed
 printf "drawing traps              ticks=%u share=%.3f%% calls=%u\n", $drawing, 100.0*$drawing/$elapsed, g_profileCalls[0]
+printf "  nested CopyBits core     ticks=%u share=%.3f%% calls=%u\n", $copyBits, 100.0*$copyBits/$elapsed, g_profileCalls[11]
+printf "  drawing dispatch/other   ticks=%u share=%.3f%%\n", $drawing-$copyBits, 100.0*($drawing-$copyBits)/$elapsed
 printf "resource traps             ticks=%u share=%.3f%% calls=%u\n", $resource, 100.0*$resource/$elapsed, g_profileCalls[1]
 printf "audio shim                 ticks=%u share=%.3f%% calls=%u\n", $audio, 100.0*$audio/$elapsed, g_profileCalls[2]
 printf "other compatibility        ticks=%u share=%.3f%% calls=%u\n", $other, 100.0*$other/$elapsed, g_profileCalls[3]

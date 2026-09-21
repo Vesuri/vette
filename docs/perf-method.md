@@ -214,24 +214,27 @@ preceding 368,582 measurement. C2P is now 41.532% of the window, and twelve comp
 inside it versus ten in the previous advancing-state run; only the verifier ratio and per-call C2P
 cost are treated as controlled evidence.
 
-### 2026-09-21 — dirty final driving publish
+### 2026-09-21 — CopyBits split and rejected dirty publish
 
-The final driving `_CopyBits` used to copy the complete 512×320 logical screen from the GWorld
-on every completed iteration. The source renderer already supplies the exact changed regions used
-by presentation: a contiguous 512×198 exterior and the captured dashboard/mirror bounds. The
-specialized publish now copies those regions only. It deliberately falls back to generic
-`CopyBits` unless the source and destination geometry, `srcCopy` mode, screen destination, packed
-row bytes, and color-table seed prove that no scaling, boolean operation, or palette mapping is
-required. The seed frame and a raster-bound overflow still copy the complete screen.
+A nested profile bracket isolates the implemented `_CopyBits` body from its Line-A dispatch and
+bookkeeping. In the restored generic-path 300-field A1200 run, CopyBits consumes 2,914,419 of
+2,957,204 drawing ticks over 32 calls: 98.6% of the row, about 91,076 ticks per call. Dispatch and
+other drawing overhead is only 42,785 ticks. This identifies a single measured owner rather than a
+collection of QuickDraw primitives.
 
-`FILLWATCH=1` first compares all 81,920 destination bytes with the full source GWorld after the
-partial publish, then independently compares the planar display against the chunky screen. Forty
-successive frames covered every one of the 320 rows with zero bad frames and zero bad pixels. In
-the same 300-field A1200 harness used for the preceding rectangle-wide C2P measurement, drawing
-traps fall from 2,951,920 to 2,913,842 ticks over 32 updates: about 1,189 ticks or 1.3% of the row
-per update, only 0.16% of the whole window. Thus the full publish was redundant, but it accounts
-for very little of the remaining 12.142% drawing row; further work must split the actual QuickDraw
-operations rather than continuing to tune this transfer.
+The source GWorld uses 260-byte rows while the logical screen uses 256-byte rows, so the existing
+full 512×320 publish is necessarily a 320-row copy. A tested alternative used the renderer's exact
+dirty information: 512×198 exterior rows plus clipped, losslessly coalesced dashboard/mirror
+bounds. It transferred 1,963,323 bytes in 434 rectangles over 31 measured calls—about 63.3 KiB and
+14 rectangles per update instead of 80 KiB. `FILLWATCH=1` compared the resulting chunky screen
+against the strided source GWorld and then the planar display against that screen; 40 frames and
+all 320 rows had zero bad frames or pixels.
+
+Despite moving 20.7% fewer bytes, the rectangle path used 3,296,008 ticks over 31 calls, about
+106,323 per call: 16.7% slower than the generic full copy. The extra clipping, coalescing, and many
+short row spans outweighed the byte saving in fast RAM, so the implementation was removed. This is
+a closed negative result; the retained CopyBits bracket will price a representation or transfer
+change without reopening that design on intuition.
 
 ## Lessons — measurement
 

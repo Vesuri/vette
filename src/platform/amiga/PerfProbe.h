@@ -16,6 +16,7 @@ enum VetteProfileCategory {
     kProfileVBI,
     kProfileC2P,
     kProfilePalette,
+    kProfileCopyBits,
     kProfileCategoryCount
 };
 

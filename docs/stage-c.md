@@ -1402,16 +1402,17 @@ change—a 5.4% reduction. The exclusive profile is now 38.266% C2P, 45.562% res
 12.297% drawing traps, and less than 2.8% for every other row. The next measured port-owned target
 is therefore the drawing-trap row, not palette, synchronization, or presentation bookkeeping.
 
-The final driving `_CopyBits` formerly copied all 81,920 visible chunky bytes from the completed
-GWorld even though the renderer's dirty list was already exact. It now publishes the contiguous
-512×198 exterior plus those same clipped dashboard/mirror bounds, with a full-copy fallback for the
-seed frame, bounds overflow, palette translation, or any call outside the proven contract. This is
-not a second framebuffer or tile cache: it transfers the original renderer's changed bounds into
-the existing logical screen. A diagnostic comparison of the partial result against the full source
-GWorld, followed by the independent planar comparison, covered 40 frames/all 320 rows with zero
-bad frames or pixels. The 300-field profile reduces drawing traps from 2,951,920 to 2,913,842 ticks
-over 32 updates (about 1.3% of that row and 0.16% of the whole window). The full publish was real
-redundant work, but it was not the explanation for the large drawing cost.
+The drawing row is now split at the implemented `_CopyBits` core. In a 300-field A1200 run it owns
+2,914,419 of 2,957,204 drawing ticks over 32 calls—98.6% of the category, about 91,076 ticks per
+publish. The remaining trap dispatch and bookkeeping is only 42,785 ticks. Vette's source GWorld
+has a 260-byte row stride while the 512-pixel logical screen has a 256-byte stride, so the generic
+path performs 320 exact row copies rather than one contiguous 81,920-byte move.
+
+A source-derived dirty-publish experiment copied the full 512×198 exterior plus the same coalesced
+dashboard/mirror bounds used by C2P. It was byte- and pixel-exact across 40 frames/all 320 rows and
+transferred about 63.3 KiB in 14 rectangles per update, but its row walks cost about 106,323 ticks
+per call—16.7% more than the generic full copy. It was removed. Dirty rectangles remain the right
+representation for the expensive C2P into chip RAM, not for this fast-RAM-to-fast-RAM publish.
 
 The differential now has a real moving checkpoint rather than a neutral car with a held
 accelerator. `VETTE_DRIVING_MOTION=1` makes the Macintosh harness wait for a valid full-window

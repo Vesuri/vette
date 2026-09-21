@@ -72,11 +72,10 @@ is consequently renumbered.
    28.0% from the first dirty-list kernel's 419,939, and 45.6% from full-frame conversion's
    555,388. The kernel now walks each whole dirty rectangle per call instead of saving registers
    once per row. Its verifier covers another 3,068,576 plane bytes with zero failures; the current
-   300-field profile averages about 287,054 C2P ticks per update, a further 5.4% reduction. The
-   final driving CopyBits now transfers the renderer's exterior and dashboard dirty bounds rather
-   than all 81,920 chunky bytes; a 40-frame source/chunky/planar audit is exact. That only reduces
-   drawing traps about 1.3% per update, however. The current 300-field window is 38.343% C2P,
-   45.593% original game/callback work, 12.142% drawing traps, and below 2.9% for every other row.
+   300-field profile averages about 287,054 C2P ticks per update, a further 5.4% reduction. A nested
+   bracket now proves CopyBits itself owns 2,914,419 of 2,957,204 drawing ticks over 32 calls:
+   98.6% of that row. The current 300-field window is 38.014% C2P, 45.742% original game/callback
+   work, 12.342% drawing traps, and below 2.9% for every other exclusive row.
    Measure the same synchronized workload on the original Macintosh and set the target from both
    results.
 3. **Fix measured visual discrepancies.** Trace wrong pixels and geometry to their source data or
@@ -85,9 +84,10 @@ is consequently renumbered.
    list cut conversion per update by about 24.4%; moving its register-bound capture ahead of the
    general dispatcher removed 432 dispatches, the four-pixel lookup cut another 12.2% from C2P per
    update, A1200 scaled indexing then cut 18.0%, and rectangle-wide traversal removed another 5.4%
-   per update. The final dirty CopyBits publish removes the full chunky-screen copy but only saves
-   about 1,189 drawing ticks per update, proving that transfer is not the source of the remaining
-   12.142% row. Split the actual QuickDraw operations next and optimize only the measured owner.
+   per update. CopyBits is now isolated as 98.6% of the 12.342% drawing row. Its source has a
+   260-byte stride while the logical screen has a 256-byte stride, so the proven full publish is a
+   320-row copy rather than one contiguous move. Optimize that measured transfer or its
+   representation next; do not reintroduce the slower rectangle-list publisher.
    Prefer representation and algorithm changes before more assembly; verify every optimization
    against the reference differential and preserve game behavior.
 5. **Finish control fidelity.** Verify keyboard aliases, throttle, brake, steering, gears, mouse
@@ -150,6 +150,11 @@ is consequently renumbered.
 
 *Read this section before proposing a lever, so a negative result is not re-derived.
 Each entry is ONE line: what was tried, what it measured, and the doc that has the detail.*
+
+- **Use renderer dirty rectangles for the final chunky CopyBits** — exact over 40 frames and cut
+  transferred data to about 63.3 KiB in 14 coalesced rectangles per update, but the required
+  260-byte-source/256-byte-destination row walks made its core about 16.7% slower than the generic
+  80 KiB copy; removed. `docs/perf-method.md`.
 
 - **68020-only instructions in the game** — none. Flow-following sweep of all 509/507 jump-table
   entries in both builds, 67.9 %/63.1 % of code bytes reached, **0** found; the unreached bytes are
