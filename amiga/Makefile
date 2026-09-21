@@ -9,6 +9,7 @@
 #   make GARAGE_CLICK=1  script the garage and vehicle selectors through real mouse events
 #   make GARAGE_CLICK=1 GARAGE_COURSE=2  select Course Two through its real UI before ACCEPT
 #   make GARAGE_CLICK=1 FREEWAY_ROUTE=1  steer by normal KeyMap input toward the Course Two freeway
+#   make GARAGE_CLICK=1 FREEWAY_ROUTE=1 FREEWAY_START=11  fast-start at freeway cell (11,36)
 #   make QUIT_PROBE=1    request the Control+LMB exit at the first safe event-pump trap
 #   make FILLWATCH=1     rolling audit of the planar back buffer against the chunky Mac surface
 #   ./run.sh             boot in FS-UAE (CTRL + left mouse button quits)
@@ -164,6 +165,15 @@ endif
 
 ifeq ($(FREEWAY_ROUTE),1)
 EXTRA_DEFINES += -DVETTE_FREEWAY_ROUTE
+endif
+
+# Diagnostic-only configurable fast start for freeway work.  Pass the desired
+# freeway X cell, for example FREEWAY_START=11.  The original game still
+# enters driving and executes its export-212 map/traffic transition; the host
+# first places the player immediately before that gateway, then moves the
+# player to the requested row-36 cell after freeway mode becomes active.
+ifdef FREEWAY_START
+EXTRA_DEFINES += -DVETTE_FREEWAY_START=$(FREEWAY_START)
 endif
 
 # Diagnostic only: select the game's shipped Mouse steering default so the

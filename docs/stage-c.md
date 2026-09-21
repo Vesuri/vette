@@ -1245,6 +1245,21 @@ with speed zero, but the obstruction did not clear. Steering the row-36 approach
 experiments were removed; the collision observer is read-only and the route still uses only
 ordinary keypad input.
 
+Long downstream compatibility runs no longer need to replay that complete route. A diagnostic
+build may set `FREEWAY_START=<x-cell>`. After the ordinary garage and countdown, it first relocates
+the player beside Main Map `(2,6)`, so the game's real export 212 still performs the freeway map
+and traffic transition. Only after A5-$3764 confirms freeway mode does it relocate the player to
+the centre of row 36 at the requested X cell. The relocation updates the rendered and physics
+coordinates, swept-collision endpoints, four hull-history samples, the cached cell, the player
+heading accumulator and its authoritative A5-$4FEC source; leaving any one of those owners stale
+causes the original code to reconstruct the pre-relocation trajectory.
+
+`FREEWAY_START=11` reached world `($5C00,$12400)`, cell `(11,36)`, local `(1024,1024)`, heading
+zero and freeway mode 1 at tick 1,954. `amiga/driving_freeway_selector90.gdb` observes that handoff.
+This is explicitly a diagnostic checkpoint, not evidence that the natural route cleared the
+confirmed x=6 `VETT`/`GGRY` collision; production builds define neither `FREEWAY_START` nor the
+input-only `FREEWAY_ROUTE` controller.
+
 The 26-record sightseeing table used by `Main+$3456` was also decoded as a possible source-native
 shortcut. Record 4 is cell `(6,26)`, only six cells from the export-221 transition at `(6,32)`, but
 the documented T command is conditional on Tour Mode. Five ordinary T down/up scans during the

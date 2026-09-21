@@ -4445,6 +4445,29 @@ static void updateDrivingInputProbe()
 #endif
 }
 
+#ifdef VETTE_FREEWAY_START
+static void relocateDiagnosticCar(uint8_t* car, uint32_t x, uint32_t z, uint16_t heading)
+{
+    // Traffic keeps the rendered position, physics position, swept-collision
+    // endpoints and four hull-history samples separately.  Traffic+$69BE
+    // derives the cell from +$6E/+$72, while +$0A1C compares those coordinates
+    // with +$48/+$4C.  Move the complete position history so the next original
+    // collision pass sees a stationary relocation rather than a map-wide
+    // swept segment.
+    static const uint8_t xOffsets[] = { 0x00, 0x48, 0x6e, 0x76, 0x7e, 0x86, 0x8e, 0xae };
+    static const uint8_t zOffsets[] = { 0x08, 0x4c, 0x72, 0x7a, 0x82, 0x8a, 0x92, 0xb2 };
+    for (uint16_t i = 0; i < sizeof(xOffsets); ++i) {
+        write32(car + xOffsets[i], x);
+        write32(car + zOffsets[i], z);
+    }
+    write32(car + 0x0c, ((uint32_t)heading * 360UL) >> 14); // physical orientation in degrees
+    write32(car + 0x64, heading);            // player heading accumulator
+    write16(s_currentA5 - 0x4fec, heading);  // source copied by Traffic+$397E
+    write16(car + 0x3e, (uint16_t)(x >> 11));
+    write16(car + 0x40, (uint16_t)(z >> 11));
+}
+#endif
+
 static void refreshDrivingKeyMap()
 {
     if (!s_currentA5) return;
@@ -4495,6 +4518,28 @@ static void refreshDrivingKeyMap()
     // patched for the diagnostic.
     if (s_garageGearPhase >= 2) {
         uint8_t* car = (uint8_t*)read32(s_currentA5 - 13944);
+#ifdef VETTE_FREEWAY_START
+        // Fast diagnostic checkpoint, deliberately separate from the normal
+        // input-only route.  Start beside the real Main Map export-212 gate
+        // so the game performs its own freeway and traffic initialization.
+        // Once that transition has completed, relocate only the player into
+        // selector 81's decoded 768..1280 opening.  All subsequent physics,
+        // traffic, collision, rendering and traps remain original game code.
+        static uint8_t freewayStartPhase;
+        bool freewayMode = (int16_t)read16(s_currentA5 - 0x3764) != 0;
+        if (car && freewayStartPhase == 0) {
+            uint32_t x = (2UL << 11) + 192;
+            uint32_t z = (7UL << 11) + 256;
+            relocateDiagnosticCar(car, x, z, 0x2000); // north through the gateway
+            freewayStartPhase = 1;
+        } else if (car && freewayStartPhase == 1 && freewayMode) {
+            uint32_t x = ((uint32_t)VETTE_FREEWAY_START << 11) + 1024;
+            uint32_t z = (36UL << 11) + 1024;
+            relocateDiagnosticCar(car, x, z, 0x0000); // eastbound straight
+            write16(car + 26, 0);                 // discard pre-gateway momentum
+            freewayStartPhase = 2;
+        }
+#endif
         uint16_t heading = car ? read16(car + 0x66) : 0x2000;
         uint16_t localX = car ? (uint16_t)(read32(car) & 0x7ff) : 192;
         uint16_t localZ = car ? (uint16_t)(read32(car + 8) & 0x7ff) : 1024;
