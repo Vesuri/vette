@@ -8,7 +8,7 @@
 #
 # The Amiga build is in amiga/ and is the real target: `cd amiga && . ./env.sh && make`.
 
-.PHONY: all todo driving-sequence-capture driving-sequence-compare driving-motion-capture driving-motion-compare driving-profile help
+.PHONY: all todo driving-sequence-capture driving-sequence-compare driving-motion-reference driving-motion-capture driving-motion-compare driving-profile help
 
 all: help
 
@@ -19,6 +19,7 @@ help:
 	@echo "  make driving-sequence-compare  compare saved MAME/Amiga driving frames"
 	@echo "  make driving-sequence-capture  capture Amiga frames at saved Macintosh game states"
 	@echo "  make driving-motion-compare    compare saved moving-driving frames by game state"
+	@echo "  make driving-motion-reference  capture distinct moving frames on the Macintosh oracle"
 	@echo "  make driving-motion-capture    capture distinct completed moving Amiga frames"
 	@echo "  make driving-profile  build and measure 300 PAL fields of target-A1200 driving"
 	@echo
@@ -56,8 +57,17 @@ driving-sequence-compare:
 		--match-state \
 		$(if $(REQUIRE_EXACT),--require-exact,)
 
+driving-motion-reference:
+	@timeout -k 5 300 env SDL_VIDEODRIVER=dummy VETTE_DRIVING_MOTION=1 \
+		mame mac2fdhd -rompath ref/mame/roms -nb9 mdc48 \
+		-ramsize 8M -hard ref/mame/hd/608_2GB_drive.hd \
+		-video none -sound none -window -skip_gameinfo -nothrottle \
+		-seconds_to_run 150 -snapshot_directory ref/mame/snap \
+		-cfg_directory ref/mame/cfg -nvram_directory ref/mame/nvram \
+		-autoboot_script tools/mac_probe_model_indices.lua > tmp/mame-motion.log 2>&1
+
 driving-motion-capture:
-	@rm -f tmp/driving-motion-sequence.tsv tmp/driving-motion-source-*.raw tmp/driving-motion-globals-*.bin
+	@rm -f tmp/driving-motion-sequence.tsv tmp/driving-motion-source-*.raw tmp/driving-motion-globals-*.bin tmp/driving-motion-car-*.bin tmp/driving-motion-object-*.bin
 	@cd amiga && . ./env.sh && $(MAKE) clean && \
 	  $(MAKE) -j4 SKIP_INTRO=1 GARAGE_CLICK=1 && \
 	  GDBTAIL=160 EXTRA_ARGS="--warp_mode=1" GDBSCRIPT=driving_motion_sequence.gdb \
@@ -68,6 +78,8 @@ driving-motion-compare:
 		ref/mame/driving-motion-source tmp/driving-motion-source \
 		--reference-manifest ref/mame/driving-motion-sequence.tsv \
 		--amiga-manifest tmp/driving-motion-sequence.tsv \
+		--reference-object-prefix ref/mame/driving-motion-object \
+		--amiga-object-prefix tmp/driving-motion-object \
 		--match-state \
 		--state-field physics_x --state-field physics_y \
 		$(if $(REQUIRE_EXACT),--require-exact,)

@@ -23,6 +23,36 @@ def numbered_frames(prefix: Path) -> dict[int, Path]:
     return frames
 
 
+def read_objects(prefix: Path, capture: int) -> tuple[tuple[str, int, int, int, int], ...]:
+    pattern = re.compile(rf"^{re.escape(prefix.name)}-{capture}-(\d+)\.bin$")
+    records = []
+    for path in prefix.parent.glob(f"{prefix.name}-{capture}-*.bin"):
+        match = pattern.match(path.name)
+        if not match:
+            continue
+        data = path.read_bytes()
+        if len(data) != 0xC8:
+            raise SystemExit(f"{path}: expected a 200-byte Traffic object, got {len(data)}")
+        tag = data[0x54:0x58].decode("mac_roman", errors="replace")
+        records.append((
+            int(match.group(1)),
+            tag,
+            int.from_bytes(data[0:4], "big", signed=True),
+            int.from_bytes(data[8:12], "big", signed=True),
+            int.from_bytes(data[0x1A:0x1C], "big", signed=True),
+            int.from_bytes(data[0x66:0x68], "big"),
+        ))
+    records.sort()
+    return tuple(record[1:] for record in records)
+
+
+def format_objects(objects: tuple[tuple[str, int, int, int, int], ...]) -> str:
+    return "[" + ", ".join(
+        f"{tag}@({x},{y})/v{speed}/h{heading}"
+        for tag, x, y, speed, heading in objects
+    ) + "]"
+
+
 def read_manifest(path: Path, state_fields: tuple[str, ...]) -> dict[int, dict[str, int]]:
     if not path.exists():
         return {}
@@ -60,6 +90,8 @@ def main() -> None:
     parser.add_argument("--amiga-row-bytes", type=int, default=260)
     parser.add_argument("--reference-manifest", type=Path)
     parser.add_argument("--amiga-manifest", type=Path)
+    parser.add_argument("--reference-object-prefix", type=Path)
+    parser.add_argument("--amiga-object-prefix", type=Path)
     parser.add_argument(
         "--require-exact", action="store_true",
         help="exit unsuccessfully when any active pixel differs")
@@ -71,6 +103,8 @@ def main() -> None:
         help="append a manifest column to the base player-state match key")
     args = parser.parse_args()
     state_fields = BASE_STATE_FIELDS + tuple(args.state_field)
+    if bool(args.reference_object_prefix) != bool(args.amiga_object_prefix):
+        raise SystemExit("object prefixes must be present for both sequences or neither")
 
     reference = numbered_frames(args.reference_prefix)
     amiga = numbered_frames(args.amiga_prefix)
@@ -145,6 +179,7 @@ def main() -> None:
     pixel_total = 0
     first_difference: int | None = None
     state_mismatches = 0
+    object_mismatches = 0
     all_transitions: Counter[tuple[int, int]] = Counter()
     print(
         f"driving sequence: {len(pairs)} paired frames, "
@@ -187,6 +222,15 @@ def main() -> None:
         if state_differences:
             status += "; state mismatch: " + ", ".join(state_differences)
             status += " [pixel result is not a fidelity comparison]"
+        if args.reference_object_prefix:
+            reference_objects = read_objects(args.reference_object_prefix, reference_frame)
+            amiga_objects = read_objects(args.amiga_object_prefix, amiga_frame)
+            if reference_objects != amiga_objects:
+                object_mismatches += 1
+                status += "; object state differs: reference "
+                status += format_objects(reference_objects)
+                status += ", Amiga " + format_objects(amiga_objects)
+                status += " [pixel result is not a complete-state fidelity comparison]"
         if args.match_state:
             state_label = ", ".join(
                 f"{field}={value}" for field, value in zip(state_fields, matched_state))
@@ -210,8 +254,11 @@ def main() -> None:
         print(f"state alignment: {state_mismatches} / {len(pairs)} frames mismatched")
     elif reference_manifest:
         print("state alignment: exact")
+    if args.reference_object_prefix:
+        print(
+            f"object alignment: {object_mismatches} / {len(pairs)} paired frames differ")
 
-    if args.require_exact and (changed_total or state_mismatches):
+    if args.require_exact and (changed_total or state_mismatches or object_mismatches):
         raise SystemExit(1)
 
 

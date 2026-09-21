@@ -34,10 +34,12 @@ is consequently renumbered.
    rendered and physics position, and both harnesses now present accelerator with the upshift at
    the same original `GetKeys` boundary. They share a complete moving-player state whose entire
    512x198 exterior viewport is exact; only 46 pixels differ, all below it in the time-dependent
-   lower-right dashboard. Earlier paired A5 dumps also proved that a larger dashboard delta came
-   from different original Traffic signal flags, not drawing or palette code. Extend this
-   state-keyed checkpoint to traffic and alternate views, and identify the remaining dashboard
-   phase before making the complete moving-frame comparison an exact gate.
+   lower-right dashboard. Active-list capture explains those pixels: the Macintosh has `VETT`,
+   `OPPO`, `TAXI`, while the Amiga has `VETT`, `OPPO`, `AMBU`, `LOVE`; the latter two are offscreen
+   in the forward view but contribute to the rear/dashboard presentation. Earlier paired A5 dumps
+   likewise proved that a larger dashboard delta came from different original Traffic signal
+   flags, not drawing or palette code. Establish a shared traffic phase, then extend the same
+   state-keyed checkpoint to alternate views before making the complete moving frame an exact gate.
 2. **Establish the performance target.** The full-accounting target-A1200 profile is now in place
    and identified presentation as 80.353% of the first moving-driving baseline. After removing a
    fully overwritten synchronization copy, adding the packed word-write C2P kernel, and deriving a

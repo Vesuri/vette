@@ -36,6 +36,10 @@ if driving_motion then
 	for i = 1, driving_capture_limit do
 		os.remove(string.format("ref/mame/%s-%u.raw", driving_capture_stem, i))
 		os.remove(string.format("ref/mame/driving-motion-globals-%u.bin", i))
+		os.remove(string.format("ref/mame/driving-motion-car-%u.bin", i))
+		for object = 0, 31 do
+			os.remove(string.format("ref/mame/driving-motion-object-%u-%u.bin", i, object))
+		end
 	end
 end
 local palette_for_window = {}
@@ -261,6 +265,7 @@ local function on_copybits(pb)
 	local viewport_sample = prog:read_u8(source_base + source_stride * 10)
 	local a5 = a24(cpu.state["A5"].value)
 	local car = a5 ~= 0 and a24(u32(a5 - 0x3678)) or 0
+	local object_count = a5 ~= 0 and u16(a5 - 0x3696) or 0
 	local state_key = car ~= 0 and string.format("%d/%d/%d/%08X/%08X/%u/%08X/%08X",
 		s16(u16(car + 0x44)), s16(u16(car + 0x1C)), s16(u16(car + 0x1A)),
 		u32(car), u32(car + 8), u16(car + 0x66), u32(car + 0x6E), u32(car + 0x72)) or nil
@@ -282,7 +287,7 @@ local function on_copybits(pb)
 		if driving_sequence_manifest == nil then
 			driving_sequence_manifest = assert(io.open(driving_manifest_path, "w"))
 			driving_sequence_manifest:write(driving_motion and
-				"capture\tticks\trpm\tgear\tspeed\tx\ty\theading\tphysics_x\tphysics_y\n" or
+				"capture\tticks\trpm\tgear\tspeed\tx\ty\theading\tphysics_x\tphysics_y\tobjects\n" or
 				"capture\tticks\trpm\tgear\tspeed\tx\ty\theading\n")
 		end
 		local row = string.format(
@@ -291,7 +296,8 @@ local function on_copybits(pb)
 			s16(u16(car + 0x1C)), s16(u16(car + 0x1A)), u32(car),
 			u32(car + 8), u16(car + 0x66))
 		if driving_motion then
-			row = row .. string.format("\t%08X\t%08X", u32(car + 0x6E), u32(car + 0x72))
+			row = row .. string.format("\t%08X\t%08X\t%u",
+				u32(car + 0x6E), u32(car + 0x72), object_count)
 		end
 		driving_sequence_manifest:write(row .. "\n")
 		driving_sequence_manifest:flush()
@@ -302,6 +308,15 @@ local function on_copybits(pb)
 		if driving_motion then
 			dump_bytes(string.format("ref/mame/driving-motion-globals-%u.bin",
 				driving_copy_captures), a5 - 31272, 31272)
+			dump_bytes(string.format("ref/mame/driving-motion-car-%u.bin",
+				driving_copy_captures), car, 0xC8)
+			local object_end = a24(u32(a5 - 0x367C))
+			local object_base = object_end - object_count * 4
+			for object = 0, math.min(object_count, 32) - 1 do
+				local record = a24(u32(object_base + object * 4))
+				dump_bytes(string.format("ref/mame/driving-motion-object-%u-%u.bin",
+					driving_copy_captures, object), record, 0xC8)
+			end
 		end
 		if driving_copy_captures == 1 and not driving_motion then
 			arm_dashboard_writer(source)

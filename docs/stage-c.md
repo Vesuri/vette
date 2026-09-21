@@ -1403,6 +1403,19 @@ composition surface lie at `(394,298)-(490,341)`, in the time-dependent lower-ri
 This proves moving 3D scene fidelity at a real shared state without transplanting game state or
 patching renderer data; dashboard phase and additional traffic/view coverage remain open.
 
+The capture now saves the current 200-byte car record and every 200-byte record in Traffic's active
+object list. That list is source-derived: Traffic+$2006 appends one record pointer through
+A5-$367C and increments the count at A5-$3696. At the shared state above, the Macintosh count is
+three (`VETT`, `OPPO`, `TAXI`) and the Amiga count is four (`VETT`, `OPPO`, `AMBU`, `LOVE`). The
+player records agree in all renderer-visible state; their only non-pointer difference is the
+fixed-point division remainder at car+$50. The extra traffic is outside the exact forward viewport
+but appears in the lower dashboard/rear presentation, accounting for the residual pixels. This is
+another original traffic-phase mismatch caused by comparing natural 60 Hz and 50 Hz histories,
+not a port drawing defect. `make driving-motion-reference` now regenerates the Macintosh side with
+the exact checked command, alongside `driving-motion-capture` and `driving-motion-compare` for the
+Amiga side and report. The report prints each paired active-object tag, position, speed, and heading,
+and refuses an exact gate when those original inputs differ.
+
 The 26-record sightseeing table used by `Main+$3456` was also decoded as a possible source-native
 shortcut. Record 4 is cell `(6,26)`, only six cells from the export-221 transition at `(6,32)`, but
 the documented T command is conditional on Tour Mode. Five ordinary T down/up scans during the
