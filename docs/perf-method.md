@@ -266,6 +266,13 @@ sample converts 104,792 pixels per frame, 63.960% of the 512×320 surface, in 8.
 frame. Dirty coverage is already materially below a full frame; the next optimization should target
 the transpose/lookup instruction path rather than inflate or replace the dirty representation.
 
+A direct Kalms-style scheduling experiment then retained the same lookup and transpose but wrote
+two planes, performed the next fast-RAM lookup pair, and wrote the remaining two planes. It stayed
+byte-exact across 2,684,832 output bytes, but the controlled C/assembly ratio fell from 2.521 to
+2.315. The extra first/final-batch loop structure cost more than any chip-slot overlap saved, so the
+change was removed. Do not reintroduce write pipelining without a structure that also reduces the
+instruction count.
+
 ## Lessons — measurement
 
 - **Compare FPS row vectors, never a `total painted` line.** A total spans a partial trailing row

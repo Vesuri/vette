@@ -162,6 +162,9 @@ Each entry is ONE line: what was tried, what it measured, and the doc that has t
   transferred data to about 63.3 KiB in 14 coalesced rectangles per update, but the required
   260-byte-source/256-byte-destination row walks made its core about 16.7% slower than the generic
   80 KiB copy; removed. `docs/perf-method.md`.
+- **Pipeline C2P chip writes between table lookups** — byte-exact across 2,684,832 output bytes,
+  but Kalms-style two-pairs scheduling lowered the controlled C/assembly ratio from 2.521 to 2.315;
+  the extra loop structure made the kernel slower, so it was removed. `docs/perf-method.md`.
 
 - **68020-only instructions in the game** — none. Flow-following sweep of all 509/507 jump-table
   entries in both builds, 67.9 %/63.1 % of code bytes reached, **0** found; the unreached bytes are
