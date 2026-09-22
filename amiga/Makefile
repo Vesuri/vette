@@ -8,6 +8,7 @@
 #   make SKIP_INTRO=1    report one synthetic first mouse press to skip the proven intro
 #   make GARAGE_CLICK=1  script the garage and vehicle selectors through real mouse events
 #   make GARAGE_CLICK=1 GARAGE_CAR=2  choose the ZR-1 through its real garage plate
+#   make GARAGE_CLICK=1 GARAGE_DYNO=1  select the garage dynamometer through its real control
 #   make GARAGE_CLICK=1 GARAGE_DIFFICULTY=3  choose PRO through its real UI rectangle
 #   make GARAGE_CLICK=1 GARAGE_OPPONENT=2  choose Lamborghini through its real UI rectangle
 #   make GARAGE_CLICK=1 GARAGE_COURSE=2  select Course Two through its real UI before ACCEPT
@@ -268,6 +269,16 @@ endif
 # never define this.
 ifeq ($(GARAGE_CLICK),1)
 EXTRA_DEFINES += -DVETTE_GARAGE_CLICK
+endif
+
+# Diagnostic only: select the garage's index-4 dynamometer control first,
+# allow its original animation to return, then continue the ordinary selector
+# and race-click sequence.
+ifeq ($(GARAGE_DYNO),1)
+ifneq ($(GARAGE_CLICK),1)
+$(error GARAGE_DYNO=1 requires GARAGE_CLICK=1)
+endif
+EXTRA_DEFINES += -DVETTE_GARAGE_DYNO
 endif
 
 ifdef GARAGE_COURSE

@@ -2095,6 +2095,25 @@ closes garage → choices → countdown → driving → original
 finish/result/score → garage for every shipped course selection. Route and mode diversity remain
 separate queue items.
 
+## Complete garage dynamometer lifecycle
+
+The initial garage's six-control tracker contains the four Corvette plates followed by the
+dynamometer and ACCEPT. Its index-4 dynamometer rectangle is
+`(top=276,left=443,bottom=299,right=489)`. `GARAGE_DYNO=1` adds one ordinary click at its center to
+the diagnostic garage sequence; it does not select the branch or alter any garage state directly.
+The original index-4 handler at `Main+$0DC0` computes its performance value, composes the two gauge
+areas, advances the authored gauge counter to 59, restores the garage backing images, and rejoins
+the common event-loop tail at `Main+$14D8`.
+
+`amiga/garage_dyno.gdb` is a one-breakpoint completion proof, deliberately avoiding debugger
+single-step effects inside the long animation. Stock Corvette returned at tick 2,006 with garage
+mode zero, car index zero, gauge 59, and no loud stop. The fixture then continues with ACCEPT and
+the normal selector clicks rather than ending the session. With `FINISH_CHECKPOINT=1`, the combined
+run reached Course One's endpoint and finish core at tick 3,550, called and returned from Score
+once, exited both Main driving loops, and settled back in the garage at tick 3,817. Thus the
+optional dynamometer is covered as a complete garage → dynamometer → garage → race → result →
+garage lifecycle, not merely as a rendered animation.
+
 ## Complete difficulty-selection lifecycles
 
 `GARAGE_DIFFICULTY=1..3` extends the same ordinary-input harness through the shipped

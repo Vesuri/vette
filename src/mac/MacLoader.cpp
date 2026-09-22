@@ -231,6 +231,9 @@ static uint16_t s_tourModeProbeInitialIndex;
 #error VETTE_GARAGE_OPPONENT must be 1..4
 #endif
 static const uint8_t kGarageDrivingPhase = 9
+#ifdef VETTE_GARAGE_DYNO
+    + 2
+#endif
 #ifdef VETTE_GARAGE_COURSE
     + 2
 #endif
@@ -239,6 +242,9 @@ static const uint8_t kGarageDrivingPhase = 9
 #endif
     ;
 static const uint8_t kGarageTransitionSkipPhase = 3
+#ifdef VETTE_GARAGE_DYNO
+    + 2
+#endif
 #ifdef VETTE_GARAGE_CAR
     + 2
 #endif
@@ -5870,31 +5876,59 @@ static bool nextEvent(uint16_t mask, uint8_t* event)
 #if defined(VETTE_GARAGE_CAR) && defined(VETTE_GARAGE_COURSE)
     static const int16_t carY[] = { 49, 76, 103, 129 };
     const int16_t clickX[] = {
+#ifdef VETTE_GARAGE_DYNO
+        466,
+#endif
         289, 293, 413, selectedOpponentX, 212,
         (int16_t)(70 + 94 * (VETTE_GARAGE_COURSE - 1)), 445
     };
     const int16_t clickY[] = {
+#ifdef VETTE_GARAGE_DYNO
+        287,
+#endif
         carY[VETTE_GARAGE_CAR - 1], 161, selectedDifficultyY, selectedOpponentY,
         154, 308, 308
     };
 #elif defined(VETTE_GARAGE_CAR)
     static const int16_t carY[] = { 49, 76, 103, 129 };
-    const int16_t clickX[] = { 289, 293, 413, selectedOpponentX, 212, 445 };
+    const int16_t clickX[] = {
+#ifdef VETTE_GARAGE_DYNO
+        466,
+#endif
+        289, 293, 413, selectedOpponentX, 212, 445
+    };
     const int16_t clickY[] = {
+#ifdef VETTE_GARAGE_DYNO
+        287,
+#endif
         carY[VETTE_GARAGE_CAR - 1], 161, selectedDifficultyY,
         selectedOpponentY, 154, 308
     };
 #elif defined(VETTE_GARAGE_COURSE)
     static const int16_t clickX[] = {
+#ifdef VETTE_GARAGE_DYNO
+        466,
+#endif
         293, 413, selectedOpponentX, 212,
         (int16_t)(70 + 94 * (VETTE_GARAGE_COURSE - 1)), 445
     };
     const int16_t clickY[] = {
+#ifdef VETTE_GARAGE_DYNO
+        287,
+#endif
         161, selectedDifficultyY, selectedOpponentY, 154, 308, 308
     };
 #else
-    const int16_t clickX[] = { 293, 413, selectedOpponentX, 212, 445 };
+    const int16_t clickX[] = {
+#ifdef VETTE_GARAGE_DYNO
+        466,
+#endif
+        293, 413, selectedOpponentX, 212, 445
+    };
     const int16_t clickY[] = {
+#ifdef VETTE_GARAGE_DYNO
+        287,
+#endif
         161, selectedDifficultyY, selectedOpponentY, 154, 308
     };
 #endif
