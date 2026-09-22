@@ -77,7 +77,11 @@ is consequently renumbered.
    512x198 exterior pixel-exact across all 101,376 pixels. The stricter full-roster comparator still
    refuses to compare differently phased Traffic, as it should. Establish an equivalent complete-
    object checkpoint, then extend exact source-oracle coverage to moving traffic, mirrors, and the
-   F1–F5 principal views.
+   remaining principal views. F1 now has an independent Macintosh/Amiga moving capture: after both
+   harnesses shift normally and pulse the original view key for one complete scanner iteration,
+   `make driving-f1-compare` proves the 512x255 principal-view region exact at a shared moving
+   state. Rows 255–256 remain outside that gate because their Traffic-dependent lower strip is not
+   synchronized by the player-state key.
 2. **Establish the performance target.** The full-accounting target-A1200 profile is now in place
    and identified presentation as 80.353% of the first moving-driving baseline. After removing a
    fully overwritten synchronization copy, adding the packed word-write C2P kernel, and deriving a

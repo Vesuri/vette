@@ -38,7 +38,8 @@ commands
   set $physics_x = *(unsigned int*)($car+0x6e)
   set $physics_y = *(unsigned int*)($car+0x72)
   set $objects = *(unsigned short*)(s_currentA5-0x3696)
-  if $gear == 1 && $speed > 0 && ($rpm != $last_rpm || $gear != $last_gear || $speed != $last_speed || $x != $last_x || $y != $last_y || $heading != $last_heading || $physics_x != $last_physics_x || $physics_y != $last_physics_y || $objects != $last_objects)
+  set $full = *(short*)sourceRect == 0 && *(short*)(sourceRect+2) == 0 && *(short*)(sourceRect+4) == 342 && *(short*)(sourceRect+6) == 512 && *(short*)destinationRect == 0 && *(short*)(destinationRect+2) == 0 && *(short*)(destinationRect+4) == 342 && *(short*)(destinationRect+6) == 512
+  if g_motionCaptureReady && $full && $gear == 1 && $speed > 0 && ($rpm != $last_rpm || $gear != $last_gear || $speed != $last_speed || $x != $last_x || $y != $last_y || $heading != $last_heading || $physics_x != $last_physics_x || $physics_y != $last_physics_y || $objects != $last_objects)
         set $captures = $captures+1
         set $last_rpm = $rpm
         set $last_gear = $gear

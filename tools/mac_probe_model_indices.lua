@@ -26,6 +26,7 @@ local driving_sequence_manifest = nil
 local driving_motion = os.getenv("VETTE_DRIVING_MOTION") == "1"
 local driving_audio = os.getenv("VETTE_DRIVING_AUDIO") == "1"
 local driving_run = driving_motion or driving_audio
+local driving_view = os.getenv("VETTE_DRIVING_VIEW")
 local follow_road = os.getenv("VETTE_FOLLOW_ROAD") == "1"
 local driving_capture_limit = driving_motion and 40 or 4
 local trace_random = os.getenv("VETTE_RANDOM_TRACE") == "1"
@@ -39,9 +40,13 @@ local random_seed_text = os.getenv("VETTE_FIDELITY_RANDOM_SEED")
 local fidelity_random_seed = random_seed_text and
 	tonumber(random_seed_text:gsub("^0[xX]", ""), 16) or nil
 local fidelity_random_seed_pending = fidelity_random_seed ~= nil
-local driving_capture_stem = driving_motion and "driving-motion-source" or "driving-copy-source"
+local driving_capture_group = driving_view and
+	("driving-" .. driving_view:lower()) or "driving-motion"
+local driving_capture_stem = driving_motion and
+	(driving_capture_group .. "-source") or "driving-copy-source"
 local driving_manifest_path = driving_motion and
-	"ref/mame/driving-motion-sequence.tsv" or "ref/mame/driving-sequence.tsv"
+	("ref/mame/" .. driving_capture_group .. "-sequence.tsv") or
+	"ref/mame/driving-sequence.tsv"
 local last_driving_state = nil
 local driving_frame_ready = false
 local driving_a5 = 0
@@ -52,10 +57,11 @@ if driving_motion then
 	os.remove(driving_manifest_path)
 	for i = 1, driving_capture_limit do
 		os.remove(string.format("ref/mame/%s-%u.raw", driving_capture_stem, i))
-		os.remove(string.format("ref/mame/driving-motion-globals-%u.bin", i))
-		os.remove(string.format("ref/mame/driving-motion-car-%u.bin", i))
+		os.remove(string.format("ref/mame/%s-globals-%u.bin", driving_capture_group, i))
+		os.remove(string.format("ref/mame/%s-car-%u.bin", driving_capture_group, i))
 		for object = 0, 31 do
-			os.remove(string.format("ref/mame/driving-motion-object-%u-%u.bin", i, object))
+			os.remove(string.format("ref/mame/%s-object-%u-%u.bin",
+				driving_capture_group, i, object))
 		end
 	end
 end
@@ -470,10 +476,10 @@ local function on_copybits(pb)
 			a24(u32(source)),
 			(u16(source + 4) & 0x3FFF) * (source_bottom - source_top))
 		if driving_motion then
-			dump_bytes(string.format("ref/mame/driving-motion-globals-%u.bin",
-				driving_copy_captures), a5 - 31272, 31272)
-			dump_bytes(string.format("ref/mame/driving-motion-car-%u.bin",
-				driving_copy_captures), car, 0xC8)
+			dump_bytes(string.format("ref/mame/%s-globals-%u.bin",
+				driving_capture_group, driving_copy_captures), a5 - 31272, 31272)
+			dump_bytes(string.format("ref/mame/%s-car-%u.bin",
+				driving_capture_group, driving_copy_captures), car, 0xC8)
 			local object_end = a24(u32(a5 - 0x367C))
 			local object_base = object_end - object_count * 4
 			for object = 0, math.min(object_count, 32) - 1 do
@@ -481,8 +487,8 @@ local function on_copybits(pb)
 				if u32(record + 0x54) == 0x54415849 then
 					arm_traffic_position_writer(record)
 				end
-				dump_bytes(string.format("ref/mame/driving-motion-object-%u-%u.bin",
-					driving_copy_captures, object), record, 0xC8)
+				dump_bytes(string.format("ref/mame/%s-object-%u-%u.bin",
+					driving_capture_group, driving_copy_captures, object), record, 0xC8)
 			end
 		end
 		if driving_copy_captures == 1 and not driving_motion then
@@ -762,7 +768,7 @@ mac.run(function()
 		-- The Amiga harness asserts accelerator in the same GetKeys refresh that
 		-- first observes gear 1.  Have it waiting before the shift so MAME cannot
 		-- lose one physics iteration to its once-per-video-frame Lua poll.
-		if driving_motion then driving_capture_armed = true end
+		if driving_motion and not driving_view then driving_capture_armed = true end
 		local accelerator = follow_road and "Keypad 9" or "Keypad 8"
 		mac.key_down(accelerator)
 		-- GetKeys is sampled by the driving loop, not the Event Manager.  Keep the
@@ -775,6 +781,14 @@ mac.run(function()
 		end, 600)
 		mac.key_up("=  +")
 		if not shifted then return end
+		if driving_view then
+			local view_iteration = driving_iterations
+			mac.key_down(driving_view)
+			if not mac.wait_for("view key scan", function()
+				return driving_iterations > view_iteration
+			end, 600) then return end
+			mac.key_up(driving_view)
+		end
 		if follow_road then
 			if not mac.wait_for("initial right turn", function()
 				local car = car_address()

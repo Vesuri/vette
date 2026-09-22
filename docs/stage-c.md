@@ -450,6 +450,18 @@ at presentation 40 prove a real renderer-state change: the ordinary surface hash
 the F1 surface to `4ec4efc8…`, and 53,940 of their 81,920 packed bytes differ. The paired
 `driving_baseline_capture.gdb` and `driving_f1_capture.gdb` scripts make that coverage repeatable.
 
+The cross-machine F1 differential now goes beyond that target-only view change. Holding F1 from
+race entry is not a valid moving fixture: Vette's ascending scanner services the view key before
+top-row `+`, leaving the car in neutral. Both harnesses therefore perform the original upshift,
+hold F1 through one verified `Main+$1FD2` iteration, release it, and only then arm their source
+captures. `VETTE_DRIVING_VIEW=F1` gives the Macintosh oracle independent artifact names, while
+`VIEW_CAPTURE_F1=1` supplies the equivalent physical edge on Amiga. At the shared moving state
+RPM 19, gear 1, speed 15, position `(12407,6116)`, heading 12288, the 512x255 principal-view region
+is exact across all 130,560 pixels. The only full-surface differences occupy rows 255–256, a lower
+composition strip whose Traffic phase is not part of the player-state key. `make
+driving-f1-compare` consequently gates the renderer-owned principal view without laundering that
+separate synchronization debt.
+
 Raw Amiga F5 (`$54`, Macintosh virtual `$60`) likewise takes the documented “Front Dash” branch
 without a new trap. The run remains in driving at depth 93 through 3,444 ticks and 70/70 frames.
 At matched presentation 40, `driving_f5_capture.gdb` records hash `3441bd48…`, differing from the

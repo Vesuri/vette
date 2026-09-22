@@ -53,6 +53,13 @@ volatile uint16_t g_stageCDepth = 1;       // _BlockMove is row 1
 volatile uint32_t g_macTicks = 0;
 volatile uint32_t g_macDrivingIterations = 0;
 volatile uint32_t g_macDrivingCallbacks = 0;
+#ifdef VETTE_MOTION_CAPTURE
+#ifdef VETTE_VIEW_CAPTURE_F1
+volatile uint8_t g_motionCaptureReady = 0;
+#else
+volatile uint8_t g_motionCaptureReady = 1;
+#endif
+#endif
 volatile uint32_t* g_macTicksAddress = 0;
 volatile uint32_t* g_macRndSeedAddress = 0;
 volatile uint32_t g_macVBLCallbackEntry = 0;
@@ -4086,9 +4093,11 @@ static bool copyBits(const uint8_t* sourceBitmap, const uint8_t* destinationBitm
 // Keeping it out of production avoids adding any state or work to the game;
 // noinline gives GDB one stable stop after the original CopyBits completes.
 extern "C" __attribute__((noinline)) void vetteMotionCaptureBoundary(
-    const uint8_t* sourceBitmap)
+    const uint8_t* sourceBitmap, const uint8_t* sourceRect,
+    const uint8_t* destinationRect)
 {
-    __asm__ volatile("" : : "g"(sourceBitmap) : "memory");
+    __asm__ volatile("" : : "g"(sourceBitmap), "g"(sourceRect),
+                     "g"(destinationRect) : "memory");
 }
 #endif
 
@@ -5187,6 +5196,25 @@ static void updateDrivingInputProbe()
     } else if (probeEventPhase == 1 && read16(s_currentA5 - 21316) == 0) {
         vetteInputInjectProbeKey(VETTE_INPUT_PROBE_EVENT_RAW_KEY, false);
         probeEventPhase = 2;
+    }
+#endif
+#ifdef VETTE_VIEW_CAPTURE_F1
+    // Shift and begin moving before selecting the alternate view. Holding F1
+    // from race entry makes the original ascending scanner service it before
+    // the upshift key, leaving the diagnostic car in neutral.
+    static uint8_t viewCapturePhase;
+    static uint32_t viewCaptureIteration;
+    if (viewCapturePhase == 0 && s_garageGearPhase >= 2) {
+        viewCaptureIteration = g_macDrivingIterations;
+        vetteInputInjectProbeKey(0x50, true); // physical F1 / Macintosh $7A
+        viewCapturePhase = 1;
+    } else if (viewCapturePhase == 1
+               && g_macDrivingIterations > viewCaptureIteration) {
+        vetteInputInjectProbeKey(0x50, false);
+        viewCapturePhase = 2;
+#ifdef VETTE_MOTION_CAPTURE
+        g_motionCaptureReady = 1;
+#endif
     }
 #endif
 }
@@ -6640,7 +6668,8 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
         s_suppressDirectScreenDirty = false;
         if (copied) {
 #ifdef VETTE_MOTION_CAPTURE
-            if (fullDrivingPublish) vetteMotionCaptureBoundary(sourceBitmap);
+            if (s_drivingFrameStarted)
+                vetteMotionCaptureBoundary(sourceBitmap, sourceRect, destinationRect);
 #endif
             if (bitmapIsScreen(destinationBitmap)) {
                 // During driving the shipped renderer publishes a complete

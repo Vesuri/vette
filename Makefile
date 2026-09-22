@@ -8,7 +8,7 @@
 #
 # The Amiga build is in amiga/ and is the real target: `cd amiga && . ./env.sh && make`.
 
-.PHONY: all todo driving-sequence-capture driving-sequence-compare driving-motion-reference driving-audio-reference driving-audio-capture driving-audio-compare driving-audio-regression driving-motion-capture driving-motion-compare driving-motion-viewport-compare driving-profile help
+.PHONY: all todo driving-sequence-capture driving-sequence-compare driving-motion-reference driving-f1-reference driving-f1-capture driving-f1-compare driving-audio-reference driving-audio-capture driving-audio-compare driving-audio-regression driving-motion-capture driving-motion-compare driving-motion-viewport-compare driving-profile help
 
 all: help
 
@@ -21,6 +21,9 @@ help:
 	@echo "  make driving-motion-compare    compare saved moving-driving frames by game state"
 	@echo "  make driving-motion-viewport-compare  gate a pixel-exact moving exterior view"
 	@echo "  make driving-motion-reference  capture distinct moving frames on the Macintosh oracle"
+	@echo "  make driving-f1-reference      capture moving F1-view frames on the Macintosh oracle"
+	@echo "  make driving-f1-capture        capture matching moving F1-view Amiga frames"
+	@echo "  make driving-f1-compare        gate a pixel-exact state-paired F1 view"
 	@echo "  make driving-audio-reference   capture/report Macintosh intro and moving-driving audio"
 	@echo "  make driving-audio-capture     capture target Bogas/Paula events for the same road workload"
 	@echo "  make driving-audio-compare     compare reference/target audio events by source progression"
@@ -73,6 +76,16 @@ driving-motion-reference:
 		-seconds_to_run 150 -snapshot_directory ref/mame/snap \
 		-cfg_directory ref/mame/cfg -nvram_directory ref/mame/nvram \
 		-autoboot_script tools/mac_probe_model_indices.lua > tmp/mame-motion.log 2>&1
+
+driving-f1-reference:
+	@timeout -k 5 300 env SDL_VIDEODRIVER=dummy VETTE_DRIVING_MOTION=1 \
+		VETTE_DRIVING_VIEW=F1 VETTE_FIDELITY_RANDOM_SEED=3BD90000 \
+		mame mac2fdhd -rompath ref/mame/roms -nb9 mdc48 \
+		-ramsize 8M -hard ref/mame/hd/608_2GB_drive.hd \
+		-video none -sound none -window -skip_gameinfo -nothrottle \
+		-seconds_to_run 150 -snapshot_directory ref/mame/snap \
+		-cfg_directory ref/mame/cfg -nvram_directory ref/mame/nvram \
+		-autoboot_script tools/mac_probe_model_indices.lua > tmp/mame-f1.log 2>&1
 
 driving-audio-reference:
 	@mkdir -p tmp
@@ -133,6 +146,23 @@ driving-motion-capture:
 	    MOTION_CAPTURE=1 && \
 	  GDBTAIL=160 EXTRA_ARGS="--warp_mode=1" GDBSCRIPT=driving_motion_sequence.gdb \
 	  ./diag_run.sh 150
+
+driving-f1-capture:
+	@rm -f tmp/driving-motion-sequence.tsv tmp/driving-motion-source-*.raw tmp/driving-motion-globals-*.bin tmp/driving-motion-car-*.bin tmp/driving-motion-object-*.bin
+	@cd amiga && . ./env.sh && $(MAKE) clean && \
+	  $(MAKE) -j4 SKIP_INTRO=1 GARAGE_CLICK=1 FIDELITY_RANDOM_SEED=0x3BD90000 \
+	    VIEW_CAPTURE_F1=1 MOTION_CAPTURE=1 && \
+	  GDBTAIL=160 EXTRA_ARGS="--warp_mode=1" GDBSCRIPT=driving_motion_sequence.gdb \
+	  ./diag_run.sh 150
+
+driving-f1-compare:
+	@python3 tools/compare_driving_sequence.py \
+		ref/mame/driving-f1-source tmp/driving-motion-source \
+		--reference-manifest ref/mame/driving-f1-sequence.tsv \
+		--amiga-manifest tmp/driving-motion-sequence.tsv \
+		--match-state --state-field physics_x --state-field physics_y \
+		--left 0 --top 0 --width 512 --height 255 \
+		--require-any-exact
 
 driving-motion-compare:
 	@python3 tools/compare_driving_sequence.py \
