@@ -1988,6 +1988,44 @@ the identical garage, shift, acceleration, and road-following workload without a
 or writing any visual capture. Visual and audio regressions consequently have independent inputs
 and artifact lifetimes.
 
+## One complete race lifecycle
+
+Course One's source-defined finish is collision selector 58, rectangle 0, in Main Map cell
+`(2,24)`, with local bounds `(u=384..640,v=0..384)`. `FINISH_CHECKPOINT=1` is a diagnostic-only
+entry: after the ordinary garage choices, countdown, shift, and live race state, it moves the
+player's complete rendered, physics, swept-collision, and history coordinate set to the centre of
+that rectangle. It does not alter the course, result latch, collision selector, finish response,
+score, or front-end state. The original `Traffic+$59A2` response therefore recognizes the finish,
+and the common `Traffic+$52A6` path clears the driving flag, chooses the shipped result, and calls
+Score.
+
+That first finish exposed four ordinary QuickDraw dependencies in Score: `SetRect`, the GrafPort
+text attributes, `MoveTo`, and `DrawString`/`DrawChar`/`DrawText`. The port now stores all of those
+states in their classic GrafPort fields. Text is drawn into the active packed 4-bpp PixMap, clipped
+to its clip region, advances the pen, and dirties only its measured bounds. As with version-1 PICT
+text and menu titles, the glyphs use the explicit compact fallback because the game resource forks
+do not contain the Macintosh System font.
+
+The same trace found a real Toolbox ABI error: Macintosh `Boolean` is an 8-bit result in a
+word-aligned compiler slot. `Button` and `StillDown` had written big-endian word value `$0001`, so
+Score's byte test read zero even when the bridge reported a press. Boolean returns now write the
+first byte and clear the alignment byte; `GetNextEvent` uses the same representation. This remains
+true for both byte-testing and word-testing Vette callers.
+
+The finish can show a shipped result PICT and then independently constructs the Top Ten surface at
+`Score+$590`. The bounded checkpoint acknowledges each real `Button` wait once. Its final
+acknowledgement also leaves the matching mouse-up transition for `GetNextEvent`, just as a physical
+click does, so the test follows Main out of its driving event loop instead of patching its branch.
+Production builds synthesize none of these inputs.
+
+`amiga/driving_race_lifecycle.gdb` is the fail-fast proof. With
+`PROBES=1 SKIP_INTRO=1 GARAGE_CLICK=1 FINISH_CHECKPOINT=1`, it observes exactly one
+`Traffic+$59A2` finish, the common finish core, one Score entry and return, Main's driving-loop exit,
+the outer `Main+$1F52` return, and completion of the following A5+$462 post-driving/garage handoff.
+The settled record is at tick 2271 with driving presentation state zero and no loud stop. This
+closes the first complete garage → choices → countdown → driving → finish/result/score → garage
+cycle; adverse outcomes and the other courses remain separate queue items.
+
 ## Correction to the MAME log
 
 The 51-row MAME table is a measurement of that reference run, not fabricated data, but the live

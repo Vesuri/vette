@@ -7,8 +7,8 @@ document. `make todo` prints this file plus a live marker sweep of the tracked, 
 ⚠ Refer to an item by its title, not its number. Entries are deleted when closed, so numbering
 changes.
 
-⭐ **HEAD OF QUEUE: Complete one race lifecycle.** Prove garage → choices → countdown → driving →
-finish → win/loss → garage with short checkpoints through the original game code.
+⭐ **HEAD OF QUEUE: Complete adverse gameplay outcomes.** Exercise ordinary and severe collisions,
+cumulative damage, repair, tow, water/lake recovery, police tickets/arrest, and terminal outcomes.
 
 Long route traces are regressions, not the primary discovery mechanism. Enter unknown behavior
 through the shortest faithful checkpoint available; do not patch game decisions merely to reach it.
@@ -17,22 +17,20 @@ For bounded driving that must follow the road, build with `GARAGE_CLICK=1 FOLLOW
 
 ## Core game completion — active queue
 
-1. **Complete one race lifecycle.** Prove garage → choices → countdown → driving → finish →
-   win/loss → garage using short checkpoints and the original game code.
-2. **Complete adverse gameplay outcomes.** Exercise ordinary and severe collisions, cumulative
+1. **Complete adverse gameplay outcomes.** Exercise ordinary and severe collisions, cumulative
    damage, repair, tow, water/lake recovery, police tickets/arrest, and terminal outcomes. Existing
    isolated damage and recovery proofs do not prove every enclosing game-state transition.
-3. **Cover every course and materially different mode.** Check representative starts, junctions,
+2. **Cover every course and materially different mode.** Check representative starts, junctions,
    map boundaries, freeway transitions, and finishes for every course, then cars, opponents,
    difficulty levels, and practice/qualifying/race variants. Do not drive for hours to reach a
    state that can be entered faithfully with a checkpoint.
-4. **Finish necessary game UI paths.** Cover the garage, dynamometer, car/opponent/course/difficulty
+3. **Finish necessary game UI paths.** Cover the garage, dynamometer, car/opponent/course/difficulty
    choices, options, pause, quit, results, and return paths. Leave unnecessary classic Mac desktop
    UI unimplemented so an erroneous fallback remains a loud failure.
-5. **Implement only traps demanded by real paths.** Every unknown trap reached by the scenarios
+4. **Implement only traps demanded by real paths.** Every unknown trap reached by the scenarios
    above must either be implemented faithfully or remain a named loud stop. Recheck all resource
    types the game actually consumes; do not implement unused managers speculatively.
-6. **Verify resources and persistence.** Determine from code whether preferences, high scores,
+5. **Verify resources and persistence.** Determine from code whether preferences, high scores,
    saved settings, or other writable state are required, then implement only what is used.
 
 ## Structural verification and release — after core game completion

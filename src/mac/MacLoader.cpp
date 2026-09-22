@@ -209,6 +209,10 @@ static const uint8_t kGarageDrivingPhase = 9;
 static bool s_garageTransitionSkipped;
 static bool s_garageRecoveryPictureLoaded;
 static bool s_garageRecoverySkipped;
+#ifdef VETTE_FINISH_CHECKPOINT
+static bool s_finishResultScreenEntered;
+static bool s_finishResultSkipped;
+#endif
 #endif
 
 struct WindowSlot {
@@ -523,6 +527,7 @@ static uint32_t read32(const uint8_t* p)
     return ((uint32_t)p[0] << 24) | ((uint32_t)p[1] << 16) | ((uint32_t)p[2] << 8) | p[3];
 }
 static void write16(uint8_t* p, uint16_t v) { p[0] = (uint8_t)(v >> 8); p[1] = (uint8_t)v; }
+static void writeBoolean(uint8_t* p, bool value) { p[0] = value ? 1 : 0; p[1] = 0; }
 static void write32(uint8_t* p, uint32_t v)
 {
     p[0] = (uint8_t)(v >> 24); p[1] = (uint8_t)(v >> 16);
@@ -576,7 +581,12 @@ static const TrapName s_trapNames[] = {
     {0xaa28,"COLOR MANAGER","GETCTSEED"}, {0xaa39,"COLOR MANAGER","MAKEITABLE"},
     {0xa91f,"WINDOW MANAGER","SELECTWINDOW"},
     {0xa922,"WINDOW MANAGER","BEGINUPDATE"}, {0xa923,"WINDOW MANAGER","ENDUPDATE"},
-    {0xa889,"QUICKDRAW","TEXTMODE"}, {0xa9b9,"QUICKDRAW","GETCURSOR"},
+    {0xa883,"QUICKDRAW","DRAWCHAR"}, {0xa884,"QUICKDRAW","DRAWSTRING"},
+    {0xa885,"QUICKDRAW","DRAWTEXT"},
+    {0xa887,"QUICKDRAW","TEXTFONT"}, {0xa888,"QUICKDRAW","TEXTFACE"},
+    {0xa889,"QUICKDRAW","TEXTMODE"}, {0xa88a,"QUICKDRAW","TEXTSIZE"},
+    {0xa88e,"QUICKDRAW","SPACEEXTRA"}, {0xa893,"QUICKDRAW","MOVETO"},
+    {0xa9b9,"QUICKDRAW","GETCURSOR"},
     {0xa851,"QUICKDRAW","SETCURSOR"}, {0xa852,"QUICKDRAW","HIDECURSOR"},
     {0xa853,"QUICKDRAW","SHOWCURSOR"},
     {0xa97c,"DIALOG MANAGER","GETNEWDIALOG"}, {0xa981,"DIALOG MANAGER","DRAWDIALOG"},
@@ -587,6 +597,7 @@ static const TrapName s_trapNames[] = {
     {0xa850,"QUICKDRAW","INITCURSOR"}, {0xa9bc,"QUICKDRAW","GETPICTURE"},
     {0xa8f6,"QUICKDRAW","DRAWPICTURE"}, {0xa89b,"QUICKDRAW","PENSIZE"},
     {0xa89c,"QUICKDRAW","PENMODE"}, {0xa8a1,"QUICKDRAW","FRAMERECT"},
+    {0xa8a7,"QUICKDRAW","SETRECT"},
     {0xa8a2,"QUICKDRAW","PAINTRECT"},
     {0xa8a4,"QUICKDRAW","INVERTRECT"},
     {0xa8a9,"QUICKDRAW","INSETRECT"}, {0xa8b0,"QUICKDRAW","FRAMEROUNDRECT"},
@@ -3557,6 +3568,52 @@ static bool currentPortIsScreen()
         && pixels == s_colorScreen;
 }
 
+static bool drawQuickDrawText(const uint8_t* text, uint16_t length,
+                              int16_t& top, int16_t& left,
+                              int16_t& bottom, int16_t& right)
+{
+    uint8_t* port = (uint8_t*)read32(s_qdThePort);
+    uint8_t* pixels;
+    uint16_t rowBytes;
+    int16_t mapTop, mapLeft, mapBottom, mapRight;
+    if (!port || (!text && length)
+        || !currentPortPixels(pixels, rowBytes, mapTop, mapLeft, mapBottom, mapRight)) return false;
+    uint16_t mode = read16(port + 72);
+    if (mode != 0 && mode != 1) return false; // srcCopy and srcOr are sufficient here
+
+    int16_t penV = (int16_t)read16(port + 48);
+    int16_t penH = (int16_t)read16(port + 50);
+    top = (int16_t)(penV - 7);
+    left = penH;
+    bottom = penV;
+    right = (int16_t)(penH + length * 6);
+
+    uint8_t** clipHandle = (uint8_t**)read32(port + 28);
+    uint8_t* clip = clipHandle ? *clipHandle : 0;
+    int16_t clipTop = mapTop, clipLeft = mapLeft, clipBottom = mapBottom, clipRight = mapRight;
+    if (clip && read16(clip) >= 10) {
+        clipTop = (int16_t)read16(clip + 2);
+        clipLeft = (int16_t)read16(clip + 4);
+        clipBottom = (int16_t)read16(clip + 6);
+        clipRight = (int16_t)read16(clip + 8);
+    }
+    for (uint16_t i = 0; i < length; ++i) {
+        for (uint16_t row = 0; row < 7; ++row) {
+            uint8_t bits = pictureGlyphRow(text[i], row);
+            for (uint16_t column = 0; column < 5; ++column) {
+                if (!(bits & (16u >> column))) continue;
+                int16_t x = (int16_t)(penH + i * 6 + column);
+                int16_t y = (int16_t)(penV - 7 + row);
+                if (y < mapTop || y >= mapBottom || x < mapLeft || x >= mapRight
+                    || y < clipTop || y >= clipBottom || x < clipLeft || x >= clipRight) continue;
+                setPackedPixel(pixels, rowBytes, mapTop, mapLeft, x, y, 15);
+            }
+        }
+    }
+    write16(port + 50, (uint16_t)right);      // QuickDraw advances the pen location
+    return true;
+}
+
 static bool copyBits(const uint8_t* sourceBitmap, const uint8_t* destinationBitmap,
                      const uint8_t* sourceRect, const uint8_t* destinationRect,
                      uint16_t mode, const uint8_t* maskRegion)
@@ -5219,7 +5276,7 @@ static void updateDrivingInputProbe()
 #endif
 }
 
-#ifdef VETTE_FREEWAY_START
+#if defined(VETTE_FREEWAY_START) || defined(VETTE_FINISH_CHECKPOINT)
 static void relocateDiagnosticCar(uint8_t* car, uint32_t x, uint32_t z, uint16_t heading)
 {
     // Traffic keeps the rendered position, physics position, swept-collision
@@ -5293,6 +5350,28 @@ static void refreshDrivingKeyMap()
         keyMap[0x5b >> 3] |= 1u << (0x5b & 7); // keypad 8: accelerate
 #endif
     }
+#ifdef VETTE_FINISH_CHECKPOINT
+        // Course One's finish is collision selector 58, rectangle 0, in Main
+        // Map cell (2,24): local u 384..640, local v 0..384.  Its centre is
+        // also the game's genuine Course Two start.  Move every current,
+        // physics, swept, and history coordinate together so this is a
+        // stationary checkpoint rather than a map-wide collision segment.
+        // Traffic+$59A2 and +$52A6 remain solely responsible for recognizing
+        // the course, ending the race, choosing win/loss, invoking Score, and
+        // returning to the garage.
+    static bool finishCheckpointPlaced;
+    uint8_t* finishCheckpointCar = (uint8_t*)read32(s_currentA5 - 13944);
+    if (!finishCheckpointPlaced && finishCheckpointCar
+            && s_garageGearPhase >= 2
+            && (int16_t)read16(s_currentA5 - 13296) >= 3) {
+        relocateDiagnosticCar(finishCheckpointCar,
+                              (2UL << 11) + 448,
+                              (24UL << 11) + 160,
+                              0x3000);
+        write16(finishCheckpointCar + 26, 0);
+        finishCheckpointPlaced = true;
+    }
+#endif
 #ifdef VETTE_FREEWAY_ROUTE
     // Course Two begins at cell (2,24), one cell north of an FWTP key.  Reach
     // it through the original drivetrain: use keypad steering to settle on a
@@ -5713,6 +5792,10 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
 #ifdef VETTE_GARAGE_CLICK
     if (trap == 0xa9bc && read16(userStack) == 140)
         s_garageRecoveryPictureLoaded = true;
+#ifdef VETTE_FINISH_CHECKPOINT
+    if (trap == 0xa9bc && read16(userStack) >= 135 && read16(userStack) <= 141)
+        s_finishResultScreenEntered = true;
+#endif
 #endif
 #ifdef VETTE_PROBE
     if (trap == 0xa9bc && read16(userStack) == 140 && !g_probePicture140TrapPC) {
@@ -5874,7 +5957,7 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
     if (trap == 0xa970) {                    // GetNextEvent(mask, event) -> Boolean
         uint8_t* event = (uint8_t*)read32(userStack);
         if (event) {
-            write16(userStack + 6, nextEvent(read16(userStack + 4), event) ? 1 : 0);
+            writeBoolean(userStack + 6, nextEvent(read16(userStack + 4), event));
             if (exitChordPressed()) requestExitAfterTrap(frame);
             if (g_stageCDepth < 81) g_stageCDepth = 81;
             return 7;
@@ -6297,6 +6380,28 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
         if (g_stageCDepth < 83) g_stageCDepth = 83;
         return 5;
     }
+    if (trap == 0xa8a7) {                    // SetRect(Rect*, left, top, right, bottom)
+        uint8_t* rectangle = (uint8_t*)read32(userStack + 8);
+        int16_t bottom = (int16_t)read16(userStack);
+        int16_t right = (int16_t)read16(userStack + 2);
+        int16_t top = (int16_t)read16(userStack + 4);
+        int16_t left = (int16_t)read16(userStack + 6);
+        if (rectangle) {
+            writeRect(rectangle, top, left, bottom, right);
+        }
+#ifdef VETTE_FINISH_CHECKPOINT
+        // Score+$590 constructs its Top Ten/result surface with this exact
+        // rectangle before drawing the table and waiting for Button.  Some
+        // finish branches also show PICT 135..141 first, so either genuine
+        // screen boundary arms the diagnostic's one synthetic acknowledgement.
+        if (top == 0 && left == 0 && bottom == 362 && right == 512) {
+            s_finishResultScreenEntered = true;
+            s_finishResultSkipped = false;   // arm the separate Top Ten acknowledgement
+        }
+#endif
+        if (g_stageCDepth < 97) g_stageCDepth = 97;
+        return 13;
+    }
     if (trap == 0xa8ad) {                    // PtInRect(Point, Rect*) -> Boolean
         const uint8_t* rectangle = (const uint8_t*)read32(userStack);
         int16_t vertical = (int16_t)read16(userStack + 4);
@@ -6320,7 +6425,10 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
         return 5;
     }
     if (trap == 0xa973) {                    // StillDown() -> Boolean
-        write16(userStack, AmigaHardware::isLeftMouseButtonPressed() ? 1 : 0);
+        // Macintosh Boolean is an 8-bit type in a word-aligned result slot.
+        // Some Vette callers test the byte and others test the whole word, so
+        // place the value in the first (big-endian) byte and clear the pad.
+        writeBoolean(userStack, AmigaHardware::isLeftMouseButtonPressed());
         if (exitChordPressed()) requestExitAfterTrap(frame);
         if (g_stageCDepth < 87) g_stageCDepth = 87;
         return 1;
@@ -6468,6 +6576,69 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
         if (g_stageCDepth < 35) g_stageCDepth = 35;
         return 3;
     }
+    if (trap == 0xa887) {                    // TextFont(font)
+        uint8_t* port = (uint8_t*)read32(s_qdThePort);
+        if (port) write16(port + 68, read16(userStack));
+        if (g_stageCDepth < 97) g_stageCDepth = 97;
+        return 3;
+    }
+    if (trap == 0xa888) {                    // TextFace(face)
+        uint8_t* port = (uint8_t*)read32(s_qdThePort);
+        if (port) port[70] = userStack[1];
+        if (g_stageCDepth < 97) g_stageCDepth = 97;
+        return 3;
+    }
+    if (trap == 0xa88a) {                    // TextSize(size)
+        uint8_t* port = (uint8_t*)read32(s_qdThePort);
+        if (port) write16(port + 74, read16(userStack));
+        if (g_stageCDepth < 97) g_stageCDepth = 97;
+        return 3;
+    }
+    if (trap == 0xa88e) {                    // SpaceExtra(extra: Fixed)
+        uint8_t* port = (uint8_t*)read32(s_qdThePort);
+        if (port) write32(port + 76, read32(userStack));
+        if (g_stageCDepth < 97) g_stageCDepth = 97;
+        return 5;
+    }
+    if (trap == 0xa893) {                    // MoveTo(horizontal, vertical)
+        uint8_t* port = (uint8_t*)read32(s_qdThePort);
+        if (port) {
+            write16(port + 48, read16(userStack));
+            write16(port + 50, read16(userStack + 2));
+        }
+        if (g_stageCDepth < 97) g_stageCDepth = 97;
+        return 5;
+    }
+    if (trap == 0xa884) {                    // DrawString(Pascal string)
+        const uint8_t* string = (const uint8_t*)read32(userStack);
+        int16_t top, left, bottom, right;
+        if (string && drawQuickDrawText(string + 1, string[0], top, left, bottom, right)) {
+            if (currentPortIsScreen()) markDirtyBounds(top, left, bottom, right);
+            if (g_stageCDepth < 97) g_stageCDepth = 97;
+            return 5;
+        }
+    }
+    if (trap == 0xa883) {                    // DrawChar(character)
+        uint8_t character = userStack[1];
+        int16_t top, left, bottom, right;
+        if (drawQuickDrawText(&character, 1, top, left, bottom, right)) {
+            if (currentPortIsScreen()) markDirtyBounds(top, left, bottom, right);
+            if (g_stageCDepth < 97) g_stageCDepth = 97;
+            return 3;
+        }
+    }
+    if (trap == 0xa885) {                    // DrawText(text, firstByte, byteCount)
+        const uint8_t* text = (const uint8_t*)read32(userStack + 4);
+        uint16_t firstByte = read16(userStack + 2);
+        uint16_t byteCount = read16(userStack);
+        int16_t top, left, bottom, right;
+        if (text && drawQuickDrawText(text + firstByte, byteCount,
+                                      top, left, bottom, right)) {
+            if (currentPortIsScreen()) markDirtyBounds(top, left, bottom, right);
+            if (g_stageCDepth < 97) g_stageCDepth = 97;
+            return 9;
+        }
+    }
     if (trap == 0xa89b) {                    // PenSize(horizontal, vertical)
         uint8_t* port = (uint8_t*)read32(s_qdThePort);
         if (port) {
@@ -6515,8 +6686,22 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
             pressed = true;
             s_garageRecoverySkipped = true;
         }
+#ifdef VETTE_FINISH_CHECKPOINT
+        // Traffic+$52A6 chooses one of the shipped single-player result
+        // pictures 135..141, then Main+$0F82 waits for Button. Advance that
+        // ordinary result-screen branch once in the bounded lifecycle proof.
+        if (s_finishResultScreenEntered && !s_finishResultSkipped) {
+            pressed = true;
+            s_finishResultSkipped = true;
+            // A real click observed through Button is followed by a mouse-up
+            // transition in GetNextEvent.  Prime that same state change so
+            // the bounded diagnostic leaves Main's driving event loop instead
+            // of waiting forever after its synthetic acknowledgement.
+            s_mouseButtonDown = true;
+        }
 #endif
-        write16(userStack, pressed ? 1 : 0);
+#endif
+        writeBoolean(userStack, pressed);
         if (exitChordPressed()) requestExitAfterTrap(frame);
         if (g_stageCDepth < 64) g_stageCDepth = 64;
         return 1;
