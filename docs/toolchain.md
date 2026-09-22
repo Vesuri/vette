@@ -119,6 +119,12 @@ indexes the native maps; the eleven byte-packed CODE payloads are copied to
 aligned resident allocations before patching and execution. Development launch
 scripts stage the local extracts with `amiga/stage_original_data.sh`.
 
+For a user-facing install, `tools/install_original_data.py` accepts either the
+original fork-preserving NDIF `VETTE!.img` or the decoded raw HFS image. It
+extracts the Color application and data resource forks directly, rejects any
+version other than the supported 1.02 byte fingerprints, and writes the exact
+two files the executable opens. See `docs/install-original-data.md`.
+
 **1. StuffIt 5 → `unar`, and there is no second option.** `7z`/p7zip handles no SIT at all; the
 `macutils` `macunpack` lineage stops at StuffIt 1.5.1; Aladdin's own StuffIt Expander was 32-bit and
 cannot run on a 64-bit-only macOS. `unar` (the XADMaster engine behind The Unarchiver) is the only

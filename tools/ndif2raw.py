@@ -76,17 +76,15 @@ def dc_checksum(data):
         s = ((s >> 1) | ((s & 1) << 31)) & 0xffffffff
     return s
 
-def main():
-    if len(sys.argv) != 3:
-        raise SystemExit("usage: ndif2raw.py <image.img> <out.raw>\n"
-                         "       (reads <image.img>/..namedfork/rsrc)")
-    src, dst = sys.argv[1], sys.argv[2]
-    data = open(src, 'rb').read()
+def named_resource_fork(src):
     try:
-        rsrc = open(src + '/..namedfork/rsrc', 'rb').read()
+        return open(src + '/..namedfork/rsrc', 'rb').read()
     except OSError:
         raise SystemExit("%s has no resource fork - the bcem block map is in it, "
                          "so a copy that lost the fork cannot be converted" % src)
+
+
+def decode_ndif(data, rsrc, verbose=True):
     bcem = resource(rsrc, 'bcem', 128)
 
     nl = bcem[4]
@@ -94,8 +92,9 @@ def main():
     sectors, = struct.unpack('>I', bcem[68:72])
     crc, = struct.unpack('>I', bcem[80:84])
     nchunks, = struct.unpack('>I', bcem[124:128])
-    print("volume %r  %d sectors (%d bytes)  checksum $%08X  %d map entries"
-          % (name, sectors, sectors * 512, crc, nchunks))
+    if verbose:
+        print("volume %r  %d sectors (%d bytes)  checksum $%08X  %d map entries"
+              % (name, sectors, sectors * 512, crc, nchunks))
 
     out = bytearray(sectors * 512)
     covered = 0
@@ -113,13 +112,26 @@ def main():
                              "make this LOUD rather than emitting a hole" % (i, typ, start))
         out[start * 512:start * 512 + len(blk)] = blk
         covered = max(covered, start + len(blk) // 512)
-        print("  chunk %2d  type 0x%02x  sector %6d  %7d -> %7d" % (i, typ, start, ln, len(blk)))
+        if verbose:
+            print("  chunk %2d  type 0x%02x  sector %6d  %7d -> %7d"
+                  % (i, typ, start, ln, len(blk)))
 
     got = dc_checksum(out)
-    print("covered %d of %d sectors; rest zero filled" % (covered, sectors))
-    print("recorded checksum $%08X, add-then-ROR over this image $%08X%s"
-          % (crc, got, "" if got == crc else "  (algorithm unidentified -- "
-             "NOT a corruption signal; validate with hfs_extract.py)"))
+    if verbose:
+        print("covered %d of %d sectors; rest zero filled" % (covered, sectors))
+        print("recorded checksum $%08X, add-then-ROR over this image $%08X%s"
+              % (crc, got, "" if got == crc else "  (algorithm unidentified -- "
+                 "NOT a corruption signal; validate with hfs_extract.py)"))
+    return bytes(out)
+
+
+def main():
+    if len(sys.argv) != 3:
+        raise SystemExit("usage: ndif2raw.py <image.img> <out.raw>\n"
+                         "       (reads <image.img>/..namedfork/rsrc)")
+    src, dst = sys.argv[1], sys.argv[2]
+    data = open(src, 'rb').read()
+    out = decode_ndif(data, named_resource_fork(src))
     open(dst, 'wb').write(out)
     print("wrote %s (%d bytes)" % (dst, len(out)))
     return 0
