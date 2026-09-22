@@ -27,6 +27,7 @@ local driving_motion = os.getenv("VETTE_DRIVING_MOTION") == "1"
 local driving_audio = os.getenv("VETTE_DRIVING_AUDIO") == "1"
 local driving_run = driving_motion or driving_audio
 local driving_view = os.getenv("VETTE_DRIVING_VIEW")
+local driving_view_key = os.getenv("VETTE_DRIVING_VIEW_KEY") or driving_view
 local follow_road = os.getenv("VETTE_FOLLOW_ROAD") == "1"
 local driving_capture_limit = driving_motion and 40 or 4
 local trace_random = os.getenv("VETTE_RANDOM_TRACE") == "1"
@@ -783,11 +784,11 @@ mac.run(function()
 		if not shifted then return end
 		if driving_view then
 			local view_iteration = driving_iterations
-			mac.key_down(driving_view)
+			mac.key_down(driving_view_key)
 			if not mac.wait_for("view key scan", function()
 				return driving_iterations > view_iteration
 			end, 600) then return end
-			mac.key_up(driving_view)
+			mac.key_up(driving_view_key)
 		end
 		if follow_road then
 			if not mac.wait_for("initial right turn", function()

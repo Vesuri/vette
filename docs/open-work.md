@@ -81,7 +81,11 @@ is consequently renumbered.
    harnesses shift normally and pulse the original view key for one complete scanner iteration,
    `make driving-f1-compare` proves the 512x255 principal-view region exact at a shared moving
    state. Rows 255–256 remain outside that gate because their Traffic-dependent lower strip is not
-   synchronized by the player-state key.
+   synchronized by the player-state key. The generalized oracle now independently proves F2,
+   F3, F4, F5, and rear-mirror-off exact over the same 512x255 region at one or more shared moving
+   player states. Each view retains separate target artifacts, and `make driving-view-regression`
+   recaptures and gates all six modes. Principal-view and mirror coverage is complete; only the
+   equivalent complete-object Traffic checkpoint remains in this item.
 2. **Establish the performance target.** The full-accounting target-A1200 profile is now in place
    and identified presentation as 80.353% of the first moving-driving baseline. After removing a
    fully overwritten synchronization copy, adding the packed word-write C2P kernel, and deriving a
@@ -176,7 +180,9 @@ is consequently renumbered.
    one exact 512x198 exterior view. The current shared moving state is exact across all 101,376
    pixels. Audio driving uses a distinct harness mode, so it can no longer erase or replace the
    straight-driving visual oracle. The complete Traffic-roster comparator remains intentionally
-   fail-closed until an equivalent whole-simulation phase exists.
+   fail-closed until an equivalent whole-simulation phase exists. The view matrix now uses the
+   same fail-closed pattern for F1–F5 and mirror-off and requires a pixel-exact 512x255 moving pair
+   for every mode.
 
 ## Core game completion — after the fidelity/performance pass
 

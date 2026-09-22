@@ -8,7 +8,7 @@
 #
 # The Amiga build is in amiga/ and is the real target: `cd amiga && . ./env.sh && make`.
 
-.PHONY: all todo driving-sequence-capture driving-sequence-compare driving-motion-reference driving-view-reference driving-view-capture driving-view-compare driving-f1-reference driving-f1-capture driving-f1-compare driving-audio-reference driving-audio-capture driving-audio-compare driving-audio-regression driving-motion-capture driving-motion-compare driving-motion-viewport-compare driving-profile help
+.PHONY: all todo driving-sequence-capture driving-sequence-compare driving-motion-reference driving-view-reference driving-view-capture driving-view-compare driving-view-regression driving-f1-reference driving-f1-capture driving-f1-compare driving-audio-reference driving-audio-capture driving-audio-compare driving-audio-regression driving-motion-capture driving-motion-compare driving-motion-viewport-compare driving-profile help
 
 all: help
 
@@ -25,6 +25,7 @@ help:
 	@echo "  make driving-f1-capture        capture matching moving F1-view Amiga frames"
 	@echo "  make driving-f1-compare        gate a pixel-exact state-paired F1 view"
 	@echo "  make driving-view-compare VIEW=F3 RAW_KEY=0x52  gate another moving view"
+	@echo "  make driving-view-regression   recapture and gate F1-F5 plus mirror-off"
 	@echo "  make driving-audio-reference   capture/report Macintosh intro and moving-driving audio"
 	@echo "  make driving-audio-capture     capture target Bogas/Paula events for the same road workload"
 	@echo "  make driving-audio-compare     compare reference/target audio events by source progression"
@@ -81,7 +82,8 @@ driving-motion-reference:
 driving-view-reference:
 	@test -n "$(VIEW)" || { echo "VIEW is required (for example F3 or MIRROROFF)"; exit 1; }
 	@timeout -k 5 300 env SDL_VIDEODRIVER=dummy VETTE_DRIVING_MOTION=1 \
-		VETTE_DRIVING_VIEW=$(VIEW) VETTE_FIDELITY_RANDOM_SEED=3BD90000 \
+		VETTE_DRIVING_VIEW=$(VIEW) VETTE_DRIVING_VIEW_KEY='$(or $(MAC_KEY),$(VIEW))' \
+		VETTE_FIDELITY_RANDOM_SEED=3BD90000 \
 		mame mac2fdhd -rompath ref/mame/roms -nb9 mdc48 \
 		-ramsize 8M -hard ref/mame/hd/608_2GB_drive.hd \
 		-video none -sound none -window -skip_gameinfo -nothrottle \
@@ -153,6 +155,7 @@ driving-motion-capture:
 	  ./diag_run.sh 150
 
 driving-view-capture:
+	@test -n "$(VIEW)" || { echo "VIEW is required (for example F3 or MIRROROFF)"; exit 1; }
 	@test -n "$(RAW_KEY)" || { echo "RAW_KEY is required (for example 0x52 for F3)"; exit 1; }
 	@rm -f tmp/driving-motion-sequence.tsv tmp/driving-motion-source-*.raw tmp/driving-motion-globals-*.bin tmp/driving-motion-car-*.bin tmp/driving-motion-object-*.bin
 	@cd amiga && . ./env.sh && $(MAKE) clean && \
@@ -160,22 +163,43 @@ driving-view-capture:
 	    VIEW_CAPTURE_RAW_KEY=$(RAW_KEY) MOTION_CAPTURE=1 && \
 	  GDBTAIL=160 EXTRA_ARGS="--warp_mode=1" GDBSCRIPT=driving_motion_sequence.gdb \
 	  ./diag_run.sh 150
+	@rm -f tmp/driving-$(shell echo $(VIEW) | tr A-Z a-z)-sequence.tsv \
+		tmp/driving-$(shell echo $(VIEW) | tr A-Z a-z)-source-*.raw \
+		tmp/driving-$(shell echo $(VIEW) | tr A-Z a-z)-globals-*.bin \
+		tmp/driving-$(shell echo $(VIEW) | tr A-Z a-z)-car-*.bin \
+		tmp/driving-$(shell echo $(VIEW) | tr A-Z a-z)-object-*.bin
+	@cp tmp/driving-motion-sequence.tsv tmp/driving-$(shell echo $(VIEW) | tr A-Z a-z)-sequence.tsv
+	@for kind in source globals car object; do \
+	  for path in tmp/driving-motion-$$kind-*; do \
+	    test -e "$$path" || continue; \
+	    cp "$$path" "$${path/driving-motion/driving-$(shell echo $(VIEW) | tr A-Z a-z)}"; \
+	  done; \
+	done
 
 driving-f1-capture:
-	@$(MAKE) driving-view-capture RAW_KEY=0x50
+	@$(MAKE) driving-view-capture VIEW=F1 RAW_KEY=0x50
 
 driving-view-compare:
 	@test -n "$(VIEW)" || { echo "VIEW is required (for example F3 or MIRROROFF)"; exit 1; }
 	@python3 tools/compare_driving_sequence.py \
-		ref/mame/driving-$(shell echo $(VIEW) | tr A-Z a-z)-source tmp/driving-motion-source \
+		ref/mame/driving-$(shell echo $(VIEW) | tr A-Z a-z)-source tmp/driving-$(shell echo $(VIEW) | tr A-Z a-z)-source \
 		--reference-manifest ref/mame/driving-$(shell echo $(VIEW) | tr A-Z a-z)-sequence.tsv \
-		--amiga-manifest tmp/driving-motion-sequence.tsv \
+		--amiga-manifest tmp/driving-$(shell echo $(VIEW) | tr A-Z a-z)-sequence.tsv \
 		--match-state --state-field physics_x --state-field physics_y \
 		--left 0 --top 0 --width 512 --height $(or $(HEIGHT),255) \
 		--require-any-exact
 
 driving-f1-compare:
 	@$(MAKE) driving-view-compare VIEW=F1 HEIGHT=255
+
+# Macintosh references are slow local oracle artifacts and are captured
+# separately. Rebuild and rerun every target view against those references.
+driving-view-regression:
+	@for spec in F1:0x50 F2:0x51 F3:0x52 F4:0x53 F5:0x54 MIRROROFF:0x06; do \
+	  view=$${spec%%:*}; raw=$${spec##*:}; \
+	  $(MAKE) driving-view-capture VIEW=$$view RAW_KEY=$$raw || exit $$?; \
+	  $(MAKE) driving-view-compare VIEW=$$view HEIGHT=255 || exit $$?; \
+	done
 
 driving-motion-compare:
 	@python3 tools/compare_driving_sequence.py \

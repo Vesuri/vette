@@ -464,6 +464,16 @@ composition strip whose Traffic phase is not part of the player-state key. `make
 driving-f1-compare` consequently gates the renderer-owned principal view without laundering that
 separate synchronization debt.
 
+The same state-paired source oracle now covers every documented principal view and the mirror
+toggle. F2 (forward), F3 (right), F4 (helicopter), F5 (front dash), and top-row 6 (rear mirror
+off) all produce at least one independently shared moving player state whose complete 512x255
+source region is pixel-exact. In the retained measurements F3 has three exact pairs, F5 and
+mirror-off have two each, and F2 has two. F4 has one exact pair; two other player-matched pairs
+differ only where independently phased moving objects occupy the lower external-car area. The
+generic capture preserves each view's artifacts separately, and `make driving-view-regression`
+reruns all six target captures against their saved Macintosh references. It remains fail-closed
+when a run happens to contain no common state or no exact pair.
+
 Raw Amiga F5 (`$54`, Macintosh virtual `$60`) likewise takes the documented “Front Dash” branch
 without a new trap. The run remains in driving at depth 93 through 3,444 ticks and 70/70 frames.
 At matched presentation 40, `driving_f5_capture.gdb` records hash `3441bd48…`, differing from the
