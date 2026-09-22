@@ -5409,25 +5409,42 @@ static void refreshDrivingKeyMap()
 #endif
     }
 #ifdef VETTE_FINISH_CHECKPOINT
-        // Course One's finish is collision selector 58, rectangle 0, in Main
-        // Map cell (2,24): local u 384..640, local v 0..384.  Its centre is
-        // also the game's genuine Course Two start.  Move every current,
-        // physics, swept, and history coordinate together so this is a
-        // stationary checkpoint rather than a map-wide collision segment.
-        // Traffic+$59A2 and +$52A6 remain solely responsible for recognizing
-        // the course, ending the race, choosing win/loss, invoking Score, and
-        // returning to the garage.
-    static bool finishCheckpointPlaced;
+    // The three source-defined endpoints form a cycle and are also the next
+    // course's genuine start:
+    //   course 0: selector 58:0, cell (2,24) -> Traffic+$59A2
+    //   course 1: selector 15:0, cell (29,44) -> Traffic+$5602
+    //   course 2: selector 59:0, cell (6,2) -> Traffic+$59C8
+    // Course Four is represented by course 0 plus A5-$5082 and advances
+    // through all three handlers.  Move the complete stationary coordinate
+    // history to each endpoint in turn; the original handlers alone decide
+    // whether to advance a long leg or end, score, and return to the garage.
+    static uint8_t finishCheckpointLeg;
+    static const uint32_t finishX[] = {
+        (2UL << 11) + 448, (29UL << 11) + 416, (6UL << 11) + 400
+    };
+    static const uint32_t finishZ[] = {
+        (24UL << 11) + 160, (44UL << 11) + 224, (2UL << 11) + 1920
+    };
+#if defined(VETTE_GARAGE_COURSE) && VETTE_GARAGE_COURSE == 2
+    const uint8_t firstFinishLeg = 1, finishLegCount = 1;
+#elif defined(VETTE_GARAGE_COURSE) && VETTE_GARAGE_COURSE == 3
+    const uint8_t firstFinishLeg = 2, finishLegCount = 1;
+#elif defined(VETTE_GARAGE_COURSE) && VETTE_GARAGE_COURSE == 4
+    const uint8_t firstFinishLeg = 0, finishLegCount = 3;
+#else
+    const uint8_t firstFinishLeg = 0, finishLegCount = 1;
+#endif
     uint8_t* finishCheckpointCar = (uint8_t*)read32(s_currentA5 - 13944);
-    if (!finishCheckpointPlaced && finishCheckpointCar
+    uint8_t leg = (uint8_t)(firstFinishLeg + finishCheckpointLeg);
+    if (finishCheckpointLeg < finishLegCount && finishCheckpointCar
             && s_garageGearPhase >= 2
-            && (int16_t)read16(s_currentA5 - 13296) >= 3) {
+            && (int16_t)read16(s_currentA5 - 13296) >= 3
+            && (uint8_t)*(s_currentA5 - 0x555a) == leg) {
         relocateDiagnosticCar(finishCheckpointCar,
-                              (2UL << 11) + 448,
-                              (24UL << 11) + 160,
+                              finishX[leg], finishZ[leg],
                               0x3000);
         write16(finishCheckpointCar + 26, 0);
-        finishCheckpointPlaced = true;
+        ++finishCheckpointLeg;
     }
 #endif
 #ifdef VETTE_DAMAGE_REPAIR_CHECKPOINT

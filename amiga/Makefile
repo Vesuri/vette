@@ -10,7 +10,7 @@
 #   make GARAGE_CLICK=1 GARAGE_COURSE=2  select Course Two through its real UI before ACCEPT
 #   make GARAGE_CLICK=1 FREEWAY_ROUTE=1  steer by normal KeyMap input toward the Course Two freeway
 #   make GARAGE_CLICK=1 FOLLOW_ROAD=1    turn right at the Course One start, then follow the road
-#   make GARAGE_CLICK=1 FINISH_CHECKPOINT=1  enter Course One's source-defined finish rectangle
+#   make GARAGE_CLICK=1 FINISH_CHECKPOINT=1  enter the selected course's source-defined finish rectangle(s)
 #   make GARAGE_CLICK=1 DAMAGE_REPAIR_CHECKPOINT=1  exercise Pro damage and gas-station repair
 #   make GARAGE_CLICK=1 TERMINAL_DAMAGE_CHECKPOINT=1 exercise the beyond-repair tow lifecycle
 #   make GARAGE_CLICK=1 POLICE_TICKET_CHECKPOINT=1 exercise all ordinary police penalties

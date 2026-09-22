@@ -2047,16 +2047,23 @@ the identical garage, shift, acceleration, and road-following workload without a
 or writing any visual capture. Visual and audio regressions consequently have independent inputs
 and artifact lifetimes.
 
-## One complete race lifecycle
+## Complete course lifecycles
 
-Course One's source-defined finish is collision selector 58, rectangle 0, in Main Map cell
-`(2,24)`, with local bounds `(u=384..640,v=0..384)`. `FINISH_CHECKPOINT=1` is a diagnostic-only
-entry: after the ordinary garage choices, countdown, shift, and live race state, it moves the
-player's complete rendered, physics, swept-collision, and history coordinate set to the centre of
-that rectangle. It does not alter the course, result latch, collision selector, finish response,
-score, or front-end state. The original `Traffic+$59A2` response therefore recognizes the finish,
-and the common `Traffic+$52A6` path clears the driving flag, chooses the shipped result, and calls
-Score.
+The three source-defined endpoints form a cycle. Course One ends at collision selector 58 record 0
+in Main Map cell `(2,24)`, Course Two at selector 15 record 0 in `(29,44)`, and Course Three at
+selector 59 record 0 in `(6,2)`. Their original handlers are respectively `Traffic+$59A2`,
+`Traffic+$5602`, and `Traffic+$59C8`. Each endpoint is also the next course's genuine start.
+Course Four is the original long-course representation—course byte zero plus A5-$5082 set—and its
+handlers advance through all three endpoints before the common finish.
+
+`FINISH_CHECKPOINT=1` is a diagnostic-only entry. After the ordinary garage choices, countdown,
+shift, and live race state, it moves the player's complete rendered, physics, swept-collision, and
+history coordinate set to the exact decoded midpoint of the applicable rectangle. It does not
+alter the course, long-course flag, result latch, collision selector, finish response, score, or
+front-end state. For Course Four it waits for each original handler to advance the course byte
+before placing the next endpoint. The handlers alone therefore decide whether to advance a long
+leg or enter the common `Traffic+$52A6` finish, which clears driving state, chooses the shipped
+result, and calls Score.
 
 That first finish exposed four ordinary QuickDraw dependencies in Score: `SetRect`, the GrafPort
 text attributes, `MoveTo`, and `DrawString`/`DrawChar`/`DrawText`. The port now stores all of those
@@ -2077,13 +2084,16 @@ acknowledgement also leaves the matching mouse-up transition for `GetNextEvent`,
 click does, so the test follows Main out of its driving event loop instead of patching its branch.
 Production builds synthesize none of these inputs.
 
-`amiga/driving_race_lifecycle.gdb` is the fail-fast proof. With
-`PROBES=1 SKIP_INTRO=1 GARAGE_CLICK=1 FINISH_CHECKPOINT=1`, it observes exactly one
-`Traffic+$59A2` finish, the common finish core, one Score entry and return, Main's driving-loop exit,
-the outer `Main+$1F52` return, and completion of the following A5+$462 post-driving/garage handoff.
-The settled record is at tick 2271 with driving presentation state zero and no loud stop. This
-closes the first complete garage → choices → countdown → driving → finish/result/score → garage
-cycle; adverse outcomes and the other courses remain separate queue items.
+`amiga/driving_course_lifecycle.gdb` is the fail-fast proof. With
+`PROBES=1 SKIP_INTRO=1 GARAGE_CLICK=1 FINISH_CHECKPOINT=1 GARAGE_COURSE=N`, it records every endpoint,
+the common finish core, one Score entry and return, Main's driving-loop exit, the outer
+`Main+$1F52` return, and completion of the following A5+$462 post-driving/garage handoff. Course One
+settles at tick 1195 after endpoint 0, Course Two at tick 1197 after endpoint 1, Course Three at tick
+1200 after endpoint 2, and Course Four at tick 1224 after endpoint sequence 0, 1, 2. Each has exactly
+one common finish and Score call/return, driving presentation state zero, and no loud stop. This
+closes garage → choices → countdown → driving → original
+finish/result/score → garage for every shipped course selection. Route and mode diversity remain
+separate queue items.
 
 ## Correction to the MAME log
 
