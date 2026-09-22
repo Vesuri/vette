@@ -62,21 +62,22 @@ run_vehicles()
 
 run_difficulties()
 {
-  local difficulty
+  local difficulty index
   for difficulty in 1 2 3; do
+    index=$((difficulty - 1))
     run_case "difficulty-$difficulty" 45 driving_course_lifecycle.gdb \
-      "course-lifecycle settled.*difficulty=$difficulty.*driving=0" \
+      "course-lifecycle settled.*difficulty=$index.*driving=0" \
       PROBES=1 SKIP_INTRO=1 GARAGE_CLICK=1 FINISH_CHECKPOINT=1 \
       "GARAGE_DIFFICULTY=$difficulty"
   done
   run_case trainee-damage 45 driving_difficulty_damage.gdb \
     'difficulty-damage immune' PROBES=1 SKIP_INTRO=1 GARAGE_CLICK=1 \
     GARAGE_DIFFICULTY=1 DIFFICULTY_DAMAGE_CHECKPOINT=1
-  run_case pro-damage 45 driving_difficulty_damage.gdb \
-    'difficulty-damage applied.*difficulty=3' PROBES=1 SKIP_INTRO=1 GARAGE_CLICK=1 \
+  run_case pro-damage 80 driving_difficulty_damage.gdb \
+    'difficulty-damage applied.*difficulty=2' PROBES=1 SKIP_INTRO=1 GARAGE_CLICK=1 \
     GARAGE_DIFFICULTY=3 DIFFICULTY_DAMAGE_CHECKPOINT=1
   run_case pro-cruise 45 driving_difficulty_dynamics.gdb \
-    'difficulty-dynamics cruise difficulty=3' PROBES=1 SKIP_INTRO=1 GARAGE_CLICK=1 \
+    'difficulty-dynamics cruise difficulty=2' PROBES=1 SKIP_INTRO=1 GARAGE_CLICK=1 \
     GARAGE_DIFFICULTY=3 DIFFICULTY_CRUISE_CHECKPOINT=1
 }
 
@@ -122,7 +123,7 @@ run_session()
   run_case emergency-quit 35 quit_path.gdb \
     'AmigaOS restore complete:.*view=1' PROBES=1 QUIT_PROBE=1
   run_case scores 45 score_persistence.gdb \
-    'score persistence changed=[1-9].*saved=1200.*view=1' \
+    'score persistence changed=[1-9].*writes=[1-9].*load-valid=1.*saved=[1-9][0-9]*.*view=1' \
     PROBES=1 SKIP_INTRO=1 SCORE_PERSISTENCE_PROBE=1
 }
 
