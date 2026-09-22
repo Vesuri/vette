@@ -1363,6 +1363,26 @@ The shipped code closes the causal gap: `Traffic+$5AC2` sets the stop/recovery s
 Lake Merced collision is therefore QUAD static-bounds behavior, not a moving-object `COLL` hit or a
 host-generated transition.
 
+The other recovery family is now closed through its enclosing transitions as well. The source map
+identifies Traffic+$4C86's eight 0..3 damage cells, difficulty/speed thresholds, low-two-tick-bit
+rate limiter, steering pull, and terminal sum; export 214 at Traffic+$5688 is the gas-station
+repair response. `DAMAGE_REPAIR_CHECKPOINT=1` waits for the short Course One route's natural
+collision, enters the authentic Rookie or Pro arm accepted by the current tick residue, and lets
+the original routine create damage. Only after that result exists does it place the complete car
+coordinate/history set in Main Map `(49,5)`, QUAD 3 / selector 26 / record 2, whose decoded special
+response is export 214. The measured run enters the station, clears all eight damage cells and the
+signed steering pull, sets repair active, and schedules the source-computed deadline from the
+damage sum.
+
+`TERMINAL_DAMAGE_CHECKPOINT=1` presents the same genuine collision with the valid cumulative state
+`{3,3,1,1,0,3,3,3}`. Traffic's untouched terminal formula reaches eight, clears driving, sets its
+terminal state, and requests the shipped tow recovery PICT 147. The deterministic garage harness
+now acknowledges both PICT 140 water recovery and PICT 147 beyond-repair recovery through their
+common original `Button` wait. The terminal trace then reaches Main+$29E6, the outer Main return,
+and the A5+$462 garage handoff with driving presentation disarmed and no loud stop.
+The observers are `amiga/driving_damage_repair.gdb` and `amiga/driving_terminal_tow.gdb`; ordinary
+builds install neither checkpoint.
+
 The trap-address table is now active as well as stateful. Control+left-mouse is sampled only after
 an original event-pump, `Button`, `StillDown`, or driving-boundary trap has completed; ordinary
 mouse clicks retain their one-button Macintosh meaning. The safe return is redirected through a

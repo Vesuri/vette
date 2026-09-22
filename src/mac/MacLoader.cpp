@@ -122,6 +122,9 @@ static const int16_t kShadowMouseV = -31276;
 static const int16_t kShadowMouseH = -31274;
 static const uint16_t kDrivingBoundaryTrap = 0xafff;
 static const uint16_t kDrivingRasterTrap = 0xaffd;
+#if defined(VETTE_DAMAGE_REPAIR_CHECKPOINT) || defined(VETTE_TERMINAL_DAMAGE_CHECKPOINT)
+static const uint16_t kAdverseDamageTrap = 0xaffc;
+#endif
 // CODE 9's twelve Pascal Bogas wrappers are replaced at their public entry
 // points.  Keep a distinct trap for each wrapper so no caller or scene needs
 // to know that Paula owns the implementation.
@@ -886,6 +889,21 @@ static bool installStaticCollisionProbe()
     uint8_t* hook = s_segments[6].begin + 0x3ffe;
     if (read16(hook) != 0x4243) return false;
     write16(hook, kStaticCollisionProbeTrap);
+#endif
+    return true;
+}
+
+static bool installAdverseDamageCheckpoint()
+{
+#if defined(VETTE_DAMAGE_REPAIR_CHECKPOINT) || defined(VETTE_TERMINAL_DAMAGE_CHECKPOINT)
+    // Traffic+$4C86 begins with CMPI.W #1,-$542C(A5), followed by the
+    // difficulty split. The diagnostic dispatcher supplies source-authored
+    // preconditions and resumes at the exact PRO arm, preserving the natural
+    // caller, collision, damage logic, terminal test, and recovery path.
+    uint8_t* hook = s_segments[6].begin + 0x4c86;
+    if (read16(hook) != 0x0c6d || read16(hook + 2) != 0x0001
+        || read16(hook + 4) != 0xabd4) return false;
+    write16(hook, kAdverseDamageTrap);
 #endif
     return true;
 }
@@ -5276,7 +5294,8 @@ static void updateDrivingInputProbe()
 #endif
 }
 
-#if defined(VETTE_FREEWAY_START) || defined(VETTE_FINISH_CHECKPOINT)
+#if defined(VETTE_FREEWAY_START) || defined(VETTE_FINISH_CHECKPOINT) \
+    || defined(VETTE_DAMAGE_REPAIR_CHECKPOINT)
 static void relocateDiagnosticCar(uint8_t* car, uint32_t x, uint32_t z, uint16_t heading)
 {
     // Traffic keeps the rendered position, physics position, swept-collision
@@ -5370,6 +5389,45 @@ static void refreshDrivingKeyMap()
                               0x3000);
         write16(finishCheckpointCar + 26, 0);
         finishCheckpointPlaced = true;
+    }
+#endif
+#ifdef VETTE_DAMAGE_REPAIR_CHECKPOINT
+    // Once the checkpointed original impact has created real damage, enter a
+    // decoded repair rectangle at the next safe frame boundary.
+    static uint8_t adverseCheckpointPhase;
+    uint8_t* adverseCar = (uint8_t*)read32(s_currentA5 - 13944);
+    bool adverseUnderway = adverseCar
+        && s_garageGearPhase >= 2
+        && (int16_t)read16(s_currentA5 - 13296) >= 3
+        && g_macDrivingIterations >= 40;
+    if (adverseUnderway && adverseCheckpointPhase == 0) {
+        bool damaged = false;
+        for (uint16_t i = 0; i != 8; ++i)
+            damaged |= read16(s_currentA5 - 0x346a + i * 2) != 0;
+        if (damaged) {
+            // Main Map cell (49,5) is QUAD 3 / selector 26. Its record 2
+            // (v=1100..1290,u=1178..1378) dispatches export 214, the shipped
+            // gas-station repair response. Stop between pump and building.
+            relocateDiagnosticCar(adverseCar,
+                                  (49UL << 11) + 1278,
+                                  (5UL << 11) + 1195,
+                                  read16(adverseCar + 0x66));
+            write16(adverseCar + 0x1a, 0);
+            write16(adverseCar + 0x1c, 0);
+            write16(adverseCar + 0x42, 0);
+            write16(adverseCar + 0x44, 0);
+            adverseCheckpointPhase = 1;
+        }
+    }
+    if (adverseCar && adverseCheckpointPhase == 1
+        && read16(s_currentA5 - 0x3458) == 0) {
+        // Stay parked for the one source response that starts repair. The
+        // generic garage harness otherwise keeps keypad-8 acceleration held.
+        keyMap[0x5b >> 3] &= (uint8_t)~(1u << (0x5b & 7));
+        write16(adverseCar + 0x1a, 0);
+        write16(adverseCar + 0x1c, 0);
+        write16(adverseCar + 0x42, 0);
+        write16(adverseCar + 0x44, 0);
     }
 #endif
 #ifdef VETTE_FREEWAY_ROUTE
@@ -5744,6 +5802,30 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
         suspendBogasAudio();
         return returnFromBogasTrap(frame, userStack, 0);
     }
+#if defined(VETTE_DAMAGE_REPAIR_CHECKPOINT) || defined(VETTE_TERMINAL_DAMAGE_CHECKPOINT)
+    if (trap == kAdverseDamageTrap
+        && pc == (uint32_t)(s_segments[6].begin + 0x4c86)) {
+        uint8_t* adverseCar = (uint8_t*)read32(s_currentA5 - 13944);
+        if (adverseCar) {
+            // The shipped low-two-tick-bit limiter accepts residue zero in
+            // Rookie and residues one..three in Pro. Select the corresponding
+            // real difficulty so this natural impact is deterministic without
+            // modifying TickCount or bypassing the limiter.
+            write16(s_currentA5 - 0x542c, (g_macTicks & 3) ? 2 : 1);
+            write16(adverseCar + 0x1a, 40);   // ordinary damaging impact
+#ifdef VETTE_TERMINAL_DAMAGE_CHECKPOINT
+            // Traffic+$4DCE's own formula evaluates this authored 0..3 state
+            // as (3+3)/2 + 1 + 1 + 3 = 8, its exact terminal threshold.
+            static const uint16_t terminalDamage[8] = { 3, 3, 1, 1, 0, 3, 3, 3 };
+            for (uint16_t i = 0; i != 8; ++i)
+                write16(s_currentA5 - 0x346a + i * 2, terminalDamage[i]);
+#endif
+        }
+        // Emulate the replaced difficulty compare and its BNE to the PRO arm.
+        write32(frame + 2, (uint32_t)(s_segments[6].begin + 0x4cb4) - 2);
+        return 1;
+    }
+#endif
 #ifdef VETTE_PROBE
     if (trap == kStaticCollisionProbeTrap
         && pc == (uint32_t)(s_segments[6].begin + 0x3ffe)) {
@@ -5790,7 +5872,8 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
     }
 #endif
 #ifdef VETTE_GARAGE_CLICK
-    if (trap == 0xa9bc && read16(userStack) == 140)
+    if (trap == 0xa9bc
+        && (read16(userStack) == 140 || read16(userStack) == 147))
         s_garageRecoveryPictureLoaded = true;
 #ifdef VETTE_FINISH_CHECKPOINT
     if (trap == 0xa9bc && read16(userStack) >= 135 && read16(userStack) <= 141)
@@ -6679,9 +6762,10 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
             pressed = true;
             s_garageTransitionSkipped = true;
         }
-        // The lake recovery picture waits in Main+$0FE2 for Button before it
-        // restores the port and returns.  Advance that shipped branch once so
-        // the deterministic collision run can expose what follows it.
+        // The water (PICT 140) and beyond-repair tow (PICT 147) recoveries
+        // both wait in Main+$0FE2 for Button before restoring the port and
+        // returning. Advance that shipped branch once so deterministic
+        // adverse-outcome runs can expose the enclosing transition.
         if (s_garageRecoveryPictureLoaded && !s_garageRecoverySkipped) {
             pressed = true;
             s_garageRecoverySkipped = true;
@@ -6961,7 +7045,8 @@ bool MacLoader::run(VetteScreen* screen)
     s_currentA5 = a5;
     if (!redirectLowMemoryGlobals(a5) || !disableCopyProtection()
         || !installDrivingBoundaryTrap() || !installDrivingRasterTraps()
-        || !installStaticCollisionProbe() || !installRemainingAudioProbe()
+        || !installStaticCollisionProbe() || !installAdverseDamageCheckpoint()
+        || !installRemainingAudioProbe()
         || !installBogasTraps()) return false;
 
     Disable();

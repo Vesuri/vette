@@ -359,7 +359,7 @@ Static disassembly groups the complete contiguous export range without guessing 
 | 207..210 | fixed relocation, with 207 selecting `Freeway_Map` and 208/209 selecting `Main_Map` |
 | 211 | changes driving/event state and conditionally enters the shared event response at `Traffic+$52A6` |
 | 212..213 | fixed relocation selecting `Freeway_Map` |
-| 214 | starts the timed impact/spin response, resets motion/control fields, and plays the reached sound |
+| 214 | gas-station response: while parked, starts timed repair from the eight-cell damage sum, clears damage/motion/control fields, and plays the reached sound |
 | 215..217 | conditional boundary crossings between `Main_Map` and `Freeway_Map` |
 | 218..219 | install fixed five-unit correction vectors while on `Main_Map` |
 | 220..222 | fixed or conditional map-boundary relocation |
@@ -510,6 +510,24 @@ the same endpoint as an over-threshold impact. It stops driving, performs the re
 shutdown/play sequence, loads `D6=900` and `D7=147`, and calls `Main+$0F82` to display PICT 147.
 This is the shipped beyond-repair recovery described by the manual, distinct from Lake Merced's
 PICT 140 water recovery.
+
+The runtime closures use short source-derived checkpoints rather than a long drive. At the
+naturally reached Course One impact, a private diagnostic hook replaces only the initial
+`CMPI.W #1,-$542C(A5)`, supplies a real Rookie/Pro selection and speed 40, and resumes at the exact
+original higher-difficulty arm. Rookie is selected for tick residue zero and Pro for residues
+one..three, so the shipped rate limiter—not the port—accepts the impact. The ordinary run raises
+one side cell and its signed steering pull. At the next safe frame boundary it moves the complete
+player coordinate/history set into Main Map cell `(49,5)`, QUAD 3, selector 26, record 2: the
+decoded rectangle `(v=1100..1290,u=1178..1378)` whose special table entry dispatches export 214.
+The original response clears all eight cells plus the steering pull, sets the repair-active word,
+and schedules repair time from the original damage sum.
+
+The terminal arm supplies the valid eight-cell state `{3,3,1,1,0,3,3,3}` at that same natural
+impact. Traffic's own formula evaluates it to exactly eight, stops driving, sets the terminal
+state, and requests PICT 147. The recovery screen is acknowledged through its shipped `Button`
+wait, after which Main reaches its driving exit and outer return and settles at the garage handoff.
+`amiga/driving_damage_repair.gdb` and `amiga/driving_terminal_tow.gdb` retain these bounded
+regressions. Production defines neither checkpoint and retains the original difficulty comparison.
 
 ## Remaining driving-data consumer map
 
