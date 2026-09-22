@@ -2222,6 +2222,27 @@ enters `Main+$3456` with Tour enabled and destination index 1. The source routin
 to 2 and moves the player to `(x=$30A0,z=$1400,heading=$0000)` with no loud stop. Production builds
 contain neither the post-session precondition nor the private destination alias.
 
+## Steering submenu keyboard equivalents
+
+The packed `MENU 126` resource assigns genuine keyboard equivalents to all four steering choices:
+Command-N for Numeric keypad, Command-K for Keyboard, Command-M for Mouse, and Command-J for
+Joystick. Main's original dispatcher owns the mutually exclusive A5 flags, checkmarks, and cursor
+changes; the compatibility layer must only return the packed menu selection.
+
+The original `MenuKey` compatibility code incorrectly restricted its search to menus drawn in the
+menu bar. Inside Macintosh specifies that `MenuKey` searches every menu in the current menu list,
+which includes hierarchical menus registered by `InsertMenu(menu, -1)`. Removing that drawing-only
+filter fixes Steering and any other resource-defined submenu equivalent without a title, car, or
+screen-specific exception.
+
+`OPTIONS_STEERING_PROBE=1` is diagnostic only. It sends physical Command-N/K/M/J/N chords through
+the ordinary event queue. `MenuKey` returns `$007E0001`, `$007E0002`, `$007E0003`, `$007E0004`, and
+`$007E0001`; after the corresponding original handlers return, the active-flag tuples are
+`(1,0,0,0)`, `(0,1,0,0)`, `(0,0,1,0)`, `(0,0,0,1)`, and `(1,0,0,0)`. The fixture therefore proves
+all modes and restores the shipped Numeric keypad default before continuing into the normal garage
+sequence. `amiga/driving_options_steering.gdb` is the fail-fast observer. Production builds contain
+none of its injected input or probe state.
+
 ## Suspended-session return and restart controls
 
 `MENU 222`'s session commands are stateful rather than interchangeable race exits. During live

@@ -56,6 +56,10 @@ volatile uint32_t g_macDrivingCallbacks = 0;
 #ifdef VETTE_TOUR_MODE_PROBE
 volatile uint16_t g_tourModeProbeComplete = 0;
 #endif
+#ifdef VETTE_OPTIONS_STEERING_PROBE
+volatile uint16_t g_optionsSteeringProbePhase = 0;
+volatile uint16_t g_optionsSteeringProbeComplete = 0;
+#endif
 #ifdef VETTE_SESSION_CONTROL_ITEM
 volatile uint16_t g_sessionControlProbeItem = VETTE_SESSION_CONTROL_ITEM;
 volatile uint16_t g_sessionControlProbePhase = 0;
@@ -212,6 +216,9 @@ static bool s_mouseButtonDown;
 #ifdef VETTE_GARAGE_CLICK
 static uint8_t s_garageClickPhase;
 static uint8_t s_garageGearPhase;
+#if defined(VETTE_TOUR_MODE_PROBE) && defined(VETTE_OPTIONS_STEERING_PROBE)
+#error Tour and Steering menu probes are separate deterministic event sequences
+#endif
 #ifdef VETTE_TOUR_MODE_PROBE
 static uint8_t s_tourModeProbePhase;
 static uint16_t s_tourModeProbeInitialIndex;
@@ -4570,7 +4577,10 @@ static uint32_t menuKey(uint8_t requestedKey)
 #endif
     for (uint16_t i = 0; i < s_menuManager.count; ++i) {
         const MenuManagerState::Entry& entry = s_menuManager.entries[i];
-        if (!entry.inMenuBar || !entry.handle || !*entry.handle) continue;
+        // Inside Macintosh requires MenuKey to scan the complete current menu
+        // list, including hierarchical submenus inserted with beforeID -1.
+        // inMenuBar is a drawing/ordering property, not a key-equivalent gate.
+        if (!entry.handle || !*entry.handle) continue;
         uint8_t* menu = *entry.handle;
         uint32_t size = handleSize(entry.handle);
         if (size < 16 || size < (uint32_t)16 + menu[14]) continue;
@@ -5778,6 +5788,28 @@ static bool nextEvent(uint16_t mask, uint8_t* event)
 {
     if (!event) return false;
     bool buttonDown = pollMacMouse();
+#ifdef VETTE_OPTIONS_STEERING_PROBE
+    // MENU 126 gives all four steering choices genuine keyboard equivalents.
+    // Feed Command-N/K/M/J and finally N again through the same physical edge
+    // queue as user input. Main's resident menu dispatcher owns the flags,
+    // CheckItem calls, cursor transitions, and restoration of the default.
+    static const uint8_t steeringKeys[] = { 0x36, 0x27, 0x37, 0x26, 0x36 };
+    if (g_optionsSteeringProbePhase < sizeof(steeringKeys) * 4) {
+        uint8_t key = steeringKeys[g_optionsSteeringProbePhase >> 2];
+        switch (g_optionsSteeringProbePhase & 3) {
+        case 0: vetteInputInjectProbeKey(0x66, true); break;
+        case 1: vetteInputInjectProbeKey(key, true); break;
+        case 2: vetteInputInjectProbeKey(key, false); break;
+        default: vetteInputInjectProbeKey(0x66, false); break;
+        }
+        ++g_optionsSteeringProbePhase;
+    } else if (read16(s_currentA5 - 0x5310) == 0x0100
+               && read16(s_currentA5 - 0x5312) == 0
+               && read16(s_currentA5 - 0x5316) == 0
+               && read16(s_currentA5 - 0x5314) == 0) {
+        g_optionsSteeringProbeComplete = 1;
+    }
+#endif
 #ifdef VETTE_TOUR_MODE_PROBE
     // Menu equivalents belong to the ordinary event loop. Prove Tour Mode on,
     // off, and on again, then select one real Tour-menu destination before the
@@ -5935,6 +5967,9 @@ static bool nextEvent(uint16_t mask, uint8_t* event)
     if (!transition && s_garageClickPhase < sizeof(clickX) / sizeof(clickX[0]) * 2
 #ifdef VETTE_TOUR_MODE_PROBE
         && (s_tourModeProbePhase == 0 || s_tourModeProbePhase >= 24)
+#endif
+#ifdef VETTE_OPTIONS_STEERING_PROBE
+        && g_optionsSteeringProbeComplete
 #endif
         ) {
         uint16_t click = (uint16_t)(s_garageClickPhase >> 1);

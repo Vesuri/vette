@@ -9,6 +9,7 @@
 #   make GARAGE_CLICK=1  script the garage and vehicle selectors through real mouse events
 #   make GARAGE_CLICK=1 GARAGE_CAR=2  choose the ZR-1 through its real garage plate
 #   make GARAGE_CLICK=1 GARAGE_DYNO=1  select the garage dynamometer through its real control
+#   make GARAGE_CLICK=1 OPTIONS_STEERING_PROBE=1  exercise all shipped steering menu equivalents
 #   make GARAGE_CLICK=1 GARAGE_DIFFICULTY=3  choose PRO through its real UI rectangle
 #   make GARAGE_CLICK=1 GARAGE_OPPONENT=2  choose Lamborghini through its real UI rectangle
 #   make GARAGE_CLICK=1 GARAGE_COURSE=2  select Course Two through its real UI before ACCEPT
@@ -193,6 +194,16 @@ ifndef GARAGE_CLICK
 $(error TOUR_MODE_PROBE=1 requires GARAGE_CLICK=1)
 endif
 EXTRA_DEFINES += -DVETTE_TOUR_MODE_PROBE
+endif
+
+# Diagnostic only: dispatch Command-N/K/M/J/N through the resource-defined
+# Steering submenu equivalents and leave the shipped default Numeric keypad
+# mode restored before the ordinary garage sequence.
+ifeq ($(OPTIONS_STEERING_PROBE),1)
+ifndef GARAGE_CLICK
+$(error OPTIONS_STEERING_PROBE=1 requires GARAGE_CLICK=1)
+endif
+EXTRA_DEFINES += -DVETTE_OPTIONS_STEERING_PROBE
 endif
 
 # Diagnostic only: suspend a live race with the shipped physical P edge, then
@@ -513,6 +524,9 @@ PROBE_SYMS += g_probePicture140TrapPC g_probePicture140Return \
 endif
 ifeq ($(TOUR_MODE_PROBE),1)
 PROBE_SYMS += g_tourModeProbeComplete
+endif
+ifeq ($(OPTIONS_STEERING_PROBE),1)
+PROBE_SYMS += g_optionsSteeringProbePhase g_optionsSteeringProbeComplete
 endif
 ifdef SESSION_CONTROL_ITEM
 PROBE_SYMS += g_sessionControlProbeItem g_sessionControlProbePhase

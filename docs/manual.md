@@ -187,6 +187,10 @@ the accelerator. If selected from the menu, the standalone port redirects its di
 `Mouse`, `RawMouse`, `MTemp`, and `MBState` accesses to private A5-adjacent shadows updated from the
 Amiga mouse. This prevents writes into the Amiga's vector page.
 
+The original submenu also defines Command-N, Command-K, Command-M, and Command-J as direct selectors
+for Numeric keypad, Keyboard, Mouse, and Joystick respectively. These work without drawing a
+pull-down menu and change the same original mutually exclusive mode state as a menu selection.
+
 The original modes remain mutually exclusive. In Mouse mode the arrow aliases do not steer,
 accelerate, or brake, although ordinary keyboard commands continue to work. The physical mouse
 remains available for menus while Keyboard steering is active.

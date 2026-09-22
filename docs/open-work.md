@@ -10,8 +10,10 @@ changes.
 ⭐ **HEAD OF QUEUE: Finish necessary game UI paths.** Car, opponent, course, difficulty, results,
 ordinary garage return, all four race lifecycles, representative city/freeway route transitions,
 Tour Mode, the garage dynamometer, pause, Return to Game, Restart Race, and menu Quit are closed.
-Cover the remaining gameplay-relevant Options commands. Leave unnecessary classic Mac desktop UI unimplemented so an
-erroneous fallback remains a loud failure.
+The Steering submenu and all four of its original keyboard equivalents are also closed. Cover the
+remaining gameplay-relevant High Score and Preferences commands; Communications remains deliberately
+single-player only. Leave unnecessary classic Mac desktop UI unimplemented so an erroneous fallback
+remains a loud failure.
 
 Long route traces are regressions, not the primary discovery mechanism. Enter unknown behavior
 through the shortest faithful checkpoint available; do not patch game decisions merely to reach it.
@@ -21,9 +23,9 @@ For bounded driving that must follow the road, build with `GARAGE_CLICK=1 FOLLOW
 ## Core game completion — active queue
 
 1. **Finish necessary game UI paths.** Car, dynamometer, opponent, course, difficulty, results, and
-   ordinary garage-return paths are closed. Cover the remaining gameplay-relevant Options commands
-   paths. Leave unnecessary classic Mac desktop UI unimplemented so an erroneous fallback remains
-   a loud failure.
+   ordinary garage-return paths are closed. Cover the remaining gameplay-relevant High Score and
+   Preferences commands. Communications remains deliberately single-player only. Leave unnecessary
+   classic Mac desktop UI unimplemented so an erroneous fallback remains a loud failure.
 2. **Implement only traps demanded by real paths.** Every unknown trap reached by the scenarios
    above must either be implemented faithfully or remain a named loud stop. Recheck all resource
    types the game actually consumes; do not implement unused managers speculatively.
