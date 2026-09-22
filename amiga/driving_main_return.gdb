@@ -6,21 +6,18 @@ set pagination off
 set confirm off
 set $reached = 0
 
-watch s_garageGearPhase
-continue
-delete 1
-set $car = *(unsigned int*)(s_currentA5-0x3678)
-watch *(unsigned int*)($car+0x3e)
-condition 2 *(unsigned short*)($car+0x3e) >= 17 && *(unsigned short*)($car+0x40) == 39 && *(signed short*)(s_currentA5-0x3764) == 0
-commands 2
+break vbiHandler if s_drivingFrameStarted && *(unsigned short*)(*(unsigned int*)(s_currentA5-0x3678)+0x3e) >= 17 && *(unsigned short*)(*(unsigned int*)(s_currentA5-0x3678)+0x40) == 39 && *(signed short*)(s_currentA5-0x3764) == 0
+commands
   silent
   set $reached = 1
+  set $car = *(unsigned int*)(s_currentA5-0x3678)
 end
 continue
 
 if $reached
   printf "main-map return boundary reached tick=%u frames=%u/%u world=($%08x,$%08x) physics=($%08x,$%08x) cell=(%u,%u) local=(%u,%u) heading=%u speed=%d mode=%d\n", g_macTicks, g_macFramesQueued, g_macFramesPresented, *(unsigned int*)$car, *(unsigned int*)($car+8), *(unsigned int*)($car+0x6e), *(unsigned int*)($car+0x72), *(unsigned short*)($car+0x3e), *(unsigned short*)($car+0x40), (*(unsigned int*)$car)&0x7ff, (*(unsigned int*)($car+8))&0x7ff, *(unsigned short*)($car+0x66), *(signed short*)($car+26), *(signed short*)(s_currentA5-0x3764)
 else
+  set $car = *(unsigned int*)(s_currentA5-0x3678)
   printf "main-map return observer ceiling tick=%u cell=(%u,%u) local=(%u,%u) heading=%u speed=%d mode=%d\n", g_macTicks, *(unsigned short*)($car+0x3e), *(unsigned short*)($car+0x40), (*(unsigned int*)$car)&0x7ff, (*(unsigned int*)($car+8))&0x7ff, *(unsigned short*)($car+0x66), *(signed short*)($car+26), *(signed short*)(s_currentA5-0x3764)
 end
 detach

@@ -47,6 +47,14 @@ set pagination off
 set confirm off
 set remotetimeout 90
 target remote 127.0.0.1:$DEBUG_PORT
+# CODE segments are disk-loaded during PlatformAmiga startup.  Pause once at
+# MacLoader::run, after prepareResourceForks has populated s_segments, before
+# sourcing observers whose breakpoint expressions use those resident bases.
+tbreak MacLoader::run
+commands
+  silent
+end
+continue
 EOF
 
 env HOME="$GDBHOME" XDG_CACHE_HOME="$GDBHOME" \

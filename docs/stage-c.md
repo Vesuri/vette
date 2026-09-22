@@ -1675,6 +1675,13 @@ with speed zero, but the obstruction did not clear. Steering the row-36 approach
 experiments were removed; the collision observer is read-only and the route still uses only
 ordinary keypad input.
 
+The release regression does not require that timing-dependent traffic collision to recur. It
+gates the stable route facts around it instead: natural input must enter freeway mode, initialize
+the freeway traffic pool, and reach the source-defined selector-81 straight at `(6,36)`. A focused
+checkpoint then exercises export 230 and the return to Main Map `(17,39)`. These three cases are
+the `routes` group in `amiga/regression.sh`; all observers attach only after disk-loaded CODE is
+resident.
+
 Long downstream compatibility runs no longer need to replay that complete route. A diagnostic
 build may set `FREEWAY_START=<x-cell>`. After the ordinary garage and countdown, it first relocates
 the player beside Main Map `(2,6)`, so the game's real export 212 still performs the freeway map

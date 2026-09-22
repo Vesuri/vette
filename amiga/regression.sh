@@ -100,12 +100,14 @@ run_routes()
   run_case city-to-freeway 190 driving_freeway_activation.gdb \
     'natural-freeway-spawn' PROBES=1 SKIP_INTRO=1 GARAGE_CLICK=1 \
     GARAGE_COURSE=2 FREEWAY_ROUTE=1
-  run_case freeway-x6 190 driving_freeway_x6_collision.gdb \
-    'freeway x6 object collision' PROBES=1 SKIP_INTRO=1 GARAGE_CLICK=1 \
+  run_case freeway-straight 360 driving_freeway_straight.gdb \
+    'freeway straight reached.*cell=\([6-9],[[:space:]]*36\).*mode=1' \
+    PROBES=1 SKIP_INTRO=1 GARAGE_CLICK=1 \
     GARAGE_COURSE=2 FREEWAY_ROUTE=1
   run_case freeway-to-city 70 driving_main_return.gdb \
     'main-map return boundary reached' PROBES=1 SKIP_INTRO=1 GARAGE_CLICK=1 \
-    GARAGE_COURSE=2 FREEWAY_ROUTE=1 FREEWAY_START=30 MAIN_START=17
+    GARAGE_COURSE=2 FREEWAY_ROUTE=1 FREEWAY_START=30 \
+    FREEWAY_START_U=1600 FREEWAY_START_V=1024 MAIN_START=17
 }
 
 run_session()
