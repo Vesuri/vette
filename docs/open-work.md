@@ -9,10 +9,10 @@ changes.
 
 ⭐ **HEAD OF QUEUE: Cover materially different race modes.** All four course selections, genuine
 starts, source-defined finish handlers, Score, and garage returns are proven. Now check representative
-junctions, map boundaries, and freeway transitions across them, then distinct difficulty behavior
-and practice/qualifying/race variants. All three difficulty selectors and their complete
-ordinary finish lifecycles are already proven. All four player cars and all four opponents are also
-proven through their UI selectors, live PERF records, and complete paired lifecycles.
+junctions, map boundaries, and freeway transitions across them, then practice/qualifying/race
+variants. All three difficulties are proven through selection, finish, damage, police, motion, and
+cruise-control branches. All four player cars and all four opponents are proven through their UI
+selectors, live PERF records, and complete paired lifecycles.
 
 Long route traces are regressions, not the primary discovery mechanism. Enter unknown behavior
 through the shortest faithful checkpoint available; do not patch game decisions merely to reach it.
@@ -23,9 +23,9 @@ For bounded driving that must follow the road, build with `GARAGE_CLICK=1 FOLLOW
 
 1. **Cover materially different race modes.** The four course starts and complete finish lifecycles
    are closed. Check representative junctions, map boundaries, and freeway transitions across them,
-   then the distinct difficulty rules and practice/qualifying/race variants. Player-car and opponent
-   selection/lifecycles and the TRAINEE/ROOKIE/PRO UI selections/lifecycles are closed. Do not drive
-   for hours to reach a state that can be entered faithfully with a checkpoint.
+   then practice/qualifying/race variants. Player-car, opponent, and TRAINEE/ROOKIE/PRO selection,
+   lifecycle, and distinct difficulty behavior are closed. Do not drive for hours to reach a state
+   that can be entered faithfully with a checkpoint.
 2. **Finish necessary game UI paths.** Car, opponent, course, difficulty, results, and ordinary
    garage-return paths are closed. Cover the remaining garage/dynamometer, options, pause, and quit
    paths. Leave unnecessary classic Mac desktop UI unimplemented so an erroneous fallback remains

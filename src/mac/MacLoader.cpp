@@ -122,7 +122,8 @@ static const int16_t kShadowMouseV = -31276;
 static const int16_t kShadowMouseH = -31274;
 static const uint16_t kDrivingBoundaryTrap = 0xafff;
 static const uint16_t kDrivingRasterTrap = 0xaffd;
-#if defined(VETTE_DAMAGE_REPAIR_CHECKPOINT) || defined(VETTE_TERMINAL_DAMAGE_CHECKPOINT)
+#if defined(VETTE_DAMAGE_REPAIR_CHECKPOINT) || defined(VETTE_TERMINAL_DAMAGE_CHECKPOINT) \
+    || defined(VETTE_DIFFICULTY_DAMAGE_CHECKPOINT)
 static const uint16_t kAdverseDamageTrap = 0xaffc;
 #endif
 #ifdef VETTE_POLICE_TICKET_CHECKPOINT
@@ -917,7 +918,8 @@ static bool installStaticCollisionProbe()
 
 static bool installAdverseDamageCheckpoint()
 {
-#if defined(VETTE_DAMAGE_REPAIR_CHECKPOINT) || defined(VETTE_TERMINAL_DAMAGE_CHECKPOINT)
+#if defined(VETTE_DAMAGE_REPAIR_CHECKPOINT) || defined(VETTE_TERMINAL_DAMAGE_CHECKPOINT) \
+    || defined(VETTE_DIFFICULTY_DAMAGE_CHECKPOINT)
     // Traffic+$4C86 begins with CMPI.W #1,-$542C(A5), followed by the
     // difficulty split. The diagnostic dispatcher supplies source-authored
     // preconditions and resumes at the exact PRO arm, preserving the natural
@@ -5466,6 +5468,20 @@ static void refreshDrivingKeyMap()
         ++finishCheckpointLeg;
     }
 #endif
+#ifdef VETTE_DIFFICULTY_CRUISE_CHECKPOINT
+    // Present the source-defined low-speed cruise predicate after a real UI
+    // selection, countdown, and shift. Traffic+$444A clears A5-$3782 only for
+    // Pro when speed is below 25; Trainee/Rookie retain constant cruise.
+    static bool difficultyCruisePlaced;
+    uint8_t* difficultyCruiseCar = (uint8_t*)read32(s_currentA5 - 13944);
+    if (!difficultyCruisePlaced && difficultyCruiseCar
+            && s_garageGearPhase >= 2
+            && (int16_t)read16(s_currentA5 - 13296) >= 3) {
+        write16(difficultyCruiseCar + 0x1a, 24);
+        write16(s_currentA5 - 0x3782, 1);
+        difficultyCruisePlaced = true;
+    }
+#endif
 #ifdef VETTE_DAMAGE_REPAIR_CHECKPOINT
     // Once the checkpointed original impact has created real damage, enter a
     // decoded repair rectangle at the next safe frame boundary.
@@ -5915,17 +5931,25 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
         suspendBogasAudio();
         return returnFromBogasTrap(frame, userStack, 0);
     }
-#if defined(VETTE_DAMAGE_REPAIR_CHECKPOINT) || defined(VETTE_TERMINAL_DAMAGE_CHECKPOINT)
+#if defined(VETTE_DAMAGE_REPAIR_CHECKPOINT) || defined(VETTE_TERMINAL_DAMAGE_CHECKPOINT) \
+    || defined(VETTE_DIFFICULTY_DAMAGE_CHECKPOINT)
     if (trap == kAdverseDamageTrap
         && pc == (uint32_t)(s_segments[6].begin + 0x4c86)) {
         uint8_t* adverseCar = (uint8_t*)read32(s_currentA5 - 13944);
         if (adverseCar) {
+#ifdef VETTE_DIFFICULTY_DAMAGE_CHECKPOINT
+            // Preserve the difficulty selected through the real UI.  Speed 40
+            // lies in the shipped ordinary-damage band for both Rookie and
+            // Pro, while Trainee's original entry branch rejects every speed.
+            write16(adverseCar + 0x1a, 40);
+#else
             // The shipped low-two-tick-bit limiter accepts residue zero in
             // Rookie and residues one..three in Pro. Select the corresponding
             // real difficulty so this natural impact is deterministic without
             // modifying TickCount or bypassing the limiter.
             write16(s_currentA5 - 0x542c, (g_macTicks & 3) ? 2 : 1);
             write16(adverseCar + 0x1a, 40);   // ordinary damaging impact
+#endif
 #ifdef VETTE_TERMINAL_DAMAGE_CHECKPOINT
             // Traffic+$4DCE's own formula evaluates this authored 0..3 state
             // as (3+3)/2 + 1 + 1 + 3 = 8, its exact terminal threshold.
@@ -5934,8 +5958,27 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
                 write16(s_currentA5 - 0x346a + i * 2, terminalDamage[i]);
 #endif
         }
+#ifdef VETTE_DIFFICULTY_DAMAGE_CHECKPOINT
+        // Emulate the replaced compare and its two original branches exactly:
+        // Trainee returns without damage, Rookie enters its speed thresholds,
+        // and Pro enters the tighter thresholds. The later tick-rate limiter
+        // and all damage mutations remain resident Traffic code.
+        int16_t difficulty = (int16_t)read16(s_currentA5 - 0x542c);
+        // Bound the fixture at the exact residue accepted by the original
+        // limiter without writing TickCount: Rookie accepts zero, Pro accepts
+        // one..three. Interrupts remain live, so this waits at most three
+        // Macintosh ticks and then resumes the untouched limiter itself.
+        if (difficulty == 1) {
+            while (g_macTicks & 3) { }
+        } else if (difficulty >= 2) {
+            while (!(g_macTicks & 3)) { }
+        }
+        uint32_t resume = difficulty < 1 ? 0x4dce : (difficulty == 1 ? 0x4c92 : 0x4cb4);
+        write32(frame + 2, (uint32_t)(s_segments[6].begin + resume) - 2);
+#else
         // Emulate the replaced difficulty compare and its BNE to the PRO arm.
         write32(frame + 2, (uint32_t)(s_segments[6].begin + 0x4cb4) - 2);
+#endif
         return 1;
     }
 #endif
@@ -5970,7 +6013,12 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
             // speeding, reckless driving, hit-and-run, and manslaughter.
             player[0x32] = 0x33;
             player[0x33] = 0;
-            write16(s_currentA5 - 0x542c, 2); // police-active Pro difficulty
+#ifndef VETTE_GARAGE_DIFFICULTY
+            // Historical checkpoint default. An explicit real-UI selection is
+            // authoritative, allowing the same fixture to prove that Trainee
+            // rejects police while Rookie and Pro retain the active path.
+            write16(s_currentA5 - 0x542c, 2);
+#endif
             write32(traffic + 0x54, 0x434f5021UL); // source `COP!` tag
             relocateDiagnosticCar(traffic, read32(player), read32(player + 8),
                                   read16(player + 0x66));

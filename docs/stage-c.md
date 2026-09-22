@@ -2139,6 +2139,39 @@ before the returned garage intentionally resets the player choice to Stock, so t
 misreported as a failed selection. Together with the independent start proof, this closes all four
 player Corvettes and all four opponent cars as UI, PERF initialization, driving, and result paths.
 
+## Complete difficulty behavior
+
+The difficulty matrix is now exercised by resident Traffic branches rather than by rewriting the
+selected level. `DIFFICULTY_DAMAGE_CHECKPOINT=1` intercepts only the already-used diagnostic hook
+at the first natural Course One impact, sets speed 40, and emulates the replaced entry compare and
+its exact Trainee/Rookie/Pro destinations. It never writes A5-$542C. To make the original low-two-
+tick-bit limiter deterministic, it waits with interrupts live for the next residue accepted by the
+selected level—zero for Rookie, nonzero for Pro—without writing TickCount. The untouched thresholds,
+limiter, cell updates, and steering-pull updates then run normally.
+
+`amiga/driving_difficulty_damage.gdb` measures the result. TRAINEE reaches the no-damage return at
+tick 1123 with all eight cells still zero. ROOKIE reaches its authored residue at tick 1124 and PRO
+at tick 1123; each raises one side cell to one and changes signed steering pull to one. This directly
+closes the manual's immunity versus reduced/realistic damage distinction at an identical natural
+impact.
+
+The ordinary police fixture now treats an explicit `GARAGE_DIFFICULTY` selection as authoritative;
+it retains its historical PRO default only when none is supplied. With the same nearby source-tagged
+`COP!` and offense mask `$33`, `amiga/driving_difficulty_police.gdb` observes sixteen passes through
+the difficulty test by iteration 80 at TRAINEE and zero catches. ROOKIE and PRO both reach the
+original catch at iteration 64, apply the resident four-step 898-tick table result, clear the offense
+mask, restore player state, and release at iteration 71. Thus inactive versus active police is a
+measured source branch, not a menu-label inference.
+
+`DIFFICULTY_CRUISE_CHECKPOINT=1` supplies speed 24 and an active cruise word only after the real UI,
+countdown, and shift. At `Traffic+$444A..+$4456`, TRAINEE and ROOKIE preserve A5-$3782 as one while
+PRO clears it, exactly implementing the manual's constant versus realistic below-25-mph behavior.
+The same run observes `Traffic+$0ADE`, the difficulty-dependent motion scaler used by the opponent/
+traffic path: input 8 becomes 6, 7, and 8 at levels 0, 1, and 2. This result is deliberately named
+motion scaling rather than guessed to be the entire traction model; it nevertheless proves another
+material runtime distinction. Damage, police, motion scaling, and cruise behavior now accompany the
+already-complete selection and finish lifecycles for every difficulty.
+
 ## Correction to the MAME log
 
 The 51-row MAME table is a measurement of that reference run, not fabricated data, but the live

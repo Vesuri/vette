@@ -15,6 +15,8 @@
 #   make GARAGE_CLICK=1 FOLLOW_ROAD=1    turn right at the Course One start, then follow the road
 #   make GARAGE_CLICK=1 FINISH_CHECKPOINT=1  enter the selected course's source-defined finish rectangle(s)
 #   make GARAGE_CLICK=1 DAMAGE_REPAIR_CHECKPOINT=1  exercise Pro damage and gas-station repair
+#   make GARAGE_CLICK=1 GARAGE_DIFFICULTY=1 DIFFICULTY_DAMAGE_CHECKPOINT=1  prove Trainee immunity
+#   make GARAGE_CLICK=1 GARAGE_DIFFICULTY=3 DIFFICULTY_CRUISE_CHECKPOINT=1  prove realistic cruise
 #   make GARAGE_CLICK=1 TERMINAL_DAMAGE_CHECKPOINT=1 exercise the beyond-repair tow lifecycle
 #   make GARAGE_CLICK=1 POLICE_TICKET_CHECKPOINT=1 exercise all ordinary police penalties
 #   make GARAGE_CLICK=1 FREEWAY_ROUTE=1 FREEWAY_START=11  fast-start at freeway cell (11,36)
@@ -292,6 +294,12 @@ endif
 # documented cumulative threshold before that same collision routine runs.
 ifeq ($(DAMAGE_REPAIR_CHECKPOINT),1)
 EXTRA_DEFINES += -DVETTE_DAMAGE_REPAIR_CHECKPOINT
+endif
+ifeq ($(DIFFICULTY_DAMAGE_CHECKPOINT),1)
+EXTRA_DEFINES += -DVETTE_DIFFICULTY_DAMAGE_CHECKPOINT
+endif
+ifeq ($(DIFFICULTY_CRUISE_CHECKPOINT),1)
+EXTRA_DEFINES += -DVETTE_DIFFICULTY_CRUISE_CHECKPOINT
 endif
 ifeq ($(TERMINAL_DAMAGE_CHECKPOINT),1)
 EXTRA_DEFINES += -DVETTE_TERMINAL_DAMAGE_CHECKPOINT
