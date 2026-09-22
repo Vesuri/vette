@@ -1329,6 +1329,34 @@ The visible Macintosh message (“caught driving a stolen Vette”) is the prote
 requester and remains intentionally unimplemented under the project's unnecessary-UI rule; this
 diagnostic exists to cover the real police sound and cleanup/exit logic, not to recreate the gate.
 
+### Ordinary police tickets and release
+
+The failed-protection arrest is not the ordinary gameplay ticket path. `Traffic+$0DD8..+$1086`
+owns the latter. A `COP!` traffic record first starts instrument 12 within `$0800` world units,
+catches an offending racer within `$00C8` (or `$0088` in the tighter map modes), stops the car, and
+advances a five-state notification/ticket/release machine. The four offense writers and bits are:
+
+| bit | source writer | charge named by the manual |
+|---:|---|---|
+| 0 | `Main+$39F2` | speeding |
+| 1 | `Traffic+$46D2` | reckless driving |
+| 4 | `Traffic+$0206` | hit-and-run |
+| 5 | `Main+$400E` | vehicular manslaughter |
+
+`POLICE_TICKET_CHECKPOINT=1` converts one already valid traffic record to the source `COP!` type,
+places its complete position history beside the player, selects police-active Pro difficulty, and
+supplies offense mask `$33`. The original distance test catches the player. The diagnostic only
+shortens three 180-tick presentation holds and supplies the deterministic acknowledgment that
+`Main+$3028` chooses whenever bit 5 is present; Traffic still draws every active charge, performs
+the penalty arithmetic, delays, restores the player state, clears the offense mask, and resumes the
+race. `amiga/driving_police_ticket.gdb` observes those boundaries.
+
+The shipped penalty loop contains a noteworthy fidelity detail. Its table at `Traffic+$1088` is
+`{300,600,-1,-1,600,1800,-1,-1}` ticks, matching the manual's 5/10/10/30-second values when indexed
+by bit. But `A1` advances only inside the set-bit arm, not once per tested bit. Therefore cumulative
+mask `$33` consumes the first four table entries and applies `300 + 600 - 1 - 1 = 898` ticks, rather
+than the manual's 3300 ticks. The port deliberately preserves this original-code behavior.
+
 The corrected route reaches the Lake Merced water collision and displays the game's own tow-truck
 recovery artwork. A probe on the actual `_GetPicture` trap records PICT 140 at the resident wrapper
 `Traffic+$663C`; that wrapper's saved return identifies the dynamic request at `Main+$0FD6`, with

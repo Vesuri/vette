@@ -125,6 +125,9 @@ static const uint16_t kDrivingRasterTrap = 0xaffd;
 #if defined(VETTE_DAMAGE_REPAIR_CHECKPOINT) || defined(VETTE_TERMINAL_DAMAGE_CHECKPOINT)
 static const uint16_t kAdverseDamageTrap = 0xaffc;
 #endif
+#ifdef VETTE_POLICE_TICKET_CHECKPOINT
+static const uint16_t kPoliceTicketTrap = 0xafef;
+#endif
 // CODE 9's twelve Pascal Bogas wrappers are replaced at their public entry
 // points.  Keep a distinct trap for each wrapper so no caller or scene needs
 // to know that Paula owns the implementation.
@@ -904,6 +907,41 @@ static bool installAdverseDamageCheckpoint()
     if (read16(hook) != 0x0c6d || read16(hook + 2) != 0x0001
         || read16(hook + 4) != 0xabd4) return false;
     write16(hook, kAdverseDamageTrap);
+#endif
+    return true;
+}
+
+static bool installPoliceTicketCheckpoint()
+{
+#ifdef VETTE_POLICE_TICKET_CHECKPOINT
+    // Traffic+$18B2 admits only a source `COP!` traffic record to the police
+    // response. The bounded diagnostic supplies that one precondition at the
+    // comparison boundary, then resumes at the original two-racer police
+    // dispatcher. No catch, ticket, timing, or release decision is patched.
+    static const uint16_t original[] = { 0x0cab, 0x434f, 0x5021, 0x0054, 0x662c };
+    uint8_t* hook = s_segments[6].begin + 0x18b2;
+    for (uint16_t i = 0; i != sizeof(original) / sizeof(original[0]); ++i)
+        if (read16(hook + i * 2) != original[i]) return false;
+    write16(hook, kPoliceTicketTrap);
+
+    // State 2 polls the ticket-panel latch without crossing another Toolbox
+    // boundary. Hook that poll so the bounded fixture can provide the exact
+    // state-4 acknowledgment chosen by Main+$3028 for offense bit $20.
+    uint8_t* acknowledge = s_segments[6].begin + 0x0fe8;
+    if (read16(acknowledge) != 0x6600 || read16(acknowledge + 2) != 0x009c)
+        return false;
+    write16(acknowledge, kPoliceTicketTrap);
+    write16(acknowledge + 2, 0x4e71);
+
+    // The three notice/acknowledgment holds are each 180 ticks in production.
+    // Bound only their diagnostic duration; the state machine and penalty
+    // table remain original. Each address is the low word of ADDI.L #$B4,Dn.
+    static const uint16_t delayWords[] = { 0x0fb8, 0x1008, 0x1050 };
+    for (uint16_t i = 0; i != sizeof(delayWords) / sizeof(delayWords[0]); ++i) {
+        uint8_t* delay = s_segments[6].begin + delayWords[i];
+        if (read16(delay) != 0x00b4) return false;
+        write16(delay, 1);
+    }
 #endif
     return true;
 }
@@ -5295,7 +5333,8 @@ static void updateDrivingInputProbe()
 }
 
 #if defined(VETTE_FREEWAY_START) || defined(VETTE_FINISH_CHECKPOINT) \
-    || defined(VETTE_DAMAGE_REPAIR_CHECKPOINT)
+    || defined(VETTE_DAMAGE_REPAIR_CHECKPOINT) \
+    || defined(VETTE_POLICE_TICKET_CHECKPOINT)
 static void relocateDiagnosticCar(uint8_t* car, uint32_t x, uint32_t z, uint16_t heading)
 {
     // Traffic keeps the rendered position, physics position, swept-collision
@@ -5823,6 +5862,57 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
         }
         // Emulate the replaced difficulty compare and its BNE to the PRO arm.
         write32(frame + 2, (uint32_t)(s_segments[6].begin + 0x4cb4) - 2);
+        return 1;
+    }
+#endif
+#ifdef VETTE_POLICE_TICKET_CHECKPOINT
+    if (trap == kPoliceTicketTrap
+        && pc == (uint32_t)(s_segments[6].begin + 0x0fe8)) {
+        uint8_t* player = (uint8_t*)read32(s_currentA5 - 0x3678);
+        bool latched = read16(s_currentA5 - 0x39bc) != 0;
+        if (player && player[0x33] == 2 && latched
+            && (player[0x32] & 0x20) != 0) {
+            player[0x33] = 4;
+            write16(s_currentA5 - 0x39bc, 0);
+        }
+        // Emulate both sides of the replaced BNE. The first state-2 pass must
+        // fall through and arm the latch; only a later latched pass returns.
+        uint32_t target = latched
+            ? (uint32_t)(s_segments[6].begin + 0x1086)
+            : (uint32_t)(s_segments[6].begin + 0x0fec);
+        write32(frame + 2, target - 2);
+        return 1;
+    }
+    if (trap == kPoliceTicketTrap
+        && pc == (uint32_t)(s_segments[6].begin + 0x18b2)) {
+        static bool checkpointSeeded;
+        uint8_t* traffic = (uint8_t*)regs[11]; // saved A3
+        uint8_t* player = (uint8_t*)read32(s_currentA5 - 0x3678);
+        bool raceUnderway = player && traffic
+            && (int16_t)read16(s_currentA5 - 0x33f0) >= 3
+            && g_macDrivingIterations >= 40;
+        if (!checkpointSeeded && raceUnderway) {
+            // Exercise all four source-defined player offenses cumulatively:
+            // speeding, reckless driving, hit-and-run, and manslaughter.
+            player[0x32] = 0x33;
+            player[0x33] = 0;
+            write16(s_currentA5 - 0x542c, 2); // police-active Pro difficulty
+            write32(traffic + 0x54, 0x434f5021UL); // source `COP!` tag
+            relocateDiagnosticCar(traffic, read32(player), read32(player + 8),
+                                  read16(player + 0x66));
+            checkpointSeeded = true;
+            // Skip the replaced tag comparison and its BNE, entering the
+            // original response exactly where a real COP! record would.
+            write32(frame + 2, (uint32_t)(s_segments[6].begin + 0x18bc) - 2);
+            return 1;
+        }
+
+        // Outside the one checkpoint entry, emulate the replaced CMP/BNE so
+        // the diagnostic changes no subsequent traffic dispatch behavior.
+        uint32_t target = traffic && read32(traffic + 0x54) == 0x434f5021UL
+            ? (uint32_t)(s_segments[6].begin + 0x18bc)
+            : (uint32_t)(s_segments[6].begin + 0x18e8);
+        write32(frame + 2, target - 2);
         return 1;
     }
 #endif
@@ -7046,6 +7136,7 @@ bool MacLoader::run(VetteScreen* screen)
     if (!redirectLowMemoryGlobals(a5) || !disableCopyProtection()
         || !installDrivingBoundaryTrap() || !installDrivingRasterTraps()
         || !installStaticCollisionProbe() || !installAdverseDamageCheckpoint()
+        || !installPoliceTicketCheckpoint()
         || !installRemainingAudioProbe()
         || !installBogasTraps()) return false;
 

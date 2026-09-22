@@ -13,6 +13,7 @@
 #   make GARAGE_CLICK=1 FINISH_CHECKPOINT=1  enter Course One's source-defined finish rectangle
 #   make GARAGE_CLICK=1 DAMAGE_REPAIR_CHECKPOINT=1  exercise Pro damage and gas-station repair
 #   make GARAGE_CLICK=1 TERMINAL_DAMAGE_CHECKPOINT=1 exercise the beyond-repair tow lifecycle
+#   make GARAGE_CLICK=1 POLICE_TICKET_CHECKPOINT=1 exercise all ordinary police penalties
 #   make GARAGE_CLICK=1 FREEWAY_ROUTE=1 FREEWAY_START=11  fast-start at freeway cell (11,36)
 #   add FREEWAY_START_U=n FREEWAY_START_V=n to choose a source-derived local point in that cell
 #   add MAIN_START=n to hand off at Main Map cell (n,39) after a real freeway-exit response
@@ -279,6 +280,9 @@ EXTRA_DEFINES += -DVETTE_DAMAGE_REPAIR_CHECKPOINT
 endif
 ifeq ($(TERMINAL_DAMAGE_CHECKPOINT),1)
 EXTRA_DEFINES += -DVETTE_TERMINAL_DAMAGE_CHECKPOINT
+endif
+ifeq ($(POLICE_TICKET_CHECKPOINT),1)
+EXTRA_DEFINES += -DVETTE_POLICE_TICKET_CHECKPOINT
 endif
 
 # Diagnostic-only configurable fast start for freeway work.  Pass the desired
