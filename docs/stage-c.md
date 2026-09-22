@@ -522,10 +522,10 @@ mouse/key state, and repeated `GrayRgn` reads.
 
 ## Resource and handle boundary
 
-The host converter packs both resource forks into the pointer-free, big-endian `VRS1` archive.
-The target Resource Manager searches the selected fork and returns real double-indirect Handles.
-Archive payloads are permanently resident: `MoveHHi` validates such a handle but needs no physical
-relocation, while `HLock`/`HUnlock` record lock state. The emulated heap now also owns real movable
+The executable reads the two original raw resource forks into Fast RAM before hardware takeover.
+The target Resource Manager searches the selected native fork index and returns real
+double-indirect Handles. Resource payloads are permanently resident: `MoveHHi` validates such a
+handle but needs no physical relocation, while `HLock`/`HUnlock` record lock state. The emulated heap now also owns real movable
 Handles: `NewHandle` creates a stable master pointer, `GetHandleSize` reports the logical payload,
 and `PtrAndHand` grows and appends while updating that master pointer. `RecoverHandle` covers both
 heap allocations and resident resource payloads. `OpenResFile` performs classic case-insensitive
@@ -1198,8 +1198,8 @@ engine is still playing on the centred channel pair at pitch `$9858`, while the 
 has expired. `amiga/driving_audio_events.gdb` records every tick, context, duration, options word,
 instrument ordinal and Play pitch in a machine-readable form suitable for Paula reconstruction.
 
-`tools/render_paula_audio.py` now performs that reconstruction outside the game. It reads the VRS1
-archive and wrapper-event log, models each hardware voice's integer period, phase continuity,
+`tools/render_paula_audio.py` now performs that reconstruction outside the game. It reads the
+original `VETTE!.Data` resource fork and wrapper-event log, models each hardware voice's integer period, phase continuity,
 initial full-sample attack, declared reload loop and finite tick deadline, and writes a diagnostic
 48 kHz stereo WAV. This is verification tooling, not a software mixer in the Amiga executable.
 The measured interval is 16.383 seconds from ticks 1,678..2,661. AUD0/1 keep the engine centred;

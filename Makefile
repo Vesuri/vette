@@ -8,6 +8,9 @@
 #
 # The Amiga build is in amiga/ and is the real target: `cd amiga && . ./env.sh && make`.
 
+VETTE_APP_RSRC ?= tmp/rsrc_VETTE!_VETTE!_Folder_Folder_Color_VETTE!_Color_VETTE!.rsrc
+VETTE_DATA_RSRC ?= tmp/rsrc_VETTE!_VETTE!_Folder_Folder_Color_VETTE!_VETTE!.Data.rsrc
+
 .PHONY: all todo static-map-check coverage-check gameplay-regression-smoke gameplay-regression fidelity-check driving-sequence-capture driving-sequence-compare driving-motion-reference driving-view-reference driving-view-capture driving-view-compare driving-view-regression driving-f1-reference driving-f1-capture driving-f1-compare driving-audio-reference driving-audio-capture driving-audio-compare driving-audio-regression driving-motion-capture driving-motion-compare driving-motion-viewport-compare driving-cadence-compare driving-control-audit driving-palette-compare driving-profile help
 
 all: help
@@ -147,7 +150,7 @@ driving-audio-capture:
 	  GDBTAIL=240 EXTRA_ARGS="--warp_mode=1" GDBSCRIPT=driving_audio_events.gdb \
 	  ./diag_run.sh 150
 	@cp amiga/.run/gdb-out.log tmp/amiga-driving-audio.log
-	@python3 tools/render_paula_audio.py amiga/assets/vette.resources \
+	@python3 tools/render_paula_audio.py '$(VETTE_DATA_RSRC)' \
 		tmp/amiga-driving-audio.log tmp/amiga-driving-audio.wav
 	@python3 tools/audio_reference_report.py tmp/amiga-driving-audio.wav
 
@@ -270,9 +273,9 @@ driving-control-audit:
 
 driving-palette-compare:
 	@python3 tools/check_driving_palette.py \
-		amiga/assets/vette.resources 131 tmp/f40_screen.palette
+		'$(VETTE_APP_RSRC)' 131 tmp/f40_screen.palette
 	@python3 tools/check_driving_palette.py \
-		amiga/assets/vette.resources 131 tmp/amiga_driving.palette
+		'$(VETTE_APP_RSRC)' 131 tmp/amiga_driving.palette
 
 # The measurement freezes in target time after 300 PAL fields; 60 seconds is
 # only a host-side safety ceiling for reaching and reading that frozen window.

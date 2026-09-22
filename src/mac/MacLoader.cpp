@@ -565,8 +565,8 @@ static Segment s_segments[11] = {
 };
 static uint8_t* s_residentSegmentStorage[11];
 // Short aliases keep the byte-verified patch sites readable. They now point
-// into aligned resident copies of the application CODE resources rather than
-// linked `.incbin` symbols.
+// into aligned resident copies of the application CODE resources loaded from
+// disk.
 static uint8_t *vette_code_0, *vette_code_0_end;
 static uint8_t *vette_code_1, *vette_code_1_end;
 static uint8_t *vette_code_2, *vette_code_2_end;

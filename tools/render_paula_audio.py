@@ -9,9 +9,9 @@ import wave
 from dataclasses import dataclass
 from pathlib import Path
 
+from resource_fork import read_resource_fork
 
-HEADER = struct.Struct(">4sHHII")
-ENTRY = struct.Struct(">Hh4sBBHIII")
+
 PAULA_CLOCK = 3_546_895
 MAC_TICKS = 60
 ORDINAL_NAMES = (
@@ -71,18 +71,12 @@ def parse_value(text):
 
 
 def load_instruments(path):
-    archive = path.read_bytes()
-    magic, version, _, count, directory = HEADER.unpack_from(archive)
-    if magic != b"VRS1" or version != 1:
-        raise ValueError("not a VRS1 resource archive")
     found = {}
-    for index in range(count):
-        entry = ENTRY.unpack_from(archive, directory + index * ENTRY.size)
-        _, _, kind, _, name_length, _, name_offset, data_offset, data_length = entry
-        if kind != b"INST":
+    for item in read_resource_fork(path):
+        if item.kind != b"INST":
             continue
-        name = archive[name_offset:name_offset + name_length].decode("mac_roman").lower()
-        body = archive[data_offset:data_offset + data_length]
+        name = item.name.lower()
+        body = item.body
         loop_start = loop_end = 0
         sample_rate = 0
         if len(body) > 8 and struct.unpack_from(">H", body, 6)[0] == len(body) - 8:
@@ -124,13 +118,13 @@ def bogas_period(base_period, pitch):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("archive", type=Path)
+    parser.add_argument("resource_fork", type=Path)
     parser.add_argument("events", type=Path)
     parser.add_argument("output", type=Path)
     parser.add_argument("--rate", type=int, default=48000)
     args = parser.parse_args()
 
-    instruments = load_instruments(args.archive)
+    instruments = load_instruments(args.resource_fork)
     events = load_events(args.events)
     first_tick = min(tick for tick, kind, _ in events if kind == "load")
     end_tick = next(tick for tick, kind, _ in events if kind == "ceiling")

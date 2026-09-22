@@ -1,48 +1,31 @@
 #!/usr/bin/env python3
-"""Report signed PCM ranges for every INST in a packed VRS1 archive."""
+"""Report signed PCM ranges for every INST in a raw Macintosh resource fork."""
 
 import argparse
-import struct
 from pathlib import Path
 
-
-HEADER = struct.Struct(">4sHHII")
-ENTRY = struct.Struct(">Hh4sBBHIII")
+from resource_fork import read_resource_fork
 
 
 def instruments(path: Path):
-    archive = path.read_bytes()
-    if len(archive) < HEADER.size:
-        raise ValueError("resource archive is shorter than its header")
-    magic, version, _, count, directory = HEADER.unpack_from(archive)
-    if magic != b"VRS1" or version != 1:
-        raise ValueError("not a VRS1 resource archive")
-    if directory + count * ENTRY.size > len(archive):
-        raise ValueError("resource directory extends past the archive")
-
-    for index in range(count):
-        entry = ENTRY.unpack_from(archive, directory + index * ENTRY.size)
-        _, rid, kind, _, name_length, _, name_offset, data_offset, data_length = entry
-        if kind != b"INST":
+    for item in read_resource_fork(path):
+        if item.kind != b"INST":
             continue
-        if name_offset + name_length > len(archive) or data_offset + data_length > len(archive):
-            raise ValueError(f"INST {rid} extends past the archive")
-        name = archive[name_offset:name_offset + name_length].decode("mac_roman")
-        body = archive[data_offset:data_offset + data_length]
+        body = item.body
         if (len(body) > 8 and body[:4] == b"\0\0\0\0"
-                and struct.unpack_from(">H", body, 6)[0] == len(body) - 8):
+                and int.from_bytes(body[6:8], "big") == len(body) - 8):
             body = body[8:]
-        yield rid, name, body
+        yield item.rid, item.name, body
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("archive", type=Path)
+    parser.add_argument("resource_fork", type=Path)
     args = parser.parse_args()
 
     global_peak = 0
     print("   id name               bytes       signed range peak")
-    for rid, name, body in instruments(args.archive):
+    for rid, name, body in instruments(args.resource_fork):
         if not body:
             raise ValueError(f"INST {rid} {name!r} has no PCM data")
         low = min(value - 128 for value in body)

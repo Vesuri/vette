@@ -624,7 +624,7 @@ obj/%.o : $(AMIGA_SRC)/%.s
 	@$(AS) $(ASFLAGS) -o $@ "$(abspath $<)"
 
 # Framework hand-written asm (vasm, Motorola syntax -> ELF).  Static pattern rule so it does not
-# collide with the gas-assembled gcc8_a_support.s / incbin.s explicit rules.
+# collide with the gas-assembled gcc8_a_support.s rule.
 $(FRAMEWORK_ASM_OBJS) : obj/%.o : %.s
 	$(info VASM $<)
 	@$(VASM) $(VASMFLAGS) -o $@ "$(abspath $<)"

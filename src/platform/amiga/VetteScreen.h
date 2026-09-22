@@ -71,8 +71,8 @@ public:
     uint8_t*  picture() const    { return m_chip; }
 
     // Stage A evidence, read by amiga/stage_a.gdb.  The checksum is computed from
-    // the bytes IN CHIP RAM after the copy, so it proves the whole asset path
-    // (converter -> .incbin -> load -> chip copy), not just that a blob exists.
+    // the bytes IN CHIP RAM after the copy, so it proves the initialized display
+    // surface rather than merely proving that host data exists.
     uint32_t pictureChecksum() const { return m_checksum; }
 
 private:
