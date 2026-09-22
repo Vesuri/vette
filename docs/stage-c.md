@@ -1224,6 +1224,14 @@ wrapper arguments, then shortens only the resulting finite countdown to two tick
 proves both deadlines become zero and context 0 becomes inactive. Indefinite engine and helicopter
 loads retain their existing zero deadline.
 
+`amiga/driving_audio_recovery.gdb` follows that same cue through the enclosing lake-result
+transition instead of stopping at expiry. It reuses the already-verified two-tick deadline fixture
+only to keep wall time bounded, then waits for the original PICT-140 click-through and VBL removal.
+At tick 2805 driving is disarmed, context 0 is inactive, both centred voice deadlines are zero, and
+no post-splash context-0 Load occurred. The source therefore does not restore the engine while
+leaving this race; silence is the correct recovery/garage-side state until a later race setup makes
+its own original engine Load.
+
 The last two named driving effects now have a bounded original-caller regression in
 `amiga/driving_audio_remaining.gdb`. Static code first fixes their meaning instead of assigning
 them from their names. `Main+$3EF2` tests an inactive map trigger against the player's two in-cell

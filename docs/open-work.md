@@ -154,7 +154,9 @@ is consequently renumbered.
    120-tick map-trigger effect and `joel` as the 300-tick high-memory, non-Trainee `COP!` response;
    both retain their original callers and context-1 replacement semantics. The complete resident
    code reference sweep also proves `cable car bell` is intro-only, with no gameplay caller to
-   implement. Continue with authored-level comparison and simultaneous-context transition stress.
+   implement. The lake-result transition also proves the game leaves context 0 silent after driving
+   is disarmed, rather than restoring the engine in the garage. Continue with authored-level
+   comparison and simultaneous-context transition stress.
 6. **Automate fidelity regressions.** Keep intro and driving framebuffer differentials, palette
    checks, clean-build audits, and eventually basic audio comparisons reproducible.
 
