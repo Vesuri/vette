@@ -10,7 +10,8 @@ changes.
 ⭐ **HEAD OF QUEUE: Cover materially different race modes.** All four course selections, genuine
 starts, source-defined finish handlers, Score, and garage returns are proven. Now check representative
 junctions, map boundaries, and freeway transitions across them, then cars, opponents, difficulty
-levels, and practice/qualifying/race variants.
+behavior, and practice/qualifying/race variants. All three difficulty selectors and their complete
+ordinary finish lifecycles are already proven.
 
 Long route traces are regressions, not the primary discovery mechanism. Enter unknown behavior
 through the shortest faithful checkpoint available; do not patch game decisions merely to reach it.
@@ -21,8 +22,9 @@ For bounded driving that must follow the road, build with `GARAGE_CLICK=1 FOLLOW
 
 1. **Cover materially different race modes.** The four course starts and complete finish lifecycles
    are closed. Check representative junctions, map boundaries, and freeway transitions across them,
-   then cars, opponents, difficulty levels, and practice/qualifying/race variants. Do not drive for
-   hours to reach a state that can be entered faithfully with a checkpoint.
+   then cars, opponents, the distinct difficulty rules, and practice/qualifying/race variants. The
+   TRAINEE/ROOKIE/PRO UI selections and ordinary finish lifecycles are closed. Do not drive for hours
+   to reach a state that can be entered faithfully with a checkpoint.
 2. **Finish necessary game UI paths.** Cover the garage, dynamometer, car/opponent/course/difficulty
    choices, options, pause, quit, results, and return paths. Leave unnecessary classic Mac desktop
    UI unimplemented so an erroneous fallback remains a loud failure.

@@ -83,7 +83,7 @@ end
 break *(s_segments[1].begin+0x1f56) if $outerReturn
 commands
   silent
-  printf "course-lifecycle settled tick=%u endpoints=(%u,%u,%u) finish=%u score=%u/%u main-exit=%u outer-return=%u course=%d long=%d driving=%u\n", g_macTicks, $endpoint0, $endpoint1, $endpoint2, $finishCore, $scoreCalls, $scoreReturned, $mainExit, $outerReturn, *(signed char*)(s_currentA5-0x555a), *(signed short*)(s_currentA5-0x5082), s_drivingFrameStarted
+  printf "course-lifecycle settled tick=%u endpoints=(%u,%u,%u) finish=%u score=%u/%u main-exit=%u outer-return=%u course=%d long=%d difficulty=%d driving=%u\n", g_macTicks, $endpoint0, $endpoint1, $endpoint2, $finishCore, $scoreCalls, $scoreReturned, $mainExit, $outerReturn, *(signed char*)(s_currentA5-0x555a), *(signed short*)(s_currentA5-0x5082), *(signed short*)(s_currentA5-0x542c), s_drivingFrameStarted
   detach
   quit
 end

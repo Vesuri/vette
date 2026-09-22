@@ -2095,6 +2095,23 @@ closes garage → choices → countdown → driving → original
 finish/result/score → garage for every shipped course selection. Route and mode diversity remain
 separate queue items.
 
+## Complete difficulty-selection lifecycles
+
+`GARAGE_DIFFICULTY=1..3` extends the same ordinary-input harness through the shipped
+TRAINEE/ROOKIE/PRO selector. The three original tracker rectangles are `(373,50)-(453,88)`,
+`(373,94)-(453,131)`, and `(373,137)-(453,175)` in local horizontal/vertical coordinates. The
+harness clicks their exact centers; it does not write the difficulty global or bypass the tracker.
+`amiga/driving_difficulty_start.gdb` observes original UI indices 0, 1, and 2 and then sees those
+same values at A5-$542C when Traffic enters live driving. The otherwise identical route retains
+player Corvette 0, opponent F40 3, Course One, and the short-course flag.
+
+Each selection was also run with the source-defined finish checkpoint. TRAINEE, ROOKIE, and PRO
+all hit `Traffic+$59A2`, enter the common finish once, call and return from Score once, leave Main's
+driving loop, and settle in the garage at tick 1146 with driving presentation disabled and no loud
+stop. This proves the complete ordinary UI and lifecycle for all three difficulty selections.
+Their materially different damage, traction, police, and cruise-control rules remain behavioral
+coverage work; the selector proof is not substituted for those tests.
+
 ## Correction to the MAME log
 
 The 51-row MAME table is a measurement of that reference run, not fabricated data, but the live

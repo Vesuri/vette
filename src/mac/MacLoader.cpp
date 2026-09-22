@@ -207,6 +207,10 @@ static uint8_t s_garageGearPhase;
 #if defined(VETTE_GARAGE_COURSE) && (VETTE_GARAGE_COURSE < 1 || VETTE_GARAGE_COURSE > 4)
 #error VETTE_GARAGE_COURSE must be 1..4
 #endif
+#if defined(VETTE_GARAGE_DIFFICULTY) \
+    && (VETTE_GARAGE_DIFFICULTY < 1 || VETTE_GARAGE_DIFFICULTY > 3)
+#error VETTE_GARAGE_DIFFICULTY must be 1..3 (Trainee, Rookie, Pro)
+#endif
 #ifdef VETTE_GARAGE_COURSE
 static const uint8_t kGarageDrivingPhase = 11;
 #else
@@ -5673,19 +5677,25 @@ static bool nextEvent(uint16_t mask, uint8_t* event)
     }
 
 #ifdef VETTE_GARAGE_CLICK
-    // Leave the garage, vehicle selector, and course selector through their
-    // real controls: ACCEPT, top plate, Corvette ZR-1, ACCEPT, optionally a
-    // requested course button, then the course screen's ACCEPT.  The visible 512x320 crop
-    // begins at Macintosh global (64,91), so keep the live state local while
-    // emitting ordinary mouse events.
+    // Leave the garage, difficulty, opponent, and course selectors through
+    // their real controls: ACCEPT, the requested difficulty, F40, ACCEPT,
+    // optionally a requested course button, then the course screen's ACCEPT.
+    // The visible 512x320 crop begins at Macintosh global (64,91), so keep the
+    // live state local while emitting ordinary mouse events.
+#ifdef VETTE_GARAGE_DIFFICULTY
+    static const int16_t difficultyY[] = { 69, 112, 156 };
+    const int16_t selectedDifficultyY = difficultyY[VETTE_GARAGE_DIFFICULTY - 1];
+#else
+    const int16_t selectedDifficultyY = 69; // shipped TRAINEE rectangle
+#endif
 #ifdef VETTE_GARAGE_COURSE
     static const int16_t clickX[] = {
         293, 413, 444, 212, (int16_t)(70 + 94 * (VETTE_GARAGE_COURSE - 1)), 445
     };
-    static const int16_t clickY[] = { 161, 69, 156, 154, 308, 308 };
+    const int16_t clickY[] = { 161, selectedDifficultyY, 156, 154, 308, 308 };
 #else
     static const int16_t clickX[] = { 293, 413, 444, 212, 445 };
-    static const int16_t clickY[] = { 161,  69, 156, 154, 308 };
+    const int16_t clickY[] = { 161, selectedDifficultyY, 156, 154, 308 };
 #endif
     if (!transition && s_garageClickPhase < sizeof(clickX) / sizeof(clickX[0]) * 2) {
         uint16_t click = (uint16_t)(s_garageClickPhase >> 1);
