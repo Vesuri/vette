@@ -155,8 +155,9 @@ is consequently renumbered.
    both retain their original callers and context-1 replacement semantics. The complete resident
    code reference sweep also proves `cable car bell` is intro-only, with no gameplay caller to
    implement. The lake-result transition also proves the game leaves context 0 silent after driving
-   is disarmed, rather than restoring the engine in the garage. Continue with authored-level
-   comparison and simultaneous-context transition stress.
+   is disarmed, rather than restoring the engine in the garage. A Course Two assertion now proves
+   engine, skid, and crash remain simultaneously active and that reloading context 2 changes only
+   AUD2's deadline. Continue with authored-level comparison.
 6. **Automate fidelity regressions.** Keep intro and driving framebuffer differentials, palette
    checks, clean-build audits, and eventually basic audio comparisons reproducible.
 

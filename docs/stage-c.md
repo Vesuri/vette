@@ -1193,6 +1193,14 @@ engine remains on AUD0/1. The 900-iteration ceiling records instruments 7, 8, 10
 effect Loads, no loud stop, and eventual collision-bound motion at speed 8. The probe now reports
 only each first-seen ordinal plus the final counts/mask, avoiding hundreds of repeated crash lines.
 
+`amiga/driving_audio_overlap.gdb` turns that workload into an explicit hardware-state assertion.
+At driving iteration 151 the original engine/skid/crash calls are simultaneously active as
+instruments `4/7/8` on contexts 0/1/2 and Paula channels `0/3/2`; AUD0/1 have no deadline while
+AUD2 and AUD3 retain independent finite deadlines. Traffic then reloads crash into context 2 while
+skid is still live. On the following presentation all three contexts remain active, only AUD2's
+deadline has advanced (2406 to 2455), AUD3 remains 2536, and DMACONR remains `$03DF`. Replacing one
+Bogas input therefore neither restarts nor silences either of the other two hardware-backed inputs.
+
 `amiga/driving_audio_horn.gdb` covers the documented Z horn without confusing selector/countdown
 input with a racing control. Its diagnostic physical-key edge waits for the game's own start state
 3 and 30 completed driving iterations, holds Z across one original KeyMap scan, then releases it
