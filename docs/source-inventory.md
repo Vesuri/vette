@@ -82,7 +82,7 @@ prior two ports had to recover the equivalent by hand, which is what `docs/renam
 | 0 | 4 072 | 4 088 | — | **the jump table** + Segment Loader header. Not code. Its 509 exports are now in `ghidra_scripts/entrypoints.csv`; generation and validation are documented in `docs/toolchain.md`. |
 | 1 | 32 606 | 24 994 | `Main` | the main loop / event loop |
 | 2 | 5 448 | 7 032 | `Initialize` | startup |
-| 3 | 9 106 | 9 110 | `Communication` | ⭐ **explained by the manual:** head-to-head play over direct serial, Hayes-compatible modem, or AppleTalk; not required for the single-player milestone |
+| 3 | 9 106 | 9 110 | `Communication` | ⭐ **explained by the manual:** head-to-head play over direct serial, Hayes-compatible modem, or AppleTalk; explicitly unsupported by the single-player Amiga port |
 | 4 | 1 618 | 1 668 | `load` | resource loading; `VETTE!.Data` is the likely subject |
 | 5 | 4 600 | 4 628 | `Score` | scoring / results |
 | 6 | 27 862 | 27 958 | `Traffic` | traffic simulation — the second-largest segment, and identical in size across builds |

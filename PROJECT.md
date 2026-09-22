@@ -91,7 +91,10 @@ locked, and other docs quote it by number.
 Inside: an **8049 KiB HFS volume** as an NDIF image, plus the extras — `scans/Manual.pdf` (5.2 MB),
 `Map.jpg`, `MapInfo_1/2.jpg`, `KeyChart.jpg`, `Package.pdf`, and `web_docs/cheats.txt`. ⭐ Read and
 distilled into `docs/manual.md`; it supplies the game's state/input vocabulary and proves that
-`Communication` is the optional head-to-head subsystem. ⚠ `readme.txt` says the build
+`Communication` is the optional head-to-head subsystem. The Amiga port is single-player only and
+will not implement direct serial, modem, AppleTalk, multiplayer chat, or remote-car synchronization;
+the segment remains resident solely because the complete original CODE image is resident. ⚠
+`readme.txt` says the build
 asks for a copy-protection password **once, on first run**, and the answers are in the first pages of
 `Manual.pdf` — so a reference-loop image must be set up past that, and a fresh one will stop there.
 ⚠ That constraint is about **ground truth**, and the protection decision does not retire it: the

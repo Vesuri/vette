@@ -34,8 +34,6 @@ For bounded driving that must follow the road, build with `GARAGE_CLICK=1 FOLLOW
    types the game actually consumes; do not implement unused managers speculatively.
 6. **Verify resources and persistence.** Determine from code whether preferences, high scores,
    saved settings, or other writable state are required, then implement only what is used.
-7. **Decide communications scope.** Either support the original head-to-head/communication mode
-   for the fidelity target or record its explicit deferral from the first packaged release.
 
 ## Structural verification and release — after core game completion
 

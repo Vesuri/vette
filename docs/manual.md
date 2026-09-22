@@ -208,9 +208,11 @@ remote car while its performance follows the other player's chosen Corvette. Cou
 is resolved randomly (or by the caller for modem play). `+` opens a chat window and pauses both
 players until the message has been read.
 
-Therefore `Communication` is not mysterious game logic and is not required for the single-player
-Amiga milestone. It should remain resident-compatible but can stay unimplemented until multiplayer
-is explicitly brought into scope.
+Therefore `Communication` is not mysterious game logic. The Amiga port is deliberately
+**single-player only**: direct serial, modem, AppleTalk, remote-car synchronization, multiplayer
+chat, and communications-setup persistence will not be implemented. The original segment remains
+resident as part of the complete CODE image, but entering its head-to-head path is unsupported and
+must remain an explicit loud failure rather than acquiring a partial transport emulation.
 
 ## Copy protection notes
 
