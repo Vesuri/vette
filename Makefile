@@ -8,7 +8,7 @@
 #
 # The Amiga build is in amiga/ and is the real target: `cd amiga && . ./env.sh && make`.
 
-.PHONY: all todo driving-sequence-capture driving-sequence-compare driving-motion-reference driving-view-reference driving-view-capture driving-view-compare driving-view-regression driving-f1-reference driving-f1-capture driving-f1-compare driving-audio-reference driving-audio-capture driving-audio-compare driving-audio-regression driving-motion-capture driving-motion-compare driving-motion-viewport-compare driving-cadence-compare driving-control-audit driving-profile help
+.PHONY: all todo driving-sequence-capture driving-sequence-compare driving-motion-reference driving-view-reference driving-view-capture driving-view-compare driving-view-regression driving-f1-reference driving-f1-capture driving-f1-compare driving-audio-reference driving-audio-capture driving-audio-compare driving-audio-regression driving-motion-capture driving-motion-compare driving-motion-viewport-compare driving-cadence-compare driving-control-audit driving-palette-compare driving-profile help
 
 all: help
 
@@ -22,6 +22,7 @@ help:
 	@echo "  make driving-motion-viewport-compare  gate a pixel-exact moving exterior view"
 	@echo "  make driving-cadence-compare  gate A1200 completed-frame cadence against the Mac"
 	@echo "  make driving-control-audit  gate the input bridge and FS-UAE configuration"
+	@echo "  make driving-palette-compare  gate selector and road CLUTs from shipped resources"
 	@echo "  make driving-motion-reference  capture distinct moving frames on the Macintosh oracle"
 	@echo "  make driving-f1-reference      capture moving F1-view frames on the Macintosh oracle"
 	@echo "  make driving-f1-capture        capture matching moving F1-view Amiga frames"
@@ -237,6 +238,12 @@ driving-cadence-compare:
 
 driving-control-audit:
 	@python3 tools/check_control_surface.py
+
+driving-palette-compare:
+	@python3 tools/check_driving_palette.py \
+		amiga/assets/vette.resources 131 tmp/f40_screen.palette
+	@python3 tools/check_driving_palette.py \
+		amiga/assets/vette.resources 131 tmp/amiga_driving.palette
 
 # The measurement freezes in target time after 300 PAL fields; 60 seconds is
 # only a host-side safety ceiling for reaching and reading that frozen window.

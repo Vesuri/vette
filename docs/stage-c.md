@@ -638,6 +638,11 @@ only in `ActivatePalette`, leaving the source one seed behind and provoking a co
 that turned sky gray and road brown. `SetPalette` now performs the measured courteous GWorld seed
 synchronization immediately, while still retaining the GWorld's creation-time RGB snapshot.
 
+`make driving-palette-compare` independently derives the selector and final-road OCS palettes from
+the shipped `pltt` 130 and 131 RGB entries and the recorded System 6 physical-slot allocations
+above. It requires all sixteen pens in the retained Amiga selector and driving captures to match;
+the check contains no car, scene-pixel, or screenshot color substitutions.
+
 `GetNewDialog` now builds the `DialogRecord` from the shipped `DLOG`/`DITL` pair and `DrawDialog`
 validates the item stream, selects the dialog port, and paints its background. `GetDItem` walks that
 stream and materializes movable text handles for static-text items; `SetIText` resizes and fills them.

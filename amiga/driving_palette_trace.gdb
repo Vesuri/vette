@@ -33,6 +33,7 @@ break vbiHandler if s_drivingFrameStarted && g_macFramesPresented >= 40
 commands
   silent
   dump binary memory ../tmp/amiga_driving_palette_trace.ctab s_windowManagerColors s_windowManagerColors+136
+  dump binary memory ../tmp/amiga_driving.palette s_loudStopScreen->m_nextPalette s_loudStopScreen->m_nextPalette+16
   printf "driving palette captured ticks=%u frames=%u/%u calls=%u\n", g_macTicks, g_macFramesQueued, g_macFramesPresented, $palette_calls
   detach
   quit
