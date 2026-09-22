@@ -46,6 +46,7 @@ disasm/*
 
 # --- Build output ------------------------------------------------------------
 build/
+/dist/
 amiga/obj/
 amiga/out/
 amiga/.run/

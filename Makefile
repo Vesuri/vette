@@ -11,7 +11,7 @@
 VETTE_APP_RSRC ?= tmp/rsrc_VETTE!_VETTE!_Folder_Folder_Color_VETTE!_Color_VETTE!.rsrc
 VETTE_DATA_RSRC ?= tmp/rsrc_VETTE!_VETTE!_Folder_Folder_Color_VETTE!_VETTE!.Data.rsrc
 
-.PHONY: all todo static-map-check coverage-check gameplay-regression-smoke gameplay-regression install-original-data fidelity-check driving-sequence-capture driving-sequence-compare driving-motion-reference driving-view-reference driving-view-capture driving-view-compare driving-view-regression driving-f1-reference driving-f1-capture driving-f1-compare driving-audio-reference driving-audio-capture driving-audio-compare driving-audio-regression driving-motion-capture driving-motion-compare driving-motion-viewport-compare driving-cadence-compare driving-control-audit driving-palette-compare driving-profile help
+.PHONY: all todo static-map-check coverage-check gameplay-regression-smoke gameplay-regression install-original-data release release-check fidelity-check driving-sequence-capture driving-sequence-compare driving-motion-reference driving-view-reference driving-view-capture driving-view-compare driving-view-regression driving-f1-reference driving-f1-capture driving-f1-compare driving-audio-reference driving-audio-capture driving-audio-compare driving-audio-regression driving-motion-capture driving-motion-compare driving-motion-viewport-compare driving-cadence-compare driving-control-audit driving-palette-compare driving-profile help
 
 all: help
 
@@ -24,6 +24,8 @@ help:
 	@echo "  make gameplay-regression-smoke  clean production + driving smoke runs"
 	@echo "  make gameplay-regression        all bounded gameplay/release scenario groups"
 	@echo "  make install-original-data IMAGE=/path/VETTE!.img DEST=/path/Vette"
+	@echo "  make release                  clean production build + copyright-clean ZIP"
+	@echo "  make release-check            static/coverage/smoke, deterministic build, ZIP audit"
 	@echo "  make fidelity-check  gate the completed local fidelity evidence set"
 	@echo "  make driving-sequence-compare  compare saved MAME/Amiga driving frames"
 	@echo "  make driving-sequence-capture  capture Amiga frames at saved Macintosh game states"
@@ -79,6 +81,21 @@ install-original-data:
 	@test -n "$(IMAGE)" || { echo "IMAGE=/path/to/VETTE!.img is required"; exit 1; }
 	@test -n "$(DEST)" || { echo "DEST=/path/to/Amiga/Vette is required"; exit 1; }
 	@python3 tools/install_original_data.py '$(IMAGE)' '$(DEST)'
+
+release:
+	@cd amiga && . ./env.sh && $(MAKE) clean && $(MAKE) -j4
+	@python3 tools/package_release.py amiga/out/Vette.exe dist
+	@python3 tools/check_release.py dist/Vette-Amiga-$$(cat VERSION).zip
+
+release-check: static-map-check coverage-check gameplay-regression-smoke
+	@cd amiga && . ./env.sh && \
+	  $(MAKE) clean >/dev/null && $(MAKE) -j4 >/dev/null 2>&1 && \
+	  first=$$(shasum -a 256 out/Vette.exe | cut -d' ' -f1) && \
+	  $(MAKE) clean >/dev/null && $(MAKE) -j4 >/dev/null 2>&1 && \
+	  second=$$(shasum -a 256 out/Vette.exe | cut -d' ' -f1) && \
+	  test "$$first" = "$$second" && echo "PASS: deterministic production executable $$second"
+	@python3 tools/package_release.py amiga/out/Vette.exe dist
+	@python3 tools/check_release.py dist/Vette-Amiga-$$(cat VERSION).zip
 
 # Fast aggregate over retained local oracle artifacts. Slow recapture remains
 # split into the dedicated reference/capture/regression targets below.
