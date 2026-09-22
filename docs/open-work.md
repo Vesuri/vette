@@ -150,8 +150,11 @@ is consequently renumbered.
    `engine` in context 0 and the forward view restores the centred engine voice, while both effect
    contexts remain independent. The lake checkpoint now proves `splash` is a finite 360-tick
    context-0 result cue; AUD0/1 and its logical voice now expire together instead of leaving a
-   silent context active forever. Continue with short source checkpoints for the remaining result
-   and environment cues, including concurrent playback and transitions.
+   silent context active forever. Byte-verified source checkpoints now also cover `kill` as a
+   120-tick map-trigger effect and `joel` as the 300-tick high-memory, non-Trainee `COP!` response;
+   both retain their original callers and context-1 replacement semantics. Continue with the
+   remaining environment-cue inventory, authored-level comparison, and simultaneous-context
+   transition stress.
 6. **Automate fidelity regressions.** Keep intro and driving framebuffer differentials, palette
    checks, clean-build audits, and eventually basic audio comparisons reproducible.
 

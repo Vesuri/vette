@@ -1200,8 +1200,8 @@ through the ordinary CIA input path. At iteration 32 the source loads instrument
 with duration `$7FFFFFFF` and options 2. The release produces no Bogas Play, Pitch, Stop,
 Deactivate, Set, or Purge call. This is consistent with the `horn` INST's authored sustain loop
 1428..4989: the original call requests a continuing horn voice until another context-1 effect
-replaces it. The observed run did exactly that when instrument 9 replaced it at iteration 57; no
-port-authored horn trigger or stop is required.
+replaces it. A current rerun leaves the horn active through its 80-iteration ceiling; no
+port-authored horn trigger or release-time stop is required.
 
 `amiga/driving_audio_heli.gdb` covers a complete principal-view audio transition through physical
 keys rather than changing Bogas state directly. The diagnostic presses the documented F4 control;
@@ -1223,6 +1223,19 @@ retires AUD0/1 and its playing flag together. `FINITE_AUDIO_PROBE=1` preserves a
 wrapper arguments, then shortens only the resulting finite countdown to two ticks; the regression
 proves both deadlines become zero and context 0 becomes inactive. Indefinite engine and helicopter
 loads retain their existing zero deadline.
+
+The last two named driving effects now have a bounded original-caller regression in
+`amiga/driving_audio_remaining.gdb`. Static code first fixes their meaning instead of assigning
+them from their names. `Main+$3EF2` tests an inactive map trigger against the player's two in-cell
+coordinates; with effects enabled, its original caller at `$3F5A` loads instrument 9 (`kill`) on
+context 1 for 120 ticks with options 1. `Traffic+$1844` dispatches the other response only for a
+`COP!` traffic object, and `Traffic+$0E5A` rejects it at Trainee difficulty. On a higher difficulty
+and on the high-memory path that registered the optional sample, the original caller at `$0F68`
+loads instrument 14 (`joel`) on context 1 for 300 ticks with options 1, replacing the indefinite
+instrument-12 police cue loaded immediately before it. `REMAINING_AUDIO_PROBE=1` is diagnostic
+only: it byte-verifies and bypasses these decoded tag, state, difficulty and distance predicates;
+it neither invokes Bogas nor chooses an instrument or context. The bounded run reaches `joel` at
+driving iteration 1 and `kill` at iteration 26 without a loud stop.
 
 The protection-failure police path is covered without restoring the deliberately unsupported modal
 requester. The diagnostic `FAIL_PROTECTION=1` replacement reproduces the two words left by the

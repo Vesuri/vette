@@ -222,6 +222,13 @@ ifeq ($(POLICE_PROBE),1)
 EXTRA_DEFINES += -DVETTE_POLICE_PROBE
 endif
 
+# Diagnostic only: bypass the decoded distance/eligibility predicates for the
+# original Main `kill` trigger and Traffic `joel` response.  Their state
+# transitions and Bogas calls remain original code.
+ifeq ($(REMAINING_AUDIO_PROBE),1)
+EXTRA_DEFINES += -DVETTE_REMAINING_AUDIO_PROBE
+endif
+
 # Deterministic Stage-C stepping only.  GetNextEvent traverses the garage,
 # vehicle and course selectors with normal mouse events; Button skips the plate
 # animation through its shipped input branch.  After driving setup returns,

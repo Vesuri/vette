@@ -860,6 +860,66 @@ static bool installStaticCollisionProbe()
     return true;
 }
 
+static bool installRemainingAudioProbe()
+{
+#ifdef VETTE_REMAINING_AUDIO_PROBE
+    // Main+$3F20/$3F28 rejects an inactive map trigger when either in-cell
+    // separation exceeds 15. NOP only those two compare/branch pairs; the
+    // source state guard, effects option, state mutation and BogasLoad remain.
+    static const uint16_t killOriginal[] = {
+        0x0c45, 0x000f, 0x6e00, 0x0072,
+        0x0c46, 0x000f, 0x6e00, 0x006a
+    };
+    uint8_t* kill = s_segments[1].begin + 0x3f20;
+    for (uint16_t i = 0; i < sizeof(killOriginal) / sizeof(killOriginal[0]); ++i) {
+        if (read16(kill + 2 * i) != killOriginal[i]) return false;
+        write16(kill + 2 * i, 0x4e71);       // NOP
+    }
+
+    uint8_t* traffic = s_segments[6].begin;
+
+    // Traffic+$18B2 normally enters this response only for a `COP!` traffic
+    // object. The deterministic short roster has none, so retain its valid
+    // object but bypass that one tag rejection for the diagnostic.
+    if (read16(traffic + 0x18ba) != 0x662c) return false;
+    write16(traffic + 0x18ba, 0x4e71);       // NOP the BNE.B
+    static const uint16_t callerGuardOffsets[] = {
+        0x18c2, 0x18c4, 0x18c6, 0x18d6, 0x18d8, 0x18da
+    };
+    static const uint16_t callerGuardOriginal[] = {
+        0x4a2c, 0x0033, 0x660a, 0x4a2c, 0x0033, 0x660a
+    };
+    for (uint16_t i = 0; i < sizeof(callerGuardOffsets) / sizeof(callerGuardOffsets[0]); ++i) {
+        uint8_t* word = traffic + callerGuardOffsets[i];
+        if (read16(word) != callerGuardOriginal[i]) return false;
+        write16(word, 0x4e71);
+    }
+
+    // Traffic+$0DD8..+$0EC4 is the joel response's eligibility chain. Force
+    // its resulting invocation down D7==0, retain a valid A4/A3 object pair,
+    // bypass the two state-byte guards and distance tests, then branch through
+    // the original response body at $0EE0. No Bogas state is synthesized.
+    static const struct { uint16_t offset, original, replacement; } joel[] = {
+        {0x0dd8, 0x4a87, 0x4e71}, {0x0dda, 0x6764, 0x6064},
+        {0x0e5a, 0x4a6d, 0x4e71}, {0x0e5c, 0xabd4, 0x4e71},
+        {0x0e5e, 0x67de, 0x4e71},
+        {0x0e60, 0x4a2c, 0x4e71}, {0x0e62, 0x0033, 0x4e71},
+        {0x0e64, 0x6600, 0x4e71}, {0x0e66, 0x010c, 0x4e71},
+        {0x0e68, 0x4a2c, 0x4e71}, {0x0e6a, 0x0032, 0x4e71},
+        {0x0e6c, 0x6700, 0x4e71}, {0x0e6e, 0x0218, 0x4e71},
+        {0x0e84, 0x0c86, 0x4e71}, {0x0e86, 0x0000, 0x4e71},
+        {0x0e88, 0x0800, 0x4e71}, {0x0e8a, 0x6e3c, 0x4e71},
+        {0x0ec0, 0xbc80, 0x4e71}, {0x0ec2, 0x6d1c, 0x601c}
+    };
+    for (uint16_t i = 0; i < sizeof(joel) / sizeof(joel[0]); ++i) {
+        uint8_t* word = traffic + joel[i].offset;
+        if (read16(word) != joel[i].original) return false;
+        write16(word, joel[i].replacement);
+    }
+#endif
+    return true;
+}
+
 static void blockMove(const uint8_t* source, uint8_t* destination, uint32_t count)
 {
     // The driving renderer uses _BlockMove as a direct packed-pixel primitive,
@@ -6652,7 +6712,8 @@ bool MacLoader::run(VetteScreen* screen)
     s_currentA5 = a5;
     if (!redirectLowMemoryGlobals(a5) || !disableCopyProtection()
         || !installDrivingBoundaryTrap() || !installDrivingRasterTraps()
-        || !installStaticCollisionProbe() || !installBogasTraps()) return false;
+        || !installStaticCollisionProbe() || !installRemainingAudioProbe()
+        || !installBogasTraps()) return false;
 
     Disable();
     *(void (**)())0x28 = vette_line_a_handler;
