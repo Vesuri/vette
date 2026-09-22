@@ -155,6 +155,7 @@ had set — and the first run of the other mode hung immediately on a bug that h
 whole time.
 
 **When the target has modes, enumerate them and ask which code each one EXCLUDES.** For a driving
-game that means: every track/course, every difficulty, every race type, the practice/qualify/race
-split, split-screen or two-player if it has one, and every menu path. Grep for the flag that gates
-the branch; it finds the untested subsystem faster than any amount of frame-staring.
+game that means: every shipped track/course, difficulty, session type, multiplayer mode if it has
+one, and every menu path. Do not assume practice or qualifying exists when the resource/UI inventory
+does not say so. Grep for the flag that gates the branch; it finds the untested subsystem faster than
+any amount of frame-staring.

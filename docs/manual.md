@@ -48,6 +48,12 @@ The documented single-player flow (pp. 2-10) is:
 8. finish between the two poles and under the checkerboard, followed by a win/loss scene and
    possibly a Top Ten name entry.
 
+The shipped session controls do **not** contain practice or qualifying modes. `MENU 444` contains
+`Tour Mode`; `MENU 222` contains `Restart Race`, `Return to Game`, `Quit to Garage`, and `Quit`.
+`MENU 130` selects `Single Player` or the deliberately unsupported communications transports.
+This inventory is reproducible with `tools/dump_menu.py` and is the coverage authority; generic
+racing-game phase terminology must not be projected onto Vette.
+
 Player cars (Appendix A, p. 31) are:
 
 - 1989 Stock Corvette

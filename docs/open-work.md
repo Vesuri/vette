@@ -9,8 +9,9 @@ changes.
 
 ⭐ **HEAD OF QUEUE: Cover materially different race modes.** All four course selections, genuine
 starts, source-defined finish handlers, Score, and garage returns are proven. Now check representative
-junctions, map boundaries, and freeway transitions across them, then practice/qualifying/race
-variants. All three difficulties are proven through selection, finish, damage, police, motion, and
+junctions, map boundaries, and freeway transitions across them, then Tour Mode and the restart/
+return race controls. Vette has no practice or qualifying modes. All three difficulties are proven
+through selection, finish, damage, police, motion, and
 cruise-control branches. All four player cars and all four opponents are proven through their UI
 selectors, live PERF records, and complete paired lifecycles.
 
@@ -23,9 +24,10 @@ For bounded driving that must follow the road, build with `GARAGE_CLICK=1 FOLLOW
 
 1. **Cover materially different race modes.** The four course starts and complete finish lifecycles
    are closed. Check representative junctions, map boundaries, and freeway transitions across them,
-   then practice/qualifying/race variants. Player-car, opponent, and TRAINEE/ROOKIE/PRO selection,
-   lifecycle, and distinct difficulty behavior are closed. Do not drive for hours to reach a state
-   that can be entered faithfully with a checkpoint.
+   then Tour Mode and the restart/return race controls; the shipped resources contain no practice or
+   qualifying modes. Player-car, opponent, and TRAINEE/ROOKIE/PRO selection, lifecycle, and distinct
+   difficulty behavior are closed. Do not drive for hours to reach a state that can be entered
+   faithfully with a checkpoint.
 2. **Finish necessary game UI paths.** Car, opponent, course, difficulty, results, and ordinary
    garage-return paths are closed. Cover the remaining garage/dynamometer, options, pause, and quit
    paths. Leave unnecessary classic Mac desktop UI unimplemented so an erroneous fallback remains
