@@ -53,6 +53,9 @@ volatile uint16_t g_stageCDepth = 1;       // _BlockMove is row 1
 volatile uint32_t g_macTicks = 0;
 volatile uint32_t g_macDrivingIterations = 0;
 volatile uint32_t g_macDrivingCallbacks = 0;
+#ifdef VETTE_TOUR_MODE_PROBE
+volatile uint16_t g_tourModeProbeComplete = 0;
+#endif
 #ifdef VETTE_MOTION_CAPTURE
 #ifdef VETTE_VIEW_CAPTURE_RAW_KEY
 volatile uint8_t g_motionCaptureReady = 0;
@@ -205,6 +208,10 @@ static bool s_mouseButtonDown;
 #ifdef VETTE_GARAGE_CLICK
 static uint8_t s_garageClickPhase;
 static uint8_t s_garageGearPhase;
+#ifdef VETTE_TOUR_MODE_PROBE
+static uint8_t s_tourModeProbePhase;
+static uint16_t s_tourModeProbeInitialIndex;
+#endif
 #if defined(VETTE_GARAGE_COURSE) && (VETTE_GARAGE_COURSE < 1 || VETTE_GARAGE_COURSE > 4)
 #error VETTE_GARAGE_COURSE must be 1..4
 #endif
@@ -482,6 +489,7 @@ static WindowManagerState s_windowManager;
 struct MenuManagerState {
     bool initialized;
     uint8_t** colorTable;
+    int16_t highlightedID;
     struct Entry {
         uint8_t** handle;
         bool inMenuBar;
@@ -634,7 +642,8 @@ static const TrapName s_trapNames[] = {
     {0xa914,"WINDOW MANAGER","DISPOSEWINDOW"}, {0xa90d,"WINDOW MANAGER","PAINTBEHIND"},
     {0xa04d,"MEMORY MANAGER","PURGEMEM"}, {0xa04c,"MEMORY MANAGER","COMPACTMEM"},
     {0xa939,"MENU MANAGER","ENABLEITEM"}, {0xa93a,"MENU MANAGER","DISABLEITEM"},
-    {0xa945,"MENU MANAGER","CHECKITEM"},
+    {0xa945,"MENU MANAGER","CHECKITEM"}, {0xa93e,"MENU MANAGER","MENUKEY"},
+    {0xa938,"MENU MANAGER","HILITEMENU"},
     {0xa931,"MENU MANAGER","NEWMENU"},
     {0xa933,"MENU MANAGER","APPENDMENU"}, {0xa94d,"MENU MANAGER","ADDRESMENU"},
     {0xa935,"MENU MANAGER","INSERTMENU"},
@@ -4467,6 +4476,7 @@ static void initMenus()
 {
     s_menuManager.initialized = true;
     s_menuManager.colorTable = 0;
+    s_menuManager.highlightedID = 0;
     s_menuManager.count = 0;
 
     // InitMenus optionally adopts the menu-color table resource.  Its ID is not
@@ -4507,10 +4517,13 @@ static bool enableMenuItem(uint8_t** menu, uint16_t item)
 
 static bool checkMenuItem(uint8_t** handle, uint16_t requestedItem, bool checked)
 {
-    if (!handle || !*handle || !requestedItem) return false;
+    if (!handle || !*handle) return false;
     uint8_t* menu = *handle;
     uint32_t size = handleSize(handle);
     if (size < 16 || size < (uint32_t)16 + menu[14]) return false;
+    // Vette uses item zero while Tour Mode has no previous destination to
+    // uncheck.  Like the classic manager, accept it without touching a mark.
+    if (!requestedItem) return true;
     uint32_t offset = 15 + menu[14];
     uint16_t item = 1;
     while (offset < size && menu[offset]) {
@@ -4524,6 +4537,49 @@ static bool checkMenuItem(uint8_t** handle, uint16_t requestedItem, bool checked
         ++item;
     }
     return false;
+}
+
+static uint32_t menuKey(uint8_t requestedKey)
+{
+    if (!s_menuManager.initialized) return 0;
+    requestedKey = asciiUpper(requestedKey);
+#ifdef VETTE_TOUR_MODE_PROBE
+    // MENU 777 has no key equivalents. Give the focused fixture a private G
+    // alias for its second (S. F. Zoo) item so the original Main menu dispatcher receives
+    // the same packed menuID/item result as MenuSelect, without implementing
+    // or drawing a pull-down menu in production.
+    if (requestedKey == 'G' && s_currentA5 && read16(s_currentA5 - 0x5318)) {
+        for (uint16_t i = 0; i < s_menuManager.count; ++i) {
+            uint8_t** handle = s_menuManager.entries[i].handle;
+            if (!handle || !*handle || handleSize(handle) < 16
+                || (int16_t)read16(*handle) != 777) continue;
+            uint32_t enabled = read32(*handle + 10);
+            if ((enabled & 5) == 5) return (777UL << 16) | 2;
+        }
+    }
+#endif
+    for (uint16_t i = 0; i < s_menuManager.count; ++i) {
+        const MenuManagerState::Entry& entry = s_menuManager.entries[i];
+        if (!entry.inMenuBar || !entry.handle || !*entry.handle) continue;
+        uint8_t* menu = *entry.handle;
+        uint32_t size = handleSize(entry.handle);
+        if (size < 16 || size < (uint32_t)16 + menu[14]) continue;
+        uint32_t enabled = read32(menu + 10);
+        if (!(enabled & 1)) continue;          // disabled menu title
+        uint32_t offset = 15UL + menu[14];
+        uint16_t item = 1;
+        while (offset < size && menu[offset]) {
+            uint8_t length = menu[offset];
+            if (offset + 5UL + length > size) break;
+            uint8_t key = menu[offset + 2 + length];
+            if (item < 32 && (enabled & (1UL << item))
+                && key && asciiUpper(key) == requestedKey)
+                return ((uint32_t)read16(menu) << 16) | item;
+            offset += 5UL + length;
+            ++item;
+        }
+    }
+    return 0;
 }
 
 static uint8_t** newMenu(int16_t id, const uint8_t* title)
@@ -4668,6 +4724,13 @@ static uint8_t** getMenu(int16_t id)
     uint8_t** menu = newHandle(size, false);
     if (!menu || !*menu) return 0;
     for (uint32_t i = 0; i < size; ++i) (*menu)[i] = source[i];
+#ifdef VETTE_TOUR_MODE_PROBE
+    // A fresh resource disables Tour Mode. Traffic teardown enables item 1
+    // after the first completed session. The ordinary finish/Score/garage
+    // lifecycle is covered independently, so begin this focused fixture from
+    // that exact post-session menu state instead of rendering Score twice.
+    if (id == 444) enableMenuItem(menu, 1);
+#endif
     return menu;
 }
 
@@ -5694,6 +5757,66 @@ static bool nextEvent(uint16_t mask, uint8_t* event)
 {
     if (!event) return false;
     bool buttonDown = pollMacMouse();
+#ifdef VETTE_TOUR_MODE_PROBE
+    // Menu equivalents belong to the ordinary event loop. Prove Tour Mode on,
+    // off, and on again, then select one real Tour-menu destination before the
+    // scripted garage clicks. MenuKey and Main's dispatcher perform every
+    // state change; the fixture only supplies physical Command/key edges.
+    if (s_tourModeProbePhase == 0 && menuKey('T')) {
+        s_tourModeProbeInitialIndex = read16(s_currentA5 - 0x4ddc);
+        vetteInputInjectProbeKey(0x66, true);
+        s_tourModeProbePhase = 1;
+    } else if (s_tourModeProbePhase == 1) {
+        vetteInputInjectProbeKey(0x14, true);
+        s_tourModeProbePhase = 2;
+    } else if (s_tourModeProbePhase == 2) {
+        vetteInputInjectProbeKey(0x14, false);
+        s_tourModeProbePhase = 3;
+    } else if (s_tourModeProbePhase == 3) {
+        vetteInputInjectProbeKey(0x66, false);
+        s_tourModeProbePhase = 4;
+    } else if (s_tourModeProbePhase == 4 && read16(s_currentA5 - 0x5318)) {
+        vetteInputInjectProbeKey(0x66, true);
+        s_tourModeProbePhase = 12;
+    } else if (s_tourModeProbePhase == 12) {
+        vetteInputInjectProbeKey(0x14, true);
+        s_tourModeProbePhase = 13;
+    } else if (s_tourModeProbePhase == 13) {
+        vetteInputInjectProbeKey(0x14, false);
+        s_tourModeProbePhase = 14;
+    } else if (s_tourModeProbePhase == 14) {
+        vetteInputInjectProbeKey(0x66, false);
+        s_tourModeProbePhase = 15;
+    } else if (s_tourModeProbePhase == 15 && !read16(s_currentA5 - 0x5318)) {
+        vetteInputInjectProbeKey(0x66, true);
+        s_tourModeProbePhase = 16;
+    } else if (s_tourModeProbePhase == 16) {
+        vetteInputInjectProbeKey(0x14, true);
+        s_tourModeProbePhase = 17;
+    } else if (s_tourModeProbePhase == 17) {
+        vetteInputInjectProbeKey(0x14, false);
+        s_tourModeProbePhase = 18;
+    } else if (s_tourModeProbePhase == 18) {
+        vetteInputInjectProbeKey(0x66, false);
+        s_tourModeProbePhase = 19;
+    } else if (s_tourModeProbePhase == 19 && read16(s_currentA5 - 0x5318)) {
+        vetteInputInjectProbeKey(0x66, true);
+        s_tourModeProbePhase = 20;
+    } else if (s_tourModeProbePhase == 20) {
+        vetteInputInjectProbeKey(0x24, true); // diagnostic MENU 777 item-2 alias
+        s_tourModeProbePhase = 21;
+    } else if (s_tourModeProbePhase == 21) {
+        vetteInputInjectProbeKey(0x24, false);
+        s_tourModeProbePhase = 22;
+    } else if (s_tourModeProbePhase == 22) {
+        vetteInputInjectProbeKey(0x66, false);
+        s_tourModeProbePhase = 23;
+    } else if (s_tourModeProbePhase == 23
+               && read16(s_currentA5 - 0x4ddc) != s_tourModeProbeInitialIndex) {
+        g_tourModeProbeComplete = 1;
+        s_tourModeProbePhase = 24;
+    }
+#endif
     bool transition = false;
     uint16_t what = 0;
     if (buttonDown != s_mouseButtonDown) {
@@ -5760,7 +5883,11 @@ static bool nextEvent(uint16_t mask, uint8_t* event)
         161, selectedDifficultyY, selectedOpponentY, 154, 308
     };
 #endif
-    if (!transition && s_garageClickPhase < sizeof(clickX) / sizeof(clickX[0]) * 2) {
+    if (!transition && s_garageClickPhase < sizeof(clickX) / sizeof(clickX[0]) * 2
+#ifdef VETTE_TOUR_MODE_PROBE
+        && (s_tourModeProbePhase == 0 || s_tourModeProbePhase >= 24)
+#endif
+        ) {
         uint16_t click = (uint16_t)(s_garageClickPhase >> 1);
         uint16_t clickWhat = (s_garageClickPhase & 1) ? 2 : 1;
         if (mask & (1u << clickWhat)) {
@@ -6326,6 +6453,17 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
             if (g_stageCDepth < 92) g_stageCDepth = 92;
             return 9;
         }
+    }
+    if (trap == 0xa93e) {                    // MenuKey(key) -> menuID/item
+        write32(userStack + 2, menuKey((uint8_t)read16(userStack)));
+        return 3;
+    }
+    if (trap == 0xa938) {                    // HiliteMenu(menuID)
+        // Keyboard equivalents conventionally finish with HiliteMenu(0).
+        // Retain that manager state even though this port deliberately has no
+        // pull-down-menu UI to invert on screen.
+        s_menuManager.highlightedID = (int16_t)read16(userStack);
+        return 3;
     }
     if (trap == 0xa931) {                    // NewMenu(id, title) -> MenuHandle
         uint8_t** menu = newMenu((int16_t)read16(userStack + 4),

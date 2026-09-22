@@ -185,6 +185,15 @@ ifdef INPUT_PROBE_EVENT_RAW_KEY
 EXTRA_DEFINES += -DVETTE_INPUT_PROBE_EVENT_RAW_KEY=$(INPUT_PROBE_EVENT_RAW_KEY)
 endif
 
+# Diagnostic only: exercise Tour Mode's real Command-T handler in both
+# directions, then feed one semantic MENU 777 choice to its real dispatcher.
+ifeq ($(TOUR_MODE_PROBE),1)
+ifndef GARAGE_CLICK
+$(error TOUR_MODE_PROBE=1 requires GARAGE_CLICK=1)
+endif
+EXTRA_DEFINES += -DVETTE_TOUR_MODE_PROBE
+endif
+
 # Diagnostic only: select helicopter view through a physical F4 edge, then
 # return to the forward view through F2, to cover context-0 audio replacement.
 ifeq ($(VIEW_AUDIO_PROBE),1)
@@ -477,6 +486,9 @@ PROBE_SYMS += g_probePicture140TrapPC g_probePicture140Return \
               g_profileState g_profileGeneration g_profileStartEpoch g_profileStopEpoch \
               g_profileStartField g_profileStopField g_profileStartFrames g_profileStopFrames \
               g_profileTicks g_profileCalls
+endif
+ifeq ($(TOUR_MODE_PROBE),1)
+PROBE_SYMS += g_tourModeProbeComplete
 endif
 ifdef FPSCOUNT
 PROBE_SYMS +=

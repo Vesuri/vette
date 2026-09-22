@@ -54,6 +54,11 @@ The shipped session controls do **not** contain practice or qualifying modes. `M
 This inventory is reproducible with `tools/dump_menu.py` and is the coverage authority; generic
 racing-game phase terminology must not be projected onto Vette.
 
+Tour Mode is not an alternate race started from the garage. Main clears its flag on the ordinary
+new-race transitions at `$1FB4` and `$2142`. While a game is suspended, Options > Tour Mode enables
+the separate `MENU 777` list of 26 San Francisco destinations; selecting one relocates the existing
+player through `Main+$3456`, and Return to Game resumes that session.
+
 Player cars (Appendix A, p. 31) are:
 
 - 1989 Stock Corvette

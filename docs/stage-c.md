@@ -2172,6 +2172,37 @@ motion scaling rather than guessed to be the entire traction model; it neverthel
 material runtime distinction. Damage, police, motion scaling, and cruise behavior now accompany the
 already-complete selection and finish lifecycles for every difficulty.
 
+## Tour Mode and keyboard menu equivalents
+
+Tour Mode is a suspended-session navigation facility, not another garage-selected race mode.
+`MENU 444` item 1 toggles A5-$5318 and enables the separate `MENU 777` destination title. That menu
+contains 26 named San Francisco locations. Its handler at `Main+$162C` converts the selected item to
+a zero-based index and calls `Main+$3456`, which copies the source-authored position and heading into
+the existing player record, updates the checked destination, and advances the tour index. Ordinary
+new-race transitions at `Main+$1FB4` and `$2142` deliberately clear the flag; this is why carrying a
+Tour selection through the garage produced a disabled destination call rather than a Tour race.
+
+The compatibility layer now implements `MenuKey` from the installed packed `MENU` records, honoring
+menu-title and item enable bits and ASCII case. It also implements the required `HiliteMenu` manager
+state used after keyboard equivalents. `CheckItem(menu, 0, false)` is accepted as the classic
+harmless no-op: Tour uses it when no previous destination exists. Pull-down menu drawing and general
+`MenuSelect` remain unimplemented, consistent with the project's rule against building unnecessary
+desktop UI.
+
+`TOUR_MODE_PROBE=1` is diagnostic only. A newly loaded MENU resource has Tour disabled; Traffic
+teardown enables it after an earlier session. Since all course finish/Score/garage returns are
+already independently proven, the focused fixture starts from that exact post-session enable bit
+instead of rendering two redundant Score sequences. It sends physical Command-T events through
+`GetNextEvent` and `MenuKey` to prove the real Main handler's `off -> on -> off -> on` transitions.
+Because MENU 777 intentionally has no keyboard equivalents and pull-down UI is out of scope, the
+fixture alone gives its enabled S. F. Zoo item a private Command-G alias. The result still enters
+Main's ordinary packed menuID/item dispatcher and untouched destination routine.
+
+`amiga/driving_tour_mode.gdb` is the fail-fast proof. It observes all three Options commands, then
+enters `Main+$3456` with Tour enabled and destination index 1. The source routine advances the index
+to 2 and moves the player to `(x=$30A0,z=$1400,heading=$0000)` with no loud stop. Production builds
+contain neither the post-session precondition nor the private destination alias.
+
 ## Correction to the MAME log
 
 The 51-row MAME table is a measurement of that reference run, not fabricated data, but the live
