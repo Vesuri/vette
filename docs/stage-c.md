@@ -2222,6 +2222,38 @@ the driving global before reaching `$1FD2` again with the same live race state. 
 no A5 game state or menu bits; it supplies only the physical P and Command-key edges. The fail-fast
 observer for both builds is `amiga/driving_session_control.gdb`.
 
+## Race-mode and route-diversity closure
+
+The four garage-selected courses, their genuine starts, all source-defined endpoint sequences,
+common finish/Score processing, and garage returns are covered above. The shipped resources and
+resident Main code expose no additional practice or qualifying race modes; Tour Mode is the
+suspended-session navigation facility documented separately. All player cars, opponents, and
+difficulties also have complete selection-to-return lifecycles, with the distinct difficulty
+branches measured independently.
+
+Route coverage now includes representative connected junctions and both map directions. An
+ordinary-input Course Two run entered the authored Main Map export 212 at tick 12,140 from cell
+`(2,6)`, changed from city mode zero to freeway mode one, and created three of fifteen freeway
+objects by tick 12,195 in freeway cell `(2,42)`. This repeated the natural transition without a
+position checkpoint. Downstream coverage follows the decoded connected path `(2,38)->(3,37)`
+through QUAD 221/220 response 197, then `(3,37)->(4,37)->(4,36)->(6,36)` through QUAD
+251/219/218 and the row-36 handoff. Those runs also cover a moving-object collision rather than
+only empty-road traversal.
+
+The far boundary is bounded with a diagnostic start because replaying the complete already-proven
+route adds no new game decision. Freeway cell `(30,36)` is authored QUAD 125, selector 72; its
+third rectangle invokes export 230. The original handler entered with freeway mode one, relocated
+the complete physics position to `($6080,$13C07)`, cleared freeway mode, and the Main Map decoder
+landed in cell `(12,39)` at QUAD 121. A later checkpoint at Main Map cell `(17,39)` additionally
+proved continued Main Map execution at QUAD 136. Checkpoints supply positions only at these bounded
+far endpoints; the city-to-freeway transition and traffic activation remain natural ordinary-input
+evidence.
+
+Together these results cover materially different race lifecycles, representative junction and
+bend responses, moving traffic, and both city/freeway map boundaries. Further long route driving
+is regression work, not an open core-game mode, so the race-mode and route-diversity queue item is
+closed.
+
 ## Correction to the MAME log
 
 The 51-row MAME table is a measurement of that reference run, not fabricated data, but the live

@@ -7,15 +7,11 @@ document. `make todo` prints this file plus a live marker sweep of the tracked, 
 ⚠ Refer to an item by its title, not its number. Entries are deleted when closed, so numbering
 changes.
 
-⭐ **HEAD OF QUEUE: Cover materially different race modes.** All four course selections, genuine
-starts, source-defined finish handlers, Score, and garage returns are proven. Now check representative
-junctions, map boundaries, and freeway transitions across them. The suspended-session Return to
-Game and garage-side Restart Race controls are closed. Tour Mode's menu toggles and 26-entry
-destination dispatcher are closed; it is a
-suspended-session navigation facility, not a race type. Vette has no practice or qualifying modes. All three difficulties are proven
-through selection, finish, damage, police, motion, and
-cruise-control branches. All four player cars and all four opponents are proven through their UI
-selectors, live PERF records, and complete paired lifecycles.
+⭐ **HEAD OF QUEUE: Finish necessary game UI paths.** Car, opponent, course, difficulty, results,
+ordinary garage return, all four race lifecycles, representative city/freeway route transitions,
+Tour Mode, Return to Game, and Restart Race are closed. Cover the remaining garage/dynamometer,
+options, pause, and quit paths. Leave unnecessary classic Mac desktop UI unimplemented so an
+erroneous fallback remains a loud failure.
 
 Long route traces are regressions, not the primary discovery mechanism. Enter unknown behavior
 through the shortest faithful checkpoint available; do not patch game decisions merely to reach it.
@@ -24,21 +20,14 @@ For bounded driving that must follow the road, build with `GARAGE_CLICK=1 FOLLOW
 
 ## Core game completion — active queue
 
-1. **Cover materially different race modes.** The four course starts and complete finish lifecycles
-   are closed. Check representative junctions, map boundaries, and freeway transitions across them.
-   Restart Race and Return to Game are closed through their real menu-state paths. Tour Mode is
-   closed as a suspended-session menu path; the shipped resources contain no practice or
-   qualifying modes. Player-car, opponent, and TRAINEE/ROOKIE/PRO selection, lifecycle, and distinct
-   difficulty behavior are closed. Do not drive for hours to reach a state that can be entered
-   faithfully with a checkpoint.
-2. **Finish necessary game UI paths.** Car, opponent, course, difficulty, results, and ordinary
+1. **Finish necessary game UI paths.** Car, opponent, course, difficulty, results, and ordinary
    garage-return paths are closed. Cover the remaining garage/dynamometer, options, pause, and quit
    paths. Leave unnecessary classic Mac desktop UI unimplemented so an erroneous fallback remains
    a loud failure.
-3. **Implement only traps demanded by real paths.** Every unknown trap reached by the scenarios
+2. **Implement only traps demanded by real paths.** Every unknown trap reached by the scenarios
    above must either be implemented faithfully or remain a named loud stop. Recheck all resource
    types the game actually consumes; do not implement unused managers speculatively.
-4. **Verify resources and persistence.** Determine from code whether preferences, high scores,
+3. **Verify resources and persistence.** Determine from code whether preferences, high scores,
    saved settings, or other writable state are required, then implement only what is used.
 
 ## Structural verification and release — after core game completion
