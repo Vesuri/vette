@@ -6139,7 +6139,17 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
     if (trap == 0xa9a0) {                    // GetResource(type:4, id:2) -> Handle result:4
         int16_t id = (int16_t)read16(userStack);
         uint32_t type = read32(userStack + 2);
-        write32(userStack + 6, (uint32_t)getResource(type, id));
+        uint8_t** handle = getResource(type, id);
+        write32(userStack + 6, (uint32_t)handle);
+        if (handle) {
+            // D0 is scratch for this Pascal Toolbox call.  System 6.0.8 leaves
+            // it zero on a successful GetResource; VETTE's Traffic+$0794
+            // accidentally relies on that exact side effect when it loads the
+            // byte-sized Course Three value into only D0.b and then compares
+            // D0.w.  Restoring the pre-trap CLST id ($012C) changes course 2
+            // into $0102 and falsely selects the long-course normalization.
+            regs[0] = 0;
+        }
         if (g_stageCDepth < 3) g_stageCDepth = 3;
         return 7;
     }

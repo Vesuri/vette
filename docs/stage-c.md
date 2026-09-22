@@ -1551,12 +1551,23 @@ again. The retirement path is working; it is not what prevents `$2302` from runn
 Static MAPS/QUAD/collision-response tracing identifies the actual gate. Special collision handlers
 set or clear A5-$3764 and switch the active map. Main Map cell `(2,6)`, for example, uses QUAD 21,
 collision selector 16, and its first rectangle dispatches export 212 (`Traffic+$5632`), which sets
-freeway mode. `amiga/driving_course_start.gdb` proves the original UI selections: Courses One,
-Three, and Four all start at world `(0x3140,0x17e0)`, cell `(6,2)`, heading `$3000`; Course Two
-starts at `(0x11c0,0xc0a0)`, cell `(2,24)`, with the same heading. The apparent proximity of
+freeway mode. `amiga/driving_course_start.gdb` proves the original UI selections: Course One starts
+at world `(0x3140,0x17e0)`, cell `(6,2)`; Course Two starts at `(0x11c0,0xc0a0)`, cell `(2,24)`;
+Course Three starts at `(0xe9a0,0x160e0)`, cell `(29,44)`; and Course Four normalizes to Course
+One's start with the long-course flag set. All four use heading `$3000`. The apparent proximity of
 `(2,6)` to the shared start is false route guidance: the decoded full-cell bounds separate that
 lane from the start's connected static-collision component. No route is claimed until ordinary
 controls cross a response rectangle.
+
+Course Three originally appeared to normalize into Course Four on the Amiga. This was a Resource
+Manager ABI defect, not a course-table rule. `Traffic+$0758` computes `CLST 300` in D0, calls the
+Pascal `GetResource`, then at `+$0794` loads the byte-sized course into D0.b and compares D0.w.
+The first bridge restored the pre-trap `$012C`; the byte load made that `$0102`, falsely satisfying
+the `>= 3` long-course branch. `tools/mac_probe_course3.lua` measures System 6.0.8 directly at the
+same instructions: successful `GetResource` leaves D0 exactly zero, the byte load produces 2, and
+the branch retains course 2 with long-course clear. The bridge now reproduces that successful-call
+scratch-register side effect. The Amiga trace consequently matches the Macintosh start exactly at
+world `(0xe9a0,0x160e0)`, cell `(29,44)`.
 
 Course Two has a direct source-defined route to that response. Cells `(2,7)..(2,22)` leave an open
 local-X corridor `0..383`; steering around its centre with the game's ordinary keypad controls
