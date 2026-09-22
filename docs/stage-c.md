@@ -2241,6 +2241,15 @@ the driving global before reaching `$1FD2` again with the same live race state. 
 no A5 game state or menu bits; it supplies only the physical P and Command-key edges. The fail-fast
 observer for both builds is `amiga/driving_session_control.gdb`.
 
+The same suspended state enables File-menu Quit. `SESSION_CONTROL_ITEM=8` supplies physical
+Command-Q only after physical P has completed and the game is polling its ordinary event loop.
+`MenuKey` returns packed selection `$00DE0008`, after which Main runs the same installed
+`ExitToShell` replacement previously proven with the independent Control-click fixture. The
+Command-Q run reaches the original user-mode unwind in state 3, enters Amiga teardown in state 4,
+and completes with saved/actual DMA masks `$02D0/$02D0`, interrupt masks `$602C/$602C`, and the
+original OS View active. `amiga/driving_menu_quit.gdb` is the fail-fast proof. This closes the
+actual shipped menu-quit route, not merely the port's emergency exit chord.
+
 ## Race-mode and route-diversity closure
 
 The four garage-selected courses, their genuine starts, all source-defined endpoint sequences,

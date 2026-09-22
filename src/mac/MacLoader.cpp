@@ -6039,8 +6039,15 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
         && read16(s_currentA5 - 21316) == 0) {
         // Restart is disabled while the session is suspended. Its real path
         // first selects Quit to Garage (Command-G); that transition enables
-        // Restart Race. Return to Game is immediately available (Command-R).
-        const uint8_t rawKey = VETTE_SESSION_CONTROL_ITEM == 5 ? 0x24 : 0x13;
+        // Restart Race. Return (Command-R) and Quit (Command-Q) are immediately
+        // available.
+#if VETTE_SESSION_CONTROL_ITEM == 5
+        const uint8_t rawKey = 0x24; // G
+#elif VETTE_SESSION_CONTROL_ITEM == 8
+        const uint8_t rawKey = 0x10; // Q
+#else
+        const uint8_t rawKey = 0x13; // R
+#endif
         vetteInputInjectProbeKey(0x19, false);
         vetteInputInjectProbeKey(0x66, true);
         vetteInputInjectProbeKey(rawKey, true);
