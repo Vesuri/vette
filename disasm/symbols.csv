@@ -1,0 +1,69 @@
+space,segment,offset,name,type,evidence,note
+code,1,0x1EDE,ApplicationEntry,function,DERIVED,First CODE 0 export and application entry
+code,1,0x05FE,CopyProtectionChallenge,function,MEASURED,Manual challenge entry patched to the successful-answer state
+code,1,0x0F82,ShowRecoveryPicture,function,MEASURED,D6 window ID and D7 PICT ID; used by water and terminal recovery
+code,1,0x1FD2,DrivingLoopBoundary,code,MEASURED,Driving-state test at the exact completed-frame boundary
+code,1,0x286A,DynamicSceneRenderer,code,MEASURED,First instruction after the fixed driving-picture batch
+code,1,0x29E6,PostDrivingSystemTask,code,MEASURED,SystemTask reached only after the driving loop exits
+code,1,0x2A9E,RenderObjectModel,function,DERIVED,Transforms OBJS coordinates and renders a selected primitive group
+code,1,0x3134,ToggleSound,function,MEASURED,Original S-key handler
+code,1,0x31AA,ToggleAutomaticShift,function,MEASURED,Original A-key handler
+code,1,0x3456,ApplyTourDestination,function,MEASURED,Copies a source-authored tour position and heading to the player
+code,2,0x009C,SetBogasMasterLevel,code,DERIVED,Only resident call setting Bogas level; shipped maximum is 300
+code,2,0x063A,DecodeObjectModel,function,DERIVED,Walks all 160 OBJS resources into runtime descriptors
+code,2,0x1862,EnterPauseOptions,function,MEASURED,Original P-key transition
+code,2,0x18FA,RestoreCursorAndEvents,code,MEASURED,ShowCursor followed by FlushEvents on return to game
+code,3,0x00B6,CommunicationEntry,function,DERIVED,First export of the optional multiplayer-only segment
+code,4,0x0004,LoadDrivingData,function,DERIVED,Only load-segment export; opens and indexes VETTE!.Data resources
+code,5,0x0004,ClearHighScores,function,DERIVED,Clears TIME 128 through 131 after the original caution alert
+code,5,0x0286,InsertHighScore,code,DERIVED,Inserts and shifts one 30-byte TIME record
+code,5,0x04F8,RenderHighScores,code,DERIVED,Renders ten fixed-size TIME records
+code,6,0x0600,DispatchMovingCollision,function,DERIVED,Pair prefilter collision test and response dispatcher
+code,6,0x0758,SelectCourseStream,code,DERIVED,Selects CLST resource from course and variant
+code,6,0x1564,AdvanceFreePath,code,DERIVED,Consumes one signed FREE path delta pair
+code,6,0x1844,DispatchVehicleResponse,function,DERIVED,Ordinary response selected after object collision
+code,6,0x2302,SpawnFreewayTraffic,code,MEASURED,Builds and resolves the FWTP cell key
+code,6,0x252C,RetireDistantTraffic,code,MEASURED,Periodic distance scan and object retirement
+code,6,0x3762,UpdateEnginePitch,code,MEASURED,Calls the Bogas pitch wrapper once per completed driving frame
+code,6,0x3D7C,ResolveRoadSurface,function,DERIVED,Uses QUAD header zero for road height and edge response
+code,6,0x4064,ResolveStaticCollision,function,DERIVED,Uses QUAD header one to select collision rectangles
+code,6,0x4C86,ApplyPlayerDamage,function,DERIVED,Difficulty and speed dependent eight-cell damage path
+code,6,0x52A6,FinishRace,function,MEASURED,Clears driving state selects result and calls Score
+code,6,0x5632,EnterFreeway,function,MEASURED,Collision response 212 relocates player and selects freeway map
+code,6,0x5AC2,RecoverFromWater,function,MEASURED,Static collision response leading to PICT 140
+code,6,0x67A4,CopyDrivingRaster,function,MEASURED,Byte raster writer used for mirror and changing dashboard digits
+code,7,0x005C,SelectRoadRaster,function,DERIVED,Converts packed road bits to a raster-table offset
+code,7,0x00FC,FillBackgroundBands,function,MEASURED,Only FRED export called directly once per active driving frame
+code,8,0x0004,RunIntro,function,MEASURED,First Intro export and complete opening sequence
+code,8,0x0224,PollIntroButton,code,MEASURED,Button call reached through the intro callback table
+code,9,0x005C,BogasDispose,function,DERIVED,First of twelve CODE 9 Bogas wrappers
+code,10,0x0004,InitializeA5World,function,DERIVED,MPW packed globals initializer and final CODE 0 export
+a5,,0x0000,ShadowTicks,long,MEASURED,Port parameter slot replacing Macintosh low-memory Ticks
+a5,,0x0004,ShadowRndSeed,long,MEASURED,Port parameter slot replacing Macintosh low-memory RndSeed
+a5,,0x0008,ShadowWMgrPort,pointer,MEASURED,Port parameter slot replacing Macintosh WMgrPort
+a5,,0x000C,ShadowGrayRgn,handle,MEASURED,Port parameter slot replacing Macintosh GrayRgn
+a5,,0x0010,ShadowKeyMap,bytes16,MEASURED,Port parameter area retaining the complete KeyMap
+a5,,-0x3678,PlayerObject,pointer,MEASURED,Current player object used by collision and police paths
+a5,,-0x3764,FreewayMode,word,MEASURED,Zero on Main Map and one on Freeway Map
+a5,,-0x542C,Difficulty,word,MEASURED,One Trainee two Rookie three Pro
+a5,,-0x555A,CourseLeg,byte,MEASURED,Current course leg advanced by shipped finish handlers
+a5,,-0x555C,CourseResultLatch,word,MEASURED,Result transition latch
+a5,,-0x5532,PlayerVehicle,word,MEASURED,Selected player vehicle index
+a5,,-0x5530,OpponentVehicle,word,MEASURED,Selected opponent vehicle index
+a5,,-0x5082,LongCourseFlag,word,MEASURED,Selects long-course lifecycle
+a5,,-0x5318,TourMode,word,MEASURED,Options menu Tour Mode flag
+a5,,-0x5316,MouseSteering,word,MEASURED,Options Steering Mouse flag
+a5,,-0x5312,KeyboardSteering,word,MEASURED,Options Steering Keyboard flag
+a5,,-0x5310,KeypadSteering,word,MEASURED,Original shipped keypad mode flag
+a5,,-0x5314,JoystickSteering,word,MEASURED,Options Steering Joystick flag
+a5,,-0x367C,ActiveObjectEnd,pointer,MEASURED,End pointer of the active object-pointer array
+lowmem,,0x0156,RndSeed,long,DERIVED,Macintosh system random seed
+lowmem,,0x016A,Ticks,long,DERIVED,Macintosh 60 Hz tick counter
+lowmem,,0x0172,MBState,byte,DERIVED,Macintosh mouse button state
+lowmem,,0x0174,KeyMap,bytes16,DERIVED,Macintosh physical keyboard bitmap
+lowmem,,0x0828,MTemp,point,DERIVED,Macintosh temporary mouse point
+lowmem,,0x082C,RawMouse,point,DERIVED,Macintosh raw mouse point
+lowmem,,0x0830,Mouse,point,DERIVED,Macintosh global mouse point
+lowmem,,0x0904,CurrentA5,pointer,DERIVED,Current application globals base
+lowmem,,0x09DE,WMgrPort,pointer,DERIVED,Window Manager port
+lowmem,,0x09EE,GrayRgn,handle,DERIVED,Desktop gray region handle

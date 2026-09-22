@@ -52,11 +52,11 @@ Verified against the Color build's own `CODE` resources:
 | All 509 JT entries are in **unloaded** form — `offset:w`, `MOVE.W #seg,-(SP)`, `_LoadSeg` ($A9F0) | the port's segment-loader stand-in can pre-patch every entry to loaded form (`offset:w`, `JMP abs.l`) once at startup and never service `_LoadSeg` at all |
 | Per-segment entry counts sum to **exactly 509** (130 `Main`, 242 `FRED`, 80 `Traffic`, 16 `Initialize`, 16 `Communication`, 12 `sound`, 9 `Score`, 2 `Intro`, 1 `load`, 1 `%A5Init`) | ⭐ the jump table is **fully accounted for** — no hidden entries, and the postmortem's dispatch sweep is a closed set of 509 |
 
-`[DERIVED]` from a 68000-vs-68020 differential over all 508 distinct entry points (2 734
-instructions walked from each entry to its first terminator): **no 68020-only encoding on any
-reachable path.** ⚠ That is a screen, not a proof — it covers 600 bytes per entry and does not follow
-branches. The linear-sweep hits (`callm`, `rtm`, `cmp2`, one `mulu.l`) are misaligned data, which is
-what a whole-file sweep of mixed code and data produces. → `docs/open-work.md`.
+`[DERIVED]` from a self-tested recursive 68000-vs-68020 differential over all 508 distinct entry
+points: **no 68020-only encoding on any reached path.** It follows direct branches and reports 609
+computed/unresolved transfers instead of silently treating them as coverage. The independent
+Ghidra/static classification and its explicit residue are in `docs/static-map.md`; linear-sweep
+hits in the residue remain data-shaped false-positive candidates rather than being declared code.
 
 ### ⚠⚠ What A actually costs, and it is not zero
 

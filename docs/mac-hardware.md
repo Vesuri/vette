@@ -177,16 +177,19 @@ screen, which reads as a broken format guess rather than as two different moment
 screen and bracket the dump with snapshots.
 
 
-## The trap surface — `[ASSUMED]` shape, `[DERIVED]` content pending
+## The trap surface — `[DERIVED]`, `[MEASURED]`
 
 Every OS and Toolbox call is an **A-line trap**: a `$Axxx` opcode that the Mac's trap dispatcher
 services. The word encodes the routine number plus flags (auto-pop, and for OS traps whether A0/D0
 are preserved). **That is the port's abstraction boundary**, and enumerating it is the analogue of
 RoF's hardware-access map and Revs's MOS inventory.
 
-Managers a game of this kind is likely to reach — **a checklist for the sweep, not an inventory**:
+The complete flow-followed static inventory is 1,430 sites and the full-intro
+live floor is 227 distinct sites, with no missing or mismatched live site. The
+manager-level checklist below is now backed by `docs/static-map.md` and the
+runtime compatibility layer rather than being a sizing guess:
 
-| Manager | Why it would be called | Port consequence `[ASSUMED]` |
+| Manager | Why it is called | Port consequence `[DERIVED]` |
 |---|---|---|
 | **Segment Loader** | `LoadSeg`/`UnloadSeg` through the `CODE 0` jump table | either honoured, or designed away by linking every segment resident |
 | **Memory Manager** | `NewHandle`/`NewPtr`/`HLock`, the heap | an allocator; ⚠ handles are double-indirect and *move* |
@@ -217,16 +220,20 @@ it is needed: a named, loud report, never a silent absorb (`docs/faithfulness-se
   the application's QuickDraw globals (`randSeed` at `thePort-126`): Vette copies the former into
   the latter once after `InitCursor`, and later `Random` traps advance only the QuickDraw field.
 
-## Open questions this file exists to have answers written into
+## Questions answered by the port
 
 1. Which Mac does 1.02 require, and is there a version that targets a larger screen?
-2. What is the complete trap set, at how many sites, with which selectors? (`make traps`)
-3. Does the game reach low memory or hardware (the VIA, the SCC, the sound buffer) directly?
+2. ~~What is the static trap set?~~ 1,430 sites; see `docs/static-map.md`. Dynamic reachability is
+   recorded separately because optional paths are intentionally excluded.
+3. ~~Does the game reach low memory directly?~~ Yes: 17 Page-0 locations. All required
+   single-player locations are redirected to semantic shadows; communications locations remain
+   unsupported. It does not directly drive Macintosh display or sound hardware.
 4. How does it time itself — `TickCount`, a VBL task, a vertical-retrace interrupt, or a spin?
-5. ~~What does it draw with?~~ **Partly answered:** it keeps a 512 × 512 4 bpp offscreen GWorld of
+5. ~~What does it draw with?~~ It keeps a 512 × 512 4 bpp offscreen GWorld of
    sprite art *with masks*, so at least some of the drawing is masked `CopyBits` compositing
-   (§The display surface). ⚠ Still open: whether the driving view also goes through QuickDraw or
-   writes the framebuffer directly, and that is what decides the render architecture.
-6. Where is its entropy from?
+   (§The display surface). The driving scene combines direct packed raster writes with QuickDraw
+   composition, then publishes the 512×320 logical surface through the verified dirty-list C2P.
+6. ~~Where is its entropy from?~~ The Macintosh RndSeed initializes QuickDraw randSeed; Random
+   advances the latter. Deterministic comparison builds replace only that initial value.
 7. What is in the "and extras" half of the archive — documentation, a manual, saved games? The
    manual is worth reading before the binary (RoF's `docs/manual.md` earned its place).

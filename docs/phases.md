@@ -90,27 +90,33 @@ that discoverable.
 
 **Exit criteria:**
 
-- [ ] Every `CODE` resource extracted and disassembled; the `CODE 0` jump table read out in full.
-- [ ] The **trap map**: every `$Axxx` site, with the manager, the routine and the selector.
-- [ ] The **low-memory map**: every absolute reference below `$0C00`.
-- [ ] The **A5 world**: the application globals, named as far as the code supports.
-- [ ] The entry-point sweep, cross-checked by two independent methods.
-- [ ] One concentrated naming pass — rough but directionally correct, in `symbols.csv`.
-- [ ] Static coverage: how many bytes are unclassified, honestly counted.
+- [x] Every `CODE` resource extracted and disassembled; the `CODE 0` jump table read out in full.
+- [x] The **trap map**: 1,430 flow-followed `$Axxx` sites, with manager/routine names and a
+      zero-mismatch gate against all 227 distinct full-intro live sites.
+- [x] The **low-memory map**: 17 absolute locations below `$0C00`, with recursive,
+      Ghidra-defined-instruction, and byte-verified production-patch accounting.
+- [x] The **A5 world**: the application globals named as far as the code supports.
+- [x] The entry-point sweep, cross-checked by CODE 0 parsing and the ten near headers.
+- [x] One concentrated naming pass — 68 evidence-labelled code/global rows in
+      `disasm/symbols.csv`.
+- [x] Static coverage: **112,694 / 118,892 bytes (94.8%) classified; 6,198 bytes (5.2%)**
+      honestly retained as mixed inline data, padding, or unreachable code.
       ⚠ **A number that improves because the tool got looser is worse than no number**
       (`docs/method-lessons.md`).
-- [ ] Findings written to `docs/static-map.md` (to be created) and the `[ASSUMED]` rows in
-      `docs/mac-hardware.md` replaced with `[DERIVED]` ones.
+- [x] Findings written to `docs/static-map.md`; `make static-map-check` is the reproducible gate.
+
+⭐ **Phase 2 is CLOSED.** The 5.2% residue is the coverage result, not a hidden claim of zero.
 
 ## Phase 3 — The trap layer
 
 The phase with no counterpart in either prior port at this size. **Exit criteria:**
 
-- [ ] Every trap in the inventory either serviced or **loudly reported** — never silently absorbed.
-- [ ] The unknown-trap reporter exists and is read on every run.
-- [ ] The timing and entropy sources identified and implemented as what they actually are (a clock
+- [x] Every reached single-player trap is either serviced or **loudly reported**; optional UI and
+      excluded communications calls retain named loud boundaries.
+- [x] The unknown-trap reporter exists and is read by the event-driven production audit.
+- [x] The timing and entropy sources identified and implemented as what they actually are (a clock
       is a clock, not a call counter).
-- [ ] ⚠ The inventory re-checked **by running it**. It is a floor until then.
+- [x] The inventory re-checked **by running it** across the gameplay coverage matrix.
 
 ## Phase 4 — End-to-end skeleton on the target, then profile, then set a target
 

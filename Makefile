@@ -8,7 +8,7 @@
 #
 # The Amiga build is in amiga/ and is the real target: `cd amiga && . ./env.sh && make`.
 
-.PHONY: all todo fidelity-check driving-sequence-capture driving-sequence-compare driving-motion-reference driving-view-reference driving-view-capture driving-view-compare driving-view-regression driving-f1-reference driving-f1-capture driving-f1-compare driving-audio-reference driving-audio-capture driving-audio-compare driving-audio-regression driving-motion-capture driving-motion-compare driving-motion-viewport-compare driving-cadence-compare driving-control-audit driving-palette-compare driving-profile help
+.PHONY: all todo static-map-check fidelity-check driving-sequence-capture driving-sequence-compare driving-motion-reference driving-view-reference driving-view-capture driving-view-compare driving-view-regression driving-f1-reference driving-f1-capture driving-f1-compare driving-audio-reference driving-audio-capture driving-audio-compare driving-audio-regression driving-motion-capture driving-motion-compare driving-motion-viewport-compare driving-cadence-compare driving-control-audit driving-palette-compare driving-profile help
 
 all: help
 
@@ -16,6 +16,7 @@ help:
 	@echo "Vette! — Macintosh 68000 -> Amiga port"
 	@echo
 	@echo "  make todo     what is open (docs/open-work.md + a live marker sweep)"
+	@echo "  make static-map-check  gate CODE structure, traps, low memory, symbols and coverage"
 	@echo "  make fidelity-check  gate the completed local fidelity evidence set"
 	@echo "  make driving-sequence-compare  compare saved MAME/Amiga driving frames"
 	@echo "  make driving-sequence-capture  capture Amiga frames at saved Macintosh game states"
@@ -54,6 +55,9 @@ todo:
 	            ':!src/platform/amiga/framework' ':!docs' 2>/dev/null); \
 	  if [ -n "$$hits" ]; then echo "$$hits"; else echo "none"; fi; \
 	else echo "(not a git repo)"; fi
+
+static-map-check:
+	@python3 tools/check_static_map.py
 
 # Fast aggregate over retained local oracle artifacts. Slow recapture remains
 # split into the dedicated reference/capture/regression targets below.

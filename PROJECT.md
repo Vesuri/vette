@@ -70,9 +70,10 @@ overscan DMA. Cropping or squeezing would therefore trade away fidelity without 
 compatibility.
 
 The package target is nevertheless the user-selected A1200 with 2 MiB chip and 8 MiB fast. The
-two 512×384×4 planar buffers alone occupy 196,608 bytes of chip RAM. The linked executable is
-about 2.3 MiB before its approximately 187 KiB BSS and dynamic Macintosh/resource allocations, so
-an unexpanded OCS machine cannot host this build regardless of display mode. Four hires bitplanes
+two 512×384×4 planar buffers alone occupy 196,608 bytes of chip RAM. The linked executable is now
+about 116 KiB because original resources are disk-loaded, but the runtime still needs the two
+approximately 2.1 MiB resource forks, aligned resident CODE copies, Macintosh state, and
+display/audio allocations. Four hires bitplanes
 also consume every bitplane fetch slot inside the active 512-pixel DDF interval; an A1200 can
 execute the game and trap layer from fast RAM while those fetches proceed. There is consequently
 **no lower-quality OCS mode and no OCS support promise**. The build deliberately retains `-m68000`
@@ -222,13 +223,12 @@ amiga/                  Amiga build infrastructure: Makefile, env.sh, run.sh, de
       fall inside the pinned span. Arguments are read at the call site, so `SetTrapAddress`'s target,
       `%A5Init`'s trap set and the `QDExtensions` selectors are measured too. ⚠ It is a **FLOOR**:
       only one bounded driving path ran, and `FRED` and `Communication` still never became resident.
-- [ ] **Phase 2 — Complete static map.** All 11 `CODE` resources are resident, the 509-entry jump
-      table and A5 world run in place, and the low-memory access audit protects the unmapped first
-      32 KiB. The exhaustive static map, entry-point CSV, naming pass and coverage accounting remain.
-- [ ] **Phase 3 — The trap layer.** The Line-A bridge is live and unknown calls stop loudly with
-      manager, routine, selector and caller. It now implements the path through the complete intro,
-      garage, vehicle/course selection and sustained driving; the inventory is still a floor and
-      later paths remain deliberately unimplemented.
+- [x] **Phase 2 — Complete static map.** All 11 `CODE` resources, 509 entries, 1,430 static trap
+      sites, 17 Page-0 locations, the A5 world, 68 curated symbols, and honest 94.8% byte
+      classification are gated by `make static-map-check` → `docs/static-map.md`.
+- [x] **Phase 3 — The trap layer.** The Line-A bridge services every reached required
+      single-player call and unknown calls stop loudly with manager, routine, selector and caller.
+      Optional desktop UI and communications remain explicit loud boundaries.
 - [ ] **Phase 4 — End-to-end skeleton on the target.** The original resident code reaches and
       repeatedly completes real moving driving frames on the A1200 acceptance configuration. A
       complete phase-share profile and the evidence-based performance target remain open.

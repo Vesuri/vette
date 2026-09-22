@@ -5,7 +5,7 @@ halts visibly at the first trap that the port deliberately does not implement.
 
 ## Measured acceptance result
 
-`amiga/stage_b.gdb`, under FS-UAE's A500+ configuration:
+`amiga/stage_b.gdb`, under the A1200 / 2 MiB chip / 8 MiB fast configuration:
 
 | check | result |
 |---|---:|
@@ -13,7 +13,7 @@ halts visibly at the first trap that the port deliberately does not implement.
 | validated and patched jump-table entries | **509** |
 | A5 world | 31,272 bytes below A5; 4,104 above; jump table at A5+32 |
 | `%A5Init` `_BlockMove` calls | **49** |
-| resource archive | 2 forks, **572 resources**, 2,168,882 bytes |
+| native resource files | 2 forks, **572 resources**, read from disk before takeover |
 | first unimplemented trap | `$A9F1` `_UnLoadSeg` |
 | manager | Segment Manager |
 | selector | not selector-dispatched (`N/A`) |
@@ -46,7 +46,9 @@ ordering and trap identity remain correct.
 
 ## Resource transport
 
-`tools/rsrc_pack.py` converts one or more classic resource forks into a single pointer-free,
-big-endian archive.  The build packs the Color application fork and `VETTE!.Data`; the runtime
-reader validates every directory, name and payload span before the game runs.  The generated
-archive and original forks stay local under the repository's copyright rules.
+The release executable contains no original data. Before hardware takeover it reads the raw
+resource forks `Color VETTE!` and `VETTE!.Data` from files beside the executable, validates their
+native Macintosh maps, and indexes all 572 resources without repacking them. The eleven CODE
+payloads are byte-packed at odd offsets in the source fork, so the loader reproduces Resource
+Manager handle behavior by copying them to aligned resident allocations before patching. The
+original file images remain unchanged and can be released after the game returns.

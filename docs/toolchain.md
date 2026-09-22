@@ -111,19 +111,13 @@ python3 tools/hfs_extract.py tmp/VETTE_1_02.raw segments \
 
 ### Resource forks on the Amiga
 
-Stage B carries the application and data resource forks with the resident code.  Convert extracted
-forks with:
-
-```sh
-python3 tools/rsrc_pack.py amiga/assets/vette.resources \
-  application=tmp/<Color-application>.rsrc data=tmp/<VETTE!.Data>.rsrc
-```
-
-The `VRS1` archive is entirely big-endian.  Its 16-byte header is `magic[4]`, `version:u16`,
-`forkCount:u16`, `resourceCount:u32`, `directoryOffset:u32`.  Each 24-byte directory record is
-`fork:u16`, `id:s16`, `type[4]`, `attrs:u8`, `nameLength:u8`, `reserved:u16`, then
-`nameOffset:u32`, `dataOffset:u32`, `dataLength:u32`.  Names and payloads follow at four-byte
-alignment.  `src/mac/ResourceArchive.*` is the bounds-checking target-side reader.
+The executable embeds no game data and uses no custom bundle. At process
+startup it reads two ordinary files beside itself: `Color VETTE!` and
+`VETTE!.Data`. Each file is the unmodified raw resource fork extracted from the
+corresponding original Macintosh file. `src/mac/ResourceForks.*` validates and
+indexes the native maps; the eleven byte-packed CODE payloads are copied to
+aligned resident allocations before patching and execution. Development launch
+scripts stage the local extracts with `amiga/stage_original_data.sh`.
 
 **1. StuffIt 5 → `unar`, and there is no second option.** `7z`/p7zip handles no SIT at all; the
 `macutils` `macunpack` lineage stops at StuffIt 1.5.1; Aladdin's own StuffIt Expander was 32-bit and
@@ -259,7 +253,8 @@ projects.
 
 1. Export current state → `disasm/listing.txt` (+ trap / xref dumps).
 2. Read the text; work out what routines and globals do.
-3. Append findings to `disasm/symbols.csv` (`segment,addr,name,type,note`).
+3. Append findings to `disasm/symbols.csv`
+   (`space,segment,offset,name,type,evidence,note`).
 4. Run `ApplyNames` → names/comments persist into `tools/ghidra-proj`.
 5. Re-export and continue, subsystem by subsystem.
 

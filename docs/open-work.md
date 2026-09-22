@@ -7,7 +7,8 @@ document. `make todo` prints this file plus a live marker sweep of the tracked, 
 ⚠ Refer to an item by its title, not its number. Entries are deleted when closed, so numbering
 changes.
 
-⭐ **HEAD OF QUEUE: Finish the formal static map.** Core single-player game completion is closed.
+⭐ **HEAD OF QUEUE: Build the gameplay coverage matrix.** Core single-player game completion and
+the formal static map are closed.
 Car, opponent, course, difficulty, results, ordinary garage return, all four race lifecycles,
 representative city/freeway transitions, necessary session controls, Steering, and persistent score
 data are covered. High Screen and Preferences are optional desktop UI and deliberately remain named
@@ -27,20 +28,18 @@ features.
 
 ## Structural verification and release — after core game completion
 
-1. **Finish the formal static map.** Close the remaining trap-site, low-memory, A5-global,
-   entry-point, symbol-naming, and static-coverage gates in `docs/phases.md`.
-2. **Build the gameplay coverage matrix.** Record the courses, modes, scenarios, traps, resources,
+1. **Build the gameplay coverage matrix.** Record the courses, modes, scenarios, traps, resources,
    and endings actually exercised, with short reproducible commands for each.
-3. **Add gameplay regressions.** Automate checkpoint scenarios and the production trap audits.
-4. **Resolve route-faithfulness debt.** Revisit the `(6,36)` collision, `(18,39)` boundary, and
+2. **Add gameplay regressions.** Automate checkpoint scenarios and the production trap audits.
+3. **Resolve route-faithfulness debt.** Revisit the `(6,36)` collision, `(18,39)` boundary, and
    other failures found only during natural traversal. Passing a checkpoint does not excuse a
    broken route in the final game.
-5. **Decode additional `VETTE!.Data` formats only when demanded.** `OBJS`, `QUAD`, `MAPS`, `COLL`,
+4. **Decode additional `VETTE!.Data` formats only when demanded.** `OBJS`, `QUAD`, `MAPS`, `COLL`,
    the used `PERF` prefix, road/bounds data, and the exercised response families are understood.
    Base further decoding on the load-segment disassembly, never visual guesses.
-6. **Harden production builds.** Repeated clean builds and long runs must survive without resource
+5. **Harden production builds.** Repeated clean builds and long runs must survive without resource
    leaks, stale diagnostic state, or broken quit/restart behavior.
-7. **Package the game.** Deliver the executable/disk or WHDLoad-style package, Amiga-readable data
+6. **Package the game.** Deliver the executable/disk or WHDLoad-style package, Amiga-readable data
    conversion flow, launch configuration, user instructions, and measured machine requirements.
 
 ## Deferred until a real caller or later phase requires it
