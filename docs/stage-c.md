@@ -1477,6 +1477,15 @@ dispatch, steering result, and exact throttle branch are independently recorded 
 `amiga/driving_mouse_control.gdb` and `amiga/driving_mouse_button.gdb`. Production remains in the
 shipped numeric-keypad mode, usable through the cursor aliases; Mouse remains a real menu choice.
 
+`make driving-control-audit` keeps the port-owned part of that result fail-closed. It checks the
+Amiga-to-Mac virtual-key translations, both original driving aliases attached to every cursor key,
+the redirected Mouse/MBState consumers, asynchronous CIA state and edge delivery, and all three
+launchers' A1200/mouse/no-keyboard-joystick configuration. It also requires the retained dynamic
+traces for upshift, throttle, drivetrain state, Mouse steering/button throttle, P, and Escape.
+Clean builds independently byte-verify the original-code patch sites before `%A5Init`; the audit
+therefore guards configuration and bridge drift without replacing the already-traced game handlers
+with a port-side control model.
+
 ### Natural traffic retirement and the freeway-mode gate
 
 The Course Two input-only route reaches Main Map cell `(2,23)`, which has an `FWTP` key, but that
