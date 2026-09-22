@@ -67,15 +67,17 @@ is consequently renumbered.
    roughly 40 ticks. Over those first 80 ticks, however, the Mac delivered 26 driving-task
    callbacks and the Amiga only six. The safe-point trampoline now drains every due queue pass
    before resuming the game and presents each callback with its pass's historical `Ticks` value;
-   the same interval now delivers 25 callbacks on Amiga. A new motion capture reduces paired-frame
-   raster differences from 6,948 to 105 pixels, but TAXI remains behind because its physics pass is
-   driven by completed main-loop iterations: the Macintosh reaches the first moving state after 45
-   loops at roughly 6–7 ticks per frame, the A1200 after 26 loops at roughly 11–12. All three paired
-   frames have different Traffic object state, so their 105 changed pixels are not valid rendering
-   discrepancies; they measure the expected phase difference between machines of different speed.
-   Make the differential require equivalent full object state, establish such a state through a
-   short diagnostic checkpoint when natural captures do not share one, then extend the exact gate
-   to motion, traffic, mirrors, and alternate views.
+   the same interval now delivers 25 callbacks on Amiga. TAXI remains behind because its physics
+   pass is driven by completed main-loop iterations: the Macintosh completes frames in roughly
+   6–7 ticks and the A1200 in roughly 10–11. The visual and audio Macintosh harnesses now have
+   separate modes and artifact lifetimes, preventing a road-following audio run from replacing the
+   straight-driving visual oracle. A diagnostic-only no-op boundary exposes the live source GWorld
+   after the original full-window CopyBits without affecting production.
+   `make driving-motion-viewport-compare` pairs complete player states and proves one moving
+   512x198 exterior pixel-exact across all 101,376 pixels. The stricter full-roster comparator still
+   refuses to compare differently phased Traffic, as it should. Establish an equivalent complete-
+   object checkpoint, then extend exact source-oracle coverage to moving traffic, mirrors, and the
+   F1–F5 principal views.
 2. **Establish the performance target.** The full-accounting target-A1200 profile is now in place
    and identified presentation as 80.353% of the first moving-driving baseline. After removing a
    fully overwritten synchronization copy, adding the packed word-write C2P kernel, and deriving a
