@@ -1421,6 +1421,11 @@ static uint16_t bogasRegisterInstrument(const uint8_t* name)
     return ordinal;
 }
 
+// Paula's AUDxVOL registers are write-only. Keep the commanded values beside
+// the existing reload/deadline state so diagnostics can verify the hardware
+// contract without pretending register readback is meaningful.
+static volatile uint16_t s_bogasVoiceVolume[4];
+
 static void stopBogasVoice(uint16_t channel)
 {
     if (channel > 3) return;
@@ -1428,6 +1433,7 @@ static void stopBogasVoice(uint16_t channel)
     volatile uint8_t* audio = (volatile uint8_t*)(0xdff0a0UL + channel * 16);
     *dmaconPointer = dma;
     *(volatile uint16_t*)(audio + 8) = 0;
+    s_bogasVoiceVolume[channel] = 0;
 }
 
 static uint8_t* s_bogasPendingReloadData[4];
@@ -1445,6 +1451,7 @@ static void startBogasVoice(uint16_t ordinal, uint16_t channel,
     *(volatile uint16_t*)(audio + 4) = (uint16_t)((instrument->size + 1) / 2);
     *(volatile uint16_t*)(audio + 6) = period;
     *(volatile uint16_t*)(audio + 8) = volume;
+    s_bogasVoiceVolume[channel] = volume;
     *dmaconPointer = (uint16_t)(DMAF_SETCLR | DMAF_MASTER | dma);
 
     // Paula latches the initial location/length when DMA starts. On the next

@@ -57,13 +57,19 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("reference", type=Path)
     parser.add_argument("target", type=Path)
+    parser.add_argument("--allow-additional-target-loads", action="store_true",
+                        help="require the reference Load sequence in order, while allowing "
+                             "additional source-driven target cues")
     args = parser.parse_args()
 
     reference_loads, reference_plays = read_trace(args.reference, "MACAUDIO")
     target_loads, target_plays = read_trace(args.target, "AUDIO")
     reference_signatures = [row[1:] for row in reference_loads]
     target_signatures = [row[1:] for row in target_loads]
-    if reference_signatures != target_signatures:
+    loads_match = (is_subsequence(reference_signatures, target_signatures)
+                   if args.allow_additional_target_loads
+                   else reference_signatures == target_signatures)
+    if not loads_match:
         raise SystemExit(f"FAIL: Load sequences differ\nreference={reference_signatures}"
                          f"\ntarget={target_signatures}")
 
@@ -75,9 +81,22 @@ def main():
 
     reference_zero = reference_loads[0][0]
     target_zero = target_loads[0][0]
-    print(f"PASS: {len(reference_loads)} Load signatures are exact")
+    if args.allow_additional_target_loads:
+        print(f"PASS: all {len(reference_loads)} reference Load signatures occur exactly "
+              f"and in order ({len(target_loads) - len(reference_loads)} additional target cues)")
+    else:
+        print(f"PASS: {len(reference_loads)} Load signatures are exact")
     print("  ordinal context/duration/options/instrument  Macintosh-delta  target-delta")
-    for index, (reference, target) in enumerate(zip(reference_loads, target_loads), 1):
+    display_targets = target_loads
+    if args.allow_additional_target_loads:
+        display_targets = []
+        position = 0
+        for reference in reference_loads:
+            while target_loads[position][1:] != reference[1:]:
+                position += 1
+            display_targets.append(target_loads[position])
+            position += 1
+    for index, (reference, target) in enumerate(zip(reference_loads, display_targets), 1):
         signature = reference[1:]
         print(f"  {index:7d} {signature!s:<36} "
               f"{reference[0] - reference_zero:16d} {target[0] - target_zero:13d}")

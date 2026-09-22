@@ -160,7 +160,12 @@ is consequently renumbered.
    AUD2's deadline. The authored-level mapping is now complete; continue with automated audio
    regression coverage.
 6. **Automate fidelity regressions.** Keep intro and driving framebuffer differentials, palette
-   checks, clean-build audits, and eventually basic audio comparisons reproducible.
+   checks, and clean-build audits reproducible. `make driving-audio-regression` now rebuilds and
+   runs two bounded target workloads: it requires every Macintosh Bogas Load signature in source
+   order (while reporting additional original-code target cues) and gates engine pitch ordering,
+   then proves deterministic engine/horn/crash overlap, independent effect-context replacement,
+   fixed Paula channel ownership, and level 300 mapping to volume 64 on all four voices. Extend this
+   same fail-closed pattern to the remaining visual and control checkpoints.
 
 ## Core game completion — after the fidelity/performance pass
 

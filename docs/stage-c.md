@@ -1079,6 +1079,25 @@ hypothetical lower levels retain their relative proportion. Sample-byte RMS and 
 enter this mapping; the unchanged sample data already carries the same authored amplitude on both
 systems.
 
+`make driving-audio-regression` makes this boundary executable rather than documentary. Given the
+separately captured Macintosh oracle trace, it rebuilds and runs the bounded normal-road event
+workload and requires the oracle's exact Bogas Load signatures plus a source-ordered engine-pitch
+progression.
+Because completed-frame cadence can expose an additional authentic map/traffic cue on one machine,
+the invariant is that every oracle Load occurs with exact arguments and in source order; additional
+target Loads are counted rather than mistaken for a backend failure.
+It then rebuilds the traffic-dense Course Two workload, injects the established physical Z-key horn
+edge, and requires simultaneous engine/horn/crash,
+the fixed context-to-Paula assignment `0 -> AUD0/1`, `1 -> AUD3`, `2 -> AUD2`, all four commanded
+voice volumes at 64 for Bogas level 300, and an effect-context replacement that leaves the other two
+contexts playing. A loud stop, missing checkpoint, changed signature, or changed register contract
+makes the target fail. The indefinite horn makes context 1 deterministic; the traffic workload uses
+the established `$3BD90000` fidelity seed so context-2 spawn and replacement, rather than the host
+clock, define the repeatable checkpoint.
+Paula's `AUDxVOL` registers are write-only, so the backend records each commanded value beside its
+existing reload/deadline state; the regression reads that state rather than treating zero-valued
+hardware readback as meaningful.
+
 Short INST resources are parsed structurally as four header words (loop start, loop end, source
 sample rate, PCM byte count). This corrects the earlier zero-loop-only test, which left the Engine
 header in its PCM stream. Direct gameplay effects use the header's 6.4 or 9.472 kHz source rate.

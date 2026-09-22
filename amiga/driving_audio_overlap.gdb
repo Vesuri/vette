@@ -1,9 +1,11 @@
 # Assert authentic three-context overlap and one subsequent context-2
-# replacement on Course Two. Requires PROBES=1 SKIP_INTRO=1 GARAGE_CLICK=1
-# GARAGE_COURSE=2 FREEWAY_ROUTE=1.
+# replacement on Course Two. The diagnostic physical Z-key edge supplies an
+# indefinite horn on context 1 while original traffic supplies crash on
+# context 2. Requires PROBES=1 SKIP_INTRO=1 GARAGE_CLICK=1 GARAGE_COURSE=2
+# FREEWAY_ROUTE=1 HORN_PROBE=1 FIDELITY_RANDOM_SEED=0x3BD90000.
 set pagination off
 set confirm off
-set $seenSkid = 0
+set $seenContext1 = 0
 set $seenCrash = 0
 set $tripleSeen = 0
 set $pendingReplacement = 0
@@ -23,8 +25,8 @@ commands
   silent
   set $context = *(unsigned short*)($sp+4)
   set $instrument = *(unsigned short*)($sp+14)
-  if $context == 1 && $instrument == 7
-    set $seenSkid = 1
+  if $context == 1 && $instrument == 6
+    set $seenContext1 = 1
   end
   if $context == 2 && $instrument == 8
     set $seenCrash = 1
@@ -40,25 +42,25 @@ commands
   continue
 end
 
-break VetteScreen::presentMacFrame if $seenSkid && $seenCrash
+break VetteScreen::presentMacFrame if $seenContext1 && $seenCrash
 commands
   silent
-  if !$tripleSeen && s_bogasContexts[0].playing && s_bogasContexts[0].instrument == 4 && s_bogasContexts[1].playing && s_bogasContexts[1].instrument == 7 && s_bogasContexts[2].playing && s_bogasContexts[2].instrument == 8
+  if !$tripleSeen && s_bogasContexts[0].playing && s_bogasContexts[0].instrument == 4 && s_bogasContexts[1].playing && s_bogasContexts[1].instrument == 6 && s_bogasContexts[2].playing && s_bogasContexts[2].instrument == 8
     set $tripleSeen = 1
-    printf "overlap triple tick=%u iterations=%u contexts=%u/%u/%u channels=%u/%u/%u deadlines=%u/%u/%u/%u dma=$%04x\n", g_macTicks, g_macDrivingIterations, s_bogasContexts[0].instrument, s_bogasContexts[1].instrument, s_bogasContexts[2].instrument, s_bogasContexts[0].channel, s_bogasContexts[1].channel, s_bogasContexts[2].channel, s_bogasVoiceEndTick[0], s_bogasVoiceEndTick[1], s_bogasVoiceEndTick[2], s_bogasVoiceEndTick[3], *(unsigned short*)0xdff002
+    printf "overlap triple tick=%u iterations=%u level=%u contexts=%u/%u/%u channels=%u/%u/%u volumes=%u/%u/%u/%u deadlines=%u/%u/%u/%u dma=$%04x\n", g_macTicks, g_macDrivingIterations, s_bogasMixLevel, s_bogasContexts[0].instrument, s_bogasContexts[1].instrument, s_bogasContexts[2].instrument, s_bogasContexts[0].channel, s_bogasContexts[1].channel, s_bogasContexts[2].channel, s_bogasVoiceVolume[0], s_bogasVoiceVolume[1], s_bogasVoiceVolume[2], s_bogasVoiceVolume[3], s_bogasVoiceEndTick[0], s_bogasVoiceEndTick[1], s_bogasVoiceEndTick[2], s_bogasVoiceEndTick[3], *(unsigned short*)0xdff002
   end
   if $pendingReplacement && s_bogasContexts[$replacementContext].instrument == $replacementInstrument && s_bogasContexts[3-$replacementContext].playing
-    printf "overlap replacement settled tick=%u iterations=%u replaced-context=%u contexts=%u/%u/%u channels=%u/%u/%u playing=%u/%u/%u deadlines=%u/%u/%u/%u dma=$%04x\n", g_macTicks, g_macDrivingIterations, $replacementContext, s_bogasContexts[0].instrument, s_bogasContexts[1].instrument, s_bogasContexts[2].instrument, s_bogasContexts[0].channel, s_bogasContexts[1].channel, s_bogasContexts[2].channel, s_bogasContexts[0].playing, s_bogasContexts[1].playing, s_bogasContexts[2].playing, s_bogasVoiceEndTick[0], s_bogasVoiceEndTick[1], s_bogasVoiceEndTick[2], s_bogasVoiceEndTick[3], *(unsigned short*)0xdff002
+    printf "overlap replacement settled tick=%u iterations=%u replaced-context=%u level=%u contexts=%u/%u/%u channels=%u/%u/%u playing=%u/%u/%u volumes=%u/%u/%u/%u deadlines=%u/%u/%u/%u dma=$%04x\n", g_macTicks, g_macDrivingIterations, $replacementContext, s_bogasMixLevel, s_bogasContexts[0].instrument, s_bogasContexts[1].instrument, s_bogasContexts[2].instrument, s_bogasContexts[0].channel, s_bogasContexts[1].channel, s_bogasContexts[2].channel, s_bogasContexts[0].playing, s_bogasContexts[1].playing, s_bogasContexts[2].playing, s_bogasVoiceVolume[0], s_bogasVoiceVolume[1], s_bogasVoiceVolume[2], s_bogasVoiceVolume[3], s_bogasVoiceEndTick[0], s_bogasVoiceEndTick[1], s_bogasVoiceEndTick[2], s_bogasVoiceEndTick[3], *(unsigned short*)0xdff002
     detach
     quit
   end
   continue
 end
 
-break VetteScreen::presentMacFrame if s_drivingFrameStarted && g_macDrivingIterations >= 220
+break VetteScreen::presentMacFrame if s_drivingFrameStarted && g_macDrivingIterations >= 300
 commands
   silent
-  printf "overlap ceiling tick=%u iterations=%u skid=%u crash=%u triple=%u pending=%u\n", g_macTicks, g_macDrivingIterations, $seenSkid, $seenCrash, $tripleSeen, $pendingReplacement
+  printf "overlap ceiling tick=%u iterations=%u context1=%u crash=%u triple=%u pending=%u\n", g_macTicks, g_macDrivingIterations, $seenContext1, $seenCrash, $tripleSeen, $pendingReplacement
   detach
   quit
 end

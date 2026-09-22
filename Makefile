@@ -8,7 +8,7 @@
 #
 # The Amiga build is in amiga/ and is the real target: `cd amiga && . ./env.sh && make`.
 
-.PHONY: all todo driving-sequence-capture driving-sequence-compare driving-motion-reference driving-audio-reference driving-audio-capture driving-audio-compare driving-motion-capture driving-motion-compare driving-profile help
+.PHONY: all todo driving-sequence-capture driving-sequence-compare driving-motion-reference driving-audio-reference driving-audio-capture driving-audio-compare driving-audio-regression driving-motion-capture driving-motion-compare driving-profile help
 
 all: help
 
@@ -23,6 +23,7 @@ help:
 	@echo "  make driving-audio-reference   capture/report Macintosh intro and moving-driving audio"
 	@echo "  make driving-audio-capture     capture target Bogas/Paula events for the same road workload"
 	@echo "  make driving-audio-compare     compare reference/target audio events by source progression"
+	@echo "  make driving-audio-regression  gate event fidelity, overlap, replacement and Paula volume"
 	@echo "  make driving-motion-capture    capture distinct completed moving Amiga frames"
 	@echo "  make driving-profile  build and measure 300 PAL fields of target-A1200 driving"
 	@echo
@@ -99,7 +100,30 @@ driving-audio-capture:
 
 driving-audio-compare:
 	@python3 tools/compare_audio_events.py \
-		tmp/mame-driving-audio.log tmp/amiga-driving-audio.log
+		tmp/mame-driving-audio.log tmp/amiga-driving-audio.log \
+		--allow-additional-target-loads
+
+# The Macintosh trace is deliberately captured separately: it is a slow oracle
+# artifact, while this gate rebuilds and reruns both bounded target workloads.
+driving-audio-regression:
+	@test -f tmp/mame-driving-audio.log || \
+	  { echo "missing tmp/mame-driving-audio.log; run make driving-audio-reference first"; exit 1; }
+	@mkdir -p tmp
+	@cd amiga && . ./env.sh && $(MAKE) clean && \
+	  $(MAKE) -j4 PROBES=1 SKIP_INTRO=1 GARAGE_CLICK=1 FOLLOW_ROAD=1 && \
+	  GDBTAIL=240 EXTRA_ARGS="--warp_mode=1" GDBSCRIPT=driving_audio_events.gdb \
+	  ./diag_run.sh 150
+	@cp amiga/.run/gdb-out.log tmp/amiga-driving-audio.log
+	@python3 tools/compare_audio_events.py \
+		tmp/mame-driving-audio.log tmp/amiga-driving-audio.log \
+		--allow-additional-target-loads
+	@cd amiga && . ./env.sh && $(MAKE) clean && \
+	  $(MAKE) -j4 PROBES=1 SKIP_INTRO=1 GARAGE_CLICK=1 GARAGE_COURSE=2 FREEWAY_ROUTE=1 \
+	    HORN_PROBE=1 FIDELITY_RANDOM_SEED=0x3BD90000 && \
+	  GDBTAIL=160 EXTRA_ARGS="--warp_mode=1" GDBSCRIPT=driving_audio_overlap.gdb \
+	  ./diag_run.sh 150
+	@cp amiga/.run/gdb-out.log tmp/amiga-driving-audio-overlap.log
+	@python3 tools/check_audio_overlap.py tmp/amiga-driving-audio-overlap.log
 
 driving-motion-capture:
 	@rm -f tmp/driving-motion-sequence.tsv tmp/driving-motion-source-*.raw tmp/driving-motion-globals-*.bin tmp/driving-motion-car-*.bin tmp/driving-motion-object-*.bin
