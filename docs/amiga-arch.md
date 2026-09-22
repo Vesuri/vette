@@ -282,11 +282,11 @@ the original 16.16 phase step supplied by Load/Play. The bridge plays the attack
 Paula's reload registers to the declared sustain range.
 BGAS command `$08`, reached through the resident `BogasPurge` wrapper with Vette's value 300,
 constructs the driver's 768-byte clipping table with a per-input coefficient of
-`floor(300/3)/128`. The bridge retains that state but does not reproduce the software mixer's
-attenuation. An exhaustive scan of all sixteen signed PCM bodies finds a global peak of -128, with
-ten instruments reaching full scale and the quieter samples retaining their authored headroom.
-They therefore play at Paula volume 64: this maps the game's absolute peak directly to full scale
-and avoids the audible resampling behavior that Paula applies below 64.
+`floor(300/3)/128`. A complete resident-CODE reference sweep finds exactly one call to this wrapper,
+at `Initialize+$009C`, and no other authored level: Vette's used Bogas level range is therefore
+0..300. The Paula boundary maps that range linearly to 0..64, so the shipped value 300 always uses
+volume 64. This mapping is deliberately independent of the PCM bytes; the same samples supply their
+own relative amplitude on both machines.
 This is still an incremental Bogas backend: intro mixing remains on its proven flag-driven path,
 and later gameplay cues still require scenario verification. Real P and Escape transitions have
 now established that leaving live driving does not call Stop, Deactivate, Dispose, or Close; the

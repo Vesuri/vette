@@ -395,6 +395,18 @@ static BogasContext s_bogasContexts[3];
 static bool s_bogasStarted;
 static volatile uint16_t s_bogasMixLevel = 300;
 
+// Vette has one BogasPurge call, Initialize+$009C, and passes 300. Treat that
+// shipped maximum as full Paula volume; lower Bogas levels retain their
+// relative proportion without inspecting or normalising the sample bytes.
+static uint16_t bogasPaulaVolume()
+{
+    const uint16_t vetteMaximumBogasLevel = 300;
+    if (s_bogasMixLevel >= vetteMaximumBogasLevel) return 64;
+    return vette_divu16((uint32_t)s_bogasMixLevel * 64
+                        + vetteMaximumBogasLevel / 2,
+                        vetteMaximumBogasLevel);
+}
+
 struct GWorldSlot {
     uint8_t port[108];
     uint8_t pixMap[50];
@@ -1513,12 +1525,14 @@ static void resumeBogasAudio()
         if (!context.playing) continue;
         if (contextIndex == 0) {
             uint16_t period = bogasPeriod(319, context.pitch);
-            startBogasVoice(context.instrument, 0, period, 64);
-            startBogasVoice(context.instrument, 1, period, 64);
+            uint16_t volume = bogasPaulaVolume();
+            startBogasVoice(context.instrument, 0, period, volume);
+            startBogasVoice(context.instrument, 1, period, volume);
         } else {
             BogasInstrument* sample = bogasInstrument(context.instrument);
             startBogasVoice(context.instrument, context.channel,
-                            sample ? sample->basePeriod : 319, 64);
+                            sample ? sample->basePeriod : 319,
+                            bogasPaulaVolume());
         }
     }
     s_bogasSuspended = false;
@@ -1582,8 +1596,9 @@ static void bogasLoad(uint16_t contextIndex, uint32_t duration,
         // the source by the Load/Play 16.16 step. The INST header rate belongs
         // to the direct effect contexts, not to this software-mixer clock.
         uint16_t period = bogasPeriod(319, options);
-        startBogasVoice(instrument, 0, period, 64);
-        startBogasVoice(instrument, 1, period, 64);
+        uint16_t volume = bogasPaulaVolume();
+        startBogasVoice(instrument, 0, period, volume);
+        startBogasVoice(instrument, 1, period, volume);
         uint32_t endTick = duration == 0x7fffffffUL ? 0 : g_macTicks + duration;
 #ifdef VETTE_FINITE_CONTEXT0_AUDIO_PROBE
         // The wrapper call retains its real duration for observation; only
@@ -1603,7 +1618,7 @@ static void bogasLoad(uint16_t contextIndex, uint32_t duration,
     context.playing = true;
     BogasInstrument* sample = bogasInstrument(instrument);
     uint16_t period = sample ? sample->basePeriod : 319;
-    startBogasVoice(instrument, channel, period, 64);
+    startBogasVoice(instrument, channel, period, bogasPaulaVolume());
     s_bogasVoiceEndTick[channel] = duration == 0x7fffffffUL ? 0 : g_macTicks + duration;
 }
 
@@ -5583,10 +5598,9 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
         return returnFromBogasTrap(frame, userStack, 2);
     }
     if (trap == kBogasPurgeTrap && pc == (uint32_t)(sound + 0x1e6)) {
-        // Retain the source level as observable Bogas state. Paula plays the
-        // original signed samples at volume 64: the shipped resources already
-        // carry their intended relative amplitudes, and lower Paula volumes
-        // engage its audibly different resampling path.
+        // Vette's only caller supplies 300, its maximum used Bogas level. The
+        // Paula boundary maps that to 64; hypothetical lower values scale
+        // proportionally instead of deriving gain from sample contents.
         s_bogasMixLevel = read16(userStack + 4);
         write32(userStack + 6, 0);
         return returnFromBogasTrap(frame, userStack, 2);

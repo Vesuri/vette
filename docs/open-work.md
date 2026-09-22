@@ -121,10 +121,10 @@ is consequently renumbered.
    reload registers and direct effects use their declared source rates. The driver proves its three
    inputs are fixed voices. Paula now preserves all three without software mixing: the engine is
    centred on AUD0/1 and contexts 1/2 occupy AUD3/AUD2. Each load replaces only its own context.
-   Command `$08` proves that Vette's `BogasPurge(300)` builds the Macintosh software mix table, but
-   an exhaustive INST scan proves ten samples already reach signed full scale. The Amiga bridge
-   therefore maps that absolute maximum directly to Paula volume 64, retaining quieter samples'
-   authored headroom and avoiding Paula's below-64 resampling artifacts. Both the shipped P
+   Command `$08` proves that Vette's `BogasPurge(300)` builds the Macintosh software mix table. A
+   complete resident-CODE reference sweep proves this is the game's only level call, so the used
+   Bogas range 0..300 maps directly to Paula 0..64 and every shipped sound runs at volume 64. The
+   mapping does not inspect or normalize PCM data. Both the shipped P
    pause/options transition and the ordinary Escape transition have now been
    traced: neither calls Stop, Deactivate, Dispose, or Close during the following two Macintosh
    seconds, and Bogas remains started across the waiting state. The shipped BGAS dispatcher proves
@@ -157,7 +157,8 @@ is consequently renumbered.
    implement. The lake-result transition also proves the game leaves context 0 silent after driving
    is disarmed, rather than restoring the engine in the garage. A Course Two assertion now proves
    engine, skid, and crash remain simultaneously active and that reloading context 2 changes only
-   AUD2's deadline. Continue with authored-level comparison.
+   AUD2's deadline. The authored-level mapping is now complete; continue with automated audio
+   regression coverage.
 6. **Automate fidelity regressions.** Keep intro and driving framebuffer differentials, palette
    checks, clean-build audits, and eventually basic audio comparisons reproducible.
 

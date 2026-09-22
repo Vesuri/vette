@@ -1071,13 +1071,13 @@ The apparent `BogasPurge(300)` lifecycle call is also audio state, not a disposa
 no-op. BGAS command `$08` passes its word to resource offset `$2738`, which rebuilds the 768-entry
 mix table. For each possible sum it applies `floor(level/3)/128` to the distance from unsigned
 silence at 384, then clamps to one output byte. Vette's level 300 therefore gives every input a
-100/128 gain in the original software mixer. The Amiga bridge records the call as Bogas state but
-does not apply that attenuation to Paula. Scanning every header-stripped INST byte proves the game
-already uses the complete signed range: `thud`, `skid`, `crash`, `horn`, `Engine`, `joel`, `heli`,
-`cable car bell`, `police`, and `mic` reach -128, while authored quieter samples retain their own
-headroom (`Opening song` peaks at 104 and `splash` at 81). Volume 64 therefore maps the game's
-absolute maximum directly to Paula's maximum without normalizing individual samples, and avoids
-Paula's lower-volume resampling artifacts.
+100/128 gain in the original software mixer. More importantly for the hardware backend, a complete
+reference sweep of all 11 resident CODE segments finds only this one call, at `Initialize+$009C`:
+300 is the maximum Bogas level the game uses. The Paula boundary consequently maps the used range
+0..300 linearly onto 0..64, clamping above it. Every shipped sound therefore runs at volume 64 while
+hypothetical lower levels retain their relative proportion. Sample-byte RMS and peak values do not
+enter this mapping; the unchanged sample data already carries the same authored amplitude on both
+systems.
 
 Short INST resources are parsed structurally as four header words (loop start, loop end, source
 sample rate, PCM byte count). This corrects the earlier zero-loop-only test, which left the Engine
