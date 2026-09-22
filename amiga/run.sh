@@ -13,6 +13,7 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 . "${FSUAE_COMMON:-$HOME/.local/share/amiga/fsuae_common.sh}"
+. ./stage_original_data.sh
 
 FSUAE="${FSUAE:-fs-uae}"
 ROM="${1:-${KICKSTART:-$HOME/Documents/RetroPie/BIOS/kick31.rom}}"
@@ -27,6 +28,7 @@ RUN=.run; DH0="$RUN/dh0"; DH1="$RUN/dh1"
 mkdir -p "$DH0/s" "$DH1" "$RUN/state"
 printf 'cd dh1:\nVette\n' > "$DH0/s/startup-sequence"
 cp -f "$EXE" "$DH1/Vette"
+stage_vette_original_data "$DH1"
 echo "running $EXE"
 
 # ⚠ ALWAYS start from a clean FS-UAE state.  diag_run.sh / the gdb-stub harnesses share this

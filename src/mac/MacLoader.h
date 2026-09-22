@@ -14,8 +14,16 @@ public:
     bool exportPersistentScores(uint8_t* data, uint32_t size) const;
     bool persistentScoresDirty() const;
 
-    // Builds the complete A5 world, makes all CODE segments resident, runs %A5Init,
-    // then transfers control to the application's first jump-table export.
+    // Validate and index the two original raw Macintosh resource forks while
+    // AmigaDOS and normal process memory are still available. The application
+    // CODE resources are copied to aligned resident storage for patching and
+    // execution; the supplied file images remain untouched.
+    bool prepareResourceForks(uint8_t* application, uint32_t applicationSize,
+                              uint8_t* data, uint32_t dataSize);
+    void releaseResourceForks();
+
+    // Builds the complete A5 world, patches the already-resident CODE resources,
+    // runs %A5Init, then transfers control to the application's first export.
     bool run(VetteScreen* screen);
 };
 

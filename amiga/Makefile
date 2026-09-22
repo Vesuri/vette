@@ -86,7 +86,9 @@ CORE_C_SRCS := \
     $(wildcard $(REPO)/src/mac/*.c) \
     $(wildcard $(REPO)/src/platform/*.c)
 
-# Support runtime (freestanding CRT: program entry, memset…) + any incbin'd assets.
+# Support runtime (freestanding CRT: program entry, memset…). Game CODE and
+# resources are deliberately not link inputs; the release executable reads the
+# two original raw Macintosh resource forks from disk before hardware takeover.
 SUPPORT_C_SRCS := $(SUPPORT)/gcc8_c_support.c
 ASM_SRCS       := $(SUPPORT)/gcc8_a_support.s $(wildcard $(AMIGA_SRC)/*.s)
 
@@ -620,34 +622,6 @@ obj/gcc8_a_support.o : $(SUPPORT)/gcc8_a_support.s
 obj/%.o : $(AMIGA_SRC)/%.s
 	$(info ASM  $<)
 	@$(AS) $(ASFLAGS) -o $@ "$(abspath $<)"
-
-# ⚠ .incbin dependencies are INVISIBLE to `gcc -MMD`, so list them explicitly here as they
-# appear.  Without it, regenerating an embedded blob leaves a stale copy in the binary while the
-# on-disk file looks correct.  Paths are relative to this amiga/ directory.
-CODE_DEPS := \
-    ../tmp/seg_color/CODE_00.bin \
-    ../tmp/seg_color/CODE_01_Main.bin \
-    ../tmp/seg_color/CODE_02_Initialize.bin \
-    ../tmp/seg_color/CODE_03_Communication.bin \
-    ../tmp/seg_color/CODE_04_load.bin \
-    ../tmp/seg_color/CODE_05_Score.bin \
-    ../tmp/seg_color/CODE_06_Traffic.bin \
-    ../tmp/seg_color/CODE_07_FRED.bin \
-    ../tmp/seg_color/CODE_08_Intro.bin \
-    ../tmp/seg_color/CODE_09_sound.bin \
-    ../tmp/seg_color/CODE_10__A5Init.bin
-APP_RSRC := ../tmp/rsrc_VETTE!_VETTE!_Folder_Folder_Color_VETTE!_Color_VETTE!.rsrc
-DATA_RSRC := ../tmp/rsrc_VETTE!_VETTE!_Folder_Folder_Color_VETTE!_VETTE!.Data.rsrc
-RESOURCE_ARCHIVE := assets/vette.resources
-INCBIN_DEPS := $(CODE_DEPS) $(RESOURCE_ARCHIVE)
-
-$(RESOURCE_ARCHIVE): ../tools/rsrc_pack.py $(APP_RSRC) $(DATA_RSRC)
-	$(info PACK $@)
-	@python3 ../tools/rsrc_pack.py "$@" "application=$(APP_RSRC)" "data=$(DATA_RSRC)"
-
-obj/incbin.o : $(AMIGA_SRC)/incbin.s $(INCBIN_DEPS)
-	$(info ASM  $<)
-	@$(AS) $(ASFLAGS) -o $@ "$(abspath $(AMIGA_SRC)/incbin.s)"
 
 # Framework hand-written asm (vasm, Motorola syntax -> ELF).  Static pattern rule so it does not
 # collide with the gas-assembled gcc8_a_support.s / incbin.s explicit rules.

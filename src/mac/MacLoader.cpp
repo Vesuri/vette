@@ -3,7 +3,7 @@
 #include <hardware/dmabits.h>
 
 #include "MacLoader.h"
-#include "ResourceArchive.h"
+#include "ResourceForks.h"
 #include "platform/amiga/VetteScreen.h"
 #include "platform/amiga/MacInput.h"
 #include "platform/amiga/PerfProbe.h"
@@ -11,19 +11,6 @@
 #include "../m68k_math.h"
 
 extern "C" {
-extern uint8_t vette_code_0[],  vette_code_0_end[];
-extern uint8_t vette_code_1[],  vette_code_1_end[];
-extern uint8_t vette_code_2[],  vette_code_2_end[];
-extern uint8_t vette_code_3[],  vette_code_3_end[];
-extern uint8_t vette_code_4[],  vette_code_4_end[];
-extern uint8_t vette_code_5[],  vette_code_5_end[];
-extern uint8_t vette_code_6[],  vette_code_6_end[];
-extern uint8_t vette_code_7[],  vette_code_7_end[];
-extern uint8_t vette_code_8[],  vette_code_8_end[];
-extern uint8_t vette_code_9[],  vette_code_9_end[];
-extern uint8_t vette_code_10[], vette_code_10_end[];
-extern uint8_t vette_resources[], vette_resources_end[];
-
 void vette_line_a_handler();
 void vette_call_mac_code(void* entry, void* a5);
 void vette_user_exit_request();
@@ -165,10 +152,10 @@ static const uint16_t kStaticCollisionProbeTrap = 0xaffe;
 static uint8_t s_a5World[kPortLowMemoryBytes + kBelowA5 + kAboveA5]
     __attribute__((aligned(4)));
 static VetteScreen* s_loudStopScreen;
-static ResourceArchive s_resourceArchive;
-static uint8_t* s_resourceMasters[572];
-static bool s_resourceLocked[572];
-static bool s_resourcePurgeable[572];
+static ResourceForks s_resourceForks;
+static uint8_t* s_resourceMasters[ResourceForks::kMaximumResources];
+static bool s_resourceLocked[ResourceForks::kMaximumResources];
+static bool s_resourcePurgeable[ResourceForks::kMaximumResources];
 static const uint16_t kScoreTableCount = 4;
 static const uint16_t kScoreTableBytes = 300;
 static uint8_t s_scoreTables[kScoreTableCount][kScoreTableBytes];
@@ -570,19 +557,27 @@ static HandleAllocation s_handleAllocations[128];
 static uint16_t s_handleAllocationCount;
 
 struct Segment { uint8_t* begin; uint8_t* end; const char* name; };
-static const Segment s_segments[11] = {
-    {vette_code_0, vette_code_0_end, "CODE0"},
-    {vette_code_1, vette_code_1_end, "MAIN"},
-    {vette_code_2, vette_code_2_end, "INITIALIZE"},
-    {vette_code_3, vette_code_3_end, "COMMUNICATION"},
-    {vette_code_4, vette_code_4_end, "LOAD"},
-    {vette_code_5, vette_code_5_end, "SCORE"},
-    {vette_code_6, vette_code_6_end, "TRAFFIC"},
-    {vette_code_7, vette_code_7_end, "FRED"},
-    {vette_code_8, vette_code_8_end, "INTRO"},
-    {vette_code_9, vette_code_9_end, "SOUND"},
-    {vette_code_10, vette_code_10_end, "%A5INIT"}
+static Segment s_segments[11] = {
+    {0, 0, "CODE0"}, {0, 0, "MAIN"}, {0, 0, "INITIALIZE"},
+    {0, 0, "COMMUNICATION"}, {0, 0, "LOAD"}, {0, 0, "SCORE"},
+    {0, 0, "TRAFFIC"}, {0, 0, "FRED"}, {0, 0, "INTRO"},
+    {0, 0, "SOUND"}, {0, 0, "%A5INIT"}
 };
+static uint8_t* s_residentSegmentStorage[11];
+// Short aliases keep the byte-verified patch sites readable. They now point
+// into aligned resident copies of the application CODE resources rather than
+// linked `.incbin` symbols.
+static uint8_t *vette_code_0, *vette_code_0_end;
+static uint8_t *vette_code_1, *vette_code_1_end;
+static uint8_t *vette_code_2, *vette_code_2_end;
+static uint8_t *vette_code_3, *vette_code_3_end;
+static uint8_t *vette_code_4, *vette_code_4_end;
+static uint8_t *vette_code_5, *vette_code_5_end;
+static uint8_t *vette_code_6, *vette_code_6_end;
+static uint8_t *vette_code_7, *vette_code_7_end;
+static uint8_t *vette_code_8, *vette_code_8_end;
+static uint8_t *vette_code_9, *vette_code_9_end;
+static uint8_t *vette_code_10, *vette_code_10_end;
 
 static uint16_t read16(const uint8_t* p) { return (uint16_t)((p[0] << 8) | p[1]); }
 static uint32_t read32(const uint8_t* p)
@@ -601,6 +596,66 @@ static void copyString(char* out, const char* in)
     uint16_t i = 0;
     while (i != 23 && in[i]) { out[i] = in[i]; ++i; }
     out[i] = 0;
+}
+
+static void clearResidentSegments()
+{
+    for (uint16_t i = 0; i < 11; ++i) {
+        delete[] s_residentSegmentStorage[i];
+        s_residentSegmentStorage[i] = 0;
+        s_segments[i].begin = s_segments[i].end = 0;
+    }
+    vette_code_0 = vette_code_0_end = 0;
+    vette_code_1 = vette_code_1_end = 0;
+    vette_code_2 = vette_code_2_end = 0;
+    vette_code_3 = vette_code_3_end = 0;
+    vette_code_4 = vette_code_4_end = 0;
+    vette_code_5 = vette_code_5_end = 0;
+    vette_code_6 = vette_code_6_end = 0;
+    vette_code_7 = vette_code_7_end = 0;
+    vette_code_8 = vette_code_8_end = 0;
+    vette_code_9 = vette_code_9_end = 0;
+    vette_code_10 = vette_code_10_end = 0;
+}
+
+static bool loadResidentSegments()
+{
+    clearResidentSegments();
+    for (uint16_t segment = 0; segment < 11; ++segment) {
+        ResourceForks::Item item;
+        if (!s_resourceForks.find(0, 0x434f4445UL, (int16_t)segment, item)
+            || item.size < 4) {
+            clearResidentSegments();
+            return false;
+        }
+        // Resource-fork payloads are byte-packed (all eleven CODE payloads in
+        // this release happen to begin at odd offsets).  Classic Resource
+        // Manager handles relocate them into aligned RAM.  Do the same here;
+        // these private copies are also where the jump-table and compatibility
+        // patches belong, leaving the original file image untouched.
+        uint8_t* resident = new uint8_t[item.size];
+        if (!resident) {
+            clearResidentSegments();
+            return false;
+        }
+        for (uint32_t byte = 0; byte < item.size; ++byte)
+            resident[byte] = item.data[byte];
+        s_residentSegmentStorage[segment] = resident;
+        s_segments[segment].begin = resident;
+        s_segments[segment].end = resident + item.size;
+    }
+    vette_code_0 = s_segments[0].begin;   vette_code_0_end = s_segments[0].end;
+    vette_code_1 = s_segments[1].begin;   vette_code_1_end = s_segments[1].end;
+    vette_code_2 = s_segments[2].begin;   vette_code_2_end = s_segments[2].end;
+    vette_code_3 = s_segments[3].begin;   vette_code_3_end = s_segments[3].end;
+    vette_code_4 = s_segments[4].begin;   vette_code_4_end = s_segments[4].end;
+    vette_code_5 = s_segments[5].begin;   vette_code_5_end = s_segments[5].end;
+    vette_code_6 = s_segments[6].begin;   vette_code_6_end = s_segments[6].end;
+    vette_code_7 = s_segments[7].begin;   vette_code_7_end = s_segments[7].end;
+    vette_code_8 = s_segments[8].begin;   vette_code_8_end = s_segments[8].end;
+    vette_code_9 = s_segments[9].begin;   vette_code_9_end = s_segments[9].end;
+    vette_code_10 = s_segments[10].begin; vette_code_10_end = s_segments[10].end;
+    return true;
 }
 
 struct TrapName { uint16_t word; const char* manager; const char* routine; };
@@ -1236,12 +1291,12 @@ static uint8_t** getResource(uint32_t type, int16_t id)
 {
     // GetResource searches the current resource file first.  The system resource chain is
     // absent on the port; the two shipped forks are searched in chain order after it.
-    for (uint16_t pass = 0; pass < s_resourceArchive.forkCount(); ++pass) {
+    for (uint16_t pass = 0; pass < s_resourceForks.forkCount(); ++pass) {
         uint16_t fork = (uint16_t)(s_currentResourceFork + pass);
-        if (fork >= s_resourceArchive.forkCount()) fork -= s_resourceArchive.forkCount();
-        ResourceArchive::Item item;
+        if (fork >= s_resourceForks.forkCount()) fork -= s_resourceForks.forkCount();
+        ResourceForks::Item item;
         uint32_t index;
-        if (s_resourceArchive.find(fork, type, id, item, &index)) {
+        if (s_resourceForks.find(fork, type, id, item, &index)) {
             bool writableScore = false;
             for (uint16_t score = 0; score < kScoreTableCount; ++score)
                 if (index == s_scoreResourceIndices[score]) {
@@ -1261,11 +1316,11 @@ static bool initializeWritableScores()
     for (uint16_t score = 0; score < kScoreTableCount; ++score)
         s_scoreResourceIndices[score] = 0xffff;
     for (uint16_t score = 0; score < kScoreTableCount; ++score) {
-        ResourceArchive::Item item;
+        ResourceForks::Item item;
         uint32_t index = 0;
         bool found = false;
-        for (uint16_t fork = 0; fork < s_resourceArchive.forkCount(); ++fork)
-            if (s_resourceArchive.find(fork, 0x54494d45UL,
+        for (uint16_t fork = 0; fork < s_resourceForks.forkCount(); ++fork)
+            if (s_resourceForks.find(fork, 0x54494d45UL,
                                        (int16_t)(128 + score), item, &index)) {
                 found = true;
                 break;
@@ -1298,8 +1353,8 @@ static IntroSample* introSample(uint16_t index)
     IntroSample& sample = s_introSamples[index];
     if (sample.chipData) return &sample;
 
-    ResourceArchive::Item item;
-    if (!s_resourceArchive.find(1, 0x494e5354UL, sample.resourceID, item) || !item.size)
+    ResourceForks::Item item;
+    if (!s_resourceForks.find(1, 0x494e5354UL, sample.resourceID, item) || !item.size)
         return 0;
     const uint8_t* source = item.data;
     uint32_t size = item.size;
@@ -1519,7 +1574,7 @@ static bool equalMacRomanStrings(const uint8_t* first, uint16_t firstLength,
     return true;
 }
 
-static bool resourceNameEquals(const ResourceArchive::Item& item, const uint8_t* name)
+static bool resourceNameEquals(const ResourceForks::Item& item, const uint8_t* name)
 {
     if (!name || name[0] != item.nameLength) return false;
     for (uint16_t i = 0; i < item.nameLength; ++i)
@@ -1529,12 +1584,12 @@ static bool resourceNameEquals(const ResourceArchive::Item& item, const uint8_t*
 
 static uint8_t** getNamedResource(uint32_t type, const uint8_t* name)
 {
-    for (uint16_t pass = 0; pass < s_resourceArchive.forkCount(); ++pass) {
+    for (uint16_t pass = 0; pass < s_resourceForks.forkCount(); ++pass) {
         uint16_t fork = (uint16_t)(s_currentResourceFork + pass);
-        if (fork >= s_resourceArchive.forkCount()) fork -= s_resourceArchive.forkCount();
-        for (uint32_t i = 0; i < s_resourceArchive.resourceCount(); ++i) {
-            ResourceArchive::Item item;
-            if (!s_resourceArchive.item(i, item)) return 0;
+        if (fork >= s_resourceForks.forkCount()) fork -= s_resourceForks.forkCount();
+        for (uint32_t i = 0; i < s_resourceForks.resourceCount(); ++i) {
+            ResourceForks::Item item;
+            if (!s_resourceForks.item(i, item)) return 0;
             if (item.fork == fork && item.type == type && resourceNameEquals(item, name)) {
                 s_resourceMasters[i] = (uint8_t*)item.data;
                 return &s_resourceMasters[i];
@@ -1551,11 +1606,11 @@ static BogasInstrument* bogasInstrument(uint16_t ordinal)
     if (instrument.chipData) return &instrument;
     if (!instrument.resource) return 0;
 
-    ResourceArchive::Item item;
+    ResourceForks::Item item;
     bool found = false;
-    for (uint32_t i = 0; i < s_resourceArchive.resourceCount(); ++i) {
+    for (uint32_t i = 0; i < s_resourceForks.resourceCount(); ++i) {
         if (&s_resourceMasters[i] != instrument.resource) continue;
-        if (!s_resourceArchive.item(i, item) || item.type != 0x494e5354UL) return 0;
+        if (!s_resourceForks.item(i, item) || item.type != 0x494e5354UL) return 0;
         found = true;
         break;
     }
@@ -1848,7 +1903,7 @@ static bool pascalEquals(const uint8_t* value, const char* expected)
 
 static int16_t openResourceFile(const uint8_t* name)
 {
-    if (s_resourceArchive.forkCount() > 1 && pascalEquals(name, "Vette!.DATA")) {
+    if (s_resourceForks.forkCount() > 1 && pascalEquals(name, "Vette!.DATA")) {
         s_currentResourceFork = 1;
         return 1;
     }
@@ -2335,8 +2390,8 @@ static int16_t setHandleSize(uint8_t** handle, uint32_t newSize);
 static uint32_t resourceHandleSize(uint8_t** handle)
 {
     int32_t index = resourceHandleIndex(handle);
-    ResourceArchive::Item item;
-    return index >= 0 && s_resourceArchive.item((uint32_t)index, item) ? item.size : 0;
+    ResourceForks::Item item;
+    return index >= 0 && s_resourceForks.item((uint32_t)index, item) ? item.size : 0;
 }
 
 static void fillColorRect(int16_t top, int16_t left, int16_t bottom, int16_t right,
@@ -4398,9 +4453,9 @@ static void paletteToColorTable(uint8_t** paletteHandle, uint8_t* colorTable)
     uint16_t count = read16(palette);
     if (count > 16) count = 16;
     int16_t resourceID = -32768;
-    for (uint32_t i = 0; i < s_resourceArchive.resourceCount(); ++i) {
-        ResourceArchive::Item item;
-        if (&s_resourceMasters[i] == paletteHandle && s_resourceArchive.item(i, item)
+    for (uint32_t i = 0; i < s_resourceForks.resourceCount(); ++i) {
+        ResourceForks::Item item;
+        if (&s_resourceMasters[i] == paletteHandle && s_resourceForks.item(i, item)
             && item.type == 0x706c7474UL) {
             resourceID = item.id;
             break;
@@ -4558,9 +4613,9 @@ static void initMenus()
 
     // InitMenus optionally adopts the menu-color table resource.  Its ID is not
     // prescribed, so mirror the Resource Manager search and take the first 'mctb'.
-    for (uint32_t i = 0; i < s_resourceArchive.resourceCount(); ++i) {
-        ResourceArchive::Item item;
-        if (!s_resourceArchive.item(i, item)) break;
+    for (uint32_t i = 0; i < s_resourceForks.resourceCount(); ++i) {
+        ResourceForks::Item item;
+        if (!s_resourceForks.item(i, item)) break;
         if (item.type == 0x6d637462UL) {      // 'mctb'
             s_resourceMasters[i] = (uint8_t*)item.data;
             s_menuManager.colorTable = &s_resourceMasters[i];
@@ -4757,9 +4812,9 @@ static bool addResourceMenu(uint8_t** menu, uint32_t type)
     // measured desk-accessory-menu call is an empty append.  Keep a loud stop
     // if a different archive does contain a named match: encoding those names
     // as menu items is observable state and must not be silently omitted.
-    for (uint32_t i = 0; i < s_resourceArchive.resourceCount(); ++i) {
-        ResourceArchive::Item item;
-        if (!s_resourceArchive.item(i, item)) return false;
+    for (uint32_t i = 0; i < s_resourceForks.resourceCount(); ++i) {
+        ResourceForks::Item item;
+        if (!s_resourceForks.item(i, item)) return false;
         if (item.type == type && item.nameLength) return false;
     }
     return true;
@@ -5006,9 +5061,9 @@ static uint8_t** recoverHandle(uint8_t* pointer)
         if (address >= base && address < base + allocation.size)
             return &allocation.master;
     }
-    for (uint32_t i = 0; i < s_resourceArchive.resourceCount(); ++i) {
-        ResourceArchive::Item item;
-        if (!s_resourceArchive.item(i, item)) break;
+    for (uint32_t i = 0; i < s_resourceForks.resourceCount(); ++i) {
+        ResourceForks::Item item;
+        if (!s_resourceForks.item(i, item)) break;
         uint32_t base = (uint32_t)item.data;
         if (address >= base && address < base + item.size) {
             s_resourceMasters[i] = (uint8_t*)item.data;
@@ -5071,8 +5126,8 @@ static uint32_t handleSize(uint8_t** handle)
         return allocation->size;
     }
     int32_t index = resourceHandleIndex(handle);
-    ResourceArchive::Item item;
-    if (index >= 0 && s_resourceArchive.item((uint32_t)index, item)) {
+    ResourceForks::Item item;
+    if (index >= 0 && s_resourceForks.item((uint32_t)index, item)) {
         s_memoryManager.error = 0;
         return item.size;
     }
@@ -6116,7 +6171,7 @@ static int32_t resourceHandleIndex(uint8_t** handle)
 {
     uint32_t address = (uint32_t)handle;
     uint32_t base = (uint32_t)s_resourceMasters;
-    uint32_t bytes = s_resourceArchive.resourceCount() * sizeof(s_resourceMasters[0]);
+    uint32_t bytes = s_resourceForks.resourceCount() * sizeof(s_resourceMasters[0]);
     if (address < base || address >= base + bytes
         || (address - base) % sizeof(s_resourceMasters[0]) != 0)
         return -1;
@@ -6941,7 +6996,7 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
     }
     if (trap == 0xa998) {                    // UseResFile(refNum)
         uint16_t fork = read16(userStack);
-        if (fork < s_resourceArchive.forkCount()) {
+        if (fork < s_resourceForks.forkCount()) {
             s_currentResourceFork = fork;
             s_memoryManager.error = 0;
         } else {
@@ -7637,13 +7692,39 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
     for (;;) { }                             // VBI remains enabled, so the report stays live
 }
 
+bool MacLoader::prepareResourceForks(uint8_t* application, uint32_t applicationSize,
+                                     uint8_t* data, uint32_t dataSize)
+{
+    s_resourceForks.close();
+    clearResidentSegments();
+    g_resourceCount = 0;
+    if (!s_resourceForks.open(application, applicationSize, data, dataSize)
+        || !loadResidentSegments()) {
+        s_resourceForks.close();
+        clearResidentSegments();
+        return false;
+    }
+    for (uint16_t i = 0; i < ResourceForks::kMaximumResources; ++i) {
+        s_resourceMasters[i] = 0;
+        s_resourceLocked[i] = false;
+        s_resourcePurgeable[i] = false;
+    }
+    s_currentResourceFork = 0;
+    g_resourceCount = s_resourceForks.resourceCount();
+    return true;
+}
+
+void MacLoader::releaseResourceForks()
+{
+    s_resourceForks.close();
+    clearResidentSegments();
+    g_resourceCount = 0;
+}
+
 bool MacLoader::run(VetteScreen* screen)
 {
     s_loudStopScreen = screen;
-    if (!s_resourceArchive.open(vette_resources,
-                                (uint32_t)(vette_resources_end - vette_resources)))
-        return false;
-    g_resourceCount = s_resourceArchive.resourceCount();
+    if (!s_resourceForks.resourceCount()) return false;
     if (!initializeWritableScores()) return false;
 
     uint8_t* a5;

@@ -40,6 +40,76 @@ volatile uint32_t g_scoreFileSaveBytes = 0;
 static const uint32_t kScoreFileHeaderBytes = 12;
 static uint8_t s_scoreFile[kScoreFileHeaderBytes + MacLoader::kPersistentScoreBytes];
 
+struct OriginalResourceFiles {
+    uint8_t* application;
+    uint32_t applicationSize;
+    uint8_t* data;
+    uint32_t dataSize;
+};
+
+static bool readOriginalResourceFork(const char* name, uint8_t*& bytes, uint32_t& size)
+{
+    bytes = 0;
+    size = 0;
+    BPTR file = Open((CONST_STRPTR)name, MODE_OLDFILE);
+    if (!file) return false;
+    bool ok = false;
+    if (Seek(file, 0, OFFSET_END) >= 0) {
+        LONG length = Seek(file, 0, OFFSET_CURRENT);
+        if (length >= 16 && (uint32_t)length <= 4UL * 1024 * 1024
+            && Seek(file, 0, OFFSET_BEGINNING) >= 0) {
+            bytes = (uint8_t*)AllocMem((uint32_t)length, MEMF_ANY);
+            if (bytes) {
+                size = (uint32_t)length;
+                LONG total = 0;
+                while (total < length) {
+                    LONG got = Read(file, bytes + total, length - total);
+                    if (got <= 0) break;
+                    total += got;
+                }
+                if (total == length) {
+                    ok = true;
+                }
+            }
+        }
+    }
+    Close(file);
+    if (!ok && bytes) {
+        FreeMem(bytes, size);
+        bytes = 0;
+        size = 0;
+    }
+    return ok;
+}
+
+static void releaseOriginalResourceFiles(OriginalResourceFiles& files)
+{
+    if (files.application)
+        FreeMem(files.application, files.applicationSize);
+    if (files.data)
+        FreeMem(files.data, files.dataSize);
+    files.application = files.data = 0;
+    files.applicationSize = files.dataSize = 0;
+}
+
+static bool loadOriginalResourceFiles(OriginalResourceFiles& files)
+{
+    files.application = files.data = 0;
+    files.applicationSize = files.dataSize = 0;
+    if (!readOriginalResourceFork("PROGDIR:Color VETTE!",
+                                  files.application, files.applicationSize)) {
+        PutStr((CONST_STRPTR)"Vette: cannot read PROGDIR:Color VETTE!\n");
+        return false;
+    }
+    if (!readOriginalResourceFork("PROGDIR:VETTE!.Data",
+                                  files.data, files.dataSize)) {
+        PutStr((CONST_STRPTR)"Vette: cannot read PROGDIR:VETTE!.Data\n");
+        releaseOriginalResourceFiles(files);
+        return false;
+    }
+    return true;
+}
+
 static uint32_t scoreFileRead32(const uint8_t* data)
 {
     return ((uint32_t)data[0] << 24) | ((uint32_t)data[1] << 16)
@@ -247,9 +317,34 @@ bool PlatformAmiga::run()
     GfxBase = (struct GfxBase*)OpenLibrary((CONST_STRPTR)"graphics.library", 33);
     if (!GfxBase) return false;     // nothing has been changed yet, so there is nothing to undo
     DOSBase = (struct DosLibrary*)OpenLibrary((CONST_STRPTR)"dos.library", 33);
+    if (!DOSBase) {
+        CloseLibrary((struct Library*)GfxBase);
+        GfxBase = 0;
+        return false;
+    }
 
     static VetteScreen screen;      // file-scope lifetime, off the stack — see src/main.cpp
     static MacLoader loader;
+    OriginalResourceFiles resourceFiles = {};
+    if (!loadOriginalResourceFiles(resourceFiles)) {
+        CloseLibrary((struct Library*)GfxBase);
+        GfxBase = 0;
+        CloseLibrary((struct Library*)DOSBase);
+        DOSBase = 0;
+        return false;
+    }
+    if (!loader.prepareResourceForks(resourceFiles.application,
+                                     resourceFiles.applicationSize,
+                                     resourceFiles.data, resourceFiles.dataSize)) {
+        PutStr((CONST_STRPTR)
+            "Vette: original Color VETTE! resource files are invalid or unsupported.\n");
+        releaseOriginalResourceFiles(resourceFiles);
+        CloseLibrary((struct Library*)GfxBase);
+        GfxBase = 0;
+        CloseLibrary((struct Library*)DOSBase);
+        DOSBase = 0;
+        return false;
+    }
     loadScoreFile(loader);
 
     // --- takeover -----------------------------------------------------------
@@ -393,6 +488,8 @@ bool PlatformAmiga::run()
 #ifdef VETTE_SCORE_PERSISTENCE_PROBE
     vetteScoreSaveComplete();
 #endif
+    loader.releaseResourceForks();
+    releaseOriginalResourceFiles(resourceFiles);
 
     // Closed here rather than in a destructor -- see the note in PlatformAmiga.h.  ⚠ AFTER
     // the LoadView restore, which needs GfxBase.
