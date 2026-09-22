@@ -194,6 +194,19 @@ endif
 EXTRA_DEFINES += -DVETTE_TOUR_MODE_PROBE
 endif
 
+# Diagnostic only: suspend a live race with the shipped physical P edge, then
+# select one shipped File-menu session control through its real Command-key
+# equivalent. Item 5 is Restart Race; item 6 is Return to Game.
+ifdef SESSION_CONTROL_ITEM
+ifndef GARAGE_CLICK
+$(error SESSION_CONTROL_ITEM requires GARAGE_CLICK=1)
+endif
+ifneq ($(filter $(SESSION_CONTROL_ITEM),5 6),$(SESSION_CONTROL_ITEM))
+$(error SESSION_CONTROL_ITEM must be 5 (Restart Race) or 6 (Return to Game))
+endif
+EXTRA_DEFINES += -DVETTE_SESSION_CONTROL_ITEM=$(SESSION_CONTROL_ITEM)
+endif
+
 # Diagnostic only: select helicopter view through a physical F4 edge, then
 # return to the forward view through F2, to cover context-0 audio replacement.
 ifeq ($(VIEW_AUDIO_PROBE),1)
@@ -489,6 +502,9 @@ PROBE_SYMS += g_probePicture140TrapPC g_probePicture140Return \
 endif
 ifeq ($(TOUR_MODE_PROBE),1)
 PROBE_SYMS += g_tourModeProbeComplete
+endif
+ifdef SESSION_CONTROL_ITEM
+PROBE_SYMS += g_sessionControlProbeItem g_sessionControlProbePhase
 endif
 ifdef FPSCOUNT
 PROBE_SYMS +=

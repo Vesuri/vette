@@ -59,6 +59,12 @@ new-race transitions at `$1FB4` and `$2142`. While a game is suspended, Options 
 the separate `MENU 777` list of 26 San Francisco destinations; selecting one relocates the existing
 player through `Main+$3456`, and Return to Game resumes that session.
 
+Pressing `P` enters the suspended-session options state. In that state `Return to Game`
+(`Command-R`) is enabled and resumes the retained race. `Restart Race` (`Command-A`) is deliberately
+disabled there: select `Quit to Garage` (`Command-G`) first, after which the game enables Restart
+Race and restarts the retained course/configuration. This is the shipped menu state machine, not a
+port-side restriction.
+
 Player cars (Appendix A, p. 31) are:
 
 - 1989 Stock Corvette

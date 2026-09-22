@@ -56,6 +56,10 @@ volatile uint32_t g_macDrivingCallbacks = 0;
 #ifdef VETTE_TOUR_MODE_PROBE
 volatile uint16_t g_tourModeProbeComplete = 0;
 #endif
+#ifdef VETTE_SESSION_CONTROL_ITEM
+volatile uint16_t g_sessionControlProbeItem = VETTE_SESSION_CONTROL_ITEM;
+volatile uint16_t g_sessionControlProbePhase = 0;
+#endif
 #ifdef VETTE_MOTION_CAPTURE
 #ifdef VETTE_VIEW_CAPTURE_RAW_KEY
 volatile uint8_t g_motionCaptureReady = 0;
@@ -5323,6 +5327,17 @@ extern "C" void vetteMacRawKeyChanged(uint8_t rawKey, bool down)
 
 static void updateDrivingInputProbe()
 {
+#ifdef VETTE_SESSION_CONTROL_ITEM
+    // Reach suspension through the shipped physical P pause/options path.
+    // Main's event loop supplies the requested menu command below.
+    bool sessionRaceUnderway = s_currentA5
+        && (int16_t)read16(s_currentA5 - 13296) >= 3
+        && g_macDrivingIterations >= 30;
+    if (g_sessionControlProbePhase == 0 && sessionRaceUnderway) {
+        vetteInputInjectProbeKey(0x19, true);  // P
+        g_sessionControlProbePhase = 1;
+    }
+#endif
 #ifdef VETTE_VIEW_AUDIO_PROBE
     // Drive the shipped view handlers through ordinary physical key edges.
     // F4 replaces the context-0 engine with the helicopter ambience; F2 must
@@ -5982,6 +5997,36 @@ static bool validatePermanentHandle(uint8_t** handle)
 // a six-byte frame on the supervisor stack.  This differs from the supervisor-mode Mac II.
 extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* userStack)
 {
+#ifdef VETTE_SESSION_CONTROL_ITEM
+    // The driving-boundary trap stops once P clears the game's driving flag.
+    // Complete the physical release at the very next Mac trap, then leave the
+    // ordered P and Command-key edges for GetNextEvent.
+    if (g_sessionControlProbePhase == 1 && s_currentA5
+        && read16(s_currentA5 - 21316) == 0) {
+        // Restart is disabled while the session is suspended. Its real path
+        // first selects Quit to Garage (Command-G); that transition enables
+        // Restart Race. Return to Game is immediately available (Command-R).
+        const uint8_t rawKey = VETTE_SESSION_CONTROL_ITEM == 5 ? 0x24 : 0x13;
+        vetteInputInjectProbeKey(0x19, false);
+        vetteInputInjectProbeKey(0x66, true);
+        vetteInputInjectProbeKey(rawKey, true);
+        vetteInputInjectProbeKey(rawKey, false);
+        vetteInputInjectProbeKey(0x66, false);
+        g_sessionControlProbePhase = 3;
+    }
+#if VETTE_SESSION_CONTROL_ITEM == 5
+    if (g_sessionControlProbePhase == 3 && s_currentA5) {
+        uint8_t** fileMenu = (uint8_t**)read32(s_currentA5 - 0x5b70);
+        if (fileMenu && *fileMenu && (read32(*fileMenu + 10) & (1UL << 5))) {
+            vetteInputInjectProbeKey(0x66, true);  // Command-A: Restart Race
+            vetteInputInjectProbeKey(0x20, true);
+            vetteInputInjectProbeKey(0x20, false);
+            vetteInputInjectProbeKey(0x66, false);
+            g_sessionControlProbePhase = 4;
+        }
+    }
+#endif
+#endif
     uint32_t pc = read32(frame + 2);
     uint16_t trap = read16((const uint8_t*)pc);
 #ifdef VETTE_PROBE

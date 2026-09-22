@@ -2203,6 +2203,25 @@ enters `Main+$3456` with Tour enabled and destination index 1. The source routin
 to 2 and moves the player to `(x=$30A0,z=$1400,heading=$0000)` with no loud stop. Production builds
 contain neither the post-session precondition nor the private destination alias.
 
+## Suspended-session return and restart controls
+
+`MENU 222`'s session commands are stateful rather than interchangeable race exits. During live
+driving a physical `P` takes the shipped pause/options path and clears the driving flag. At that
+point the File menu enable mask is `$FFFFFFC1`: Return to Game (item 6), Quit to Garage (item 7),
+and Quit (item 8) are enabled, while Restart Race (item 5) is intentionally disabled. Feeding
+Command-A directly from the suspended state therefore correctly produces no `MenuKey` selection.
+
+`SESSION_CONTROL_ITEM=6` queues a complete physical Command-R chord only after that P transition.
+`MenuKey` returns `$00DE0006`, Main enters its untouched item-6 handler at `$10CC`, and the retained
+race reaches the driving boundary again at tick 2,032 with race state 3 and the driving global set.
+
+Restart follows the longer source-defined path. `SESSION_CONTROL_ITEM=5` first sends Command-G;
+Main's item-7 handler returns to the garage and enables Restart Race. Only after the real MENU
+enable bit appears does the fixture send Command-A. Main enters item 5 at tick 2,187 and restores
+the driving global before reaching `$1FD2` again with the same live race state. The fixture changes
+no A5 game state or menu bits; it supplies only the physical P and Command-key edges. The fail-fast
+observer for both builds is `amiga/driving_session_control.gdb`.
+
 ## Correction to the MAME log
 
 The 51-row MAME table is a measurement of that reference run, not fabricated data, but the live
