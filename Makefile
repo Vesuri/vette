@@ -1,12 +1,6 @@
-# Vette! — host build + repo-level targets.
-#
-# ⚠ THE HOST BUILD IS AN OPEN DECISION (PROJECT.md §Open decisions #6).  RoF had an SDL backend
-# and its approximation cost real time on bugs that existed only in the approximation; Revs
-# deliberately had NO renderer and used the host purely for differentials.  This port's
-# differentials are different again — there is no transliteration oracle to compare against — so
-# the question is genuinely open, and this Makefile does not pre-answer it by growing a backend.
-#
-# The Amiga build is in amiga/ and is the real target: `cd amiga && . ./env.sh && make`.
+# Vette! — repository-level tools and release gates.
+# The game has no host renderer: host code installs/inspects original data and runs fidelity
+# comparisons. The Amiga build is the product: `cd amiga && . ./env.sh && make`.
 
 VETTE_APP_RSRC ?= tmp/rsrc_VETTE!_VETTE!_Folder_Folder_Color_VETTE!_Color_VETTE!.rsrc
 VETTE_DATA_RSRC ?= tmp/rsrc_VETTE!_VETTE!_Folder_Folder_Color_VETTE!_VETTE!.Data.rsrc
@@ -47,7 +41,7 @@ help:
 	@echo "  make driving-motion-capture    capture distinct completed moving Amiga frames"
 	@echo "  make driving-profile  build and measure 300 PAL fields of target-A1200 driving"
 	@echo
-	@echo "There is no host build yet — see PROJECT.md 'Open decisions' #6."
+	@echo "There is deliberately no host game build; the Amiga executable is the product."
 	@echo "The Amiga build:  cd amiga && . ./env.sh && make"
 
 # ⭐⭐ WHAT IS OPEN.  The queue plus a live sweep for markers in the tracked, non-vendored tree.

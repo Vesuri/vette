@@ -14,7 +14,7 @@
 | 1 | **The Macintosh reference loop is built and DRIVES** | `docs/mac-reference-loop.md` |
 | 2 | **Exhaustive entry-point + trap sweep** before a line of port code is written against the binary — every `CODE 0` jump-table entry, every `$Axxx` site, every stored procedure pointer, every absolute low-memory reference | `docs/toolchain.md` §Before the FIRST export is trusted |
 | 3 | **The seam rule is written down** before the first routine is converted | `docs/faithfulness-seam.md` |
-| 4 | **Profile an end-to-end skeleton on the real A500** before choosing what to optimise, and before setting any performance target | `docs/perf-method.md` |
+| 4 | **Profile an end-to-end skeleton on the target A1200** before choosing what to optimise, and before setting any performance target | `docs/perf-method.md` |
 
 ⚠ #3 replaces Revs's "the transpiler emits clean C before mass-generating". Both are the same
 principle — *decide the mechanical policy before applying it 500 times* — and both are late-is-pure-tax.
@@ -125,31 +125,37 @@ The phase with no counterpart in either prior port at this size. **Exit criteria
 - [x] A phase-share profile with its accounting check printing ~100% every run. The first target-
       A1200 moving-driving window accounts exactly 100%; presentation is 80.353% and the same-rate
       empty bracket is 0.035% (`docs/perf-method.md`).
-- [ ] **Only then**: a performance target, argued from that profile and from the original's own
-      framerate under the reference loop.
+- [x] The performance target is set from matched moving-driving captures: median at most 12
+      Macintosh ticks, 95th percentile at most 15, and no more than twice the Macintosh median.
+      The current production path passes.
 
 ⚠ Postmortem §4.1. Do not set the target earlier, and do not quote the Mac's framerate as the
 Amiga's.
 
 ## Phase 5 — Render + input
 
-- [ ] The display architecture decided **from measurement** (`docs/mac-hardware.md` question 5).
-- [ ] Input mapped; the one-button mouse's second button and the keyboard assigned deliberately.
-- [ ] A framebuffer differential against the reference loop — the gate that settles "faithful or
-      port bug?".
+- [x] The measured display is 512×384, four-bitplane hires interlace, with exactly 512 pixels of
+      fetch and the 512×320 game surface centred vertically.
+- [x] Keyboard, keypad aliases, mouse, menus, and driving controls are deliberately mapped.
+- [x] The synchronized named driving frame matches all 175,104 live indexed pixels exactly.
 
 ## Phase 6 — Optimisation
 
-- [ ] Shape-probe before optimising (`docs/perf-method.md` Rule 4).
-- [ ] Representation before asm — asm written against an arrangement that is about to change has to
+- [x] Shape-probe before optimising (`docs/perf-method.md` Rule 4).
+- [x] Representation before asm — asm written against an arrangement that is about to change has to
       be rewritten.
-- [ ] Hand asm only where the C floor is provably GCC's floor, verified with an in-process
+- [x] Hand asm only where the C floor is provably GCC's floor, verified with an in-process
       differential.
+
+The completed pass retains renderer-derived dirty rectangles and the verified 68020 packed-nibble
+C2P. Further conversion work is measured optional work, not a fidelity or release blocker.
 
 ## Phase 7 — Packaging
 
-- [ ] WHDLoad slave, or an equivalent. RoF's `docs/whdload-slave.md` is the worked example.
-- [ ] Machine requirements stated from measurement.
+- [x] Equivalent hard-disk package: Amiga HUNK executable, FS-UAE configuration, startup disk,
+      original-data installer, checksums, and deterministic copyright-clean ZIP.
+- [x] Machine requirements stated from measurement: A1200, 2 MiB chip, 8 MiB fast, hard disk,
+      Kickstart/Workbench 3.1 or compatible.
 
 ---
 

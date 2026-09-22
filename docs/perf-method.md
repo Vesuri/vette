@@ -32,12 +32,11 @@ amounts of work, and that difference is the port.
 
 ## The target
 
-**Undecided — see PROJECT.md.** Set it from a measurement of an end-to-end skeleton on the target,
-plus a measurement of the original under a Mac emulator, and not before. Postmortem §4.1: profile a
-slow end-to-end skeleton on real hardware *before* committing to an approach. RoF's retired
-"50 FPS is impossible without an algorithm change" was disproven by hand-asm — the ceiling was GCC,
-not the algorithm. That cuts both ways: don't declare it impossible from reasoning, and don't
-declare it reached from optimism.
+The moving-driving fidelity workload must complete with a median interval of at most 12 Macintosh
+ticks, a 95th-percentile interval of at most 15 ticks, and no more than twice the captured Macintosh
+median. The reference median is 6 ticks; the production A1200 median is 9. The target therefore
+passes while acknowledging that presentation makes the Amiga behave like a somewhat slower Mac.
+This is a cadence ceiling, not a demand for lockstep Traffic phase or an arbitrary 50 FPS claim.
 
 ## Vette measurements
 

@@ -93,7 +93,7 @@ mode decisions.
 | Quit to Garage then Restart Race | `SESSION_CONTROL_ITEM=5`; same observer | original enable-state transition and race restart |
 | menu Quit | `SESSION_CONTROL_ITEM=8`; `driving_menu_quit.gdb` | original ExitToShell cleanup and AmigaOS restoration |
 | Control+left-mouse emergency exit | `QUIT_PROBE=1`; `quit_path.gdb` | same installed cleanup plus DMA/interrupt/View restoration |
-| persistent scores | `SCORE_PERSISTENCE_PROBE=1`; `score_persistence.gdb` | 1,200-byte TIME payload writes after handback and imports on next launch |
+| persistent scores | `SCORE_PERSISTENCE_PROBE=1`; `score_persistence.gdb` | 1,212-byte TIME file writes after handback and imports on next launch |
 
 `tools/check_gameplay_coverage.py` keeps this document's named observers and
 build switches tied to the tree. `amiga/regression.sh` is the executable

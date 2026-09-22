@@ -46,19 +46,15 @@ centre of gravity**, and it is the thing to size before anything else.
 | **Amiga machine** | ⭐⭐ **A1200, 2 MiB chip + 8 MiB fast** (user decision). No separate OCS display mode; the code remains 68000-compatible where practical, but OCS is not a supported package target |
 | **Copy protection** | ⭐ **Patched out, not reproduced.** The one deliberate, named departure from 1:1 — see `docs/faithfulness-seam.md` §The copy protection |
 
-## Open decisions
+## Closed implementation decisions
 
-These are genuinely open and are the right things to settle before building. They are ordered by
-how much else depends on them.
-
-1. **Performance target.** Deliberately not set. → `docs/perf-method.md` §The target. ⭐ Unlike both
-   prior ports there is a real reference: the Mac Plus's 7.83 MHz 68000 is within 12% of the A500's
-   7.09 MHz, so the original's own framerate under the reference loop is a meaningful yardstick.
-   Set the target from that plus a Phase 4 profile.
-2. **Host build: does it exist, and what for?** RoF had an SDL backend and its approximation cost
-   real time; Revs deliberately had **no renderer** and used the host only for differentials.
-   ⚠ This port's differentials are different again (there is no transliteration oracle), so the
-   question is open rather than answered by either precedent.
+- **Performance target.** The moving-driving fidelity workload must stay within a median of 12
+  Macintosh ticks, a 95th-percentile interval of 15 ticks, and twice the captured Macintosh median.
+  The current production path passes. C2P remains the measured dominant cost and further work is
+  optional rather than a release gate. → `docs/perf-method.md` §The target.
+- **No host game build.** Host tools install and inspect original data and perform differentials;
+  the game itself runs on the Amiga target. A second renderer would add a new approximation without
+  supplying an independent gameplay oracle.
 
 ### Closed: no separate OCS display fallback
 
@@ -70,9 +66,9 @@ overscan DMA. Cropping or squeezing would therefore trade away fidelity without 
 compatibility.
 
 The package target is nevertheless the user-selected A1200 with 2 MiB chip and 8 MiB fast. The
-two 512×384×4 planar buffers alone occupy 196,608 bytes of chip RAM. The linked executable is now
-about 116 KiB because original resources are disk-loaded, but the runtime still needs the two
-approximately 2.1 MiB resource forks, aligned resident CODE copies, Macintosh state, and
+two 512×384×4 planar buffers alone occupy 196,608 bytes of chip RAM. The production executable is
+about 97 KiB because original resources are disk-loaded, but the runtime still needs the two
+resource forks totalling about 2.1 MiB, aligned resident CODE copies, Macintosh state, and
 display/audio allocations. Four hires bitplanes
 also consume every bitplane fetch slot inside the active 512-pixel DDF interval; an A1200 can
 execute the game and trap layer from fast RAM while those fetches proceed. There is consequently
@@ -199,7 +195,7 @@ src/
   m68k_math.h           68000 16-bit mul/div helpers (the 68000 has no 32-bit mul/div)
   mac/                  the Toolbox/OS trap layer
   platform/             platform.h abstraction
-    host/               a host backend, if there is one (open decision #6)
+    host/               host-side test/differential support; no host game renderer
     amiga/              PlatformAmiga + the scene + the vendored dA JoRMaS framework
 amiga/                  Amiga build infrastructure: Makefile, env.sh, run.sh, debug.sh, *.gdb
 ```
@@ -229,91 +225,27 @@ amiga/                  Amiga build infrastructure: Makefile, env.sh, run.sh, de
 - [x] **Phase 3 — The trap layer.** The Line-A bridge services every reached required
       single-player call and unknown calls stop loudly with manager, routine, selector and caller.
       Optional desktop UI and communications remain explicit loud boundaries.
-- [ ] **Phase 4 — End-to-end skeleton on the target.** The original resident code reaches and
-      repeatedly completes real moving driving frames on the A1200 acceptance configuration. A
-      complete phase-share profile and the evidence-based performance target remain open.
-- [ ] **Phase 5 — Render + input.** Game-produced 4-bit chunky surfaces are presented through the
-      512×384, four-bitplane hires-interlaced display, with dirty conversion and physical keyboard
-      state/event translation. Full control mapping, the driving reference differential and the
-      remaining surface-height measurement are open.
-- [ ] Phase 6 — Optimisation
-- [ ] Phase 7 — Packaging
+- [x] **Phase 4 — End-to-end skeleton on the target.** The original resident code reaches and
+      repeatedly completes real moving driving frames on the A1200 acceptance configuration. The
+      phase-share profile accounts for 100% of the measured window and the cadence target is set
+      from matched Macintosh and A1200 captures.
+- [x] **Phase 5 — Render + input.** Game-produced 4-bit chunky surfaces are presented through the
+      512×384, four-bitplane hires-interlaced display. The named driving-frame differential is
+      pixel exact, and keyboard, keypad aliases, mouse, menus, and driving controls are mapped.
+- [x] **Phase 6 — Fidelity and performance.** Palette, PICT, driving raster, audio, dirty-list, C2P,
+      timing, recovery, and shutdown paths are measured on target. Further C2P work is explicitly
+      deferred because it no longer blocks fidelity or the accepted cadence ceiling.
+- [x] **Phase 7 — Structural verification and release.** Production loads the two unchanged original
+      resource forks from disk. The deterministic copyright-clean archive supplies the Amiga HUNK
+      executable, installer, FS-UAE configuration, checksums, requirements, and no game data.
 
 See `docs/phases.md` for exit criteria and the gating between phases.
 
-## Immediate next step
+## Current state
 
-### ⭐⭐ Build the driving reference differential
-
-The complete game-owned intro passes its 163,840-pixel differential, the scripted garage path
-enters driving, and a sustained A1200 run presents 143 complete moving frames over 6,422 Macintosh
-ticks without a loud stop. More straight-line accelerator soaking is therefore closed as a
-discovery method.
-
-The shipped key chart labels Escape “Menu Options.” Correcting a byte-local KeyMap bit-order bug
-makes physical Escape take that original transition at tick 1,864 after 32 complete frames. The
-path exits driving, reaches implemented depth 94 and encounters no new loud stop. The next step is
-confirmed with a diagnostic-only physical down/up pair through the ordinary edge queue: the settled
-state remains supported and trap-free. F1 “Helicopter View Left” is also measured: a frame-matched
-capture changes 53,940 of 81,920 packed bytes while driving remains trap-free at depth 93.
-F5 “Front Dash” changes 31,214 packed bytes and remains trap-free through 70/70 frames. P reaches
-the original pause/options transition and settles trap-free at depth 94; updating Page-0 KeyMap
-on CIA keyboard edges makes its no-Toolbox wait observe physical key transitions. S reaches the
-original `Main+$3134` sound toggle, changes the shipped sound flag from 1 to 0, calls the resident
-sound segment, and remains trap-free through 50/50 driving frames. A reaches `Main+$31AA`, changes
-the current car's automatic-shift field from 1 to 0, advances the transmission gate from 0 to 1,
-and likewise remains trap-free through 50/50 frames. The planned control slice is complete without
-finding a new compatibility boundary. The Macintosh reference harness now reaches live driving,
-expands the measured trap floor from 51 to 63, and proves the front window is 512×320 above a
-separate 512×342 window. Next capture a named, reproducible driving state from both machines and
-compare the chunky indices. An initial unsynchronised capture already proves that source and
-destination RGB tables match entry for entry, source and destination seeds match on both machines,
-and the live full-window copy preserves indices; captured-table rendering also reproduces the same
-sky, road, dashboard, and mirror color roles. The synchronized Corvette/held-accelerator capture
-now matches all 175,104 live pixels exactly. The final 774-pixel mirror strip came from the general
-indexed-PICT scaling rule: a 77-row picture is drawn into 78 rows at `(388,0)-(466,168)`, and System
-6 samples destination pixel centres. Applying the same rule removes the top-edge displacement.
-The FRED height state and 80-row Traffic fill are identical on both machines; the earlier reference
-value 78 was a post-two-row loop counter. The driving reference differential's named first frame
-is therefore closed. → `docs/open-work.md` §Blocking.
-
-⭐⭐ **Stage A is done and measured: the Amiga display path works.** The port takes the machine
-over, brings up 512×320 in 4 bitplanes hires interlaced and displays Target 1's captured Macintosh
-frame out of chip RAM; the chip-RAM checksum matches the host-computed one byte for byte, the
-long/short field ratio is 0.500, and the window on the glass measures **exactly 512×320**,
-undistorted and centred in the standard PAL display window. ⛔ **That milestone was a display-path
-proof and nothing more** — no Macintosh code ran in Stage A itself. `tools/mac_fb_to_amiga.py` is the pixel differential every later stage is
-judged by, and it prices each transformation separately: chunky→planar is asserted **lossless**,
-the CLUT→DAC gamma of 1.435 is re-measured against MAME on every run (worst channel 1/255), and
-the OCS 4-bit quantisation floor is **8/255 worst channel, 1.52/255 mean**. ⚠ A finished Target 1
-must differ from the Macintosh by *exactly* that and no more — **a smaller difference means the
-palette that ran is not the one derived here.**
-
-⭐ Every gate that stood in front of it is gone — the trap log is measured, arguments included
-(`docs/trap-log.md`):
-
-- **36 of the 63 currently measured traps** stand between launch and a painted intro screen. The art is up at frame
-  1758; the last new traps before it are `CopyBits` and `EraseRect` at 1698–1699.
-  ⚠⚠ **This is double the "18" previously recorded here**, and the 18 were blind rather than wrong:
-  the earlier tracer cleared its accumulators when the app became frontmost, discarding the game's
-  own first 230 frames — `%A5Init`, QuickDraw/Font/Window/Menu init, the `QUAD` + 160 `OBJS` loads,
-  the GWorld creation. Nothing left the list; 18 more joined the front of it.
-- **Rows 37–38 are the animation + wait-for-click loop and rows 39–51 are the garage screen** — both
-  explicitly out of scope, listed as deferred in the queue so they are not implemented "while we are
-  here".
-- **`GetNextEvent` is not on the intro path at all.** The intro polls `Button` from `Intro+0224`, so
-  Target 1 needs **no Event Manager** — nor Menu Manager, nor the `GDevice`/`Palette` calls.
-- **`DrawPicture` is 16 calls and `GetPicture` 47**, so Stage D's PICT interpreter is sized and small.
-  The first call draws 512×323 at (0,0); the other 15 are two small overlay rects.
-- ⭐ **The trap the game patches is `_ExitToShell`, and it is the only one.** `SetTrapAddress` at
-  `load+00B8`, frame 1617, handler `$786A96`. Option A means the port installs that patch too — but
-  ⛔ no general trap-patching machinery is needed.
-- ⭐ **`%A5Init` costs one trap:** `_BlockMove`, ×46. Stage B's prerequisite is that alone.
-- ⭐ **`QDExtensions` dispatches on `D0`, not on a stack selector**, and Target 1 needs two:
-  `NewGWorld` (0) and `LockPixels` (1), with `flags=$40000000` and `pixelDepth=0`.
-- **`Traffic` calls `GetPicture`** (`Traffic+663C`) and is resident during the intro, so that
-  segment is not purely the driving rasteriser.
-
-⚠ Resist implementing traps by reading Inside Macintosh's index. The postmortem's one-sentence
-lesson is *build the discovery and validation infrastructure exhaustively up front instead of
-growing it reactively*, and "guess which QuickDraw calls the intro needs" is the reactive version.
+The scoped single-player port and structural/release phase are complete. `docs/open-work.md` has no
+required queue item. `make release-check` is the final gate: it verifies the static map and gameplay
+coverage, boots a production disk-loaded build, enters driving, builds twice byte-identically, and
+audits the release ZIP for its exact manifest, checksums, HUNK executable, and absence of original
+resource forks. Further work is optional and starts from the deferred measurements in
+`docs/open-work.md`, not from an unfinished compatibility milestone.
