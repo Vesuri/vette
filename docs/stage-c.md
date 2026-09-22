@@ -1959,6 +1959,28 @@ bounded renderer-fidelity result, not a claim that differently paced traffic is 
 existing `driving-motion-compare` still includes every active Traffic record in its key and still
 refuses to compare when no complete shared roster exists.
 
+That complete-roster comparison remains a useful diagnostic, but it is not an acceptance gate
+between machines with different completed-frame cadence. Traffic is resident original game code:
+with the synchronized seed both machines test `COP!`, `GGRY`, then `TAXI`, initialize TAXI to
+exactly `(0x3060,0x2800)`, and execute the measured TAXI displacement of -39. Spawn and movement
+passes advance from completed original main-loop iterations, so a slower target legitimately need
+not expose the same whole roster at the same player tuple. Opportunistically shared states have
+already proved the exterior and every principal view (F1–F5 plus mirror-off) pixel-exact; remaining
+phase-dependent differences are confined to independently advancing traffic and dashboard signal
+state. The strict roster comparator continues to refuse incomparable captures rather than hiding
+that distinction.
+
+`make fidelity-check` is the fast aggregate for the retained fidelity evidence. It gates the intro,
+cursor-free chunky-to-planar conversion, state-paired driving image, moving cadence, source-derived
+selector and road palettes, complete control bridge, Macintosh/Paula event sequence, overlap,
+replacement, pitch, and level mapping. The intro capture contains 96 pixels of hardware cursor
+overlay inside one 16x16 rectangle; the game-owned chunky surface remains an exact Macintosh image,
+and the independent cursor-free planar oracle verifies all 163,840 display pixels. Slow emulator
+recapture is deliberately separate in `driving-view-regression`; it is fail-closed when a shared
+state exists, while differently phased runs are not fabricated into pairs. These gates close the
+fidelity/performance phase. Further C2P tuning is deferred as measured presentation cost, and the
+active queue advances to completing one race lifecycle.
+
 The Macintosh audio oracle formerly reused `VETTE_DRIVING_MOTION=1` merely to obtain moving input.
 That mode also owns and cleans the visual motion artifacts, so a right-turn audio run silently
 replaced the straight-driving framebuffer oracle. Audio now uses `VETTE_DRIVING_AUDIO=1`: it keeps
