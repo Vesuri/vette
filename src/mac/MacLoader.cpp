@@ -211,11 +211,26 @@ static uint8_t s_garageGearPhase;
     && (VETTE_GARAGE_DIFFICULTY < 1 || VETTE_GARAGE_DIFFICULTY > 3)
 #error VETTE_GARAGE_DIFFICULTY must be 1..3 (Trainee, Rookie, Pro)
 #endif
-#ifdef VETTE_GARAGE_COURSE
-static const uint8_t kGarageDrivingPhase = 11;
-#else
-static const uint8_t kGarageDrivingPhase = 9;
+#if defined(VETTE_GARAGE_CAR) && (VETTE_GARAGE_CAR < 1 || VETTE_GARAGE_CAR > 4)
+#error VETTE_GARAGE_CAR must be 1..4
 #endif
+#if defined(VETTE_GARAGE_OPPONENT) \
+    && (VETTE_GARAGE_OPPONENT < 1 || VETTE_GARAGE_OPPONENT > 4)
+#error VETTE_GARAGE_OPPONENT must be 1..4
+#endif
+static const uint8_t kGarageDrivingPhase = 9
+#ifdef VETTE_GARAGE_COURSE
+    + 2
+#endif
+#ifdef VETTE_GARAGE_CAR
+    + 2
+#endif
+    ;
+static const uint8_t kGarageTransitionSkipPhase = 3
+#ifdef VETTE_GARAGE_CAR
+    + 2
+#endif
+    ;
 static bool s_garageTransitionSkipped;
 static bool s_garageRecoveryPictureLoaded;
 static bool s_garageRecoverySkipped;
@@ -5678,8 +5693,9 @@ static bool nextEvent(uint16_t mask, uint8_t* event)
 
 #ifdef VETTE_GARAGE_CLICK
     // Leave the garage, difficulty, opponent, and course selectors through
-    // their real controls: ACCEPT, the requested difficulty, F40, ACCEPT,
-    // optionally a requested course button, then the course screen's ACCEPT.
+    // their real controls: optionally choose a player Corvette, ACCEPT, the
+    // requested difficulty and opponent, ACCEPT, optionally choose a course,
+    // then the course screen's ACCEPT.
     // The visible 512x320 crop begins at Macintosh global (64,91), so keep the
     // live state local while emitting ordinary mouse events.
 #ifdef VETTE_GARAGE_DIFFICULTY
@@ -5688,14 +5704,45 @@ static bool nextEvent(uint16_t mask, uint8_t* event)
 #else
     const int16_t selectedDifficultyY = 69; // shipped TRAINEE rectangle
 #endif
-#ifdef VETTE_GARAGE_COURSE
-    static const int16_t clickX[] = {
-        293, 413, 444, 212, (int16_t)(70 + 94 * (VETTE_GARAGE_COURSE - 1)), 445
-    };
-    const int16_t clickY[] = { 161, selectedDifficultyY, 156, 154, 308, 308 };
+#ifdef VETTE_GARAGE_OPPONENT
+    static const int16_t opponentX[] = { 320, 445, 320, 444 };
+    static const int16_t opponentY[] = { 76, 76, 156, 156 };
+    const int16_t selectedOpponentX = opponentX[VETTE_GARAGE_OPPONENT - 1];
+    const int16_t selectedOpponentY = opponentY[VETTE_GARAGE_OPPONENT - 1];
 #else
-    static const int16_t clickX[] = { 293, 413, 444, 212, 445 };
-    const int16_t clickY[] = { 161, selectedDifficultyY, 156, 154, 308 };
+    const int16_t selectedOpponentX = 444; // shipped F40 rectangle
+    const int16_t selectedOpponentY = 156;
+#endif
+#if defined(VETTE_GARAGE_CAR) && defined(VETTE_GARAGE_COURSE)
+    static const int16_t carY[] = { 49, 76, 103, 129 };
+    const int16_t clickX[] = {
+        289, 293, 413, selectedOpponentX, 212,
+        (int16_t)(70 + 94 * (VETTE_GARAGE_COURSE - 1)), 445
+    };
+    const int16_t clickY[] = {
+        carY[VETTE_GARAGE_CAR - 1], 161, selectedDifficultyY, selectedOpponentY,
+        154, 308, 308
+    };
+#elif defined(VETTE_GARAGE_CAR)
+    static const int16_t carY[] = { 49, 76, 103, 129 };
+    const int16_t clickX[] = { 289, 293, 413, selectedOpponentX, 212, 445 };
+    const int16_t clickY[] = {
+        carY[VETTE_GARAGE_CAR - 1], 161, selectedDifficultyY,
+        selectedOpponentY, 154, 308
+    };
+#elif defined(VETTE_GARAGE_COURSE)
+    static const int16_t clickX[] = {
+        293, 413, selectedOpponentX, 212,
+        (int16_t)(70 + 94 * (VETTE_GARAGE_COURSE - 1)), 445
+    };
+    const int16_t clickY[] = {
+        161, selectedDifficultyY, selectedOpponentY, 154, 308, 308
+    };
+#else
+    const int16_t clickX[] = { 293, 413, selectedOpponentX, 212, 445 };
+    const int16_t clickY[] = {
+        161, selectedDifficultyY, selectedOpponentY, 154, 308
+    };
 #endif
     if (!transition && s_garageClickPhase < sizeof(clickX) / sizeof(clickX[0]) * 2) {
         uint16_t click = (uint16_t)(s_garageClickPhase >> 1);
@@ -6885,7 +6932,8 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
         // control.  Once both deterministic garage selections have been
         // delivered, exercise that real branch once to keep bring-up runs
         // bounded; production and ordinary SKIP_INTRO builds never do this.
-        if (!s_garageTransitionSkipped && s_garageClickPhase >= 3) {
+        if (!s_garageTransitionSkipped
+                && s_garageClickPhase >= kGarageTransitionSkipPhase) {
             pressed = true;
             s_garageTransitionSkipped = true;
         }

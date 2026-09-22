@@ -11,6 +11,8 @@ set $scoreCalls = 0
 set $scoreReturned = 0
 set $mainExit = 0
 set $outerReturn = 0
+set $racePlayer = -1
+set $raceOpponent = -1
 
 break VetteScreen::showLoudStop
 commands
@@ -24,6 +26,10 @@ break *(s_segments[6].begin+0x59a2)
 commands
   silent
   set $endpoint0 = $endpoint0 + 1
+  if $racePlayer < 0
+    set $racePlayer = *(signed short*)(s_currentA5-0x5532)
+    set $raceOpponent = *(signed short*)(s_currentA5-0x5530)
+  end
   printf "course-lifecycle endpoint-0 tick=%u course=%d long=%d\n", g_macTicks, *(signed char*)(s_currentA5-0x555a), *(signed short*)(s_currentA5-0x5082)
   continue
 end
@@ -32,6 +38,10 @@ break *(s_segments[6].begin+0x5602)
 commands
   silent
   set $endpoint1 = $endpoint1 + 1
+  if $racePlayer < 0
+    set $racePlayer = *(signed short*)(s_currentA5-0x5532)
+    set $raceOpponent = *(signed short*)(s_currentA5-0x5530)
+  end
   printf "course-lifecycle endpoint-1 tick=%u course=%d long=%d\n", g_macTicks, *(signed char*)(s_currentA5-0x555a), *(signed short*)(s_currentA5-0x5082)
   continue
 end
@@ -40,6 +50,10 @@ break *(s_segments[6].begin+0x59c8)
 commands
   silent
   set $endpoint2 = $endpoint2 + 1
+  if $racePlayer < 0
+    set $racePlayer = *(signed short*)(s_currentA5-0x5532)
+    set $raceOpponent = *(signed short*)(s_currentA5-0x5530)
+  end
   printf "course-lifecycle endpoint-2 tick=%u course=%d long=%d\n", g_macTicks, *(signed char*)(s_currentA5-0x555a), *(signed short*)(s_currentA5-0x5082)
   continue
 end
@@ -83,7 +97,7 @@ end
 break *(s_segments[1].begin+0x1f56) if $outerReturn
 commands
   silent
-  printf "course-lifecycle settled tick=%u endpoints=(%u,%u,%u) finish=%u score=%u/%u main-exit=%u outer-return=%u course=%d long=%d difficulty=%d driving=%u\n", g_macTicks, $endpoint0, $endpoint1, $endpoint2, $finishCore, $scoreCalls, $scoreReturned, $mainExit, $outerReturn, *(signed char*)(s_currentA5-0x555a), *(signed short*)(s_currentA5-0x5082), *(signed short*)(s_currentA5-0x542c), s_drivingFrameStarted
+  printf "course-lifecycle settled tick=%u endpoints=(%u,%u,%u) finish=%u score=%u/%u main-exit=%u outer-return=%u course=%d long=%d difficulty=%d race-player=%d race-opponent=%d post-player=%d post-opponent=%d driving=%u\n", g_macTicks, $endpoint0, $endpoint1, $endpoint2, $finishCore, $scoreCalls, $scoreReturned, $mainExit, $outerReturn, *(signed char*)(s_currentA5-0x555a), *(signed short*)(s_currentA5-0x5082), *(signed short*)(s_currentA5-0x542c), $racePlayer, $raceOpponent, *(signed short*)(s_currentA5-0x5532), *(signed short*)(s_currentA5-0x5530), s_drivingFrameStarted
   detach
   quit
 end

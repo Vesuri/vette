@@ -7,7 +7,9 @@
 #   make FPSCOUNT=1      the HONEST framerate build: one counter, no probe instrumentation
 #   make SKIP_INTRO=1    report one synthetic first mouse press to skip the proven intro
 #   make GARAGE_CLICK=1  script the garage and vehicle selectors through real mouse events
+#   make GARAGE_CLICK=1 GARAGE_CAR=2  choose the ZR-1 through its real garage plate
 #   make GARAGE_CLICK=1 GARAGE_DIFFICULTY=3  choose PRO through its real UI rectangle
+#   make GARAGE_CLICK=1 GARAGE_OPPONENT=2  choose Lamborghini through its real UI rectangle
 #   make GARAGE_CLICK=1 GARAGE_COURSE=2  select Course Two through its real UI before ACCEPT
 #   make GARAGE_CLICK=1 FREEWAY_ROUTE=1  steer by normal KeyMap input toward the Course Two freeway
 #   make GARAGE_CLICK=1 FOLLOW_ROAD=1    turn right at the Course One start, then follow the road
@@ -250,6 +252,14 @@ endif
 
 ifdef GARAGE_DIFFICULTY
 EXTRA_DEFINES += -DVETTE_GARAGE_DIFFICULTY=$(GARAGE_DIFFICULTY)
+endif
+
+ifdef GARAGE_CAR
+EXTRA_DEFINES += -DVETTE_GARAGE_CAR=$(GARAGE_CAR)
+endif
+
+ifdef GARAGE_OPPONENT
+EXTRA_DEFINES += -DVETTE_GARAGE_OPPONENT=$(GARAGE_OPPONENT)
 endif
 
 ifeq ($(FREEWAY_ROUTE),1)

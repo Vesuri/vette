@@ -2112,6 +2112,33 @@ stop. This proves the complete ordinary UI and lifecycle for all three difficult
 Their materially different damage, traction, police, and cruise-control rules remain behavioral
 coverage work; the selector proof is not substituted for those tests.
 
+## Complete player-car and opponent lifecycles
+
+`GARAGE_CAR=1..4` and `GARAGE_OPPONENT=1..4` select vehicles only through the shipped garage and
+opponent hit rectangles. The four garage plates are centered at local `(289,49)`, `(289,76)`,
+`(289,103)`, and `(289,129)`. The opponent selector centers are Porsche `(320,76)`, Lamborghini
+`(445,76)`, Testarossa `(320,156)`, and F40 `(444,156)`. Defaults remain Stock Corvette and F40
+when the variables are omitted.
+
+Adding the optional garage click initially exposed a diagnostic timing assumption: the bounded
+Button-based plate-animation skip was armed by a hard-coded click phase. With a player-car click
+inserted, it could fire one screen early and make a later selector timing-dependent. The arm phase
+now includes that optional press/release pair. This changes diagnostic builds only; production has
+neither scripted input nor animation skipping.
+
+`amiga/driving_vehicle_start.gdb` observes live player/opponent indices `(0,0)` through `(3,3)` for
+the four paired runs and checks the records populated from `PERF`. Player gear-count/automatic
+pairs are `(4,1)`, `(6,0)`, `(6,0)`, and `(5,0)`; all four computer opponents report `(5,1)`, exactly
+matching the decoded resource distinctions. The pointers are real Traffic car records rather than
+selector scratch state.
+
+The paired configurations also reach Course One's original endpoint, common finish, Score, Main
+exit, and garage return with no loud stop. The first, third, and fourth proofs settle at ticks 1128,
+1153, and 1153; the second settles at 1158. The lifecycle observer preserves the race-time indices
+before the returned garage intentionally resets the player choice to Stock, so that reset is not
+misreported as a failed selection. Together with the independent start proof, this closes all four
+player Corvettes and all four opponent cars as UI, PERF initialization, driving, and result paths.
+
 ## Correction to the MAME log
 
 The 51-row MAME table is a measurement of that reference run, not fabricated data, but the live
