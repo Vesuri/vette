@@ -152,9 +152,9 @@ is consequently renumbered.
    context-0 result cue; AUD0/1 and its logical voice now expire together instead of leaving a
    silent context active forever. Byte-verified source checkpoints now also cover `kill` as a
    120-tick map-trigger effect and `joel` as the 300-tick high-memory, non-Trainee `COP!` response;
-   both retain their original callers and context-1 replacement semantics. Continue with the
-   remaining environment-cue inventory, authored-level comparison, and simultaneous-context
-   transition stress.
+   both retain their original callers and context-1 replacement semantics. The complete resident
+   code reference sweep also proves `cable car bell` is intro-only, with no gameplay caller to
+   implement. Continue with authored-level comparison and simultaneous-context transition stress.
 6. **Automate fidelity regressions.** Keep intro and driving framebuffer differentials, palette
    checks, clean-build audits, and eventually basic audio comparisons reproducible.
 

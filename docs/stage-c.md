@@ -1237,6 +1237,13 @@ only: it byte-verifies and bypasses these decoded tag, state, difficulty and dis
 it neither invokes Bogas nor chooses an instrument or context. The bounded run reaches `joel` at
 driving iteration 1 and `kill` at iteration 26 without a loud stop.
 
+There is no second, gameplay-side cable-car-bell call to cover. Initialize stores that returned
+ordinal at A5-$5A84, and an exhaustive reference sweep of all ten resident CODE segments finds
+exactly one later load: `Intro+$0480`, the already-working hilltop bell callback. The similar
+countdown selection at `Main+$26D4` loads A5-$5A7C, which the initialization order proves is
+instrument 10 (`beep1`), not the bell. The bell is therefore intro-only in the shipped program;
+adding a road or cable-car trigger in the port would be invented behavior.
+
 The protection-failure police path is covered without restoring the deliberately unsupported modal
 requester. The diagnostic `FAIL_PROTECTION=1` replacement reproduces the two words left by the
 original second-wrong-answer branch at `Main+$0868`: both the processed flag at A5-$58FE and failed
