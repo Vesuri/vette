@@ -96,6 +96,9 @@ mode decisions.
 | persistent scores | `SCORE_PERSISTENCE_PROBE=1`; `score_persistence.gdb` | 1,200-byte TIME payload writes after handback and imports on next launch |
 
 `tools/check_gameplay_coverage.py` keeps this document's named observers and
-build switches tied to the tree. The executable scenario runner introduced by
-the regression phase is the machine-readable companion; this file remains the
-human scope statement.
+build switches tied to the tree. `amiga/regression.sh` is the executable
+companion. Run an individual group (`smoke`, `courses`, `vehicles`,
+`difficulties`, `recovery`, `routes`, or `session`) or repository
+`make gameplay-regression` for all groups. Every case requires a specific
+success record and rejects loud-stop output; a mere wall-time expiry cannot
+pass. This file remains the human scope statement.

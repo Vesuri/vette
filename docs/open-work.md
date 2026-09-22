@@ -7,8 +7,8 @@ document. `make todo` prints this file plus a live marker sweep of the tracked, 
 ⚠ Refer to an item by its title, not its number. Entries are deleted when closed, so numbering
 changes.
 
-⭐ **HEAD OF QUEUE: Add gameplay regressions.** Core single-player game completion, the formal
-static map, and the gameplay coverage matrix are closed.
+⭐ **HEAD OF QUEUE: Resolve route-faithfulness debt.** Core single-player game completion, the
+formal static map, the gameplay coverage matrix, and bounded gameplay regressions are closed.
 Car, opponent, course, difficulty, results, ordinary garage return, all four race lifecycles,
 representative city/freeway transitions, necessary session controls, Steering, and persistent score
 data are covered. High Screen and Preferences are optional desktop UI and deliberately remain named
@@ -28,16 +28,15 @@ features.
 
 ## Structural verification and release — after core game completion
 
-1. **Add gameplay regressions.** Automate checkpoint scenarios and the production trap audits.
-2. **Resolve route-faithfulness debt.** Revisit the `(6,36)` collision, `(18,39)` boundary, and
+1. **Resolve route-faithfulness debt.** Revisit the `(6,36)` collision, `(18,39)` boundary, and
    other failures found only during natural traversal. Passing a checkpoint does not excuse a
    broken route in the final game.
-3. **Decode additional `VETTE!.Data` formats only when demanded.** `OBJS`, `QUAD`, `MAPS`, `COLL`,
+2. **Decode additional `VETTE!.Data` formats only when demanded.** `OBJS`, `QUAD`, `MAPS`, `COLL`,
    the used `PERF` prefix, road/bounds data, and the exercised response families are understood.
    Base further decoding on the load-segment disassembly, never visual guesses.
-4. **Harden production builds.** Repeated clean builds and long runs must survive without resource
+3. **Harden production builds.** Repeated clean builds and long runs must survive without resource
    leaks, stale diagnostic state, or broken quit/restart behavior.
-5. **Package the game.** Deliver the executable/disk or WHDLoad-style package, Amiga-readable data
+4. **Package the game.** Deliver the executable/disk or WHDLoad-style package, Amiga-readable data
    conversion flow, launch configuration, user instructions, and measured machine requirements.
 
 ## Deferred until a real caller or later phase requires it
