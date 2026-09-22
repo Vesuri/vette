@@ -54,7 +54,7 @@ volatile uint32_t g_macTicks = 0;
 volatile uint32_t g_macDrivingIterations = 0;
 volatile uint32_t g_macDrivingCallbacks = 0;
 #ifdef VETTE_MOTION_CAPTURE
-#ifdef VETTE_VIEW_CAPTURE_F1
+#ifdef VETTE_VIEW_CAPTURE_RAW_KEY
 volatile uint8_t g_motionCaptureReady = 0;
 #else
 volatile uint8_t g_motionCaptureReady = 1;
@@ -5198,7 +5198,7 @@ static void updateDrivingInputProbe()
         probeEventPhase = 2;
     }
 #endif
-#ifdef VETTE_VIEW_CAPTURE_F1
+#ifdef VETTE_VIEW_CAPTURE_RAW_KEY
     // Shift and begin moving before selecting the alternate view. Holding F1
     // from race entry makes the original ascending scanner service it before
     // the upshift key, leaving the diagnostic car in neutral.
@@ -5206,11 +5206,11 @@ static void updateDrivingInputProbe()
     static uint32_t viewCaptureIteration;
     if (viewCapturePhase == 0 && s_garageGearPhase >= 2) {
         viewCaptureIteration = g_macDrivingIterations;
-        vetteInputInjectProbeKey(0x50, true); // physical F1 / Macintosh $7A
+        vetteInputInjectProbeKey(VETTE_VIEW_CAPTURE_RAW_KEY, true);
         viewCapturePhase = 1;
     } else if (viewCapturePhase == 1
                && g_macDrivingIterations > viewCaptureIteration) {
-        vetteInputInjectProbeKey(0x50, false);
+        vetteInputInjectProbeKey(VETTE_VIEW_CAPTURE_RAW_KEY, false);
         viewCapturePhase = 2;
 #ifdef VETTE_MOTION_CAPTURE
         g_motionCaptureReady = 1;

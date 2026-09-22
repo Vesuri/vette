@@ -455,7 +455,9 @@ race entry is not a valid moving fixture: Vette's ascending scanner services the
 top-row `+`, leaving the car in neutral. Both harnesses therefore perform the original upshift,
 hold F1 through one verified `Main+$1FD2` iteration, release it, and only then arm their source
 captures. `VETTE_DRIVING_VIEW=F1` gives the Macintosh oracle independent artifact names, while
-`VIEW_CAPTURE_F1=1` supplies the equivalent physical edge on Amiga. At the shared moving state
+`VIEW_CAPTURE_RAW_KEY=0x50` supplies the equivalent physical edge on Amiga. The generic
+`driving-view-{reference,capture,compare}` targets use this same source boundary for the other
+documented view and mirror keys rather than growing view-specific harness code. At the shared moving state
 RPM 19, gear 1, speed 15, position `(12407,6116)`, heading 12288, the 512x255 principal-view region
 is exact across all 130,560 pixels. The only full-surface differences occupy rows 255–256, a lower
 composition strip whose Traffic phase is not part of the player-state key. `make
