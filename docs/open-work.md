@@ -157,15 +157,20 @@ is consequently renumbered.
    implement. The lake-result transition also proves the game leaves context 0 silent after driving
    is disarmed, rather than restoring the engine in the garage. A Course Two assertion now proves
    engine, skid, and crash remain simultaneously active and that reloading context 2 changes only
-   AUD2's deadline. The authored-level mapping is now complete; continue with automated audio
-   regression coverage.
+   AUD2's deadline. The authored-level mapping and automated regression coverage are now complete.
 6. **Automate fidelity regressions.** Keep intro and driving framebuffer differentials, palette
    checks, and clean-build audits reproducible. `make driving-audio-regression` now rebuilds and
    runs two bounded target workloads: it requires every Macintosh Bogas Load signature in source
    order (while reporting additional original-code target cues) and gates engine pitch ordering,
    then proves deterministic engine/horn/crash overlap, independent effect-context replacement,
    fixed Paula channel ownership, and level 300 mapping to volume 64 on all four voices. Extend this
-   same fail-closed pattern to the remaining visual and control checkpoints.
+   same fail-closed pattern to the remaining visual and control checkpoints. The moving capture
+   now has a diagnostic-only boundary at the original full-window CopyBits and a separate
+   `driving-motion-viewport-compare` gate: it pairs complete player states and requires at least
+   one exact 512x198 exterior view. The current shared moving state is exact across all 101,376
+   pixels. Audio driving uses a distinct harness mode, so it can no longer erase or replace the
+   straight-driving visual oracle. The complete Traffic-roster comparator remains intentionally
+   fail-closed until an equivalent whole-simulation phase exists.
 
 ## Core game completion — after the fidelity/performance pass
 

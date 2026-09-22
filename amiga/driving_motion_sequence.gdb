@@ -23,11 +23,9 @@ printf "capture\tticks\titeration\ttraffic_phase\trpm\tgear\tspeed\tx\ty\theadin
 set logging enabled off
 set logging overwrite off
 
-# Stop at the same boundary as the Macintosh trap tap: the full-window
-# CopyBits while its 512-row source GWorld is still alive.  By presentation
-# time the game has disposed that source and only the clipped 320-row Amiga
-# display buffer remains.
-break copyBits if s_drivingFrameStarted
+# Diagnostic builds call this no-op only after a successful full-window
+# driving CopyBits, with the original source PixMap still alive.
+break vetteMotionCaptureBoundary
 commands
   silent
   set $car = *(unsigned int*)(s_currentA5-0x3678)
@@ -40,11 +38,7 @@ commands
   set $physics_x = *(unsigned int*)($car+0x6e)
   set $physics_y = *(unsigned int*)($car+0x72)
   set $objects = *(unsigned short*)(s_currentA5-0x3696)
-  set $full = *(short*)sourceRect == 0 && *(short*)(sourceRect+2) == 0 && *(short*)(sourceRect+4) == 342 && *(short*)(sourceRect+6) == 512 && *(short*)destinationRect == 0 && *(short*)(destinationRect+2) == 0 && *(short*)(destinationRect+4) == 342 && *(short*)(destinationRect+6) == 512
-  if $full && $gear == 1 && $speed > 0 && ($rpm != $last_rpm || $gear != $last_gear || $speed != $last_speed || $x != $last_x || $y != $last_y || $heading != $last_heading || $physics_x != $last_physics_x || $physics_y != $last_physics_y || $objects != $last_objects)
-    set $i = 0
-    while $i < 8
-      if s_gworlds[$i].used && sourceBitmap == &s_gworlds[$i].port[2]
+  if $gear == 1 && $speed > 0 && ($rpm != $last_rpm || $gear != $last_gear || $speed != $last_speed || $x != $last_x || $y != $last_y || $heading != $last_heading || $physics_x != $last_physics_x || $physics_y != $last_physics_y || $objects != $last_objects)
         set $captures = $captures+1
         set $last_rpm = $rpm
         set $last_gear = $gear
@@ -58,9 +52,15 @@ commands
         set logging enabled on
         printf "%u\t%u\t%u\t%u\t%d\t%d\t%d\t%08x\t%08x\t%u\t%08x\t%08x\t%u\n", $captures, g_macTicks, g_macDrivingIterations, g_macDrivingCallbacks, $rpm, $gear, $speed, $x, $y, $heading, $physics_x, $physics_y, $objects
         set logging enabled off
-        set $rows = *(short*)(&s_gworlds[$i].pixMap[10])-*(short*)(&s_gworlds[$i].pixMap[6])
-        set $stride = *(unsigned short*)(&s_gworlds[$i].pixMap[4])&0x3fff
-        eval "dump binary memory ../tmp/driving-motion-source-%u.raw s_gworlds[$i].pixels s_gworlds[$i].pixels+$rows*$stride", $captures
+        set $world = 0
+        while $world < 8
+          if s_gworlds[$world].used && sourceBitmap == &s_gworlds[$world].port[2]
+            set $stride = *(unsigned short*)(&s_gworlds[$world].pixMap[4])&0x3fff
+            set $rows = *(short*)(&s_gworlds[$world].pixMap[10])-*(short*)(&s_gworlds[$world].pixMap[6])
+            eval "dump binary memory ../tmp/driving-motion-source-%u.raw s_gworlds[$world].pixels s_gworlds[$world].pixels+$rows*$stride", $captures
+          end
+          set $world = $world+1
+        end
         eval "dump binary memory ../tmp/driving-motion-globals-%u.bin s_currentA5-31272 s_currentA5", $captures
         eval "dump binary memory ../tmp/driving-motion-car-%u.bin $car $car+0xc8", $captures
         set $object_count = *(unsigned short*)(s_currentA5-0x3696)
@@ -72,9 +72,6 @@ commands
           set $object_index = $object_index+1
         end
         printf "captured moving state %u tick=%u rpm=%d speed=%d pos=($%08x,$%08x) heading=%u\n", $captures, g_macTicks, $rpm, $speed, $x, $y, $heading
-      end
-      set $i = $i+1
-    end
   end
   if $captures >= 40
     detach

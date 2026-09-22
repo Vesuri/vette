@@ -8,7 +8,7 @@
 #
 # The Amiga build is in amiga/ and is the real target: `cd amiga && . ./env.sh && make`.
 
-.PHONY: all todo driving-sequence-capture driving-sequence-compare driving-motion-reference driving-audio-reference driving-audio-capture driving-audio-compare driving-audio-regression driving-motion-capture driving-motion-compare driving-profile help
+.PHONY: all todo driving-sequence-capture driving-sequence-compare driving-motion-reference driving-audio-reference driving-audio-capture driving-audio-compare driving-audio-regression driving-motion-capture driving-motion-compare driving-motion-viewport-compare driving-profile help
 
 all: help
 
@@ -19,6 +19,7 @@ help:
 	@echo "  make driving-sequence-compare  compare saved MAME/Amiga driving frames"
 	@echo "  make driving-sequence-capture  capture Amiga frames at saved Macintosh game states"
 	@echo "  make driving-motion-compare    compare saved moving-driving frames by game state"
+	@echo "  make driving-motion-viewport-compare  gate a pixel-exact moving exterior view"
 	@echo "  make driving-motion-reference  capture distinct moving frames on the Macintosh oracle"
 	@echo "  make driving-audio-reference   capture/report Macintosh intro and moving-driving audio"
 	@echo "  make driving-audio-capture     capture target Bogas/Paula events for the same road workload"
@@ -75,7 +76,7 @@ driving-motion-reference:
 
 driving-audio-reference:
 	@mkdir -p tmp
-	@timeout -k 5 360 env SDL_VIDEODRIVER=dummy VETTE_DRIVING_MOTION=1 \
+	@timeout -k 5 360 env SDL_VIDEODRIVER=dummy VETTE_DRIVING_AUDIO=1 \
 		VETTE_FOLLOW_ROAD=1 VETTE_FIDELITY_RANDOM_SEED=3BD90000 VETTE_AUDIO_TRACE=1 \
 		mame mac2fdhd -rompath ref/mame/roms -nb9 mdc48 \
 		-ramsize 8M -hard ref/mame/hd/608_2GB_drive.hd \
@@ -128,7 +129,8 @@ driving-audio-regression:
 driving-motion-capture:
 	@rm -f tmp/driving-motion-sequence.tsv tmp/driving-motion-source-*.raw tmp/driving-motion-globals-*.bin tmp/driving-motion-car-*.bin tmp/driving-motion-object-*.bin
 	@cd amiga && . ./env.sh && $(MAKE) clean && \
-	  $(MAKE) -j4 SKIP_INTRO=1 GARAGE_CLICK=1 FIDELITY_RANDOM_SEED=0x3BD90000 && \
+	  $(MAKE) -j4 SKIP_INTRO=1 GARAGE_CLICK=1 FIDELITY_RANDOM_SEED=0x3BD90000 \
+	    MOTION_CAPTURE=1 && \
 	  GDBTAIL=160 EXTRA_ARGS="--warp_mode=1" GDBSCRIPT=driving_motion_sequence.gdb \
 	  ./diag_run.sh 150
 
@@ -143,6 +145,18 @@ driving-motion-compare:
 		--match-objects \
 		--state-field physics_x --state-field physics_y \
 		$(if $(REQUIRE_EXACT),--require-exact,)
+
+# Presentation cadence changes Traffic state between machines. This narrower
+# gate pairs only identical complete player states and requires at least one
+# exact exterior view; the full-roster target above remains deliberately strict.
+driving-motion-viewport-compare:
+	@python3 tools/compare_driving_sequence.py \
+		ref/mame/driving-motion-source tmp/driving-motion-source \
+		--reference-manifest ref/mame/driving-motion-sequence.tsv \
+		--amiga-manifest tmp/driving-motion-sequence.tsv \
+		--match-state --state-field physics_x --state-field physics_y \
+		--left 0 --top 0 --width 512 --height 198 \
+		--require-any-exact
 
 # The measurement freezes in target time after 300 PAL fields; 60 seconds is
 # only a host-side safety ceiling for reaching and reading that frozen window.

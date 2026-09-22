@@ -1907,6 +1907,27 @@ patching the guard. The bounded observation script `amiga/driving_freeway_moveme
 exports 207 and 221, retirement, `FWTM`/`FREE` movement, and the first natural `$2302` spawn without
 altering game state.
 
+The moving visual regression no longer pays for a software breakpoint on every startup CopyBits.
+A diagnostic-only no-op boundary is compiled immediately after the original full-window driving
+CopyBits succeeds, while its source GWorld is still live. GDB stops only there and saves the same
+512-row, 260-byte-row indexed source surface as the Macintosh trap tap. This observation boundary
+does not copy pixels, patch state, or exist in production builds.
+
+`make driving-motion-viewport-compare` pairs captures by RPM, gear, speed, rendered and physics
+position, and heading, then compares only the 512x198 exterior. It requires at least one paired
+region to be pixel-exact. The current independent captures share the moving state RPM 18, gear 1,
+speed 14, position `(12531,6112)`, heading 12288; all 101,376 exterior pixels are exact. This is a
+bounded renderer-fidelity result, not a claim that differently paced traffic is synchronized. The
+existing `driving-motion-compare` still includes every active Traffic record in its key and still
+refuses to compare when no complete shared roster exists.
+
+The Macintosh audio oracle formerly reused `VETTE_DRIVING_MOTION=1` merely to obtain moving input.
+That mode also owns and cleans the visual motion artifacts, so a right-turn audio run silently
+replaced the straight-driving framebuffer oracle. Audio now uses `VETTE_DRIVING_AUDIO=1`: it keeps
+the identical garage, shift, acceleration, and road-following workload without arming, deleting,
+or writing any visual capture. Visual and audio regressions consequently have independent inputs
+and artifact lifetimes.
+
 ## Correction to the MAME log
 
 The 51-row MAME table is a measurement of that reference run, not fabricated data, but the live

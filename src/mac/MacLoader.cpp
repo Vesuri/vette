@@ -4081,6 +4081,17 @@ static bool copyBits(const uint8_t* sourceBitmap, const uint8_t* destinationBitm
     return true;
 }
 
+#ifdef VETTE_MOTION_CAPTURE
+// Diagnostic-only live-source boundary for the moving framebuffer oracle.
+// Keeping it out of production avoids adding any state or work to the game;
+// noinline gives GDB one stable stop after the original CopyBits completes.
+extern "C" __attribute__((noinline)) void vetteMotionCaptureBoundary(
+    const uint8_t* sourceBitmap)
+{
+    __asm__ volatile("" : : "g"(sourceBitmap) : "memory");
+}
+#endif
+
 #ifdef VETTE_DRIVING_COPY_ASM
 static bool copyDrivingPublishAsm(const uint8_t* sourceBitmap,
                                   const uint8_t* destinationBitmap,
@@ -6628,6 +6639,9 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
         }
         s_suppressDirectScreenDirty = false;
         if (copied) {
+#ifdef VETTE_MOTION_CAPTURE
+            if (fullDrivingPublish) vetteMotionCaptureBoundary(sourceBitmap);
+#endif
             if (bitmapIsScreen(destinationBitmap)) {
                 // During driving the shipped renderer publishes a complete
                 // 512x342 GWorld repeatedly while constructing one frame.

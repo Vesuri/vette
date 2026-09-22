@@ -28,26 +28,30 @@ def compare_surfaces(
     height: int,
     left_row_bytes: int,
     right_row_bytes: int,
+    origin_left: int = 0,
+    origin_top: int = 0,
 ) -> Comparison:
-    """Compare two packed surfaces and return active-pixel differences."""
+    """Compare a rectangular region of two packed surfaces."""
     if width <= 0 or height <= 0:
         raise ValueError("surface dimensions must be positive")
-    active_bytes = (width + 1) // 2
+    if origin_left < 0 or origin_top < 0:
+        raise ValueError("surface origin must not be negative")
+    active_bytes = (origin_left + width + 1) // 2
     if left_row_bytes < active_bytes or right_row_bytes < active_bytes:
         raise ValueError("rowBytes is too small for the requested width")
 
-    left_needed = left_row_bytes * height
-    right_needed = right_row_bytes * height
+    left_needed = left_row_bytes * (origin_top + height)
+    right_needed = right_row_bytes * (origin_top + height)
     if len(left) < left_needed or len(right) < right_needed:
         raise ValueError(
             f"surface is truncated (need {left_needed} and {right_needed} bytes, "
             f"got {len(left)} and {len(right)})")
 
     changed = 0
-    bounds = [width, height, -1, -1]
+    bounds = [origin_left + width, origin_top + height, -1, -1]
     transitions: Counter[tuple[int, int]] = Counter()
-    for y in range(height):
-        for x in range(width):
+    for y in range(origin_top, origin_top + height):
+        for x in range(origin_left, origin_left + width):
             a = pixel(left, left_row_bytes, x, y)
             b = pixel(right, right_row_bytes, x, y)
             if a == b:
@@ -87,6 +91,8 @@ def main() -> None:
     parser.add_argument("--height", type=int, required=True)
     parser.add_argument("--left-row-bytes", type=int, required=True)
     parser.add_argument("--right-row-bytes", type=int, required=True)
+    parser.add_argument("--left", type=int, default=0)
+    parser.add_argument("--top", type=int, default=0)
     args = parser.parse_args()
 
     left = args.left.read_bytes()
@@ -99,6 +105,8 @@ def main() -> None:
             height=args.height,
             left_row_bytes=args.left_row_bytes,
             right_row_bytes=args.right_row_bytes,
+            origin_left=args.left,
+            origin_top=args.top,
         )
     except ValueError as error:
         raise SystemExit(str(error)) from error

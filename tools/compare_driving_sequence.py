@@ -88,6 +88,8 @@ def main() -> None:
     parser.add_argument("--height", type=int, default=342)
     parser.add_argument("--reference-row-bytes", type=int, default=260)
     parser.add_argument("--amiga-row-bytes", type=int, default=260)
+    parser.add_argument("--left", type=int, default=0)
+    parser.add_argument("--top", type=int, default=0)
     parser.add_argument("--reference-manifest", type=Path)
     parser.add_argument("--amiga-manifest", type=Path)
     parser.add_argument("--reference-object-prefix", type=Path)
@@ -95,6 +97,9 @@ def main() -> None:
     parser.add_argument(
         "--require-exact", action="store_true",
         help="exit unsuccessfully when any active pixel differs")
+    parser.add_argument(
+        "--require-any-exact", action="store_true",
+        help="exit unsuccessfully unless at least one paired region is pixel-exact")
     parser.add_argument(
         "--match-state", action="store_true",
         help="pair frames by the complete state tuple instead of capture ordinal")
@@ -200,10 +205,12 @@ def main() -> None:
     first_difference: int | None = None
     state_mismatches = 0
     object_mismatches = 0
+    any_exact = False
     all_transitions: Counter[tuple[int, int]] = Counter()
     print(
         f"driving sequence: {len(pairs)} paired frames, "
-        f"{args.width}x{args.height} active pixels")
+        f"region ({args.left},{args.top})-"
+        f"({args.left + args.width},{args.top + args.height})")
     for reference_frame, amiga_frame, matched_state in pairs:
         try:
             comparison = compare_surfaces(
@@ -213,6 +220,8 @@ def main() -> None:
                 height=args.height,
                 left_row_bytes=args.reference_row_bytes,
                 right_row_bytes=args.amiga_row_bytes,
+                origin_left=args.left,
+                origin_top=args.top,
             )
         except ValueError as error:
             raise SystemExit(
@@ -242,15 +251,19 @@ def main() -> None:
         if state_differences:
             status += "; state mismatch: " + ", ".join(state_differences)
             status += " [pixel result is not a fidelity comparison]"
+        object_matches = True
         if args.reference_object_prefix:
             reference_objects = read_objects(args.reference_object_prefix, reference_frame)
             amiga_objects = read_objects(args.amiga_object_prefix, amiga_frame)
             if reference_objects != amiga_objects:
+                object_matches = False
                 object_mismatches += 1
                 status += "; object state differs: reference "
                 status += format_objects(reference_objects)
                 status += ", Amiga " + format_objects(amiga_objects)
                 status += " [pixel result is not a complete-state fidelity comparison]"
+        if not comparison.changed and state_matches and object_matches:
+            any_exact = True
         if match_state:
             state_label = ", ".join(
                 f"{field}={value}" for field, value in zip(match_fields, matched_state))
@@ -280,6 +293,8 @@ def main() -> None:
         print(
             f"object alignment: {object_mismatches} / {len(pairs)} paired frames differ")
 
+    if args.require_any_exact and not any_exact:
+        raise SystemExit("no paired region is pixel-exact")
     if args.require_exact and (changed_total or state_mismatches or object_mismatches):
         raise SystemExit(1)
 

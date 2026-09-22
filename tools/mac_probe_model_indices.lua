@@ -24,6 +24,8 @@ local driving_copy_captures = 0
 local driving_capture_armed = false
 local driving_sequence_manifest = nil
 local driving_motion = os.getenv("VETTE_DRIVING_MOTION") == "1"
+local driving_audio = os.getenv("VETTE_DRIVING_AUDIO") == "1"
+local driving_run = driving_motion or driving_audio
 local follow_road = os.getenv("VETTE_FOLLOW_ROAD") == "1"
 local driving_capture_limit = driving_motion and 40 or 4
 local trace_random = os.getenv("VETTE_RANDOM_TRACE") == "1"
@@ -710,7 +712,7 @@ mac.run(function()
 	click(477, 160, 600)     -- upper vehicle plate; wait for selector construction
 	mac.step("after upper plate"); mac.shot()
 	local screen = main_device_pixmap()
-	if not driving_motion then
+	if not driving_run then
 		-- Palette/model work deliberately retains complete Porsche and F40
 		-- rotations.  The moving differential must instead follow the Amiga
 		-- harness's direct top-plate -> Corvette route without consuming random
@@ -727,8 +729,8 @@ mac.run(function()
 		end
 	end
 	stage = "corvette"
-	click(508, 247, driving_motion and 0 or 480) -- Corvette ZR-1
-	if driving_motion and not mac.wait_for("Corvette selector redraw", function()
+	click(508, 247, driving_run and 0 or 480) -- Corvette ZR-1
+	if driving_run and not mac.wait_for("Corvette selector redraw", function()
 		return selector_car_ready
 	end, 600) then return end
 	mac.step("after Corvette"); mac.shot()
@@ -745,7 +747,7 @@ mac.run(function()
 	-- countdown state 3, so wait for that original-game state, pulse top-row +
 	-- until gear 1 is visible, and only then hold keypad 8.  The older stationary
 	-- capture deliberately retains its neutral behavior.
-	if driving_motion then
+	if driving_run then
 		local function car_address()
 			local a5 = driving_a5
 			return a5 ~= 0 and a24(u32(a5 - 0x3678)) or 0, a5
@@ -760,7 +762,7 @@ mac.run(function()
 		-- The Amiga harness asserts accelerator in the same GetKeys refresh that
 		-- first observes gear 1.  Have it waiting before the shift so MAME cannot
 		-- lose one physics iteration to its once-per-video-frame Lua poll.
-		driving_capture_armed = true
+		if driving_motion then driving_capture_armed = true end
 		local accelerator = follow_road and "Keypad 9" or "Keypad 8"
 		mac.key_down(accelerator)
 		-- GetKeys is sampled by the driving loop, not the Event Manager.  Keep the
@@ -783,9 +785,9 @@ mac.run(function()
 		end
 	end
 	if not follow_road then mac.key_down("Keypad 8") end
-	driving_capture_armed = true
+	if driving_motion then driving_capture_armed = true end
 	arm_mirror_source_writer()
-	mac.wait(driving_motion and 500 or 1200)
+	mac.wait(driving_run and 500 or 1200)
 	mac.key_up("Keypad 8")
 	mac.step("driving"); mac.shot()
 	screen = main_device_pixmap()
@@ -797,5 +799,5 @@ mac.run(function()
 		if table ~= 0 then dump_bytes("ref/mame/driving-device.ctab", table, 136) end
 	end
 	print(string.format("VP model CopyBits captures=%u", captures))
-	if driving_motion then manager.machine:exit() end
+	if driving_run then manager.machine:exit() end
 end)
