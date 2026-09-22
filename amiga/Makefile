@@ -10,6 +10,7 @@
 #   make GARAGE_CLICK=1 GARAGE_CAR=2  choose the ZR-1 through its real garage plate
 #   make GARAGE_CLICK=1 GARAGE_DYNO=1  select the garage dynamometer through its real control
 #   make GARAGE_CLICK=1 OPTIONS_STEERING_PROBE=1  exercise all shipped steering menu equivalents
+#   make SCORE_PERSISTENCE_PROBE=1  clear TIME resources and verify deferred AmigaDOS persistence
 #   make GARAGE_CLICK=1 GARAGE_DIFFICULTY=3  choose PRO through its real UI rectangle
 #   make GARAGE_CLICK=1 GARAGE_OPPONENT=2  choose Lamborghini through its real UI rectangle
 #   make GARAGE_CLICK=1 GARAGE_COURSE=2  select Course Two through its real UI before ACCEPT
@@ -204,6 +205,13 @@ ifndef GARAGE_CLICK
 $(error OPTIONS_STEERING_PROBE=1 requires GARAGE_CLICK=1)
 endif
 EXTRA_DEFINES += -DVETTE_OPTIONS_STEERING_PROBE
+endif
+
+# Diagnostic only: give High Screen item 6 a private Command-H alias, run the
+# original clear path, then exit after its ChangedResource/WriteResource calls
+# so the platform can verify the deferred on-disk save.
+ifeq ($(SCORE_PERSISTENCE_PROBE),1)
+EXTRA_DEFINES += -DVETTE_SCORE_PERSISTENCE_PROBE
 endif
 
 # Diagnostic only: suspend a live race with the shipped physical P edge, then
@@ -527,6 +535,10 @@ PROBE_SYMS += g_tourModeProbeComplete
 endif
 ifeq ($(OPTIONS_STEERING_PROBE),1)
 PROBE_SYMS += g_optionsSteeringProbePhase g_optionsSteeringProbeComplete
+endif
+ifeq ($(SCORE_PERSISTENCE_PROBE),1)
+PROBE_SYMS += g_scorePersistenceChanged g_scorePersistenceWrites \
+              g_scoreFileLoadValid g_scoreFileSaveBytes
 endif
 ifdef SESSION_CONTROL_ITEM
 PROBE_SYMS += g_sessionControlProbeItem g_sessionControlProbePhase

@@ -195,6 +195,12 @@ The original modes remain mutually exclusive. In Mouse mode the arrow aliases do
 accelerate, or brake, although ordinary keyboard commands continue to work. The physical mouse
 remains available for menus while Keyboard steering is active.
 
+High-score tables are retained beside the executable as `Vette.scores`. The file is written only
+when the original Score code changes a `TIME` table and the program subsequently exits cleanly;
+missing or invalid files fall back to the shipped tables. Optional High Screen, Preferences, and
+network configuration dialogs are not part of the standalone single-player interface and remain
+loudly unimplemented.
+
 ## Courses and world boundaries
 
 The four course endpoints (pp. 18-21) are:

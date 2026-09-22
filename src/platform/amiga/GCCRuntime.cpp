@@ -6,12 +6,14 @@
 #include <proto/exec.h>
 #include <exec/execbase.h>
 #include <exec/memory.h>
+#include <dos/dosextens.h>
 
 struct ExecBase* SysBase = 0;
 __attribute__((constructor)) static void initSysBase() { SysBase = *(struct ExecBase**)4UL; }
 
 // Set by main() after OpenLibrary("graphics.library").
 struct GfxBase* GfxBase = 0;
+struct DosLibrary* DOSBase = 0;
 
 // ---- C++ heap via AllocMem --------------------------------------------------
 void* operator new(unsigned long n)   { unsigned long* p = (unsigned long*)AllocMem(n + sizeof(unsigned long), MEMF_ANY | MEMF_CLEAR); if (!p) return 0; *p = n + sizeof(unsigned long); return p + 1; }

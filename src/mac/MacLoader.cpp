@@ -60,6 +60,10 @@ volatile uint16_t g_tourModeProbeComplete = 0;
 volatile uint16_t g_optionsSteeringProbePhase = 0;
 volatile uint16_t g_optionsSteeringProbeComplete = 0;
 #endif
+#ifdef VETTE_SCORE_PERSISTENCE_PROBE
+volatile uint16_t g_scorePersistenceChanged = 0;
+volatile uint16_t g_scorePersistenceWrites = 0;
+#endif
 #ifdef VETTE_SESSION_CONTROL_ITEM
 volatile uint16_t g_sessionControlProbeItem = VETTE_SESSION_CONTROL_ITEM;
 volatile uint16_t g_sessionControlProbePhase = 0;
@@ -165,6 +169,14 @@ static ResourceArchive s_resourceArchive;
 static uint8_t* s_resourceMasters[572];
 static bool s_resourceLocked[572];
 static bool s_resourcePurgeable[572];
+static const uint16_t kScoreTableCount = 4;
+static const uint16_t kScoreTableBytes = 300;
+static uint8_t s_scoreTables[kScoreTableCount][kScoreTableBytes];
+static uint16_t s_scoreResourceIndices[kScoreTableCount];
+static bool s_scoreChanged[kScoreTableCount];
+static bool s_scoreImportValid;
+static bool s_scoreTablesInitialized;
+static bool s_scoresDirty;
 static uint8_t s_quickDrawScreen[(512 / 8) * 320];
 static uint8_t s_colorScreen[(512 / 2) * 320];
 // The first driving frame expands its roadside panorama as 512x24 8-bit
@@ -607,7 +619,10 @@ static const TrapName s_trapNames[] = {
     {0xa090,"TOOLBOX UTILITIES","SYSENVIRONS"},
     {0xa746,"TRAP MANAGER","GETTOOLTRAPADDRESS"},
     {0xa31e,"MEMORY MANAGER","NEWPTRCLEAR"}, {0xaa32,"QUICKDRAW","GETGDEVICE"},
-    {0xa9a0,"RESOURCE MANAGER","GETRESOURCE"}, {0xa064,"MEMORY MANAGER","MOVEHHI"},
+    {0xa9a0,"RESOURCE MANAGER","GETRESOURCE"},
+    {0xa9aa,"RESOURCE MANAGER","CHANGEDRESOURCE"},
+    {0xa9b0,"RESOURCE MANAGER","WRITERESOURCE"},
+    {0xa064,"MEMORY MANAGER","MOVEHHI"},
     {0xa029,"MEMORY MANAGER","HLOCK"}, {0xa11e,"MEMORY MANAGER","NEWPTR"},
     {0xa51e,"MEMORY MANAGER","NEWPTRSYS"},
     {0xa122,"MEMORY MANAGER","NEWHANDLE"},
@@ -641,6 +656,8 @@ static const TrapName s_trapNames[] = {
     {0xa851,"QUICKDRAW","SETCURSOR"}, {0xa852,"QUICKDRAW","HIDECURSOR"},
     {0xa853,"QUICKDRAW","SHOWCURSOR"},
     {0xa97c,"DIALOG MANAGER","GETNEWDIALOG"}, {0xa981,"DIALOG MANAGER","DRAWDIALOG"},
+    {0xa988,"DIALOG MANAGER","CAUTIONALERT"},
+    {0xa990,"DIALOG MANAGER","GETITEXT"}, {0xa991,"DIALOG MANAGER","MODALDIALOG"},
     {0xab1d,"QUICKDRAW","QDEXTENSIONS"},
     {0xaa95,"PALETTE MANAGER","SETPALETTE"}, {0xa146,"TRAP MANAGER","GETTRAPADDRESS"},
     {0xaa2e,"GRAPHICS DEVICE MANAGER","INITGDEVICE"},
@@ -1225,11 +1242,54 @@ static uint8_t** getResource(uint32_t type, int16_t id)
         ResourceArchive::Item item;
         uint32_t index;
         if (s_resourceArchive.find(fork, type, id, item, &index)) {
-            s_resourceMasters[index] = (uint8_t*)item.data;
+            bool writableScore = false;
+            for (uint16_t score = 0; score < kScoreTableCount; ++score)
+                if (index == s_scoreResourceIndices[score]) {
+                    s_resourceMasters[index] = s_scoreTables[score];
+                    writableScore = true;
+                    break;
+                }
+            if (!writableScore) s_resourceMasters[index] = (uint8_t*)item.data;
             return &s_resourceMasters[index];
         }
     }
     return 0;
+}
+
+static bool initializeWritableScores()
+{
+    for (uint16_t score = 0; score < kScoreTableCount; ++score)
+        s_scoreResourceIndices[score] = 0xffff;
+    for (uint16_t score = 0; score < kScoreTableCount; ++score) {
+        ResourceArchive::Item item;
+        uint32_t index = 0;
+        bool found = false;
+        for (uint16_t fork = 0; fork < s_resourceArchive.forkCount(); ++fork)
+            if (s_resourceArchive.find(fork, 0x54494d45UL,
+                                       (int16_t)(128 + score), item, &index)) {
+                found = true;
+                break;
+            }
+        if (!found || item.size != kScoreTableBytes) return false;
+        s_scoreResourceIndices[score] = (uint16_t)index;
+        if (!s_scoreImportValid)
+            for (uint16_t byte = 0; byte < kScoreTableBytes; ++byte)
+                s_scoreTables[score][byte] = item.data[byte];
+        s_resourceMasters[index] = s_scoreTables[score];
+        s_scoreChanged[score] = false;
+    }
+    s_scoreTablesInitialized = true;
+    s_scoresDirty = false;
+    return true;
+}
+
+static int16_t writableScoreForHandle(uint8_t** handle)
+{
+    for (uint16_t score = 0; score < kScoreTableCount; ++score) {
+        uint16_t index = s_scoreResourceIndices[score];
+        if (index != 0xffff && handle == &s_resourceMasters[index]) return (int16_t)score;
+    }
+    return -1;
 }
 
 static IntroSample* introSample(uint16_t index)
@@ -4575,6 +4635,21 @@ static uint32_t menuKey(uint8_t requestedKey)
         }
     }
 #endif
+#ifdef VETTE_SCORE_PERSISTENCE_PROBE
+    // High Screen has no shipped equivalent. The fixture's private Command-H
+    // alias reaches enabled item 6 through Main's normal packed menu
+    // dispatcher; it does not add a production shortcut or draw a pull-down.
+    if (requestedKey == 'H') {
+        for (uint16_t i = 0; i < s_menuManager.count; ++i) {
+            uint8_t** handle = s_menuManager.entries[i].handle;
+            if (!handle || !*handle || handleSize(handle) < 16
+                || (int16_t)read16(*handle) != 177) continue;
+            uint32_t enabled = read32(*handle + 10);
+            if ((enabled & (1UL | (1UL << 6))) == (1UL | (1UL << 6)))
+                return (177UL << 16) | 6;
+        }
+    }
+#endif
     for (uint16_t i = 0; i < s_menuManager.count; ++i) {
         const MenuManagerState::Entry& entry = s_menuManager.entries[i];
         // Inside Macintosh requires MenuKey to scan the complete current menu
@@ -4887,6 +4962,9 @@ static void requestExitAfterTrap(uint8_t* frame)
 
 static bool exitChordPressed()
 {
+#ifdef VETTE_SCORE_PERSISTENCE_PROBE
+    if (s_scoresDirty) return true;
+#endif
 #ifdef VETTE_QUIT_PROBE
     static bool requested;
     if (!requested) {
@@ -5788,6 +5866,18 @@ static bool nextEvent(uint16_t mask, uint8_t* event)
 {
     if (!event) return false;
     bool buttonDown = pollMacMouse();
+#ifdef VETTE_SCORE_PERSISTENCE_PROBE
+    static uint8_t scorePersistencePhase;
+    if (!s_scoresDirty && scorePersistencePhase < 4) {
+        switch (scorePersistencePhase) {
+        case 0: vetteInputInjectProbeKey(0x66, true); break;
+        case 1: vetteInputInjectProbeKey(0x25, true); break;  // physical H
+        case 2: vetteInputInjectProbeKey(0x25, false); break;
+        default: vetteInputInjectProbeKey(0x66, false); break;
+        }
+        ++scorePersistencePhase;
+    }
+#endif
 #ifdef VETTE_OPTIONS_STEERING_PROBE
     // MENU 126 gives all four steering choices genuine keyboard equivalents.
     // Feed Command-N/K/M/J and finally N again through the same physical edge
@@ -6105,6 +6195,16 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
 #endif
     uint32_t pc = read32(frame + 2);
     uint16_t trap = read16((const uint8_t*)pc);
+#ifdef VETTE_SCORE_PERSISTENCE_PROBE
+    // The High Screen clear command first asks for confirmation with
+    // CautionAlert 141. Dialog UI remains deliberately unimplemented in the
+    // production layer; this focused fixture supplies only its OK result so
+    // the untouched clear/write path beyond it can be verified.
+    if (trap == 0xa988 && pc == (uint32_t)(s_segments[5].begin + 0x10)) {
+        write16(userStack + 6, 1);
+        return 7;
+    }
+#endif
 #ifdef VETTE_PROBE
     // Empty same-rate bracket: its total bounds the profiler's per-dispatch
     // observer cost and catches a timer whose apparent resolution is fiction.
@@ -6533,6 +6633,29 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
     if (trap == 0xa9a3) {                    // ReleaseResource(resource)
         if (releaseResource((uint8_t**)read32(userStack))) {
             if (g_stageCDepth < 78) g_stageCDepth = 78;
+            return 5;
+        }
+    }
+    if (trap == 0xa9aa) {                    // ChangedResource(resource)
+        int16_t score = writableScoreForHandle((uint8_t**)read32(userStack));
+        if (score >= 0) {
+            s_scoreChanged[score] = true;
+#ifdef VETTE_SCORE_PERSISTENCE_PROBE
+            ++g_scorePersistenceChanged;
+#endif
+            return 5;
+        }
+    }
+    if (trap == 0xa9b0) {                    // WriteResource(resource)
+        int16_t score = writableScoreForHandle((uint8_t**)read32(userStack));
+        if (score >= 0) {
+            if (s_scoreChanged[score]) {
+                s_scoreChanged[score] = false;
+                s_scoresDirty = true;
+            }
+#ifdef VETTE_SCORE_PERSISTENCE_PROBE
+            ++g_scorePersistenceWrites;
+#endif
             return 5;
         }
     }
@@ -7521,6 +7644,7 @@ bool MacLoader::run(VetteScreen* screen)
                                 (uint32_t)(vette_resources_end - vette_resources)))
         return false;
     g_resourceCount = s_resourceArchive.resourceCount();
+    if (!initializeWritableScores()) return false;
 
     uint8_t* a5;
     if (!buildA5World(a5)) return false;
@@ -7543,4 +7667,28 @@ bool MacLoader::run(VetteScreen* screen)
     vette_call_mac_code((void*)read32(firstJump + 4), a5);
     g_macExitState = 4;
     return true;
+}
+
+bool MacLoader::importPersistentScores(const uint8_t* data, uint32_t size)
+{
+    if (!data || size != kPersistentScoreBytes) return false;
+    for (uint16_t score = 0; score < kScoreTableCount; ++score)
+        for (uint16_t byte = 0; byte < kScoreTableBytes; ++byte)
+            s_scoreTables[score][byte] = data[score * kScoreTableBytes + byte];
+    s_scoreImportValid = true;
+    return true;
+}
+
+bool MacLoader::exportPersistentScores(uint8_t* data, uint32_t size) const
+{
+    if (!data || size != kPersistentScoreBytes || !s_scoreTablesInitialized) return false;
+    for (uint16_t score = 0; score < kScoreTableCount; ++score)
+        for (uint16_t byte = 0; byte < kScoreTableBytes; ++byte)
+            data[score * kScoreTableBytes + byte] = s_scoreTables[score][byte];
+    return true;
+}
+
+bool MacLoader::persistentScoresDirty() const
+{
+    return s_scoresDirty;
 }

@@ -10,12 +10,14 @@
  */
 #include <proto/exec.h>
 #include <proto/graphics.h>
+#include <proto/dos.h>
 #include <exec/execbase.h>
 #include <exec/interrupts.h>
 #include <exec/nodes.h>
 #include <exec/memory.h>
 #include <graphics/gfxbase.h>
 #include <graphics/view.h>
+#include <dos/dos.h>
 #include <hardware/dmabits.h>
 #include <hardware/intbits.h>
 
@@ -28,6 +30,97 @@
 #include "mac/MacLoader.h"
 
 extern struct GfxBase* GfxBase;         // opened below; the global lives in GCCRuntime.cpp
+#ifdef VETTE_SCORE_PERSISTENCE_PROBE
+extern "C" {
+volatile uint16_t g_scoreFileLoadValid = 0;
+volatile uint32_t g_scoreFileSaveBytes = 0;
+}
+#endif
+
+static const uint32_t kScoreFileHeaderBytes = 12;
+static uint8_t s_scoreFile[kScoreFileHeaderBytes + MacLoader::kPersistentScoreBytes];
+
+static uint32_t scoreFileRead32(const uint8_t* data)
+{
+    return ((uint32_t)data[0] << 24) | ((uint32_t)data[1] << 16)
+         | ((uint32_t)data[2] << 8) | data[3];
+}
+
+static void scoreFileWrite32(uint8_t* data, uint32_t value)
+{
+    data[0] = (uint8_t)(value >> 24);
+    data[1] = (uint8_t)(value >> 16);
+    data[2] = (uint8_t)(value >> 8);
+    data[3] = (uint8_t)value;
+}
+
+static uint32_t scoreFileChecksum(const uint8_t* data, uint32_t size)
+{
+    uint32_t checksum = 0x56545445UL; // 'VTTE'
+    for (uint32_t i = 0; i < size; ++i) {
+        checksum = (checksum << 5) | (checksum >> 27);
+        checksum += data[i];
+    }
+    return checksum;
+}
+
+static void loadScoreFile(MacLoader& loader)
+{
+    if (!DOSBase) return;
+    BPTR file = Open((CONST_STRPTR)
+#ifdef VETTE_SCORE_PERSISTENCE_PROBE
+                     "PROGDIR:Vette.scores.test",
+#else
+                     "PROGDIR:Vette.scores",
+#endif
+                     MODE_OLDFILE);
+    if (!file) return;
+    LONG bytes = Read(file, s_scoreFile, sizeof(s_scoreFile));
+    Close(file);
+    if (bytes != (LONG)sizeof(s_scoreFile)
+        || scoreFileRead32(s_scoreFile) != 0x56534331UL // 'VSC1'
+        || scoreFileRead32(s_scoreFile + 4) != MacLoader::kPersistentScoreBytes
+        || scoreFileRead32(s_scoreFile + 8)
+            != scoreFileChecksum(s_scoreFile + kScoreFileHeaderBytes,
+                                 MacLoader::kPersistentScoreBytes)) return;
+    loader.importPersistentScores(s_scoreFile + kScoreFileHeaderBytes,
+                                  MacLoader::kPersistentScoreBytes);
+#ifdef VETTE_SCORE_PERSISTENCE_PROBE
+    g_scoreFileLoadValid = 1;
+#endif
+}
+
+static void saveScoreFile(const MacLoader& loader)
+{
+    if (!DOSBase || !loader.persistentScoresDirty()
+        || !loader.exportPersistentScores(s_scoreFile + kScoreFileHeaderBytes,
+                                          MacLoader::kPersistentScoreBytes)) return;
+    scoreFileWrite32(s_scoreFile, 0x56534331UL); // 'VSC1'
+    scoreFileWrite32(s_scoreFile + 4, MacLoader::kPersistentScoreBytes);
+    scoreFileWrite32(s_scoreFile + 8,
+                     scoreFileChecksum(s_scoreFile + kScoreFileHeaderBytes,
+                                       MacLoader::kPersistentScoreBytes));
+    BPTR file = Open((CONST_STRPTR)
+#ifdef VETTE_SCORE_PERSISTENCE_PROBE
+                     "PROGDIR:Vette.scores.test",
+#else
+                     "PROGDIR:Vette.scores",
+#endif
+                     MODE_NEWFILE);
+    if (!file) return;
+    LONG written = Write(file, s_scoreFile, sizeof(s_scoreFile));
+    Close(file);
+#ifdef VETTE_SCORE_PERSISTENCE_PROBE
+    g_scoreFileSaveBytes = (uint32_t)written;
+#endif
+}
+
+#ifdef VETTE_SCORE_PERSISTENCE_PROBE
+extern "C" __attribute__((noinline)) void vetteScoreSaveComplete()
+{
+    __asm__ volatile ("" ::: "memory");
+}
+#endif
 
 // ---------------------------------------------------------------------------
 // ⚠⚠ EVERY GLOBAL A COMMITTED .gdb SCRIPT READS MUST BE IN amiga/Makefile's PROBE_SYMS.
@@ -153,8 +246,11 @@ bool PlatformAmiga::run()
     // for why none of this is in a constructor.
     GfxBase = (struct GfxBase*)OpenLibrary((CONST_STRPTR)"graphics.library", 33);
     if (!GfxBase) return false;     // nothing has been changed yet, so there is nothing to undo
+    DOSBase = (struct DosLibrary*)OpenLibrary((CONST_STRPTR)"dos.library", 33);
 
     static VetteScreen screen;      // file-scope lifetime, off the stack — see src/main.cpp
+    static MacLoader loader;
+    loadScoreFile(loader);
 
     // --- takeover -----------------------------------------------------------
     struct View* savedView = GfxBase->ActiView;
@@ -235,7 +331,6 @@ bool PlatformAmiga::run()
     // Stage B hands control to the original Macintosh instructions.  Its Line-A handler
     // services the one prerequisite (_BlockMove), then deliberately stops on the first
     // unimplemented trap and paints the full diagnostic into this screen.
-    static MacLoader loader;
     if (ok) ok = loader.run(&screen);
 
     // Keep multitasking forbidden through the Wait()-free hardware handback.
@@ -291,9 +386,21 @@ bool PlatformAmiga::run()
     vetteRestoreComplete();
 #endif
 
+    // Resource Manager WriteResource requests are deferred until the OS owns
+    // interrupts, DMA, the View, and multitasking again. Disk I/O during the
+    // takeover would resume unrelated tasks against partially restored state.
+    saveScoreFile(loader);
+#ifdef VETTE_SCORE_PERSISTENCE_PROBE
+    vetteScoreSaveComplete();
+#endif
+
     // Closed here rather than in a destructor -- see the note in PlatformAmiga.h.  ⚠ AFTER
     // the LoadView restore, which needs GfxBase.
     CloseLibrary((struct Library*)GfxBase);
     GfxBase = 0;
+    if (DOSBase) {
+        CloseLibrary((struct Library*)DOSBase);
+        DOSBase = 0;
+    }
     return true;
 }

@@ -7,30 +7,23 @@ document. `make todo` prints this file plus a live marker sweep of the tracked, 
 ⚠ Refer to an item by its title, not its number. Entries are deleted when closed, so numbering
 changes.
 
-⭐ **HEAD OF QUEUE: Finish necessary game UI paths.** Car, opponent, course, difficulty, results,
-ordinary garage return, all four race lifecycles, representative city/freeway route transitions,
-Tour Mode, the garage dynamometer, pause, Return to Game, Restart Race, and menu Quit are closed.
-The Steering submenu and all four of its original keyboard equivalents are also closed. Cover the
-remaining gameplay-relevant High Score and Preferences commands; Communications remains deliberately
-single-player only. Leave unnecessary classic Mac desktop UI unimplemented so an erroneous fallback
-remains a loud failure.
+⭐ **HEAD OF QUEUE: Finish the formal static map.** Core single-player game completion is closed.
+Car, opponent, course, difficulty, results, ordinary garage return, all four race lifecycles,
+representative city/freeway transitions, necessary session controls, Steering, and persistent score
+data are covered. High Screen and Preferences are optional desktop UI and deliberately remain named
+loud stops; Communications remains single-player only.
 
 Long route traces are regressions, not the primary discovery mechanism. Enter unknown behavior
 through the shortest faithful checkpoint available; do not patch game decisions merely to reach it.
 For bounded driving that must follow the road, build with `GARAGE_CLICK=1 FOLLOW_ROAD=1`. Omitting
 `FOLLOW_ROAD` preserves the straight-to-water collision/recovery fixture.
 
-## Core game completion — active queue
+## Core game completion — complete
 
-1. **Finish necessary game UI paths.** Car, dynamometer, opponent, course, difficulty, results, and
-   ordinary garage-return paths are closed. Cover the remaining gameplay-relevant High Score and
-   Preferences commands. Communications remains deliberately single-player only. Leave unnecessary
-   classic Mac desktop UI unimplemented so an erroneous fallback remains a loud failure.
-2. **Implement only traps demanded by real paths.** Every unknown trap reached by the scenarios
-   above must either be implemented faithfully or remain a named loud stop. Recheck all resource
-   types the game actually consumes; do not implement unused managers speculatively.
-3. **Verify resources and persistence.** Determine from code whether preferences, high scores,
-   saved settings, or other writable state are required, then implement only what is used.
+The required single-player paths, their demanded traps, and writable `TIME` score state are closed.
+Optional classic-Mac desktop dialogs remain named loud stops instead of speculative compatibility
+code. Copy-protection `DATE` and network `GNRL` persistence remain excluded with their parent
+features.
 
 ## Structural verification and release — after core game completion
 

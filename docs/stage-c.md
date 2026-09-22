@@ -2243,6 +2243,44 @@ all modes and restores the shipped Numeric keypad default before continuing into
 sequence. `amiga/driving_options_steering.gdb` is the fail-fast observer. Production builds contain
 none of its injected input or probe state.
 
+## Remaining Options scope and persistent high scores
+
+The remaining menu branches are now classified from their resident code rather than inferred from
+their labels. `MENU 177` (`High Screen`) sends items 1--4 to `Score+$0088`, which renders the four
+`TIME` tables, and item 6 to `Score+$0004`, which clears them only after `CautionAlert` 141.
+`MENU 444` item 7 calls `Score+$0B2A`, a 14-control Preferences dialog built from DLOG 1111. The
+Communications submenu enters the separate network segment; Single Player remains the shipped
+default and every network choice is outside the declared scope.
+
+Neither High Screen nor Preferences has a required role in starting, driving, finishing, returning,
+or restarting a single-player race. Their pull-down and modal desktop UI therefore remain
+unimplemented by design. In particular, selecting Clear High Scores stops loudly and now names
+`DIALOG MANAGER / CAUTIONALERT` at `Score+$0010`; Preferences stops at its first genuinely required
+dialog operation. This preserves the project's rule that optional UI cannot hide an unrelated
+failure. It also avoids a generic windowing system merely to make every menu item silent.
+
+The data underneath High Screen is nevertheless real persistent game state. The four `TIME`
+resources 128--131 are each ten 30-byte records, and `Score+$0004` and `$0286` are the only
+single-player writers. The compatibility layer gives exactly those four resources writable
+300-byte overlays. `ChangedResource` and `WriteResource` accept only their resource handles; the
+copy-protection `DATE` writer and Communications `GNRL` writer remain loud because those features
+are deliberately excluded.
+
+AmigaDOS I/O cannot safely run while the machine takeover has disabled multitasking and owns the
+View, DMA, and interrupt vector. A successful `WriteResource` therefore marks the score overlay
+dirty, and the platform writes `PROGDIR:Vette.scores` only after the complete hardware handback and
+`Permit`. The file is a 12-byte `VSC1` header (payload size and rolling checksum) followed by the
+four byte-exact tables, 1,212 bytes total. A missing, truncated, or checksum-invalid file is ignored
+and the shipped resource values remain the default.
+
+`SCORE_PERSISTENCE_PROBE=1` is diagnostic only. It gives High Screen item 6 a private Command-H
+alias and supplies the confirmation result without implementing `CautionAlert`. The original clear
+routine then issued four `ChangedResource` and four `WriteResource` calls. Its first run wrote all
+1,212 bytes only after restoration, with saved/actual DMA `$02D0/$02D0`, interrupts
+`$602C/$602C`, and the original View active. A second launch accepted the checksum and imported the
+1,200-byte payload before the takeover. The test uses `Vette.scores.test`; production uses
+`Vette.scores`. `amiga/score_persistence.gdb` is the fail-fast observer.
+
 ## Suspended-session return and restart controls
 
 `MENU 222`'s session commands are stateful rather than interchangeable race exits. During live
