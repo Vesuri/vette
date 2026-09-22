@@ -408,6 +408,15 @@ host speed and the gdb stub's own slowness cancel out completely. Sample it with
 *program* stores for itself (the VERTB handler, every N vblanks), read afterwards; never with a
 conditional-breakpoint script.
 
+For the moving-driving fidelity workload, `make driving-cadence-compare` applies the corresponding
+source-domain gate directly to completed frames. The current Macintosh oracle has a median
+interval of 6 ticks (normally 6–7); the target A1200 has a median of 9 ticks (normally 9–10). The
+accepted A1200 ceiling is a median of 12 ticks, a 95th-percentile interval of 15 ticks, and no more
+than twice the captured Macintosh median. These are deliberately throughput bounds, not a demand for lockstep frame or
+Traffic phase: C2P and presentation make the target behave like a slower CPU, while equivalent
+completed game states must still render identically. The separate fully accounted 300-field
+profile remains the tool for attributing that cost.
+
 ⚠ Both counters must be a linker gc ROOT (`PROBE_SYMS` in `amiga/Makefile`), or `--gc-sections`
 drops the unreferenced one and gdb prints **instruction bytes** in its place — a fake measurement
 rather than an obvious zero. `make probe-audit` enforces it on every link.

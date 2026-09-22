@@ -8,7 +8,7 @@
 #
 # The Amiga build is in amiga/ and is the real target: `cd amiga && . ./env.sh && make`.
 
-.PHONY: all todo driving-sequence-capture driving-sequence-compare driving-motion-reference driving-view-reference driving-view-capture driving-view-compare driving-view-regression driving-f1-reference driving-f1-capture driving-f1-compare driving-audio-reference driving-audio-capture driving-audio-compare driving-audio-regression driving-motion-capture driving-motion-compare driving-motion-viewport-compare driving-profile help
+.PHONY: all todo driving-sequence-capture driving-sequence-compare driving-motion-reference driving-view-reference driving-view-capture driving-view-compare driving-view-regression driving-f1-reference driving-f1-capture driving-f1-compare driving-audio-reference driving-audio-capture driving-audio-compare driving-audio-regression driving-motion-capture driving-motion-compare driving-motion-viewport-compare driving-cadence-compare driving-profile help
 
 all: help
 
@@ -20,6 +20,7 @@ help:
 	@echo "  make driving-sequence-capture  capture Amiga frames at saved Macintosh game states"
 	@echo "  make driving-motion-compare    compare saved moving-driving frames by game state"
 	@echo "  make driving-motion-viewport-compare  gate a pixel-exact moving exterior view"
+	@echo "  make driving-cadence-compare  gate A1200 completed-frame cadence against the Mac"
 	@echo "  make driving-motion-reference  capture distinct moving frames on the Macintosh oracle"
 	@echo "  make driving-f1-reference      capture moving F1-view frames on the Macintosh oracle"
 	@echo "  make driving-f1-capture        capture matching moving F1-view Amiga frames"
@@ -224,6 +225,14 @@ driving-motion-viewport-compare:
 		--match-state --state-field physics_x --state-field physics_y \
 		--left 0 --top 0 --width 512 --height 198 \
 		--require-any-exact
+
+# Cadence is measured in the game's 60 Hz Macintosh tick domain, not host wall
+# time.  The A1200 may complete fewer frames than the reference Mac, but the
+# bounded target prevents an accidental presentation regression from being
+# mistaken for an arbitrary "slower CPU" difference.
+driving-cadence-compare:
+	@python3 tools/check_driving_cadence.py \
+		ref/mame/driving-motion-sequence.tsv tmp/driving-motion-sequence.tsv
 
 # The measurement freezes in target time after 300 PAL fields; 60 seconds is
 # only a host-side safety ceiling for reaching and reading that frozen window.
