@@ -426,6 +426,7 @@ static IntroSample s_introSamples[] = {
 static bool s_introSoundStarted[5];
 static uint32_t s_introMusicEndTick;
 static uint32_t s_introEffectEndTick[2];  // Paula channels 2 and 3
+static bool s_introAudioRetired;
 static bool s_introLogoHeld;
 static bool s_introLogoParked;
 static uint16_t s_introLogoFrames;
@@ -1396,6 +1397,17 @@ static void stopIntroChannel(uint16_t channel)
     *(volatile uint16_t*)(audio + 8) = 0;
 }
 
+static void retireIntroAudio()
+{
+    if (s_introAudioRetired) return;
+    for (uint16_t channel = 0; channel < 4; ++channel) stopIntroChannel(channel);
+    s_introMusicEndTick = 0;
+    s_introEffectEndTick[0] = 0;
+    s_introEffectEndTick[1] = 0;
+    s_introAudioRetired = true;
+    if (g_introAudioState != 3) g_introAudioState = 2;
+}
+
 static void stabilizeIntroAnimation()
 {
     if (!s_currentA5) return;
@@ -1453,7 +1465,7 @@ static void updateIntroAudio()
 #ifdef VETTE_PROBE
     VetteProfileScope profileAudio(kProfileAudio);
 #endif
-    if (!s_currentA5) return;
+    if (!s_currentA5 || s_introAudioRetired) return;
 
     // Follow the original intro's own one-shot flags.  The Mac code sets each
     // immediately after its BogasLoad call, so animation and sound remain tied
@@ -2308,6 +2320,12 @@ static bool disposeWindow(uint8_t* window)
 {
     WindowSlot* slot = windowSlot(window);
     if (!slot) return false;
+    // Intro samples use their own direct Paula path.  The complete sequence
+    // naturally replaces and finishes its opening loop at the logo, but a
+    // Button exit can retire the intro window while that loop is still live.
+    // Dispose is the common lifecycle boundary before the garage's Bogas
+    // contexts take ownership of the voices.
+    if (!s_introAudioRetired && s_introSoundStarted[0]) retireIntroAudio();
     uint8_t* next = (uint8_t*)read32(window + 144);
     if (s_windowList == window) s_windowList = next;
     else {
@@ -7243,6 +7261,13 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
         if (firstButtonPoll) {
             pressed = true;
             firstButtonPoll = false;
+        }
+#endif
+#ifdef VETTE_INTRO_AUDIO_SKIP_PROBE
+        static bool introAudioSkipDelivered = false;
+        if (!introAudioSkipDelivered && s_introSoundStarted[1]) {
+            pressed = true;
+            introAudioSkipDelivered = true;
         }
 #endif
 #ifdef VETTE_GARAGE_CLICK

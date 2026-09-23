@@ -94,6 +94,12 @@ Instrument bytes come from the converted `INST` resources; short instruments
 have their eight-byte Bogas header removed before DMA. All five play at PAL period 319, the closest
 Paula rate to the measured Macintosh 11.127 kHz playback.
 
+Those intro samples are a direct-Paula compatibility path, separate from the gameplay Bogas
+contexts. Disposing the intro window is their ownership boundary: it silences all four intro voices,
+cancels pending cue deadlines, and retires the intro audio service before the garage can start its
+own sounds. This is redundant after the complete logo sequence, but essential when `Button` exits
+during the tram animation while `Opening song` is still looping.
+
 The cable-car callback has no terminal branch and assumes the remaining intro work completes by the
 time its downhill pass reaches the lower-left edge. That assumption fails on the slower compatibility
 path: it keeps consuming frames and walks the tram completely offscreen. Once its destination crosses

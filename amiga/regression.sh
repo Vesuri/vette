@@ -33,6 +33,8 @@ run_case()
 run_smoke()
 {
   run_case production 90 production_audit.gdb 'production-audit PASS.*resources=572.*jumps=509'
+  run_case intro-click-audio 90 intro_click_audio.gdb 'intro-click-audio PASS' \
+    PROBES=1 INTRO_AUDIO_SKIP_PROBE=1
   run_case driving-smoke 35 gameplay_smoke.gdb 'gameplay-smoke PASS' \
     PROBES=1 SKIP_INTRO=1 GARAGE_CLICK=1
 }

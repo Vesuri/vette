@@ -261,6 +261,13 @@ ifeq ($(SKIP_INTRO),1)
 EXTRA_DEFINES += -DVETTE_SKIP_INTRO
 endif
 
+# Regression-only: wait until the tram bell has begun over the opening music,
+# then make one Button poll report a click.  This exercises the physical
+# mid-intro exit rather than the earlier SKIP_INTRO development shortcut.
+ifeq ($(INTRO_AUDIO_SKIP_PROBE),1)
+EXTRA_DEFINES += -DVETTE_INTRO_AUDIO_SKIP_PROBE
+endif
+
 # Diagnostic only: take the original protection routine's two-wrong-answers
 # result without constructing its deliberately unsupported modal dialog. The
 # ordinary build still patches the protection to the verified success state.
