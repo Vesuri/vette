@@ -8137,6 +8137,11 @@ bool MacLoader::run(VetteScreen* screen)
     g_stageBState = 1;
     uint8_t* firstJump = a5 + kJumpOffset;
     if (read16(firstJump + 2) != 0x4ef9) return false;
+    // These segments were loaded as data, then patched together with the A5
+    // JMP table. Publish dirty data and discard stale instruction-cache lines
+    // before executing any of them (Exec V37+, our OS 2.04 baseline).
+    // Do not disable caches: let Exec use the installed CPU support routines.
+    CacheClearU();
     // Main+1EDA is the application entry stub.  Its first JSR is through the final
     // jump-table entry to %A5Init; invoking %A5Init here as well would initialise twice.
     vette_call_mac_code((void*)read32(firstJump + 4), a5);

@@ -8,6 +8,19 @@
 
 ## Display: takeover, not OS-friendly
 
+### Loaded-code cache coherency
+
+`MacLoader::run` calls Exec `CacheClearU()` after all resident CODE patches and A5
+jump-table construction, immediately before the original entry stub executes.
+This publishes dirty data-cache lines and invalidates stale instructions without
+disabling caches or assuming a particular CPU. The call requires Exec V37, matching
+the release's OS 2.04 baseline. See the
+[Exec autodoc](https://amigadev.elowar.com/read/ADCD_2.1/Includes_and_Autodocs_2._guide/node0339.html).
+This fixes a missing coherency boundary; it does not yet establish the cause of the
+reported `68040-NOMMU` + SetPatch black screen on the other installation.
+
+### Hardware ownership
+
 - `LoadView(NULL)` + `WaitTOF()` × 2 to suspend the OS display.
 - Our own copper list pointed at by `COP1LC` directly (not `MakeScreen`/`LoadRGB4`).
 - `*dmaconPointer = DMAF_SETCLR | DMAF_MASTER | DMAF_COPPER | …` — copper DMA only at first;
