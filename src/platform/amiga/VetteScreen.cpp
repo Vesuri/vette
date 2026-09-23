@@ -170,10 +170,16 @@ static void initializePairToPlanes()
  * one field's 160 rows as a whole picture -- a plausible, half-resolution, WRONG image. */
 #define VS_BPLCON0  (0x8000 | (VetteScreen::kPlanes << 12) | 0x0200 | 0x0004 | 0x0001)
 
+/* BPLCON2 PF1P/PF2P encode how many sprite pairs win over each playfield.
+ * Priority 4 puts all four sprite pairs in front.  Keep both fields explicit
+ * even though the current four-plane mode uses only PF1. */
+#define VS_BPLCON2  0x0024
+
 // ⭐ The mode word is DERIVED above, so assert what it derives to.  This is the honest
 // replacement for the BPLCON0 readback that could not work (PlatformAmiga.cpp says why):
 // it verifies the arithmetic, at compile time, and claims nothing about the hardware.
 static_assert(VS_BPLCON0 == 0xC205, "BPLCON0 no longer derives to HIRES|4 planes|COLOR|LACE|ECSENA");
+static_assert(VS_BPLCON2 == ((4 << 3) | 4), "mouse sprite must remain ahead of both playfields");
 static_assert(VS_DDFSTOP == VS_DDFSTRT + 4 * (VS_WORDS - 2), "hires DDF window inconsistent");
 
 /* ⭐⭐ THE CROSS-CHECK AGAINST THE FRAMEWORK.  AmigaHardware::setPlayfield() can express
@@ -303,7 +309,7 @@ void VetteScreen::writeModeRegisters()
     *fmodePointer   = 0x0000;      // OCS fetch mode, so an AGA machine behaves like an A500
     *bplcon0Pointer = VS_BPLCON0;
     *bplcon1Pointer = 0x0000;      // no scroll
-    *bplcon2Pointer = 0x0000;      // sprite 0 in front of the single playfield
+    *bplcon2Pointer = VS_BPLCON2;  // all sprite pairs in front of both playfields
     *bplcon3Pointer = 0x0c80;      // AGA HIRES sprites, palette bank 0
     *diwstrtPointer = VS_DIWSTRT;
     *diwstopPointer = VS_DIWSTOP;

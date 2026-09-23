@@ -83,6 +83,11 @@ short field's at `base + 256 + k*64`.  A bitplane pointer advances 64 B as it fe
 must reach the same plane **two** rows down, so `BPL1MOD = BPL2MOD = 2*256 - 64 = 448`.
 The pointers are re-pointed **first** in the VERTB handler, every field.
 
+The mouse uses sprite 0 and must remain above every nonzero game pixel, not merely above
+`COLOR00`. `VetteScreen` therefore owns `BPLCON2=$0024`: `PF1P=PF2P=4` places all four sprite
+pairs ahead of both playfields. The earlier `$0000` setting had the priority direction backwards
+and put sprite pair 0/1 behind PF1, making the pointer disappear beneath game artwork.
+
 ⚠ **`AmigaHardware::isLongFrame()` did not LINK** — in the ASSEMBLER configurations it was declared
 `__asm`/bridged and `jsr`ed `_isLongFrame__13AmigaHardwareFv`, a symbol no `.s` ever defined, so the
 *first* caller was an undefined-symbol link error and only an interlaced display needs the field

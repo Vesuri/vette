@@ -45,6 +45,7 @@ printf "VPOSR[0..7]   = %04X %04X %04X %04X %04X %04X %04X %04X\n", \
     g_lofSamples[0], g_lofSamples[1], g_lofSamples[2], g_lofSamples[3], \
     g_lofSamples[4], g_lofSamples[5], g_lofSamples[6], g_lofSamples[7]
 printf "                (bit 15 must ALTERNATE; a constant word = not interlaced, FFFF = bad read)\n"
+printf "BPLCON2       = %04X      (want 0024: every sprite pair ahead of both playfields)\n", *(unsigned short*)0xdff104
 printf "===================\n\n"
 detach
 quit

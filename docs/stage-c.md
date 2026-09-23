@@ -1476,7 +1476,9 @@ writes the live chip-RAM sprite control and data words. Interlace fields take al
 halves, AGA HIRES sprite resolution keeps the pointer at game-pixel scale, and colours 17..19 supply
 black, neutral XOR fallback, and white independently of the game's palette. The chunky surface and
 dirty list are now cursor-free, so the pointer remains live at the 50 Hz display cadence even when
-the game has no frame ready. `_DragWindow` is also named in the loud stop, so this path could be
+the game has no frame ready. `BPLCON2=$0024` sets both playfield priorities to four, keeping sprite
+0 in front of every nonzero playfield pixel as well as the background. `_DragWindow` is also named
+in the loud stop, so this path could be
 identified rather than reported as an unknown trap.
 
 A second physical test then clicked the still-visible ACCEPT artwork after the difficulty choices
