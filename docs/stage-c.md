@@ -182,6 +182,13 @@ The successful first-use order is:
 post-intro continuation is:
 
 68. `PaintBehind`
+
+The standalone Amiga presentation has no Macintosh desktop. `PaintBehind` keeps the original
+window-list validation but clears an exposed background to reserved black instead of synthesising
+the System 6 checker pattern. A complete `GrayRgn` exposure also clears rows 0--19, which ceased to
+have an owner when the Macintosh menu bar was removed. Title-to-garage and garage-to-course
+transitions therefore pass through a clean black surface rather than desktop chrome.
+
 69. `PurgeMem`
 70. `CompactMem`
 71. `DisableItem`

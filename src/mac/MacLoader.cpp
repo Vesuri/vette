@@ -2337,10 +2337,10 @@ static bool paintBehind(uint8_t* startWindow, uint8_t** clobberedRegion)
     uint8_t* region = clobberedRegion ? *clobberedRegion : 0;
     if (!slot || !region || read16(region) != 10) return false;
 
-    // The measured post-intro call starts at the newly allocated, still hidden
-    // garage window.  There are no visible windows behind it, so PaintBehind
-    // exposes only the desktop inside GrayRgn.  Retain the loud stop if a later
-    // call actually needs WDEF drawing for a window farther down the chain.
+    // The measured transition calls start at a newly allocated, still hidden
+    // game window.  There are no visible windows behind it, so PaintBehind
+    // exposes only the background inside GrayRgn.  Retain the loud stop if a
+    // later call actually needs WDEF drawing for a window farther down the chain.
     for (uint8_t* behind = (uint8_t*)read32(startWindow + 144); behind;
          behind = (uint8_t*)read32(behind + 144))
         if (behind[110]) return false;
@@ -2355,24 +2355,28 @@ static bool paintBehind(uint8_t* startWindow, uint8_t** clobberedRegion)
     if (right > 512) right = 512;
     if (top >= bottom || left >= right) return true;
 
-    // Classic desktop gray alternates the reserved black and white palette
-    // entries.  Work in packed 4-bpp bytes, preserving boundary nibbles.
+    // There is no Macintosh desktop in the standalone Amiga game.  When the
+    // complete GrayRgn is exposed, include the former menu-bar rows so pixels
+    // from the retiring full-screen window cannot remain above the next one.
+    if (top == 20 && left == 0 && bottom == 320 && right == 512) top = 0;
+
+    // Clear exposed space to reserved black.  Work in packed 4-bpp bytes and
+    // preserve boundary nibbles for any future partial background exposure.
     for (int16_t y = top; y < bottom; ++y) {
-        uint8_t pattern = (y & 1) ? 0x0f : 0xf0;
         uint8_t* row = s_colorScreen + (uint32_t)y * (512 / 2);
         int16_t x = left;
         if (x & 1) {
-            row[x >> 1] = (uint8_t)((row[x >> 1] & 0xf0) | (pattern & 0x0f));
+            row[x >> 1] &= 0xf0;
             ++x;
         }
         uint16_t firstByte = (uint16_t)(x >> 1);
         uint16_t fullBytes = (uint16_t)((right - x) >> 1);
-        blockFill(row + firstByte, fullBytes, pattern);
+        blockFill(row + firstByte, fullBytes, 0);
         x = (int16_t)(x + fullBytes * 2);
         if (x < right)
-            row[x >> 1] = (uint8_t)((row[x >> 1] & 0x0f) | (pattern & 0xf0));
+            row[x >> 1] &= 0x0f;
     }
-    markDirty(region + 2);
+    markDirtyBounds(top, left, bottom, right);
     return true;
 }
 
