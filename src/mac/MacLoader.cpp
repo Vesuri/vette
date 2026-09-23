@@ -54,6 +54,7 @@ volatile uint32_t g_probeDrawPictureTicks = 0;
 volatile uint32_t g_probeDrawPictureCalls = 0;
 volatile int16_t g_probeDrawPictureTrace[64][5] = {};
 volatile uint32_t g_probeDrawPictureTraceTicks[64] = {};
+volatile uint16_t g_probePaulaZeroedMask = 0x000f;
 volatile uint16_t g_probeCopyTraceEnabled = 0;
 volatile uint16_t g_probeCopyTraceCount = 0;
 volatile int16_t g_probeCopyTrace[32][12] = {};
@@ -1399,6 +1400,55 @@ static IntroSample* introSample(uint16_t index)
     return &sample;
 }
 
+static uint16_t paulaBeamLine()
+{
+    // V8 lives in VPOSR while V0..V7 live in VHPOSR. Re-read VPOSR so a
+    // raster wrap between the two register reads cannot manufacture a line.
+    uint16_t before, after, horizontal;
+    do {
+        before = *vposrPointer;
+        horizontal = *vhposrPointer;
+        after = *vposrPointer;
+    } while ((before & 1) != (after & 1));
+    return (uint16_t)(((after & 1) << 8) | (horizontal >> 8));
+}
+
+static void waitPaulaDmaLines(uint16_t lines)
+{
+    uint16_t previous = paulaBeamLine();
+    while (lines) {
+        uint16_t current = paulaBeamLine();
+        if (current == previous) continue;
+        previous = current;
+        --lines;
+    }
+}
+
+static void quiescePaulaChannel(uint16_t channel)
+{
+    if (channel > 3) return;
+    uint16_t dma = (uint16_t)(DMAF_AUD0 << channel);
+    volatile uint8_t* audio = (volatile uint8_t*)(0xdff0a0UL + channel * 16);
+
+    // DMA-off and volume zero merely mute a Paula channel: they do not clear
+    // the two sample bytes held in AUDxDAT.  Let Agnus observe the disable,
+    // then explicitly load signed PCM zero so emulator/hardware hand-off does
+    // not expose the previous nonzero DAC value as a shutdown click.
+    *dmaconPointer = dma;
+    *(volatile uint16_t*)(audio + 8) = 0;
+    waitPaulaDmaLines(2);
+    // Direct (non-DMA) output advances the two bytes in AUDxDAT at AUDxPER.
+    // Use the documented minimum period, then allow both zero bytes to reach
+    // and settle in the DAC rather than merely leaving zero in its holding
+    // register. This also gives never-used channels a valid period.
+    *(volatile uint16_t*)(audio + 6) = 124;
+    *(volatile uint16_t*)(audio + 10) = 0;
+    waitPaulaDmaLines(2);
+#ifdef VETTE_PROBE
+    g_probePaulaZeroedMask |= (uint16_t)(1U << channel);
+#endif
+}
+
 static void playIntroSample(uint16_t sampleIndex, uint16_t channel, uint16_t volume)
 {
     IntroSample* sample = introSample(sampleIndex);
@@ -1410,15 +1460,15 @@ static void playIntroSample(uint16_t sampleIndex, uint16_t channel, uint16_t vol
     *(volatile uint16_t*)(audio + 4) = (uint16_t)((sample->size + 1) / 2);
     *(volatile uint16_t*)(audio + 6) = 319; // 11,118.8 Hz; Mac nominal 11.127 kHz
     *(volatile uint16_t*)(audio + 8) = volume;
+#ifdef VETTE_PROBE
+    g_probePaulaZeroedMask &= (uint16_t)~(1U << channel);
+#endif
     *dmaconPointer = (uint16_t)(DMAF_SETCLR | DMAF_MASTER | dma);
 }
 
 static void stopIntroChannel(uint16_t channel)
 {
-    uint16_t dma = (uint16_t)(DMAF_AUD0 << channel);
-    volatile uint8_t* audio = (volatile uint8_t*)(0xdff0a0UL + channel * 16);
-    *dmaconPointer = dma;
-    *(volatile uint16_t*)(audio + 8) = 0;
+    quiescePaulaChannel(channel);
 }
 
 static void retireIntroAudio()
@@ -1701,37 +1751,10 @@ static volatile uint16_t s_bogasVoiceVolume[4];
 volatile uint16_t g_probeBogasDmaRestarts[4] = {};
 #endif
 
-static uint16_t bogasBeamLine()
-{
-    // V8 lives in VPOSR while V0..V7 live in VHPOSR. Re-read VPOSR so a
-    // raster wrap between the two register reads cannot manufacture a line.
-    uint16_t before, after, horizontal;
-    do {
-        before = *vposrPointer;
-        horizontal = *vhposrPointer;
-        after = *vposrPointer;
-    } while ((before & 1) != (after & 1));
-    return (uint16_t)(((after & 1) << 8) | (horizontal >> 8));
-}
-
-static void waitBogasDmaLines(uint16_t lines)
-{
-    uint16_t previous = bogasBeamLine();
-    while (lines) {
-        uint16_t current = bogasBeamLine();
-        if (current == previous) continue;
-        previous = current;
-        --lines;
-    }
-}
-
 static void stopBogasVoice(uint16_t channel)
 {
     if (channel > 3) return;
-    uint16_t dma = (uint16_t)(DMAF_AUD0 << channel);
-    volatile uint8_t* audio = (volatile uint8_t*)(0xdff0a0UL + channel * 16);
-    *dmaconPointer = dma;
-    *(volatile uint16_t*)(audio + 8) = 0;
+    quiescePaulaChannel(channel);
     s_bogasVoiceVolume[channel] = 0;
 }
 
@@ -1748,12 +1771,15 @@ static void startBogasVoice(uint16_t ordinal, uint16_t channel,
     // uninterrupted burst can therefore leave the old sample running. Wait
     // two raster lines after disable before installing and enabling the new
     // attack, as required by the hardware restart sequence.
-    waitBogasDmaLines(2);
+    waitPaulaDmaLines(2);
     *(volatile uint32_t*)(audio + 0) = (uint32_t)instrument->chipData;
     *(volatile uint16_t*)(audio + 4) = (uint16_t)((instrument->size + 1) / 2);
     *(volatile uint16_t*)(audio + 6) = period;
     *(volatile uint16_t*)(audio + 8) = volume;
     s_bogasVoiceVolume[channel] = volume;
+#ifdef VETTE_PROBE
+    g_probePaulaZeroedMask &= (uint16_t)~(1U << channel);
+#endif
     *dmaconPointer = (uint16_t)(DMAF_SETCLR | DMAF_MASTER | dma);
 
     // Paula also needs time to latch that initial location and length. Writing
@@ -1773,7 +1799,7 @@ static void startBogasVoice(uint16_t ordinal, uint16_t channel,
             reloadWords = (uint16_t)(loopBytes / 2);
         }
     }
-    waitBogasDmaLines(2);
+    waitPaulaDmaLines(2);
     *(volatile uint32_t*)(audio + 0) = (uint32_t)reloadData;
     *(volatile uint16_t*)(audio + 4) = reloadWords;
 #ifdef VETTE_PROBE
@@ -7998,6 +8024,10 @@ bool MacLoader::run(VetteScreen* screen)
     // Main+1EDA is the application entry stub.  Its first JSR is through the final
     // jump-table entry to %A5Init; invoking %A5Init here as well would initialise twice.
     vette_call_mac_code((void*)read32(firstJump + 4), a5);
+    // The original normally closes Bogas before ExitToShell, but every exit
+    // route shares this final ownership boundary.  Leave all four Paula DACs
+    // holding signed zero before PlatformAmiga restores the operating system.
+    stopBogasAudio();
     g_macExitState = 4;
     return true;
 }

@@ -14,10 +14,10 @@ end
 break paintBehind if s_introAudioRetired
 commands
   silent
-  if g_introAudioState == 2 && s_introMusicEndTick == 0 && s_introEffectEndTick[0] == 0 && s_introEffectEndTick[1] == 0
-    printf "intro-click-audio PASS tick=%u state=%u deadlines=%u/%u/%u\n", g_macTicks, g_introAudioState, s_introMusicEndTick, s_introEffectEndTick[0], s_introEffectEndTick[1]
+  if g_introAudioState == 2 && s_introMusicEndTick == 0 && s_introEffectEndTick[0] == 0 && s_introEffectEndTick[1] == 0 && g_probePaulaZeroedMask == 15
+    printf "intro-click-audio PASS tick=%u state=%u deadlines=%u/%u/%u zeroed=$%x\n", g_macTicks, g_introAudioState, s_introMusicEndTick, s_introEffectEndTick[0], s_introEffectEndTick[1], g_probePaulaZeroedMask
   else
-    printf "intro-click-audio FAIL state=%u deadlines=%u/%u/%u\n", g_introAudioState, s_introMusicEndTick, s_introEffectEndTick[0], s_introEffectEndTick[1]
+    printf "intro-click-audio FAIL state=%u deadlines=%u/%u/%u zeroed=$%x\n", g_introAudioState, s_introMusicEndTick, s_introEffectEndTick[0], s_introEffectEndTick[1], g_probePaulaZeroedMask
   end
   detach
   quit

@@ -1153,6 +1153,16 @@ could occasionally fail to start or could latch the silent reload as its attack.
 `beep1, beep1, beep2` (ordinals 10, 10, 11) and three completed AUD2 restart protocols before it
 accepts the first post-GO frame.
 
+Channel stop is likewise a hardware operation rather than only a logical Bogas state change.
+Both the direct intro path and every Bogas expiry, suspension, close and replacement now disable
+the channel, command volume zero, wait for Paula to observe the DMA transition, and write signed
+PCM zero to `AUDxDAT` at the minimum valid period, allowing both bytes to settle before returning.
+The final Macintosh return repeats that quiesce for all four channels before
+AmigaOS DMA state is restored. Previously the code stopped DMA and set `AUDxVOL` to zero but left
+the last two sample bytes in Paula's data latch; an emulator or hardware-output handoff could turn
+that retained nonzero level into a click. The intro click-through regression now requires a
+four-channel zeroed mask in addition to cleared deadlines and retired intro ownership.
+
 `make driving-audio-regression` makes this boundary executable rather than documentary. Given the
 separately captured Macintosh oracle trace, it rebuilds and runs the bounded normal-road event
 workload and requires the oracle's exact Bogas Load signatures plus a source-ordered engine-pitch

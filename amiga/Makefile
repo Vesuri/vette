@@ -550,7 +550,7 @@ PROBE_SYMS += g_probePicture140TrapPC g_probePicture140Return \
               g_probeDrawPictureTrace g_probeDrawPictureTraceTicks \
               g_probeCopyTraceEnabled g_probeCopyTraceCount g_probeCopyTrace \
               g_probeCopyModeTicks g_probeCopyModeCalls \
-              g_probeBogasDmaRestarts \
+              g_probeBogasDmaRestarts g_probePaulaZeroedMask \
               g_macExitState g_macHostReturnSP \
               g_restoreSavedDmacon g_restoreActualDmacon \
               g_restoreSavedIntena g_restoreActualIntena g_restoreViewMatches \
