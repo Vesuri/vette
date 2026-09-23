@@ -194,12 +194,13 @@ post-intro continuation is:
 
 76. `GetMenu` (validated packed `MENU` resource cloned into a mutable movable handle)
 
-77. `DrawMenuBar` (visible inserted titles and separator; hierarchical menus remain off-bar)
+77. `DrawMenuBar` (accepted without drawing; Macintosh desktop chrome is deliberately absent)
 
-The menu bar uses an explicit compact compatibility alphabet because the two shipped resource forks
-do not contain the Macintosh System file's Chicago bitmap font; it does not claim font-level pixel
-identity. The current loud stop is `ReleaseResource`, confirmed in `Score+$0A74` by the depth-77
-run.
+The installed menu records remain live because `MenuKey` and Main's original command dispatcher use
+their enable bits, checkmarks, and keyboard equivalents. `DrawMenuBar` is an Amiga presentation
+no-op: no System-file font substitute, title strip, or separator is painted into the game surface.
+This removes only the Macintosh chrome and does not yet choose its eventual native-Amiga options UI.
+The current loud stop is `ReleaseResource`, confirmed in `Score+$0A74` by the depth-77 run.
 
 78. `ReleaseResource` (invalidate the archive-backed master pointer; permit a later reload)
 

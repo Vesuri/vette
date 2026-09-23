@@ -62,7 +62,8 @@ DRIVING
   Escape or Q  menu
 
 The cursor keys are Amiga aliases for the original keyboard/keypad controls.
-The original menus and mouse remain usable.
+The mouse remains usable. The Macintosh menu bar is deliberately not drawn;
+its keyboard equivalents still invoke the original game commands.
 
 NOTES
 
