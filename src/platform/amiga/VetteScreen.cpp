@@ -204,12 +204,20 @@ static_assert(VS_DIWHIGH == ((((VS_HSTOP & 0x100) ? 0x2000 : 0) | (((VS_VSTOP >>
  * framework now uses: (interlace ? 2 : 1) * rowBytes - bytesPerRow. */
 #define VS_BPLMOD   (2 * VetteScreen::kRowStride - VetteScreen::kBytesPerRow)
 
-// Copper-list layout.  Small and fixed: the pointers first (the copper must have loaded
-// them before the display window opens), then the palette, then the end marker.
-#define VS_CL_PTRS   0                       /* 8 moves: BPL1PTH..BPL4PTL */
-#define VS_CL_COLORS (VS_CL_PTRS + 8)        /* 16 moves: COLOR00..COLOR15 */
-#define VS_CL_END    (VS_CL_COLORS + 16)
+// Copper-list layout. Pointers come first so DMA sees complete addresses before
+// the display opens. Sprite 0 uses colours 17..19 independently of the game's
+// sixteen-colour palette.
+#define VS_CL_PTRS       0                   /* 8 moves: BPL1PTH..BPL4PTL */
+#define VS_CL_SPRITE     (VS_CL_PTRS + 8)    /* 2 moves: SPR0PTH/SPR0PTL */
+#define VS_CL_COLORS     (VS_CL_SPRITE + 2)  /* 16 moves: COLOR00..COLOR15 */
+#define VS_CL_SPRCOLORS  (VS_CL_COLORS + 16) /* COLOR17..COLOR19 */
+#define VS_CL_END        (VS_CL_SPRCOLORS + 3)
 #define VS_CL_LONGS  (VS_CL_END + 1)
+
+// One interlaced field displays eight of the cursor's sixteen rows. Layout is
+// two control words, eight DATA/DATB pairs, and the mandatory zero terminator.
+static const uint16_t kMouseSpriteFieldRows = 8;
+static const uint32_t kMouseSpriteBytes = (kMouseSpriteFieldRows + 2) * 4;
 
 // ⭐ The checksum the Stage A acceptance test compares against a host-computed one
 // (tools/mac_fb_to_amiga.py's blob, same algorithm).  Rotate-then-xor, not a plain sum:
@@ -237,8 +245,16 @@ bool VetteScreen::initialize(const uint8_t* picture, const uint16_t* palette16)
     m_back = (uint8_t*)AllocMem(kPictureBytes, MEMF_CHIP);
     if (!m_back) { FreeMem(m_chip, kPictureBytes); m_chip = 0; return false; }
 
+    m_mouseSprite = (uint16_t*)AllocMem(kMouseSpriteBytes, MEMF_CHIP | MEMF_CLEAR);
+    if (!m_mouseSprite) {
+        FreeMem(m_back, kPictureBytes); m_back = 0;
+        FreeMem(m_chip, kPictureBytes); m_chip = 0;
+        return false;
+    }
+
     m_copper = (uint32_t*)AllocMem(VS_CL_LONGS * sizeof(uint32_t), MEMF_CHIP | MEMF_CLEAR);
     if (!m_copper) {
+        FreeMem(m_mouseSprite, kMouseSpriteBytes); m_mouseSprite = 0;
         FreeMem(m_back, kPictureBytes); m_back = 0;
         FreeMem(m_chip, kPictureBytes); m_chip = 0;
         return false;
@@ -256,9 +272,15 @@ bool VetteScreen::initialize(const uint8_t* picture, const uint16_t* palette16)
         m_copper[VS_CL_PTRS + k * 2 + 0] = copperMove(bpl1pth + k * 4, 0);
         m_copper[VS_CL_PTRS + k * 2 + 1] = copperMove(bpl1ptl + k * 4, 0);
     }
+    uint32_t sprite = (uint32_t)m_mouseSprite;
+    m_copper[VS_CL_SPRITE] = copperMove(spr1pth, (uint16_t)(sprite >> 16));
+    m_copper[VS_CL_SPRITE + 1] = copperMove(spr1ptl, (uint16_t)sprite);
     for (uint16_t i = 0; i < 16; i++)
         m_copper[VS_CL_COLORS + i] = copperMove(color00 + i * 2,
                                                 palette16 ? palette16[i] : 0);
+    m_copper[VS_CL_SPRCOLORS + 0] = copperMove(color00 + 17 * 2, 0x000); // black
+    m_copper[VS_CL_SPRCOLORS + 1] = copperMove(color00 + 18 * 2, 0x888); // XOR fallback
+    m_copper[VS_CL_SPRCOLORS + 2] = copperMove(color00 + 19 * 2, 0xfff); // white
     m_copper[VS_CL_END] = 0xfffffffe;
 
     // Fill in a valid set of bitplane pointers for whichever field is next, before anything
@@ -281,8 +303,8 @@ void VetteScreen::writeModeRegisters()
     *fmodePointer   = 0x0000;      // OCS fetch mode, so an AGA machine behaves like an A500
     *bplcon0Pointer = VS_BPLCON0;
     *bplcon1Pointer = 0x0000;      // no scroll
-    *bplcon2Pointer = 0x0024;      // playfield priority, sprites behind
-    *bplcon3Pointer = 0x0c00;      // AGA: bank 0, normal; harmless on OCS
+    *bplcon2Pointer = 0x0000;      // sprite 0 in front of the single playfield
+    *bplcon3Pointer = 0x0c80;      // AGA HIRES sprites, palette bank 0
     *diwstrtPointer = VS_DIWSTRT;
     *diwstopPointer = VS_DIWSTOP;
     *diwhighPointer = VS_DIWHIGH;  // ⚠ must be written, not inherited -- see above
@@ -331,13 +353,72 @@ void VetteScreen::vbiUpdate()
     // ⚠ AmigaHardware::isLongFrame() used to be an undefined symbol at LINK time in this
     // build's GCC+ASSEMBLER configuration (its bridge `jsr`ed a routine no .s defined);
     // it is fixed and unconditional now, and it is exactly this test.
+    bool oddField = AmigaHardware::isLongFrame();
     uint32_t base = (uint32_t)m_chip;
-    if (AmigaHardware::isLongFrame()) base += kRowStride;   // LOF set here => SHORT field next
+    if (oddField) base += kRowStride;   // LOF set here => SHORT field next
 
     for (uint16_t k = 0; k < kPlanes; k++) {
         uint32_t p = base + (uint32_t)k * kBytesPerRow;
         m_copper[m_ptrIndex + k * 2 + 0] = copperMove(bpl1pth + k * 4, (uint16_t)(p >> 16));
         m_copper[m_ptrIndex + k * 2 + 1] = copperMove(bpl1ptl + k * 4, (uint16_t)p);
+    }
+    updateMouseSprite(oddField);
+}
+
+void VetteScreen::setMouseCursor(const uint8_t* cursor, int16_t x, int16_t y,
+                                 bool visible)
+{
+    // The VBI may fire at any instruction. Publish one coherent cursor state;
+    // the critical section is only 36 word/coordinate stores.
+    Disable();
+    m_cursorX = x;
+    m_cursorY = y;
+    m_cursorVisible = visible && cursor;
+    if (cursor) {
+        for (uint16_t row = 0; row < 16; ++row) {
+            m_cursorImage[row] = (uint16_t)(cursor[row * 2] << 8 | cursor[row * 2 + 1]);
+            m_cursorMask[row] = (uint16_t)(cursor[32 + row * 2] << 8
+                                         | cursor[33 + row * 2]);
+        }
+        m_cursorHotY = (int16_t)(cursor[64] << 8 | cursor[65]);
+        m_cursorHotX = (int16_t)(cursor[66] << 8 | cursor[67]);
+    }
+    Enable();
+}
+
+void VetteScreen::updateMouseSprite(bool oddField)
+{
+    if (!m_mouseSprite) return;
+
+    int16_t left = (int16_t)(m_cursorX - m_cursorHotX);
+    int16_t top = (int16_t)(kMacTop + m_cursorY - m_cursorHotY);
+    uint16_t firstSourceRow = (uint16_t)(((top & 1) == (oddField ? 1 : 0)) ? 0 : 1);
+    int16_t firstScreenRow = (int16_t)(top + firstSourceRow);
+    bool visible = m_cursorVisible && left < (int16_t)kWidth
+        && left + 16 > 0 && firstScreenRow >= 0
+        && firstScreenRow + 14 < (int16_t)kHeight;
+
+    uint16_t hstart = (uint16_t)(VS_HSTART + (left > 0 ? left : 0) / 2);
+    uint16_t vstart = (uint16_t)(VS_VSTART + firstScreenRow / 2);
+    uint16_t vstop = (uint16_t)(vstart + kMouseSpriteFieldRows);
+    uint8_t* control = (uint8_t*)m_mouseSprite;
+    control[0] = visible ? (uint8_t)vstart : 0;
+    control[1] = visible ? (uint8_t)(hstart >> 1) : 0;
+    control[2] = visible ? (uint8_t)vstop : 0;
+    control[3] = visible ? (uint8_t)(((vstart >> 8) & 1) << 2
+                                   | ((vstop >> 8) & 1) << 1
+                                   | (hstart & 1)) : 0;
+
+    for (uint16_t fieldRow = 0; fieldRow < kMouseSpriteFieldRows; ++fieldRow) {
+        uint16_t sourceRow = (uint16_t)(firstSourceRow + fieldRow * 2);
+        uint16_t image = m_cursorImage[sourceRow];
+        uint16_t mask = m_cursorMask[sourceRow];
+        uint16_t black = (uint16_t)(image & mask);
+        uint16_t white = (uint16_t)(~image & mask);
+        uint16_t invert = (uint16_t)(image & ~mask);
+        // Sprite value 1 -> black, 2 -> neutral XOR fallback, 3 -> white.
+        m_mouseSprite[2 + fieldRow * 2] = (uint16_t)(black | white);
+        m_mouseSprite[3 + fieldRow * 2] = (uint16_t)(white | invert);
     }
 }
 
@@ -609,6 +690,7 @@ bool VetteScreen::presentMacFrame(const uint8_t* chunky, const uint8_t* colorTab
 void VetteScreen::shutdown()
 {
     if (m_copper) { FreeMem(m_copper, VS_CL_LONGS * sizeof(uint32_t)); m_copper = 0; }
+    if (m_mouseSprite) { FreeMem(m_mouseSprite, kMouseSpriteBytes); m_mouseSprite = 0; }
     if (m_back)   { FreeMem(m_back, kPictureBytes); m_back = 0; }
     if (m_chip)   { FreeMem(m_chip, kPictureBytes); m_chip = 0; }
 }

@@ -138,6 +138,13 @@ cursor composited into the captured asset, and the interlace field polarity inve
 is the argument for keeping a human-eyeball step with a written list of what to look for, rather
 than treating a green probe run as the end of a display bring-up.
 
+The live pointer is now deliberately outside the game framebuffer. Amiga sprite 0 owns it, uses
+AGA HIRES sprite resolution, and is rebuilt at the start of every VBI from the latest Macintosh
+Cursor image, hot spot, position, and visibility. Each field receives the corresponding eight of
+the cursor's sixteen rows, so the interlaced output remains 16 full-raster pixels high. Colours
+17..19 are reserved for black, a neutral stand-in for QuickDraw XOR, and white. Cursor movement
+therefore neither dirties chunky pixels nor waits for a completed C2P presentation.
+
 ## VBI: take over the VERTB IntVector
 
 Not `AddIntServer(INTB_VERTB, …)`.  Replacing exec's `IntVector` wholesale drops

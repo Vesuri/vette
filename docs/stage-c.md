@@ -1453,14 +1453,17 @@ garage: the garage's mode-specific tracker had already failed to consume the cli
 window dragging would therefore hide an input-position failure behind unnecessary UI.
 
 The cause was the cursor half of the input bridge. `GetNextEvent` integrated the Amiga mouse
-counters into a Macintosh-local point, but the tracked QuickDraw cursor was never composited into
-the displayed pixels. A player was consequently aiming with the host pointer while the game tested
-an invisible pointer that began at `(256,160)`. The presentation path now composites the installed
-16x16 Cursor at that actual point, including its hot spot, black/white mask and XOR pixels, then
-restores the chunky framebuffer after the dirty rectangle has been converted. Mouse movement dirties
-only the union of the old and new cursor bounds; `HideCursor`, `ShowCursor`, and `SetCursor` likewise
-restore or redraw that small area. `_DragWindow` is also named in the loud stop, so this path could
-be identified rather than reported as an unknown trap.
+counters into a Macintosh-local point, but the tracked QuickDraw cursor was never shown at that
+point. The first implementation composited it into the chunky framebuffer, which tied pointer
+motion to game presentation and needlessly sent cursor pixels through C2P. The shipping Amiga seam
+instead maps the installed 16x16 Cursor to sprite 0. `SetCursor`, `HideCursor`, `ShowCursor`, real
+mouse polling, and scripted garage clicks publish image/visibility/position state; the VBI alone
+writes the live chip-RAM sprite control and data words. Interlace fields take alternating eight-row
+halves, AGA HIRES sprite resolution keeps the pointer at game-pixel scale, and colours 17..19 supply
+black, neutral XOR fallback, and white independently of the game's palette. The chunky surface and
+dirty list are now cursor-free, so the pointer remains live at the 50 Hz display cadence even when
+the game has no frame ready. `_DragWindow` is also named in the loud stop, so this path could be
+identified rather than reported as an unknown trap.
 
 A second physical test then clicked the still-visible ACCEPT artwork after the difficulty choices
 appeared. The game's three active mode-1 rectangles cover only TRAINEE, ROOKIE, and PRO, so the
@@ -2039,9 +2042,9 @@ that distinction.
 `make fidelity-check` is the fast aggregate for the retained fidelity evidence. It gates the intro,
 cursor-free chunky-to-planar conversion, state-paired driving image, moving cadence, source-derived
 selector and road palettes, complete control bridge, Macintosh/Paula event sequence, overlap,
-replacement, pitch, and level mapping. The intro capture contains 96 pixels of hardware cursor
-overlay inside one 16x16 rectangle; the game-owned chunky surface remains an exact Macintosh image,
-and the independent cursor-free planar oracle verifies all 163,840 display pixels. Slow emulator
+replacement, pitch, and level mapping. The game-owned chunky surface contains no cursor overlay,
+and the independent cursor-free planar oracle verifies all 163,840 display pixels; sprite 0 is an
+Amiga-native layer outside that differential. Slow emulator
 recapture is deliberately separate in `driving-view-regression`; it is fail-closed when a shared
 state exists, while differently phased runs are not fabricated into pairs. These gates close the
 fidelity/performance phase. Further C2P tuning is deferred as measured presentation cost, and the

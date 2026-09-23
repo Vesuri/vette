@@ -2498,14 +2498,6 @@ static uint32_t multiplyUnsigned16(uint16_t first, uint16_t second)
     return product;
 }
 
-static uint8_t packedPixel(const uint8_t* pixels, uint16_t rowBytes,
-                           int16_t boundsTop, int16_t boundsLeft, int16_t x, int16_t y)
-{
-    const uint8_t* byte = pixels + multiplyUnsigned16((uint16_t)(y - boundsTop), rowBytes)
-                         + (uint16_t)(x - boundsLeft) / 2;
-    return (x - boundsLeft) & 1 ? (uint8_t)(*byte & 0x0f) : (uint8_t)(*byte >> 4);
-}
-
 static void setPackedPixel(uint8_t* pixels, uint16_t rowBytes,
                            int16_t boundsTop, int16_t boundsLeft,
                            int16_t x, int16_t y, uint8_t value)
@@ -2516,101 +2508,11 @@ static void setPackedPixel(uint8_t* pixels, uint16_t rowBytes,
     else *byte = (uint8_t)((*byte & 0x0f) | ((value & 0x0f) << 4));
 }
 
-static void cursorBounds(int16_t x, int16_t y, const uint8_t* cursor,
-                         int16_t& top, int16_t& left, int16_t& bottom, int16_t& right)
+static void publishMouseCursor()
 {
-    int16_t hotVertical = cursor ? (int16_t)read16(cursor + 64) : 0;
-    int16_t hotHorizontal = cursor ? (int16_t)read16(cursor + 66) : 0;
-    top = (int16_t)(y - hotVertical);
-    left = (int16_t)(x - hotHorizontal);
-    bottom = (int16_t)(top + 16);
-    right = (int16_t)(left + 16);
-}
-
-static void markCursorDirtyAt(int16_t x, int16_t y, const uint8_t* cursor)
-{
-    if (!cursor) return;
-    int16_t top, left, bottom, right;
-    cursorBounds(x, y, cursor, top, left, bottom, right);
-    if (s_drivingFrameStarted) markDrivingDirtyBounds(top, left, bottom, right);
-    else markDirtyBounds(top, left, bottom, right);
-}
-
-static void markCurrentCursorDirty()
-{
-    if (s_cursor.initialized && s_cursor.visible)
-        markCursorDirtyAt(s_mouseX, s_mouseY, s_cursor.image);
-}
-
-static uint8_t s_cursorSavedPixels[16 * 16];
-static int16_t s_cursorSavedTop, s_cursorSavedLeft;
-static bool s_cursorComposited;
-
-static void cursorPaletteExtremes(uint8_t& dark, uint8_t& light)
-{
-    dark = 0;
-    light = 15;
-    uint16_t finalIndex = read16(s_windowManagerColors + 6);
-    if (finalIndex > 15) finalIndex = 15;
-    bool deviceTable = (read16(s_windowManagerColors + 4) & 0x8000) != 0;
-    uint32_t darkest = 0xffffffffUL, lightest = 0;
-    bool found = false;
-    for (uint16_t i = 0; i <= finalIndex; ++i) {
-        const uint8_t* spec = s_windowManagerColors + 8 + i * 8;
-        uint16_t pen = deviceTable ? i : read16(spec);
-        if (pen >= 16) continue;
-        uint32_t brightness = (uint32_t)read16(spec + 2)
-                            + ((uint32_t)read16(spec + 4) << 1)
-                            + (uint32_t)read16(spec + 6);
-        if (!found || brightness < darkest) { darkest = brightness; dark = (uint8_t)pen; }
-        if (!found || brightness > lightest) { lightest = brightness; light = (uint8_t)pen; }
-        found = true;
-    }
-}
-
-static bool compositeCursor()
-{
-    if (!s_cursor.initialized || !s_cursor.visible || !s_cursor.image) return false;
-    int16_t bottom, right;
-    cursorBounds(s_mouseX, s_mouseY, s_cursor.image,
-                 s_cursorSavedTop, s_cursorSavedLeft, bottom, right);
-    uint8_t dark, light;
-    cursorPaletteExtremes(dark, light);
-    for (int16_t row = 0; row < 16; ++row) {
-        uint16_t image = read16(s_cursor.image + row * 2);
-        uint16_t mask = read16(s_cursor.image + 32 + row * 2);
-        int16_t y = (int16_t)(s_cursorSavedTop + row);
-        for (int16_t column = 0; column < 16; ++column) {
-            int16_t x = (int16_t)(s_cursorSavedLeft + column);
-            if (x < 0 || x >= 512 || y < 0 || y >= 320) continue;
-            uint16_t bit = (uint16_t)(0x8000u >> column);
-            uint8_t old = packedPixel(s_colorScreen, 512 / 2, 0, 0, x, y);
-            s_cursorSavedPixels[row * 16 + column] = old;
-            if (mask & bit)
-                setPackedPixel(s_colorScreen, 512 / 2, 0, 0, x, y,
-                               image & bit ? dark : light);
-            else if (image & bit)
-                setPackedPixel(s_colorScreen, 512 / 2, 0, 0, x, y,
-                               (uint8_t)(old ^ 0x0f));
-        }
-    }
-    s_cursorComposited = true;
-    return true;
-}
-
-static void restoreCursor()
-{
-    if (!s_cursorComposited) return;
-    for (int16_t row = 0; row < 16; ++row) {
-        int16_t y = (int16_t)(s_cursorSavedTop + row);
-        for (int16_t column = 0; column < 16; ++column) {
-            int16_t x = (int16_t)(s_cursorSavedLeft + column);
-            if (x < 0 || x >= 512 || y < 0 || y >= 320) continue;
-            setPackedPixel(s_colorScreen, 512 / 2, 0, 0, x, y,
-                           s_cursorSavedPixels[row * 16 + column]);
-        }
-    }
-    s_cursorComposited = false;
+    if (s_loudStopScreen)
+        s_loudStopScreen->setMouseCursor(s_cursor.image, s_mouseX, s_mouseY,
+                                         s_cursor.initialized && s_cursor.visible);
 }
 
 static uint32_t multiplyDivide(uint16_t value, uint16_t multiplier, uint16_t divisor)
@@ -4964,7 +4866,7 @@ static void initCursor()
     s_cursor.initialized = true;
     s_cursor.visible = true;
     s_cursor.image = s_qdThePort - 108;       // qd.arrow
-    markCurrentCursorDirty();
+    publishMouseCursor();
 }
 
 static bool isImplementedToolTrap(uint16_t trap)
@@ -5305,10 +5207,8 @@ extern "C" void vetteVBLCallbackComplete()
 static void presentMacRuntime()
 {
     if (!s_screenDirty || !s_loudStopScreen) return;
-    bool cursor = compositeCursor();
     bool presented = s_loudStopScreen->presentMacFrame(
         s_colorScreen, s_windowManagerColors, s_dirtyRects, s_dirtyRectCount);
-    if (cursor) restoreCursor();
     if (presented) {
         s_screenDirty = false;
         s_pixelsDirty = false;
@@ -5885,15 +5785,9 @@ static bool pollMacMouse()
     } else {
         int8_t deltaX = (int8_t)(counterX - s_mouseCounterX);
         int8_t deltaY = (int8_t)(counterY - s_mouseCounterY);
-        int16_t oldMouseX = s_mouseX, oldMouseY = s_mouseY;
         s_mouseX = addClampedMouseDelta(s_mouseX, deltaX, 511);
         s_mouseY = addClampedMouseDelta(s_mouseY, deltaY, 319);
-        if (s_mouseX != oldMouseX || s_mouseY != oldMouseY) {
-            if (s_cursor.initialized && s_cursor.visible) {
-                markCursorDirtyAt(oldMouseX, oldMouseY, s_cursor.image);
-                markCursorDirtyAt(s_mouseX, s_mouseY, s_cursor.image);
-            }
-        }
+        if (deltaX || deltaY) publishMouseCursor();
         if (s_currentA5 && (deltaX || deltaY)) {
             const int16_t verticals[] = {
                 kShadowMTempV, kShadowRawMouseV, kShadowMouseV
@@ -6120,12 +6014,9 @@ static bool nextEvent(uint16_t mask, uint8_t* event)
         uint16_t click = (uint16_t)(s_garageClickPhase >> 1);
         uint16_t clickWhat = (s_garageClickPhase & 1) ? 2 : 1;
         if (mask & (1u << clickWhat)) {
-            if (s_cursor.initialized && s_cursor.visible)
-                markCursorDirtyAt(s_mouseX, s_mouseY, s_cursor.image);
             s_mouseX = clickX[click];
             s_mouseY = clickY[click];
-            if (s_cursor.initialized && s_cursor.visible)
-                markCursorDirtyAt(s_mouseX, s_mouseY, s_cursor.image);
+            publishMouseCursor();
             buttonDown = (s_garageClickPhase & 1) == 0;
             s_mouseButtonDown = buttonDown;
             what = clickWhat;
@@ -6531,9 +6422,6 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
                 // The original 3D renderer rebuilds the complete exterior
                 // viewport. Dashboard writers contribute separate rectangles
                 // through the Traffic hooks above.
-                // Include a stationary cursor in this completed frame before
-                // transferring the driving list to the presentation list.
-                markCurrentCursorDirty();
                 s_pixelsDirty = false;
                 s_dirtyRectCount = 0;
                 if (!s_drivingFrameSeeded || rasterBoundsOverflowed) {
@@ -6822,14 +6710,14 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
         return 1;
     }
     if (trap == 0xa852) {                    // HideCursor()
-        markCurrentCursorDirty();
         s_cursor.visible = false;
+        publishMouseCursor();
         if (g_stageCDepth < 93) g_stageCDepth = 93;
         return 1;
     }
     if (trap == 0xa853) {                    // ShowCursor()
         s_cursor.visible = true;
-        markCurrentCursorDirty();
+        publishMouseCursor();
         if (g_stageCDepth < 94) g_stageCDepth = 94;
         return 1;
     }
@@ -7614,10 +7502,9 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
         }
     }
     if (trap == 0xa851) {                    // SetCursor(Cursor*)
-        markCurrentCursorDirty();
         s_cursor.image = (const uint8_t*)read32(userStack);
         s_cursor.visible = true;
-        markCurrentCursorDirty();
+        publishMouseCursor();
         if (g_stageCDepth < 37) g_stageCDepth = 37;
         return 5;
     }

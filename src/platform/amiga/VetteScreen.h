@@ -62,6 +62,11 @@ public:
     bool presentMacFrame(const uint8_t* chunky, const uint8_t* colorTable,
                          const DirtyRect* dirtyRects, uint16_t dirtyRectCount);
 
+    // Publish the Macintosh cursor to Amiga sprite 0. The main thread owns the
+    // logical mouse state; vbiUpdate() is the only writer of the live sprite
+    // control/data words, so pointer motion is independent of game/C2P cadence.
+    void setMouseCursor(const uint8_t* cursor, int16_t x, int16_t y, bool visible);
+
     // Stage B's fail-loud surface.  It replaces the captured frame with a diagnostic
     // generated on the Amiga, so an unknown Mac trap cannot masquerade as a freeze.
     void showLoudStop(const char* manager, const char* routine, int32_t selector,
@@ -77,6 +82,7 @@ public:
 
 private:
     void writeModeRegisters();
+    void updateMouseSprite(bool oddField);
 
     uint32_t* m_copper = 0;
     uint8_t*  m_chip = 0;
@@ -85,6 +91,14 @@ private:
     uint16_t  m_ptrIndex = 0;      // copper-list index of the first BPLxPT move
     uint16_t  m_nextPalette[16] = {0};
     volatile bool m_framePending = false;
+    uint16_t* m_mouseSprite = 0;
+    uint16_t  m_cursorImage[16] = {0};
+    uint16_t  m_cursorMask[16] = {0};
+    int16_t   m_cursorX = 256;
+    int16_t   m_cursorY = 160;
+    int16_t   m_cursorHotX = 0;
+    int16_t   m_cursorHotY = 0;
+    bool      m_cursorVisible = false;
     DirtyRect m_syncRects[kMaxDirtyRects] = {};
     uint16_t m_syncRectCount = 0;
 };

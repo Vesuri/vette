@@ -411,10 +411,10 @@ bool PlatformAmiga::run()
     if (ok) s_screen = &screen;
 
     // Our list is installed and the mode registers are set — safe to start display DMA.
-    // The copper restarts from COP1LC (ours) at the next vblank.  ⚠ No sprite DMA: nothing
-    // here uses sprites, and BPLCON2 already puts the playfield in front.
+    // Sprite 0 is the mouse pointer and is rebuilt by VetteScreen at every VBI.
     if (ok)
-        *dmaconPointer = (uint16_t)(DMAF_SETCLR | DMAF_MASTER | DMAF_COPPER | DMAF_RASTER);
+        *dmaconPointer = (uint16_t)(DMAF_SETCLR | DMAF_MASTER | DMAF_COPPER
+                                  | DMAF_RASTER | DMAF_SPRITE);
 
     // Install the keyboard edge queue while Exec calls are still legal.
     if (ok) ok = vetteInputInitialize();
