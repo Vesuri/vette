@@ -532,6 +532,9 @@ ifdef PROBES
 PROBE_SYMS += g_probePicture140TrapPC g_probePicture140Return \
               g_probePicture140Ticks g_probePicture140Frames g_probeIntroGeometry \
               g_probeStaticCollision g_probeLakeCollision \
+              g_probeSkipC2P g_probeC2PFrames g_probeC2PRects g_probeC2PPixels \
+              g_probeCopyMapIdentity g_probeCopyMapHits g_probeCopyMapMisses \
+              g_probeCopyBitsTicks g_probeCopyBitsCalls \
               g_macExitState g_macHostReturnSP \
               g_restoreSavedDmacon g_restoreActualDmacon \
               g_restoreSavedIntena g_restoreActualIntena g_restoreViewMatches \

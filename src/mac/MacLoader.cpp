@@ -40,6 +40,13 @@ volatile uint16_t g_stageCDepth = 1;       // _BlockMove is row 1
 volatile uint32_t g_macTicks = 0;
 volatile uint32_t g_mouseVBISamples = 0;
 volatile uint32_t g_mouseVBIMoves = 0;
+#ifdef VETTE_PROBE
+volatile uint32_t g_probeCopyMapIdentity = 0;
+volatile uint32_t g_probeCopyMapHits = 0;
+volatile uint32_t g_probeCopyMapMisses = 0;
+volatile uint32_t g_probeCopyBitsTicks = 0;
+volatile uint32_t g_probeCopyBitsCalls = 0;
+#endif
 volatile uint32_t g_macDrivingIterations = 0;
 volatile uint32_t g_macDrivingCallbacks = 0;
 #ifdef VETTE_TOUR_MODE_PROBE
@@ -3760,6 +3767,22 @@ static bool drawQuickDrawText(const uint8_t* text, uint16_t length,
     return true;
 }
 
+static __attribute__((noinline)) void shiftPackedCopyRowsC(
+    const uint8_t* source, uint8_t* destination,
+    uint16_t bytesPerRow, uint16_t height,
+    uint16_t sourceModulo, uint16_t destinationModulo)
+{
+    while (height--) {
+        uint16_t bytes = bytesPerRow;
+        while (bytes--) {
+            *destination++ = (uint8_t)((source[0] << 4) | (source[1] >> 4));
+            ++source;
+        }
+        source += sourceModulo;
+        destination += destinationModulo;
+    }
+}
+
 static bool copyBits(const uint8_t* sourceBitmap, const uint8_t* destinationBitmap,
                      const uint8_t* sourceRect, const uint8_t* destinationRect,
                      uint16_t mode, const uint8_t* maskRegion)
@@ -3786,9 +3809,28 @@ static bool copyBits(const uint8_t* sourceBitmap, const uint8_t* destinationBitm
     int16_t toRight = (int16_t)read16(destinationRect + 6);
     if (fromBottom <= fromTop || fromRight <= fromLeft
         || toBottom <= toTop || toRight <= toLeft) return false;
-    uint8_t colorMap[16], packedColorMap[256];
+    struct ColorMapCache {
+        const uint8_t* source;
+        const uint8_t* destination;
+        uint32_t sourceSeed;
+        uint32_t destinationSeed;
+        uint8_t color[16];
+        uint8_t packed[256];
+        bool mapped;
+    };
+    static ColorMapCache colorCaches[4] = {};
+    static uint16_t nextColorCache = 0;
+    static uint8_t identityColorMap[16];
+    static uint8_t identityPackedColorMap[256];
+    static bool identityReady = false;
+    if (!identityReady) {
+        for (uint16_t i = 0; i < 16; ++i) identityColorMap[i] = (uint8_t)i;
+        for (uint16_t i = 0; i < 256; ++i) identityPackedColorMap[i] = (uint8_t)i;
+        identityReady = true;
+    }
+    const uint8_t* colorMap = identityColorMap;
+    const uint8_t* packedColorMap = identityPackedColorMap;
     bool colorsMapped = false;
-    for (uint16_t i = 0; i < 16; ++i) colorMap[i] = (uint8_t)i;
     const uint8_t* sourceColors = bitmapColorTable(sourceBitmap);
     const uint8_t* destinationColors = bitmapColorTable(destinationBitmap);
     // Color QuickDraw treats matching ctSeed values as the same color
@@ -3797,29 +3839,69 @@ static bool copyBits(const uint8_t* sourceBitmap, const uint8_t* destinationBitm
     // update sees a changed device seed and therefore needs translation.
     if (mode == 0 && sourceColors && destinationColors
         && read32(sourceColors) != read32(destinationColors)) {
-        for (uint8_t sourceIndex = 0; sourceIndex < 16; ++sourceIndex) {
-            const uint8_t* sourceColor = sourceColors + 8 + (uint16_t)sourceIndex * 8;
-            uint16_t sr = read16(sourceColor + 2), sg = read16(sourceColor + 4);
-            uint16_t sb = read16(sourceColor + 6);
-            uint32_t bestDistance = 0xffffffffUL;
-            uint8_t bestIndex = 0;
-            for (uint8_t destinationIndex = 0; destinationIndex < 16; ++destinationIndex) {
-                const uint8_t* destinationColor
-                    = destinationColors + 8 + (uint16_t)destinationIndex * 8;
-                uint16_t dr = read16(destinationColor + 2), dg = read16(destinationColor + 4);
-                uint16_t db = read16(destinationColor + 6);
-                uint16_t distance = colorDistance4(sr, sg, sb, dr, dg, db);
-                if (distance < bestDistance) {
-                    bestDistance = distance;
-                    bestIndex = destinationIndex;
-                }
+        uint32_t sourceSeed = read32(sourceColors);
+        uint32_t destinationSeed = read32(destinationColors);
+        ColorMapCache* cache = 0;
+        for (uint16_t i = 0; i < sizeof(colorCaches) / sizeof(colorCaches[0]); ++i) {
+            if (colorCaches[i].source == sourceColors
+                && colorCaches[i].destination == destinationColors
+                && colorCaches[i].sourceSeed == sourceSeed
+                && colorCaches[i].destinationSeed == destinationSeed) {
+                cache = &colorCaches[i];
+                break;
             }
-            colorMap[sourceIndex] = bestIndex;
-            if (bestIndex != sourceIndex) colorsMapped = true;
         }
+        if (!cache) {
+            cache = &colorCaches[nextColorCache++];
+            if (nextColorCache == sizeof(colorCaches) / sizeof(colorCaches[0]))
+                nextColorCache = 0;
+            cache->source = sourceColors;
+            cache->destination = destinationColors;
+            cache->sourceSeed = sourceSeed;
+            cache->destinationSeed = destinationSeed;
+            cache->mapped = false;
+            for (uint8_t sourceIndex = 0; sourceIndex < 16; ++sourceIndex) {
+                const uint8_t* sourceColor
+                    = sourceColors + 8 + (uint16_t)sourceIndex * 8;
+                uint16_t sr = read16(sourceColor + 2), sg = read16(sourceColor + 4);
+                uint16_t sb = read16(sourceColor + 6);
+                uint32_t bestDistance = 0xffffffffUL;
+                uint8_t bestIndex = 0;
+                for (uint8_t destinationIndex = 0; destinationIndex < 16;
+                     ++destinationIndex) {
+                    const uint8_t* destinationColor
+                        = destinationColors + 8 + (uint16_t)destinationIndex * 8;
+                    uint16_t dr = read16(destinationColor + 2);
+                    uint16_t dg = read16(destinationColor + 4);
+                    uint16_t db = read16(destinationColor + 6);
+                    uint16_t distance = colorDistance4(sr, sg, sb, dr, dg, db);
+                    if (distance < bestDistance) {
+                        bestDistance = distance;
+                        bestIndex = destinationIndex;
+                    }
+                }
+                cache->color[sourceIndex] = bestIndex;
+                if (bestIndex != sourceIndex) cache->mapped = true;
+            }
+            for (uint16_t i = 0; i < 256; ++i)
+                cache->packed[i] = (uint8_t)((cache->color[i >> 4] << 4)
+                                            | cache->color[i & 0x0f]);
+#ifdef VETTE_PROBE
+            ++g_probeCopyMapMisses;
+#endif
+        } else {
+#ifdef VETTE_PROBE
+            ++g_probeCopyMapHits;
+#endif
+        }
+        colorMap = cache->color;
+        packedColorMap = cache->packed;
+        colorsMapped = cache->mapped;
+#ifdef VETTE_PROBE
+    } else {
+        ++g_probeCopyMapIdentity;
+#endif
     }
-    for (uint16_t i = 0; i < 256; ++i)
-        packedColorMap[i] = (uint8_t)((colorMap[i >> 4] << 4) | colorMap[i & 0x0f]);
     uint16_t width = (uint16_t)(toRight - toLeft);
     uint16_t height = (uint16_t)(toBottom - toTop);
     int16_t clipTop = destinationTop, clipLeft = destinationLeft;
@@ -4004,6 +4086,78 @@ static bool copyBits(const uint8_t* sourceBitmap, const uint8_t* destinationBitm
                 uint8_t& destinationByte = destinationRow[destinationByteIndex];
                 if (mode == 1) destinationByte = (uint8_t)(destinationByte | sourceValue);
                 else destinationByte = (uint8_t)(destinationByte & (uint8_t)~sourceValue);
+            }
+        }
+        return true;
+    }
+    if (unscaled && mode == 0 && !colorsMapped && sourcePixels != destinationPixels
+        && packedTop < packedBottom && packedLeft < packedRight) {
+        // Identity-colour srcCopy with opposite nibble alignment is the garage
+        // animation hot path (for example 44x44 pixels from x=50 to x=311).
+        // It has no scaling, palette operation or overlap, so retain only the
+        // two edge read/modify/writes and assemble the packed interior bytes
+        // directly. The general cross-GWorld loop below re-tested mode,
+        // mapping and nibble parity for every pair of pixels.
+        uint16_t pixelCount = (uint16_t)(packedRight - packedLeft);
+        uint16_t sourceFirstColumn = (uint16_t)(packedSourceLeft - sourceLeft);
+        uint16_t destinationFirstColumn = (uint16_t)(packedLeft - destinationLeft);
+        uint16_t leadingPixel = (uint16_t)(destinationFirstColumn & 1);
+        uint16_t interiorPixels = (uint16_t)(pixelCount - leadingPixel);
+        uint16_t interiorBytes = (uint16_t)(interiorPixels >> 1);
+        uint16_t trailingPixel = (uint16_t)(interiorPixels & 1);
+        uint16_t interiorSourceColumn = (uint16_t)(sourceFirstColumn + leadingPixel);
+        uint16_t interiorDestinationColumn
+            = (uint16_t)(destinationFirstColumn + leadingPixel);
+
+        // Preserve only the destination nibbles outside the rectangle. Do
+        // both edges in one row walk, then process the packed interior as one
+        // rectangular byte operation instead of redoing row-address multiplies
+        // and mode/parity decisions for every byte.
+        for (int16_t y = packedTop; y < packedBottom; ++y) {
+            int16_t sourceY = (int16_t)(fromTop + y - toTop);
+            const uint8_t* sourceRow = sourcePixels
+                + multiplyUnsigned16((uint16_t)(sourceY - sourceTop), sourceRowBytes);
+            uint8_t* destinationRow = destinationPixels
+                + multiplyUnsigned16((uint16_t)(y - destinationTop), destinationRowBytes);
+            if (leadingPixel) {
+                uint8_t sourceByte = sourceRow[sourceFirstColumn >> 1];
+                uint8_t value = sourceFirstColumn & 1 ? (uint8_t)(sourceByte & 0x0f)
+                                                      : (uint8_t)(sourceByte >> 4);
+                uint8_t& destinationByte
+                    = destinationRow[destinationFirstColumn >> 1];
+                destinationByte = (uint8_t)((destinationByte & 0xf0) | value);
+            }
+            if (trailingPixel) {
+                uint16_t sourceColumn = (uint16_t)(sourceFirstColumn + pixelCount - 1);
+                uint16_t destinationColumn
+                    = (uint16_t)(destinationFirstColumn + pixelCount - 1);
+                uint8_t sourceByte = sourceRow[sourceColumn >> 1];
+                uint8_t value = sourceColumn & 1 ? (uint8_t)(sourceByte & 0x0f)
+                                                 : (uint8_t)(sourceByte >> 4);
+                uint8_t& destinationByte
+                    = destinationRow[destinationColumn >> 1];
+                destinationByte = (uint8_t)((destinationByte & 0x0f) | (value << 4));
+            }
+        }
+        if (interiorBytes) {
+            const uint8_t* source = sourcePixels
+                + multiplyUnsigned16((uint16_t)(packedSourceTop - sourceTop), sourceRowBytes)
+                + (interiorSourceColumn >> 1);
+            uint8_t* destination = destinationPixels
+                + multiplyUnsigned16((uint16_t)(packedTop - destinationTop),
+                                     destinationRowBytes)
+                + (interiorDestinationColumn >> 1);
+            uint16_t height = (uint16_t)(packedBottom - packedTop);
+            if (interiorSourceColumn & 1) {
+                shiftPackedCopyRowsC(source, destination, interiorBytes, height,
+                    (uint16_t)(sourceRowBytes - interiorBytes),
+                    (uint16_t)(destinationRowBytes - interiorBytes));
+            } else {
+                for (uint16_t row = 0; row < height; ++row) {
+                    blockMove(source, destination, interiorBytes);
+                    source += sourceRowBytes;
+                    destination += destinationRowBytes;
+                }
             }
         }
         return true;
@@ -7450,11 +7604,18 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
         const uint8_t* sourceRect = (const uint8_t*)read32(userStack + 10);
         uint16_t mode = read16(userStack + 4);
         const uint8_t* maskRegion = (const uint8_t*)read32(userStack);
-        s_suppressDirectScreenDirty = fullDrivingPublish;
+        // CopyBits owns an exact destination rectangle and publishes it once
+        // below. Its packed fast paths use BlockMove row by row; letting that
+        // generic hook mark the screen would rebuild and merge the same dirty
+        // rectangle once per scanline (44 times for every garage car frame).
+        // Direct BlockMove calls outside CopyBits retain their conservative
+        // dirty tracking.
+        s_suppressDirectScreenDirty = true;
         bool copied;
         {
 #ifdef VETTE_PROBE
             VetteProfileScope profileCopyBits(kProfileCopyBits);
+            uint32_t copyBitsStart = vetteProfileBeamEpoch();
 #endif
             copied = false;
 #ifdef VETTE_DRIVING_COPY_ASM
@@ -7466,6 +7627,10 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
             if (!copied)
                 copied = copyBits(sourceBitmap, destinationBitmap, sourceRect,
                                   destinationRect, mode, maskRegion);
+#ifdef VETTE_PROBE
+            g_probeCopyBitsTicks += vetteProfileBeamEpoch() - copyBitsStart;
+            ++g_probeCopyBitsCalls;
+#endif
         }
         s_suppressDirectScreenDirty = false;
         if (copied) {

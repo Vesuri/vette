@@ -2146,6 +2146,21 @@ once, exited both Main driving loops, and settled back in the garage at tick 3,8
 optional dynamometer is covered as a complete garage → dynamometer → garage → race → result →
 garage lifecycle, not merely as a rendered animation.
 
+The dynamometer's apparent display cost was measured separately rather than attributed to C2P.
+The original routine makes 1,385 `CopyBits` calls: its repeated car frames are 44×44 transfers,
+while the pre-rendered 83-pixel-high graph is revealed by growing its copy rectangle to width 59.
+The baseline presented 899 frames in 944 PAL fields, but converted only 2,682,672 pixels—an average
+of 2,984 pixels per update, not a full screen. Bypassing C2P still took 942 fields, proving the
+chunky QuickDraw composition was the bottleneck.
+
+All 1,385 transfers use an identity ColorTable relationship. `CopyBits` now retains permanent
+identity tables, caches genuine ColorTable translations by table address and `ctSeed`, and batches
+the opposite-nibble-aligned packed interior while preserving only the two edge nibbles. The same
+authored gauge value 59 and call count now complete in 267 fields / 321 Mac ticks; direct
+`CopyBits` time falls from 51,954,185 to 13,813,683 beam units. Restoring real C2P produces the
+same 267-field result (260 presented frames, 321 dirty rectangles, 981,808 converted pixels), so
+the measured improvement is in composition rather than hidden presentation work.
+
 ## Complete difficulty-selection lifecycles
 
 `GARAGE_DIFFICULTY=1..3` extends the same ordinary-input harness through the shipped

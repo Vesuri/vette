@@ -41,6 +41,12 @@ volatile uint16_t g_beamPresentMin = 0xffff;
 volatile uint16_t g_beamPresentMax = 0;
 volatile uint32_t g_beamPresents = 0;
 volatile uint32_t g_beamPresentsLate = 0;
+#ifdef VETTE_PROBE
+volatile uint16_t g_probeSkipC2P = 0;
+volatile uint32_t g_probeC2PFrames = 0;
+volatile uint32_t g_probeC2PRects = 0;
+volatile uint32_t g_probeC2PPixels = 0;
+#endif
 #ifdef VETTE_FILLWATCH
 volatile uint32_t g_fillWatchFrames = 0;
 volatile uint32_t g_fillWatchRows = 0;
@@ -555,6 +561,14 @@ bool VetteScreen::presentMacFrame(const uint8_t* chunky, const uint8_t* colorTab
 
 #ifdef VETTE_PROBE
     VetteProfileScope profilePresent(kProfilePresent);
+    if (g_probeSkipC2P) {
+        // Diagnostic only: retain all original chunky composition and dirty
+        // publication, but remove conversion/display cost so probes can
+        // distinguish those two halves of a slow scene.
+        ++g_macFramesQueued;
+        ++g_macFramesPresented;
+        return true;
+    }
 #endif
 
 #ifdef VETTE_FREEWAY_ROUTE
@@ -599,6 +613,17 @@ bool VetteScreen::presentMacFrame(const uint8_t* chunky, const uint8_t* colorTab
         normalized[normalizedCount++] = rectangle;
     }
     bool pixelsDirty = normalizedCount != 0;
+#ifdef VETTE_PROBE
+    if (pixelsDirty) {
+        ++g_probeC2PFrames;
+        g_probeC2PRects += normalizedCount;
+        for (uint16_t i = 0; i < normalizedCount; ++i) {
+            uint16_t width = (uint16_t)(normalized[i].right - normalized[i].left);
+            for (int16_t y = normalized[i].top; y < normalized[i].bottom; ++y)
+                g_probeC2PPixels += width;
+        }
+    }
+#endif
 
     // After the previous swap m_back is the frame from two updates ago. Bring
     // forward each rectangle changed last time unless one of this frame's
