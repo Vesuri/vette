@@ -1478,7 +1478,9 @@ copper `SPR0PT` pair, leaving the currently scanned object untouched. AGA HIRES 
 keeps the pointer at game-pixel scale, and colours 17..19 supply
 black, neutral XOR fallback, and white independently of the game's palette. The chunky surface and
 dirty list are now cursor-free, so the pointer remains live at the 50 Hz display cadence even when
-the game has no frame ready. `BPLCON2=$0024` sets both playfield priorities to four, keeping sprite
+the game has no frame ready. The VBI itself samples `JOY0DAT`, advances the cursor and redirected
+Macintosh mouse globals, and then builds that field's sprite; `GetNextEvent` no longer gates mouse
+tracking. `BPLCON2=$0024` sets both playfield priorities to four, keeping sprite
 0 in front of every nonzero playfield pixel as well as the background. The same copper list owns
 all eight sprite pointers: channels 1--7 point at a shared cleared, zero-height chip-RAM sprite so
 enabling sprite DMA cannot follow stale OS pointers through arbitrary memory. `_DragWindow` is also

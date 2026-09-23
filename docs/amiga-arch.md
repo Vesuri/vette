@@ -102,6 +102,12 @@ current field may still be fetching. The field choice uses the same measured inv
 polarity as the bitplane pointers: the VBI observes the current field while preparing the list for
 the opposite one.
 
+Mouse tracking is also a VBI responsibility. After the field's time-critical bitplane pointers are
+written, the handler samples `JOY0DAT` and the left button, integrates the signed 8-bit counter
+deltas, updates the redirected Macintosh `MTemp`, `RawMouse`, `Mouse`, and `MBState` globals, and
+publishes the position directly to sprite 0 before its field object is built. Toolbox event polling
+only consumes this asynchronous state; it cannot throttle the visible pointer or mouse steering.
+
 ⚠ **`AmigaHardware::isLongFrame()` did not LINK** — in the ASSEMBLER configurations it was declared
 `__asm`/bridged and `jsr`ed `_isLongFrame__13AmigaHardwareFv`, a symbol no `.s` ever defined, so the
 *first* caller was an undefined-symbol link error and only an interlaced display needs the field

@@ -38,6 +38,8 @@ volatile uint16_t g_jumpEntryCount = 0;
 volatile uint16_t g_blockMoveCount = 0;
 volatile uint16_t g_stageCDepth = 1;       // _BlockMove is row 1
 volatile uint32_t g_macTicks = 0;
+volatile uint32_t g_mouseVBISamples = 0;
+volatile uint32_t g_mouseVBIMoves = 0;
 volatile uint32_t g_macDrivingIterations = 0;
 volatile uint32_t g_macDrivingCallbacks = 0;
 #ifdef VETTE_TOUR_MODE_PROBE
@@ -208,10 +210,12 @@ static bool s_fidelityRandomSeedPending = true;
 #endif
 static uint8_t* s_currentA5;
 static uint16_t s_currentResourceFork = 0;  // application resource file at process launch
-static bool s_mouseInitialized;
+static volatile bool s_mouseInitialized;
 static uint8_t s_mouseCounterX, s_mouseCounterY;
-static int16_t s_mouseX = 256, s_mouseY = 160;
+static volatile int16_t s_mouseX = 256, s_mouseY = 160;
+static volatile bool s_mouseHardwareButtonDown;
 static bool s_mouseButtonDown;
+static uint8_t* s_mouseGlobalsA5;
 #ifdef VETTE_GARAGE_CLICK
 static uint8_t s_garageClickPhase;
 static uint8_t s_garageGearPhase;
@@ -5722,7 +5726,7 @@ static int16_t addClampedMouseDelta(int16_t value, int8_t delta, int16_t maximum
     return changed;
 }
 
-static bool pollMacMouse()
+extern "C" void vetteMacMouseVBI()
 {
     uint16_t counters = *joy0datPointer;
     uint8_t counterX = (uint8_t)counters;
@@ -5731,24 +5735,12 @@ static bool pollMacMouse()
     if (!s_mouseInitialized) {
         s_mouseCounterX = counterX;
         s_mouseCounterY = counterY;
-        s_mouseButtonDown = buttonDown;
         s_mouseInitialized = true;
-        if (s_currentA5) {
-            int16_t globalV = (int16_t)(s_mouseY + 91);
-            int16_t globalH = (int16_t)(s_mouseX + 64);
-            write16(s_currentA5 + kShadowMTempV, (uint16_t)globalV);
-            write16(s_currentA5 + kShadowMTempH, (uint16_t)globalH);
-            write16(s_currentA5 + kShadowRawMouseV, (uint16_t)globalV);
-            write16(s_currentA5 + kShadowRawMouseH, (uint16_t)globalH);
-            write16(s_currentA5 + kShadowMouseV, (uint16_t)globalV);
-            write16(s_currentA5 + kShadowMouseH, (uint16_t)globalH);
-        }
     } else {
         int8_t deltaX = (int8_t)(counterX - s_mouseCounterX);
         int8_t deltaY = (int8_t)(counterY - s_mouseCounterY);
         s_mouseX = addClampedMouseDelta(s_mouseX, deltaX, 511);
         s_mouseY = addClampedMouseDelta(s_mouseY, deltaY, 319);
-        if (deltaX || deltaY) publishMouseCursor();
         if (s_currentA5 && (deltaX || deltaY)) {
             const int16_t verticals[] = {
                 kShadowMTempV, kShadowRawMouseV, kShadowMouseV
@@ -5757,19 +5749,42 @@ static bool pollMacMouse()
                 kShadowMTempH, kShadowRawMouseH, kShadowMouseH
             };
             for (uint16_t i = 0; i < 3; ++i) {
-                int16_t v = (int16_t)read16(s_currentA5 + verticals[i]);
-                int16_t h = (int16_t)read16(s_currentA5 + horizontals[i]);
-                write16(s_currentA5 + verticals[i],
-                        (uint16_t)addClampedMouseDelta(v, deltaY, 479));
-                write16(s_currentA5 + horizontals[i],
-                        (uint16_t)addClampedMouseDelta(h, deltaX, 639));
+                volatile uint16_t* v = (volatile uint16_t*)(s_currentA5 + verticals[i]);
+                volatile uint16_t* h = (volatile uint16_t*)(s_currentA5 + horizontals[i]);
+                *v = (uint16_t)addClampedMouseDelta((int16_t)*v, deltaY, 479);
+                *h = (uint16_t)addClampedMouseDelta((int16_t)*h, deltaX, 639);
             }
         }
+        if (deltaX || deltaY) ++g_mouseVBIMoves;
         s_mouseCounterX = counterX;
         s_mouseCounterY = counterY;
     }
+    if (s_currentA5 && s_mouseGlobalsA5 != s_currentA5) {
+        // Mouse sampling begins as soon as the Amiga screen is live, before
+        // the Macintosh A5 world exists. Initialize its redirected globals on
+        // the first VBI after that world is published.
+        int16_t globalV = (int16_t)(s_mouseY + 91);
+        int16_t globalH = (int16_t)(s_mouseX + 64);
+        *(volatile uint16_t*)(s_currentA5 + kShadowMTempV) = (uint16_t)globalV;
+        *(volatile uint16_t*)(s_currentA5 + kShadowMTempH) = (uint16_t)globalH;
+        *(volatile uint16_t*)(s_currentA5 + kShadowRawMouseV) = (uint16_t)globalV;
+        *(volatile uint16_t*)(s_currentA5 + kShadowRawMouseH) = (uint16_t)globalH;
+        *(volatile uint16_t*)(s_currentA5 + kShadowMouseV) = (uint16_t)globalV;
+        *(volatile uint16_t*)(s_currentA5 + kShadowMouseH) = (uint16_t)globalH;
+        s_mouseGlobalsA5 = s_currentA5;
+    }
+    s_mouseHardwareButtonDown = buttonDown;
     if (s_currentA5) s_currentA5[kShadowMBState] = buttonDown ? 0x00 : 0x80;
-    return buttonDown;
+    if (s_loudStopScreen)
+        s_loudStopScreen->setMousePositionFromVBI(s_mouseX, s_mouseY);
+    ++g_mouseVBISamples;
+}
+
+static bool pollMacMouse()
+{
+    // Position, button and redirected low-memory globals are maintained by
+    // vetteMacMouseVBI(). Event polling only consumes that asynchronous state.
+    return s_mouseHardwareButtonDown;
 }
 
 static bool nextEvent(uint16_t mask, uint8_t* event)
@@ -7586,7 +7601,12 @@ bool MacLoader::run(VetteScreen* screen)
 
     uint8_t* a5;
     if (!buildA5World(a5)) return false;
+    // The VBI consumes this 32-bit pointer. Publish it atomically with respect
+    // to the level-3 handler; a torn 68000 longword would point the ISR at
+    // arbitrary memory.
+    Disable();
     s_currentA5 = a5;
+    Enable();
     if (!redirectLowMemoryGlobals(a5) || !disableCopyProtection()
         || !installDrivingBoundaryTrap() || !installDrivingRasterTraps()
         || !installStaticCollisionProbe() || !installAdverseDamageCheckpoint()

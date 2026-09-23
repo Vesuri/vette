@@ -62,10 +62,13 @@ public:
     bool presentMacFrame(const uint8_t* chunky, const uint8_t* colorTable,
                          const DirtyRect* dirtyRects, uint16_t dirtyRectCount);
 
-    // Publish the Macintosh cursor to Amiga sprite 0. The main thread owns the
-    // logical mouse state; vbiUpdate() is the only writer of the live sprite
-    // control/data words, so pointer motion is independent of game/C2P cadence.
+    // Publish the Macintosh cursor shape/state to Amiga sprite 0. Physical
+    // position is sampled by the VBI independently of game/Toolbox polling.
     void setMouseCursor(const uint8_t* cursor, int16_t x, int16_t y, bool visible);
+
+    // VBI-only position publication. A 68000 word store is atomic, and the VBI
+    // immediately consumes these coordinates when it builds the next sprite.
+    void setMousePositionFromVBI(int16_t x, int16_t y);
 
     // Stage B's fail-loud surface.  It replaces the captured frame with a diagnostic
     // generated on the Amiga, so an unknown Mac trap cannot masquerade as a freeze.

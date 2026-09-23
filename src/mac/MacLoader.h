@@ -32,4 +32,9 @@ public:
 // code that waits without making a Toolbox call still sees transitions.
 extern "C" void vetteMacRawKeyChanged(uint8_t rawKey, bool down);
 
+// The Macintosh mouse globals were maintained by a vertical-retrace task, not
+// by GetNextEvent.  The Amiga VBI calls this after the time-critical bitplane
+// pointer update and before sprite 0 is built for the upcoming field.
+extern "C" void vetteMacMouseVBI();
+
 #endif

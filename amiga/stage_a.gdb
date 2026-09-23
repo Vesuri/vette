@@ -47,11 +47,14 @@ printf "VPOSR[0..7]   = %04X %04X %04X %04X %04X %04X %04X %04X\n", \
 printf "                (bit 15 must ALTERNATE; a constant word = not interlaced, FFFF = bad read)\n"
 printf "BPLCON2       = %04X      (want 0024: every sprite pair ahead of both playfields)\n", *(unsigned short*)0xdff104
 set $cursorPointerA = ((m_copper[8] & 0xffff) << 16) | (m_copper[9] & 0xffff)
+set $mouseSamplesA = g_mouseVBISamples
 tbreak VetteScreen::vbiUpdate if g_laceFields >= 251
 continue
 set $cursorPointerB = ((m_copper[8] & 0xffff) << 16) | (m_copper[9] & 0xffff)
+set $mouseSamplesB = g_mouseVBISamples
 set $cursorAlternates = ($cursorPointerA != $cursorPointerB) && (($cursorPointerA == (unsigned int)m_mouseSprite[0] && $cursorPointerB == (unsigned int)m_mouseSprite[1]) || ($cursorPointerA == (unsigned int)m_mouseSprite[1] && $cursorPointerB == (unsigned int)m_mouseSprite[0]))
 printf "cursorSprites = %08X/%08X fields=%08X/%08X alternating=%u (want 1)\n", m_mouseSprite[0], m_mouseSprite[1], $cursorPointerA, $cursorPointerB, $cursorAlternates
+printf "mouseVBI      = %u -> %u delta=%u (want 1 sample per field)\n", $mouseSamplesA, $mouseSamplesB, $mouseSamplesB - $mouseSamplesA
 set $emptySprite = (unsigned int)m_emptySprite
 set $spritePointersOk = 1
 set $channel = 1

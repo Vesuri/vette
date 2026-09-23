@@ -13,6 +13,7 @@
 #include "framework/CopperList.h"   /* copperMove() -- the list entries, nothing else */
 #include "VetteScreen.h"
 #include "PerfProbe.h"
+#include "mac/MacLoader.h"
 
 extern "C" {
 #ifdef VETTE_C2P_ASM
@@ -394,6 +395,12 @@ void VetteScreen::vbiUpdate()
         m_copper[m_ptrIndex + k * 2 + 0] = copperMove(bpl1pth + k * 4, (uint16_t)(p >> 16));
         m_copper[m_ptrIndex + k * 2 + 1] = copperMove(bpl1ptl + k * 4, (uint16_t)p);
     }
+
+    // Classic Mac OS tracks the mouse from vertical retrace. Do this only
+    // after the time-critical bitplane pointer writes, but before sprite 0 is
+    // built, so every field sees the newest hardware counters even when the
+    // game has not called GetNextEvent (or any Toolbox trap) for a long time.
+    vetteMacMouseVBI();
     updateMouseSprite(oddField);
 }
 
@@ -416,6 +423,12 @@ void VetteScreen::setMouseCursor(const uint8_t* cursor, int16_t x, int16_t y,
         m_cursorHotX = (int16_t)(cursor[66] << 8 | cursor[67]);
     }
     Enable();
+}
+
+void VetteScreen::setMousePositionFromVBI(int16_t x, int16_t y)
+{
+    m_cursorX = x;
+    m_cursorY = y;
 }
 
 void VetteScreen::updateMouseSprite(bool oddField)
