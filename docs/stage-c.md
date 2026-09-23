@@ -1134,6 +1134,16 @@ hypothetical lower levels retain their relative proportion. Sample-byte RMS and 
 enter this mapping; the unchanged sample data already carries the same authored amplitude on both
 systems.
 
+Paula channel replacement now follows the hardware restart protocol synchronously: disable the
+channel, wait two raster lines, install and enable the new attack, wait another two raster lines,
+then install the declared sustain loop or silent one-word reload. Previously the bridge cleared
+and immediately re-enabled DMA and deferred the reload-register write to the next arbitrary Line-A
+trap. Both operations depended on Paula DMA-slot phase; in particular, the short `beep2` GO cue
+could occasionally fail to start or could latch the silent reload as its attack. The bounded
+`make driving-audio-countdown-regression` workload requires the original context-2 sequence
+`beep1, beep1, beep2` (ordinals 10, 10, 11) and three completed AUD2 restart protocols before it
+accepts the first post-GO frame.
+
 `make driving-audio-regression` makes this boundary executable rather than documentary. Given the
 separately captured Macintosh oracle trace, it rebuilds and runs the bounded normal-road event
 workload and requires the oracle's exact Bogas Load signatures plus a source-ordered engine-pitch
@@ -1175,9 +1185,9 @@ by the measured 27,000-and-rising Play stream; 150 and 120 are the exact lifetim
 crash loads. These semantics now come from the shipped driver, not timing inference.
 
 The loop metadata is honored as well. When an INST supplies nonempty loop bounds, Paula first
-starts from the complete PCM body; at the next safe trap boundary the bridge changes only the DMA
-reload location and length. The attack therefore plays once and subsequent hardware reloads repeat
-the source-declared sustain region. The Engine resource verifies as bytes 370..5682; its INST rate
+starts from the complete PCM body; after the hardware's two-line latch interval the bridge changes
+only the DMA reload location and length. The attack therefore plays once and subsequent hardware
+reloads repeat the source-declared sustain region. The Engine resource verifies as bytes 370..5682; its INST rate
 would be Paula period 554 for a direct context, while context 0 correctly uses the 11.127 kHz mixer
 base before applying the phase step. Instruments with zero loop bounds play their complete body
 only once, then reload a reserved silent word until the original Bogas context is replaced or
@@ -1216,7 +1226,8 @@ must capture or reconstruct the Paula voices over the same Bogas-call interval.
 
 `make driving-audio-capture` establishes that target interval at the same original wrapper
 boundary. It performs a clean A1200 diagnostic build, follows the bounded Course One road workload
-for 100 original driving iterations, and retains the complete event log in
+with the oracle's `$3BD90000` random seed for 100 original driving iterations, and retains the
+complete event log in
 `tmp/amiga-driving-audio.log`. The measured run contains one Start, six Loads and 99 engine Play
 updates with no Stop, Deactivate or loud stop. Context 0 loads the indefinite Engine at tick 1,678;
 context 2 then loads beep1 twice, beep2 once and thud twice. At the tick-2,661 ceiling the

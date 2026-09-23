@@ -5,7 +5,7 @@
 VETTE_APP_RSRC ?= tmp/rsrc_VETTE!_VETTE!_Folder_Folder_Color_VETTE!_Color_VETTE!.rsrc
 VETTE_DATA_RSRC ?= tmp/rsrc_VETTE!_VETTE!_Folder_Folder_Color_VETTE!_VETTE!.Data.rsrc
 
-.PHONY: all todo static-map-check coverage-check gameplay-regression-smoke gameplay-regression install-original-data release release-check fidelity-check driving-sequence-capture driving-sequence-compare driving-motion-reference driving-view-reference driving-view-capture driving-view-compare driving-view-regression driving-f1-reference driving-f1-capture driving-f1-compare driving-audio-reference driving-audio-capture driving-audio-compare driving-audio-regression driving-motion-capture driving-motion-compare driving-motion-viewport-compare driving-cadence-compare driving-control-audit driving-palette-compare driving-profile help
+.PHONY: all todo static-map-check coverage-check gameplay-regression-smoke gameplay-regression install-original-data release release-check fidelity-check driving-sequence-capture driving-sequence-compare driving-motion-reference driving-view-reference driving-view-capture driving-view-compare driving-view-regression driving-f1-reference driving-f1-capture driving-f1-compare driving-audio-reference driving-audio-capture driving-audio-compare driving-audio-countdown-regression driving-audio-regression driving-motion-capture driving-motion-compare driving-motion-viewport-compare driving-cadence-compare driving-control-audit driving-palette-compare driving-profile help
 
 all: help
 
@@ -38,6 +38,7 @@ help:
 	@echo "  make driving-audio-capture     capture target Bogas/Paula events for the same road workload"
 	@echo "  make driving-audio-compare     compare reference/target audio events by source progression"
 	@echo "  make driving-audio-regression  gate event fidelity, overlap, replacement and Paula volume"
+	@echo "  make driving-audio-countdown-regression  gate reliable ready-set-GO Paula restarts"
 	@echo "  make driving-motion-capture    capture distinct completed moving Amiga frames"
 	@echo "  make driving-profile  build and measure 300 PAL fields of target-A1200 driving"
 	@echo
@@ -163,7 +164,8 @@ driving-audio-reference:
 driving-audio-capture:
 	@mkdir -p tmp
 	@cd amiga && . ./env.sh && $(MAKE) clean && \
-	  $(MAKE) -j4 PROBES=1 SKIP_INTRO=1 GARAGE_CLICK=1 FOLLOW_ROAD=1 && \
+	  $(MAKE) -j4 PROBES=1 SKIP_INTRO=1 GARAGE_CLICK=1 FOLLOW_ROAD=1 \
+	    FIDELITY_RANDOM_SEED=0x3BD90000 && \
 	  GDBTAIL=240 EXTRA_ARGS="--warp_mode=1" GDBSCRIPT=driving_audio_events.gdb \
 	  ./diag_run.sh 150
 	@cp amiga/.run/gdb-out.log tmp/amiga-driving-audio.log
@@ -176,6 +178,16 @@ driving-audio-compare:
 		tmp/mame-driving-audio.log tmp/amiga-driving-audio.log \
 		--allow-additional-target-loads
 
+driving-audio-countdown-regression:
+	@mkdir -p tmp
+	@cd amiga && . ./env.sh && $(MAKE) clean && \
+	  $(MAKE) -j4 PROBES=1 SKIP_INTRO=1 GARAGE_CLICK=1 FOLLOW_ROAD=1 \
+	    FIDELITY_RANDOM_SEED=0x3BD90000 && \
+	  GDBTAIL=120 EXTRA_ARGS="--warp_mode=1" GDBSCRIPT=driving_audio_countdown.gdb \
+	  ./diag_run.sh 90
+	@cp amiga/.run/gdb-out.log tmp/amiga-driving-audio-countdown.log
+	@grep -q "countdown-audio PASS" tmp/amiga-driving-audio-countdown.log
+
 # The Macintosh trace is deliberately captured separately: it is a slow oracle
 # artifact, while this gate rebuilds and reruns both bounded target workloads.
 driving-audio-regression:
@@ -183,7 +195,8 @@ driving-audio-regression:
 	  { echo "missing tmp/mame-driving-audio.log; run make driving-audio-reference first"; exit 1; }
 	@mkdir -p tmp
 	@cd amiga && . ./env.sh && $(MAKE) clean && \
-	  $(MAKE) -j4 PROBES=1 SKIP_INTRO=1 GARAGE_CLICK=1 FOLLOW_ROAD=1 && \
+	  $(MAKE) -j4 PROBES=1 SKIP_INTRO=1 GARAGE_CLICK=1 FOLLOW_ROAD=1 \
+	    FIDELITY_RANDOM_SEED=0x3BD90000 && \
 	  GDBTAIL=240 EXTRA_ARGS="--warp_mode=1" GDBSCRIPT=driving_audio_events.gdb \
 	  ./diag_run.sh 150
 	@cp amiga/.run/gdb-out.log tmp/amiga-driving-audio.log

@@ -1697,6 +1697,33 @@ static uint16_t bogasRegisterInstrument(const uint8_t* name)
 // the existing reload/deadline state so diagnostics can verify the hardware
 // contract without pretending register readback is meaningful.
 static volatile uint16_t s_bogasVoiceVolume[4];
+#ifdef VETTE_PROBE
+volatile uint16_t g_probeBogasDmaRestarts[4] = {};
+#endif
+
+static uint16_t bogasBeamLine()
+{
+    // V8 lives in VPOSR while V0..V7 live in VHPOSR. Re-read VPOSR so a
+    // raster wrap between the two register reads cannot manufacture a line.
+    uint16_t before, after, horizontal;
+    do {
+        before = *vposrPointer;
+        horizontal = *vhposrPointer;
+        after = *vposrPointer;
+    } while ((before & 1) != (after & 1));
+    return (uint16_t)(((after & 1) << 8) | (horizontal >> 8));
+}
+
+static void waitBogasDmaLines(uint16_t lines)
+{
+    uint16_t previous = bogasBeamLine();
+    while (lines) {
+        uint16_t current = bogasBeamLine();
+        if (current == previous) continue;
+        previous = current;
+        --lines;
+    }
+}
 
 static void stopBogasVoice(uint16_t channel)
 {
@@ -1708,9 +1735,6 @@ static void stopBogasVoice(uint16_t channel)
     s_bogasVoiceVolume[channel] = 0;
 }
 
-static uint8_t* s_bogasPendingReloadData[4];
-static uint16_t s_bogasPendingReloadWords[4];
-
 static void startBogasVoice(uint16_t ordinal, uint16_t channel,
                             uint16_t period, uint16_t volume)
 {
@@ -1719,6 +1743,12 @@ static void startBogasVoice(uint16_t ordinal, uint16_t channel,
     uint16_t dma = (uint16_t)(DMAF_AUD0 << channel);
     volatile uint8_t* audio = (volatile uint8_t*)(0xdff0a0UL + channel * 16);
     *dmaconPointer = dma;
+    // Paula samples an audio DMA transition at its DMA slots, not at the CPU
+    // write which changes DMACON. Clearing and setting the same channel in one
+    // uninterrupted burst can therefore leave the old sample running. Wait
+    // two raster lines after disable before installing and enabling the new
+    // attack, as required by the hardware restart sequence.
+    waitBogasDmaLines(2);
     *(volatile uint32_t*)(audio + 0) = (uint32_t)instrument->chipData;
     *(volatile uint16_t*)(audio + 4) = (uint16_t)((instrument->size + 1) / 2);
     *(volatile uint16_t*)(audio + 6) = period;
@@ -1726,22 +1756,29 @@ static void startBogasVoice(uint16_t ordinal, uint16_t channel,
     s_bogasVoiceVolume[channel] = volume;
     *dmaconPointer = (uint16_t)(DMAF_SETCLR | DMAF_MASTER | dma);
 
-    // Paula latches the initial location/length when DMA starts. On the next
-    // safe Line-A boundary replace its reload registers with the INST loop or
-    // a reserved silent word. The complete attack still plays once; later DMA
-    // reloads use only the authored sustain range, or silence for a one-shot.
+    // Paula also needs time to latch that initial location and length. Writing
+    // the loop/silent reload on the next arbitrary Line-A trap was racy: a
+    // nearby trap could replace the registers before the first audio DMA slot,
+    // intermittently turning the third countdown cue directly into silence.
+    // After two more lines the attack is latched and the reload is safe.
     uint32_t silentOffset = (instrument->size + 1) & ~1UL;
-    s_bogasPendingReloadData[channel] = instrument->chipData + silentOffset;
-    s_bogasPendingReloadWords[channel] = 1;
+    uint8_t* reloadData = instrument->chipData + silentOffset;
+    uint16_t reloadWords = 1;
     if (instrument->loopEnd > instrument->loopStart
         && instrument->loopEnd <= instrument->size) {
         uint16_t loopStart = (uint16_t)(instrument->loopStart & ~1U);
         uint16_t loopBytes = (uint16_t)((instrument->loopEnd - loopStart) & ~1U);
         if (loopBytes >= 2) {
-            s_bogasPendingReloadData[channel] = instrument->chipData + loopStart;
-            s_bogasPendingReloadWords[channel] = (uint16_t)(loopBytes / 2);
+            reloadData = instrument->chipData + loopStart;
+            reloadWords = (uint16_t)(loopBytes / 2);
         }
     }
+    waitBogasDmaLines(2);
+    *(volatile uint32_t*)(audio + 0) = (uint32_t)reloadData;
+    *(volatile uint16_t*)(audio + 4) = reloadWords;
+#ifdef VETTE_PROBE
+    ++g_probeBogasDmaRestarts[channel];
+#endif
 }
 
 static uint16_t bogasPeriod(uint16_t basePeriod, uint32_t pitch)
@@ -1768,8 +1805,6 @@ static void stopBogasAudio()
     for (uint16_t channel = 0; channel < 4; ++channel) {
         stopBogasVoice(channel);
         s_bogasVoiceEndTick[channel] = 0;
-        s_bogasPendingReloadData[channel] = 0;
-        s_bogasPendingReloadWords[channel] = 0;
     }
     for (uint16_t i = 0; i < 3; ++i) s_bogasContexts[i].playing = false;
     s_bogasStarted = false;
@@ -1782,8 +1817,6 @@ static void suspendBogasAudio()
     if (!s_bogasStarted || s_bogasSuspended) return;
     for (uint16_t channel = 0; channel < 4; ++channel) {
         stopBogasVoice(channel);
-        s_bogasPendingReloadData[channel] = 0;
-        s_bogasPendingReloadWords[channel] = 0;
     }
     // BGAS Stop/Deactivate inhibit output without freeing its three voice
     // records or their sample positions.  Keep the corresponding Paula-side
@@ -1821,14 +1854,6 @@ static void resumeBogasAudio()
 static void serviceBogasAudio()
 {
     if (!s_bogasStarted || s_bogasSuspended) return;
-    for (uint16_t channel = 0; channel < 4; ++channel) {
-        if (!s_bogasPendingReloadData[channel]) continue;
-        volatile uint8_t* audio = (volatile uint8_t*)(0xdff0a0UL + channel * 16);
-        *(volatile uint32_t*)(audio + 0) = (uint32_t)s_bogasPendingReloadData[channel];
-        *(volatile uint16_t*)(audio + 4) = s_bogasPendingReloadWords[channel];
-        s_bogasPendingReloadData[channel] = 0;
-        s_bogasPendingReloadWords[channel] = 0;
-    }
     // Context 0 owns the centred AUD0/1 pair. Most engine/view loads are
     // indefinite, but result cues such as splash use a finite countdown and
     // must retire both hardware voices together just like a BGAS voice.
