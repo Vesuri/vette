@@ -8,6 +8,7 @@ import hashlib
 import stat
 import zipfile
 from pathlib import Path
+from installer_icon import installer_icon
 
 
 ORIGINAL_HASHES = {
@@ -48,6 +49,14 @@ def main() -> None:
     files: dict[str, tuple[bytes, int]] = {}
 
     add_file(files, f"{prefix}/Vette", args.executable, 0o755)
+    files[f"{prefix}/Vette.info"] = (installer_icon(game=True), 0o644)
+    add_file(files, f"{prefix}/VetteInstallData",
+             root / "build/install-data/VetteInstallData.exe", 0o755)
+    add_file(files, f"{prefix}/Install", root / "release/Install", 0o755)
+    files[f"{prefix}/Install.info"] = (installer_icon(), 0o644)
+    for source in sorted((root / "tools/install-data").iterdir()):
+        if source.is_file() and (source.suffix in (".c", ".h", ".s", ".md", ".py") or source.name in ("Makefile", "COPYING.LIB")):
+            add_file(files, f"{prefix}/installer-source/{source.name}", source)
     add_file(files, f"{prefix}/README.txt", root / "release/README.txt")
     add_file(files, f"{prefix}/Vette.fs-uae", root / "release/Vette.fs-uae")
     add_file(files, f"{prefix}/fs-uae/dh0/s/startup-sequence",

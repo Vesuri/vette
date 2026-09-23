@@ -14,30 +14,50 @@ REQUIREMENTS
 
 INSTALL THE ORIGINAL DATA
 
-You need VETTE!.img from your original Vette! 1.02 archive. On a computer with
-Python 3, run this from the extracted release directory:
+Download the original VETTE__1.02_and_extras.sit archive. Leave it compressed.
+Double-click Install. Choose the parent installation drawer, a temporary drawer
+(default T:), and the downloaded archive. Installer creates a Vette! drawer and
+icons. The standard Amiga Installer (V43 or later) must be available.
 
-  python3 host-tools/install_original_data.py "/path/to/VETTE!.img" .
+No xadmaster, Python, Deark or Macintosh emulator is needed. Installation runs
+on the Amiga itself and may take several minutes on an A1200. Allow 12 MB free
+in the temporary drawer and 3 MB at the destination. T: normally uses RAM;
+choose a hard disk temporary drawer when RAM is insufficient.
+Temporary files are automatically removed; the original archive is unchanged.
 
-The original StuffIt archive must be expanded by a program that preserves the
-Macintosh resource fork of VETTE!.img. On macOS, unar does this. The installer
-also accepts an 8 MB raw HFS image previously made with ndif2raw.py.
+Alternatively, create Work:Games/Vette! and an existing Work:Temp drawer,
+then run from an Amiga Shell in the release directory:
 
-After a successful install, these files sit beside the Amiga executable:
+  VetteInstallData "Work:Downloads/VETTE__1.02_and_extras.sit" "Work:Games/Vette!/data" "Work:Temp"
 
-  Vette             the Amiga executable supplied by this archive
-  Color VETTE!      original 1.02 application resource fork
-  VETTE!.Data       original 1.02 game-data resource fork
+Copy Vette and Vette.info into the Vette! drawer
+(rename both to Vette! and Vette!.info if desired). The helper works with the default
+4096-byte stack. It verifies the exact supported 1.02 files before installing
+either of them, and never overwrites existing original game files. If existing
+files differ, it reports an error so that you can select another destination.
+
+Unix users can build the same helper from installer-source (make BUILD=build)
+and invoke build/VetteInstallData with the archive and destination paths.
+The older Python host-tools remain available for NDIF/raw HFS inputs.
+
+After a successful graphical install, the Vette! drawer contains:
+
+  Vette!            Amiga executable, with Vette!.info
+  data/Color VETTE! original 1.02 application resource fork
+  data/VETTE!.Data  original 1.02 game-data resource fork
 
 Do not use the empty Macintosh data forks, MacBinary or AppleDouble wrappers,
 or VETTE!.img itself under those names. Full extraction details are in
 docs/install-original-data.md.
 
+The separate installer helper is LGPL-2.1-or-later. Its complete source,
+build instructions and license are included in installer-source.
+
 RUNNING ON AN AMIGA
 
-Open a Shell, change to this directory, and enter:
+Double-click Vette! in the installed drawer, or enter in a Shell there:
 
-  Vette
+  Vette!
 
 RUNNING IN FS-UAE
 

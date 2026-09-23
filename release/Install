@@ -1,0 +1,54 @@
+; Vette! native installation. Standard Commodore Installer V43 or newer.
+(set @app-name "Vette!")
+(if (< @installer-version (* 43 65536))
+  (abort "This installation requires Amiga Installer 43 or newer."))
+(welcome)
+(set #source (pathonly @icon))
+(set @execute-dir #source)
+(set #parent
+  (askdir
+    (prompt "Where should Vette! be installed? A Vette! drawer will be created here.")
+    (help "Choose a hard disk drawer with at least 3 MB free for the game and its original data.")
+    (default @default-dest)))
+(set #temp
+  (askdir
+    (prompt "Select a temporary drawer for extraction.")
+    (help "Allow 12 MB free. T: normally uses RAM; choose a hard disk drawer if RAM is insufficient. Temporary files are removed when finished.")
+    (default "T:")))
+(while (< (getdiskspace #temp) 12582912)
+  ((message "The temporary drawer needs 12 MB free. Please select a hard disk drawer or free some space." (all))
+   (set #temp
+     (askdir
+       (prompt "Select a temporary drawer with at least 12 MB free.")
+       (help "Choose an existing hard disk drawer. Temporary files are removed when finished.")
+       (default #temp)))))
+(set #archive
+  (askfile
+    (prompt "Select the downloaded VETTE__1.02_and_extras.sit archive.")
+    (help "Choose the original, unexpanded Vette! 1.02 StuffIt archive. No other extraction tools are needed.")
+    (default "VETTE__1.02_and_extras.sit")))
+(set #dest (tackon #parent "Vette!"))
+(set #data (tackon #dest "data"))
+(makedir #dest (infos) (help @makedir-help))
+(makedir #data (help @makedir-help))
+(complete 10)
+(if (= @pretend 0)
+  ((working "Extracting and checking the original game data. This may take several minutes on an A1200.")
+   (set #result
+     (run ("\"%s\" \"%s\" \"%s\" \"%s\"" (tackon #source "VetteInstallData") #archive #data #temp)))
+   (if (<> #result 0)
+     (abort "Original game data could not be installed. Check the archive, free disk space and any existing game files. See the helper's error message for details."))))
+(complete 90)
+(copyfiles
+  (source (tackon #source "Vette"))
+  (dest #dest)
+  (newname "Vette!")
+  (infos)
+  (help @copyfiles-help))
+(copyfiles
+  (source (tackon #source "README.txt"))
+  (dest #dest)
+  (help @copyfiles-help))
+(set @default-dest #dest)
+(complete 100)
+(exit)

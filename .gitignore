@@ -78,6 +78,7 @@ amiga/*_probe.sh
 
 # --- OS / local tooling state ------------------------------------------------
 .DS_Store
+__pycache__/
 .claude/*.lock
 .claude/scheduled_tasks.lock
 # FS-UAE writes a .uaem metadata sidecar next to every file in a directory it

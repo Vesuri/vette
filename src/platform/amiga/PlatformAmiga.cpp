@@ -96,14 +96,18 @@ static bool loadOriginalResourceFiles(OriginalResourceFiles& files)
 {
     files.application = files.data = 0;
     files.applicationSize = files.dataSize = 0;
-    if (!readOriginalResourceFork("PROGDIR:Color VETTE!",
+    if (!readOriginalResourceFork("PROGDIR:data/Color VETTE!",
+                                  files.application, files.applicationSize) &&
+        !readOriginalResourceFork("PROGDIR:Color VETTE!",
                                   files.application, files.applicationSize)) {
-        PutStr((CONST_STRPTR)"Vette: cannot read PROGDIR:Color VETTE!\n");
+        PutStr((CONST_STRPTR)"Vette: cannot read Color VETTE! in PROGDIR:data/ or PROGDIR:\n");
         return false;
     }
-    if (!readOriginalResourceFork("PROGDIR:VETTE!.Data",
+    if (!readOriginalResourceFork("PROGDIR:data/VETTE!.Data",
+                                  files.data, files.dataSize) &&
+        !readOriginalResourceFork("PROGDIR:VETTE!.Data",
                                   files.data, files.dataSize)) {
-        PutStr((CONST_STRPTR)"Vette: cannot read PROGDIR:VETTE!.Data\n");
+        PutStr((CONST_STRPTR)"Vette: cannot read VETTE!.Data in PROGDIR:data/ or PROGDIR:\n");
         releaseOriginalResourceFiles(files);
         return false;
     }

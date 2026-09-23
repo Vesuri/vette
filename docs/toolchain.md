@@ -112,23 +112,31 @@ python3 tools/hfs_extract.py tmp/VETTE_1_02.raw segments \
 ### Resource forks on the Amiga
 
 The executable embeds no game data and uses no custom bundle. At process
-startup it reads two ordinary files beside itself: `Color VETTE!` and
-`VETTE!.Data`. Each file is the unmodified raw resource fork extracted from the
+startup it reads `data/Color VETTE!` and `data/VETTE!.Data` relative to itself
+(with compatibility fallback to the older adjacent-file layout).
+Each file is the unmodified raw resource fork extracted from the
 corresponding original Macintosh file. `src/mac/ResourceForks.*` validates and
 indexes the native maps; the eleven byte-packed CODE payloads are copied to
 aligned resident allocations before patching and execution. Development launch
 scripts stage the local extracts with `amiga/stage_original_data.sh`.
 
-For a user-facing install, `tools/install_original_data.py` accepts either the
+For user-facing installation, the portable C helper in `tools/install-data` accepts
+the original `VETTE__1.02_and_extras.sit` directly. `make install-data-helper` builds
+it for Unix; `make install-data-helper-amiga` builds the standalone Amiga HUNK program.
+The release's Workbench `Install` script asks for that archive and invokes the helper.
+It needs no xadmaster or external extraction tools. See `docs/install-original-data.md`.
+
+As an independent host reference, `tools/install_original_data.py` accepts either the
 original fork-preserving NDIF `VETTE!.img` or the decoded raw HFS image. It
 extracts the Color application and data resource forks directly, rejects any
 version other than the supported 1.02 byte fingerprints, and writes the exact
 two files the executable opens. See `docs/install-original-data.md`.
 
-**1. StuffIt 5 → `unar`, and there is no second option.** `7z`/p7zip handles no SIT at all; the
+**1. StuffIt 5 → `unar` for the historical host pipeline.** `7z`/p7zip handles no SIT at all; the
 `macutils` `macunpack` lineage stops at StuffIt 1.5.1; Aladdin's own StuffIt Expander was 32-bit and
-cannot run on a 64-bit-only macOS. `unar` (the XADMaster engine behind The Unarchiver) is the only
-maintained SIT5 implementation, and it also **preserves the resource fork**, which layer 2 needs.
+cannot run on a 64-bit-only macOS. `unar` (the XADMaster engine behind The Unarchiver) was used
+here and **preserves the resource fork**, which layer 2 needs. The native installer now reads
+both image forks directly from the original archive's entries.
 ⭐ It verifies StuffIt's per-file CRC16 and prints `OK` per entry — so its `OK` is a real check, not
 a "no exception was thrown". Trust it, and note the archive *declares* each entry's size, which is
 how a suspicious-looking size can be cleared without a second extractor.

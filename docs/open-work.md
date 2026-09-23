@@ -33,7 +33,9 @@ Production boots from the two byte-identical original resource forks on disk. Th
 matrix covers courses, vehicles, difficulties, damage/recovery, police, city/freeway transitions,
 restart, return, normal and emergency quit, score writing, and AmigaOS restoration. The release is
 deterministic and contains no copyrighted game data; its installer derives the two required raw
-resource forks from the user's original NDIF or raw HFS image and validates the exact release.
+resource forks directly from the user's original StuffIt archive and validates the exact release.
+The native `VetteInstallData` helper is self-contained; the older Python tools also accept NDIF
+or raw HFS images. Native installation details and verification are in `docs/install-original-data.md`.
 
 ## Deferred until a real caller or later phase requires it
 

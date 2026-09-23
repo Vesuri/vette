@@ -18,6 +18,9 @@ help:
 	@echo "  make gameplay-regression-smoke  clean production + driving smoke runs"
 	@echo "  make gameplay-regression        all bounded gameplay/release scenario groups"
 	@echo "  make install-original-data IMAGE=/path/VETTE!.img DEST=/path/Vette"
+	@echo "  make install-data-helper       standalone Unix installer for the original .sit"
+	@echo "  make install-data-helper-amiga standalone Amiga installer (no dependencies)"
+	@echo "  make install-data-test         original archive and corruption regression tests"
 	@echo "  make release                  clean production build + copyright-clean ZIP"
 	@echo "  make release-check            static/coverage/smoke, deterministic build, ZIP audit"
 	@echo "  make fidelity-check  gate the completed local fidelity evidence set"
@@ -82,6 +85,17 @@ gameplay-regression-smoke:
 gameplay-regression:
 	@amiga/regression.sh all
 
+install-data-helper:
+	@$(MAKE) -C tools/install-data
+
+.PHONY: install-data-helper install-data-helper-amiga install-data-test
+
+install-data-helper-amiga:
+	@. amiga/env.sh && $(MAKE) -C tools/install-data amiga
+
+install-data-test:
+	@$(MAKE) -C tools/install-data test
+
 install-original-data:
 	@test -n "$(IMAGE)" || { echo "IMAGE=/path/to/VETTE!.img is required"; exit 1; }
 	@test -n "$(DEST)" || { echo "DEST=/path/to/Amiga/Vette is required"; exit 1; }
@@ -89,10 +103,12 @@ install-original-data:
 
 release:
 	@cd amiga && . ./env.sh && $(MAKE) clean && $(MAKE) -j4
+	@$(MAKE) install-data-helper-amiga
 	@python3 tools/package_release.py amiga/out/Vette.exe dist
 	@python3 tools/check_release.py dist/Vette-Amiga-$$(cat VERSION).zip
 
 release-check: static-map-check coverage-check gameplay-regression-smoke
+	@$(MAKE) install-data-helper-amiga install-data-test
 	@cd amiga && . ./env.sh && \
 	  $(MAKE) clean >/dev/null && $(MAKE) -j4 >/dev/null 2>&1 && \
 	  first=$$(shasum -a 256 out/Vette.exe | cut -d' ' -f1) && \
