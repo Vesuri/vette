@@ -7,7 +7,7 @@ not included and must be supplied separately.
 REQUIREMENTS
 
   68020 or better (required by the current graphics conversion routine)
-  AGA recommended
+  68030 or better with AGA recommended
   Kickstart 2.04 or later (3.1 tested)
   1 MB chip RAM and 4 MB additional RAM (tested configuration)
   Hard disk with 3 MB free for the installed game
