@@ -1,4 +1,4 @@
-VETTE! FOR AMIGA - VERSION 0.1.0
+VETTE! FOR AMIGA - VERSION 0.90 (23.09.2026)
 ================================
 
 This archive contains an independently developed Amiga port. It does not
@@ -36,10 +36,6 @@ Copy Vette and Vette.info into the Vette! drawer
 either of them, and never overwrites existing original game files. If existing
 files differ, it reports an error so that you can select another destination.
 
-Unix users can build the same helper from installer-source (make BUILD=build)
-and invoke build/VetteInstallData with the archive and destination paths.
-The older Python host-tools remain available for NDIF/raw HFS inputs.
-
 After a successful graphical install, the Vette! drawer contains:
 
   Vette!            Amiga executable, with Vette!.info
@@ -47,11 +43,13 @@ After a successful graphical install, the Vette! drawer contains:
   data/VETTE!.Data  original 1.02 game-data resource fork
 
 Do not use the empty Macintosh data forks, MacBinary or AppleDouble wrappers,
-or VETTE!.img itself under those names. Full extraction details are in
-docs/install-original-data.md.
+or VETTE!.img itself under those names.
 
-The separate installer helper is LGPL-2.1-or-later. Its complete source,
-build instructions and license are included in installer-source.
+The separate installer helper is LGPL-2.1-or-later. Source, build instructions
+and license are maintained separately at:
+https://github.com/Vesuri/vette/tree/main/tools/install-data
+Its StuffIt format tables derive from XADMaster, copyright 2017-present
+MacPaw Way Ltd. No XAD library is needed at runtime.
 
 RUNNING ON AN AMIGA
 
@@ -59,14 +57,9 @@ Double-click Vette! in the installed drawer, or enter in a Shell there:
 
   Vette!
 
-RUNNING IN FS-UAE
-
-Vette.fs-uae describes the supported A1200, 2 MB chip/8 MB fast configuration.
-Set your legal Kickstart 3.1 ROM in FS-UAE and open that configuration. It
-mounts this directory as DH1: and starts Vette through the included DH0: boot
-directory. If your FS-UAE front end overrides input ports, set port 0 to Mouse
-and port 1 to Nothing; keyboard joystick emulation otherwise consumes the
-cursor keys.
+If using an emulator, configure an A1200 with 2 MB chip and 8 MB fast RAM.
+Set port 0 to Mouse and port 1 to Nothing; keyboard joystick emulation may
+otherwise consume the cursor keys.
 
 DRIVING
 

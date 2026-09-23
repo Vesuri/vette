@@ -6,6 +6,14 @@ The installer copies no Macintosh filesystem wrapper into the Amiga
 directory: it writes the two original resource forks, byte for byte, under the
 names the port opens at startup.
 
+`make dist` builds `dist/Vette-0.90.lha` (also available through the `make release`
+alias). Its `Vette! Install` drawer contains only `Vette`, `Vette.info`,
+`VetteInstallData`, `Install`, `Install.info`, and `README.txt`. The readme
+contains the helper's license and repository source link. No original data,
+sources, emulator configuration, checksum manifest or host tools are bundled.
+The deterministic generic level-zero LH0 archive needs no host compression tool;
+its CRCs and file listing were independently verified with Lhasa.
+
 ## Native Amiga installation
 
 Double-click `Install` in the release drawer. Choose the parent installation
@@ -60,7 +68,7 @@ The Workbench floppy and Installer executable are local test dependencies only,
 not redistributed in the release.
 
 The helper is a separate LGPL-2.1-or-later program; its complete C source and
-license are distributed in `installer-source`. See its README for supported
+license are in the repository's `tools/install-data`. See its README for supported
 format limits and tests. These are original, unmodified resource forks, not a
 custom bundle and not data embedded in the game executable.
 
@@ -73,7 +81,7 @@ make install-data-helper
 build/install-data/VetteInstallData VETTE__1.02_and_extras.sit /path/to/Vette
 ```
 
-From a release's `installer-source` directory: `make BUILD=build`, then invoke
+From the repository's `tools/install-data` directory: `make BUILD=build`, then invoke
 `build/VetteInstallData`. The portable C core and Amiga binary use the same
 parsing, decompression and integrity checks.
 

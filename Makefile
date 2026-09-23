@@ -21,8 +21,8 @@ help:
 	@echo "  make install-data-helper       standalone Unix installer for the original .sit"
 	@echo "  make install-data-helper-amiga standalone Amiga installer (no dependencies)"
 	@echo "  make install-data-test         original archive and corruption regression tests"
-	@echo "  make release                  clean production build + copyright-clean ZIP"
-	@echo "  make release-check            static/coverage/smoke, deterministic build, ZIP audit"
+	@echo "  make dist                     clean production build + Vette-0.90.lha"
+	@echo "  make release-check            static/coverage/smoke, deterministic build, LHA audit"
 	@echo "  make fidelity-check  gate the completed local fidelity evidence set"
 	@echo "  make driving-sequence-compare  compare saved MAME/Amiga driving frames"
 	@echo "  make driving-sequence-capture  capture Amiga frames at saved Macintosh game states"
@@ -101,11 +101,14 @@ install-original-data:
 	@test -n "$(DEST)" || { echo "DEST=/path/to/Amiga/Vette is required"; exit 1; }
 	@python3 tools/install_original_data.py '$(IMAGE)' '$(DEST)'
 
-release:
+.PHONY: dist
+release: dist
+
+dist:
 	@cd amiga && . ./env.sh && $(MAKE) clean && $(MAKE) -j4
 	@$(MAKE) install-data-helper-amiga
 	@python3 tools/package_release.py amiga/out/Vette.exe dist
-	@python3 tools/check_release.py dist/Vette-Amiga-$$(cat VERSION).zip
+	@python3 tools/check_release.py dist/Vette-$$(cat VERSION).lha
 
 release-check: static-map-check coverage-check gameplay-regression-smoke
 	@$(MAKE) install-data-helper-amiga install-data-test
@@ -116,7 +119,7 @@ release-check: static-map-check coverage-check gameplay-regression-smoke
 	  second=$$(shasum -a 256 out/Vette.exe | cut -d' ' -f1) && \
 	  test "$$first" = "$$second" && echo "PASS: deterministic production executable $$second"
 	@python3 tools/package_release.py amiga/out/Vette.exe dist
-	@python3 tools/check_release.py dist/Vette-Amiga-$$(cat VERSION).zip
+	@python3 tools/check_release.py dist/Vette-$$(cat VERSION).lha
 
 # Fast aggregate over retained local oracle artifacts. Slow recapture remains
 # split into the dedicated reference/capture/regression targets below.
