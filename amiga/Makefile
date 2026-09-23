@@ -506,6 +506,7 @@ PROBE_SYMS = g_vbiCount g_planeChecksum g_screenReady g_laceFields g_longFields 
              g_trapPC g_trapRegisters g_trapUserStack g_resourceCount g_jumpEntryCount \
              g_blockMoveCount g_trapManager g_trapRoutine
 PROBE_SYMS += g_stageCDepth
+PROBE_SYMS += SysBase
 PROBE_SYMS += g_macTicks
 PROBE_SYMS += g_macDrivingIterations
 PROBE_SYMS += g_macDrivingCallbacks

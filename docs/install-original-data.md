@@ -16,6 +16,37 @@ its CRCs and file listing were independently verified with Lhasa.
 
 ## Native Amiga installation
 
+### Hardware and OS requirements audit
+
+The current executable is not wholly 68000-compatible: `C2P.s` uses scaled
+word indexing (`d0.w*4`), assembled with `-mcpu=68020`. Most other code remains
+68000-targeted. AGA is recommended rather than naming a particular Amiga model.
+No broader OCS/ECS visual-fidelity claim has been established by this audit.
+
+Kickstart 1.3 is not a supported claim for this build: game disk access uses
+`PROGDIR:` and `PutStr`, and the helper opens dos.library V37 and uses `ReadArgs`.
+The API baseline is OS 2.04; runtime tests use 3.1. An attempted 2.04/ECS debugger
+run failed during remote symbol relocation (`E01`, unrelocated breakpoint), so
+it establishes neither compatibility nor a game defect on 2.04.
+
+Reduced-memory tests passed with **1 MiB chip + 4 MiB fast RAM**, not the old
+2+8 MiB recommendation. `memory_requirements.gdb` samples Exec's memory lists
+at each frame boundary. The full production intro reached garage setup (depth
+68), with minima of 472,680 free chip bytes and 68,544 free fast bytes. A clean
+scripted-driving build reached depth 93 with 681,200 free chip bytes and 26,776
+free fast bytes. These are separate minima, not necessarily simultaneous.
+They include AmigaOS usage, and do not measure every transient allocation or
+every game route; the readme calls this a tested configuration, not an exact
+minimum. Both runs used a clean emulated system; other resident programs need
+additional headroom.
+
+Reproduce using `CHIP_MEMORY=1024 FAST_MEMORY=4096 EXTRA_ARGS=--warp_mode=1`
+with `amiga/diag_run.sh`, `memory_requirements.gdb` for a normal production
+build, or `memory_driving.gdb` with `PROBES=1 SKIP_INTRO=1 GARAGE_CLICK=1`.
+Use a 180-second host ceiling for the full intro and 80 for driving.
+
+### Installation procedure
+
 Double-click `Install` in the release drawer. Choose the parent installation
 drawer, temporary drawer (default `T:`), then the downloaded `.sit`. The script
 creates `Vette!` with a drawer icon, `Vette!` executable and icon, and `data`.

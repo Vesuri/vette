@@ -22,7 +22,7 @@ stage_vette_original_data "$DH1"
 
 fsuae_claim_port
 "$FSUAE" \
-  --amiga_model="$MODEL" --chip_memory=2048 --fast_memory=8192 \
+  --amiga_model="$MODEL" --chip_memory="${CHIP_MEMORY:-2048}" --fast_memory="${FAST_MEMORY:-8192}" \
   --kickstart_file="$ROM" \
   --hard_drive_0="$DH0" --hard_drive_1="$DH1" \
   --joystick_port_0=mouse --joystick_port_1=nothing \

@@ -1,65 +1,38 @@
 VETTE! FOR AMIGA - VERSION 0.90 (23.09.2026)
-================================
+==========================================
 
-This archive contains an independently developed Amiga port. It does not
-contain the copyrighted original Vette! program or game data.
+This archive contains an independently developed Amiga port. Game data is
+not included and must be supplied separately.
 
 REQUIREMENTS
 
-  Amiga 1200
-  Kickstart/Workbench 3.1 or compatible
-  2 MB chip RAM
-  8 MB fast RAM
-  hard disk (the installed original resource files total about 2.1 MB)
+  68020 or better (required by the current graphics conversion routine)
+  AGA recommended
+  Kickstart 2.04 or later (3.1 tested)
+  1 MB chip RAM and 4 MB additional RAM (tested configuration)
+  Hard disk with 3 MB free for the installed game
+  Amiga Installer V43 or later for installation
 
-INSTALL THE ORIGINAL DATA
+INSTALLATION
 
-Download the original VETTE__1.02_and_extras.sit archive. Leave it compressed.
-Double-click Install. Choose the parent installation drawer, a temporary drawer
-(default T:), and the downloaded archive. Installer creates a Vette! drawer and
-icons. The standard Amiga Installer (V43 or later) must be available.
+Download VETTE__1.02_and_extras.sit from the Vette! page at Macintosh Repository:
+https://www.macintoshrepository.org/4948-vette-
+Leave the downloaded file compressed.
 
-No xadmaster, Python, Deark or Macintosh emulator is needed. Installation runs
-on the Amiga itself and may take several minutes on an A1200. Allow 12 MB free
-in the temporary drawer and 3 MB at the destination. T: normally uses RAM;
-choose a hard disk temporary drawer when RAM is insufficient.
-Temporary files are automatically removed; the original archive is unchanged.
+Double-click Install. Choose where to install the game, a temporary drawer,
+and the downloaded file. A Vette! drawer and its icons will be created.
 
-Alternatively, create Work:Games/Vette! and an existing Work:Temp drawer,
-then run from an Amiga Shell in the release directory:
+The temporary drawer needs at least 12 MB free. The default is T:, which
+normally uses RAM. Choose a hard disk drawer if there is not enough free RAM.
+Extraction may take several minutes. Temporary files are removed when finished;
+the downloaded file is not changed.
 
-  VetteInstallData "Work:Downloads/VETTE__1.02_and_extras.sit" "Work:Games/Vette!/data" "Work:Temp"
+RUNNING
 
-Copy Vette and Vette.info into the Vette! drawer
-(rename both to Vette! and Vette!.info if desired). The helper works with the default
-4096-byte stack. It verifies the exact supported 1.02 files before installing
-either of them, and never overwrites existing original game files. If existing
-files differ, it reports an error so that you can select another destination.
+Double-click Vette! in the installed drawer.
 
-After a successful graphical install, the Vette! drawer contains:
-
-  Vette!            Amiga executable, with Vette!.info
-  data/Color VETTE! original 1.02 application resource fork
-  data/VETTE!.Data  original 1.02 game-data resource fork
-
-Do not use the empty Macintosh data forks, MacBinary or AppleDouble wrappers,
-or VETTE!.img itself under those names.
-
-The separate installer helper is LGPL-2.1-or-later. Source, build instructions
-and license are maintained separately at:
-https://github.com/Vesuri/vette/tree/main/tools/install-data
-Its StuffIt format tables derive from XADMaster, copyright 2017-present
-MacPaw Way Ltd. No XAD library is needed at runtime.
-
-RUNNING ON AN AMIGA
-
-Double-click Vette! in the installed drawer, or enter in a Shell there:
-
-  Vette!
-
-If using an emulator, configure an A1200 with 2 MB chip and 8 MB fast RAM.
-Set port 0 to Mouse and port 1 to Nothing; keyboard joystick emulation may
-otherwise consume the cursor keys.
+If using an emulator, set port 0 to Mouse and port 1 to Nothing; keyboard
+joystick emulation may otherwise consume the cursor keys.
 
 DRIVING
 
@@ -74,13 +47,11 @@ DRIVING
   P            pause/options
   Escape or Q  menu
 
-The cursor keys are Amiga aliases for the original keyboard/keypad controls.
-The mouse remains usable. The Macintosh menu bar is deliberately not drawn;
-its keyboard equivalents still invoke the original game commands.
+Single-player only; network play is not supported.
 
-NOTES
+INSTALLER HELPER
 
-The package supports the single-player game. Macintosh desktop preference,
-high-screen, and communications dialogs are intentionally not implemented;
-network play is out of scope. Unknown required Macintosh calls stop loudly and
-identify the failing manager, routine, selector, and original caller.
+The separate installer helper is LGPL-2.1-or-later. Source and build instructions:
+https://github.com/Vesuri/vette/tree/main/tools/install-data
+Its archive format tables are copyright 2017-present MacPaw Way Ltd.
+The helper's license follows below.

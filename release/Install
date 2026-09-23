@@ -13,7 +13,7 @@
     (default @default-dest)))
 (set #temp
   (askdir
-    (prompt "Select a temporary drawer for extraction.")
+    (prompt "Select a temporary drawer with at least 12 MB free.")
     (help "Allow 12 MB free. T: normally uses RAM; choose a hard disk drawer if RAM is insufficient. Temporary files are removed when finished.")
     (default "T:")))
 (while (< (getdiskspace #temp) 12582912)
@@ -26,7 +26,7 @@
 (set #archive
   (askfile
     (prompt "Select the downloaded VETTE__1.02_and_extras.sit archive.")
-    (help "Choose the original, unexpanded Vette! 1.02 StuffIt archive. No other extraction tools are needed.")
+    (help "Choose VETTE__1.02_and_extras.sit downloaded from the Vette! page at Macintosh Repository. Leave it compressed.")
     (default "VETTE__1.02_and_extras.sit")))
 (set #dest (tackon #parent "Vette!"))
 (set #data (tackon #dest "data"))
@@ -34,7 +34,7 @@
 (makedir #data (help @makedir-help))
 (complete 10)
 (if (= @pretend 0)
-  ((working "Extracting and checking the original game data. This may take several minutes on an A1200.")
+  ((working "Extracting and checking the game data. This may take several minutes. Temporary files are removed when finished.")
    (set #result
      (run ("\"%s\" \"%s\" \"%s\" \"%s\"" (tackon #source "VetteInstallData") #archive #data #temp)))
    (if (<> #result 0)
