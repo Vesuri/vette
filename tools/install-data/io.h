@@ -24,5 +24,5 @@ int io_remove(const char *path);
 int io_rename(const char *from, const char *to);
 int io_cancelled(void);
 void io_message(const char *s);
-int install_data(const char *source, const char *dest);
+int install_data(const char *source, const char *dest, const char *temp);
 #endif

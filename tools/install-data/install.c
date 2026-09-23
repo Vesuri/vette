@@ -15,6 +15,8 @@ static unsigned char input[BUFSIZE],output[BUFSIZE],history[65536],scratch[4096]
 static File archive,ndif,raw,writing,checking;
 static char workdir[1024],paths[4][1100],targets[2][1100];
 static unsigned owned,committed;
+static char publishdir[1024],staged[2][1100];
+static unsigned publish_owned;
 static const char *names[2]={"Color VETTE!","VETTE!.Data"};
 static const uint32_t sizes[2]={1587389,577498};
 static const char *hashes[2]={
@@ -455,8 +457,8 @@ static int extract_hfs(void) {
     }
     TRY(closefile(&raw)); return 1;
 }
-static int perform(const char *source,const char *dest) {
-    unsigned i,existing=0; char suffix[32];
+static int perform(const char *source,const char *dest,const char *temp) {
+    unsigned i,existing=0; char suffix[32]; uint32_t off,n;
     REQUIRE(io_open(&archive,source,0),"Cannot open source archive.");
     crc_init(); TRY(find_image());
     if(!io_exists(dest)) REQUIRE(io_mkdir(dest),"Cannot create destination directory.");
@@ -470,7 +472,7 @@ static int perform(const char *source,const char *dest) {
     if(existing==2) return 1;
     for(i=0;i<100;i++) {
         memcpy(suffix,".vette-install-00",18); suffix[15]="0123456789abcdef"[i>>4]; suffix[16]="0123456789abcdef"[i&15];
-        TRY(join(workdir,sizeof(workdir),dest,suffix));
+        TRY(join(workdir,sizeof(workdir),temp,suffix));
         if(io_mkdir(workdir)) { owned=1; break; }
     }
     REQUIRE(owned,"Cannot create installer temporary directory.");
@@ -481,20 +483,44 @@ static int perform(const char *source,const char *dest) {
     TRY(unpack_fork(0)); TRY(unpack_fork(1)); TRY(closefile(&archive));
     io_message("Decoding NDIF disk image..."); TRY(decode_ndif());
     io_message("Extracting and verifying original game files..."); TRY(extract_hfs());
+    /* Stage on the destination volume: the selected scratch volume may differ. */
+    for(i=0;i<100;i++) {
+        memcpy(suffix,".vette-publish-00",17); suffix[14]="0123456789abcdef"[i>>4]; suffix[15]="0123456789abcdef"[i&15];
+        TRY(join(publishdir,sizeof(publishdir),dest,suffix));
+        if(io_mkdir(publishdir)) { publish_owned=1; break; }
+    }
+    REQUIRE(publish_owned,"Cannot create destination staging directory.");
+    for(i=0;i<2;i++) {
+        TRY(join(staged[i],sizeof(staged[i]),publishdir,names[i]));
+        REQUIRE(io_open(&checking,paths[i],0),"Cannot read verified game file.");
+        REQUIRE(io_open(&writing,staged[i],1),"Cannot create destination staging file.");
+        for(off=0;off<sizes[i];off+=n) {
+            n=sizes[i]-off; if(n>BUFSIZE) n=BUFSIZE;
+            TRY(readat(&checking,off,scratch,n)); TRY(writebytes(&writing,scratch,n));
+        }
+        TRY(closefile(&checking)); TRY(closefile(&writing));
+        REQUIRE(io_open(&checking,staged[i],0),"Cannot verify destination staging file.");
+        TRY(verify_file(&checking,i)); TRY(closefile(&checking));
+    }
     for(i=0;i<2;i++) {
         if(io_exists(targets[i])) {
             REQUIRE(io_open(&checking,targets[i],0),"Cannot verify existing game file.");
             TRY(verify_file(&checking,i)); TRY(closefile(&checking));
         } else {
-            REQUIRE(io_rename(paths[i],targets[i]),"Cannot install verified game file."); committed|=1U<<i;
+            REQUIRE(io_rename(staged[i],targets[i]),"Cannot install verified game file."); committed|=1U<<i;
         }
     }
     return 1;
 }
-int install_data(const char *source,const char *dest) {
-    unsigned i; int ok=perform(source,dest);
+int install_data(const char *source,const char *dest,const char *temp) {
+    unsigned i; int ok=perform(source,dest,temp);
     io_close(&archive); io_close(&ndif); io_close(&raw); io_close(&writing); io_close(&checking);
     if(!ok) for(i=0;i<2;i++) if(committed&(1U<<i)) io_remove(targets[i]);
+    if(publish_owned) {
+        for(i=0;i<2;i++) if(staged[i][0] && io_exists(staged[i]) && !io_remove(staged[i]))
+            io_message("Warning: could not remove a staging file.");
+        if(!io_remove(publishdir)) io_message("Warning: could not remove destination staging directory.");
+    }
     if(owned) {
         for(i=0;i<3;i++) if(paths[i][0] && io_exists(paths[i]) && !io_remove(paths[i]))
             io_message("Warning: could not remove a temporary installer file.");

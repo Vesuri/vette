@@ -6,7 +6,7 @@ executable. On Amiga it uses dos.library and exec.library directly.
 
 ```
 make -C tools/install-data
-build/install-data/VetteInstallData VETTE__1.02_and_extras.sit destination
+build/install-data/VetteInstallData VETTE__1.02_and_extras.sit destination [temporary-directory]
 . amiga/env.sh
 make -C tools/install-data amiga
 make -C tools/install-data test
@@ -33,16 +33,19 @@ decompressors share a 64 KiB history window and 4 KiB input/output buffers.
 The Amiga build emits `.su` stack reports and has no unresolved runtime helpers.
 
 Measured on FS-UAE A1200 / Kickstart 3.1, with `Stack 4096`: a complete extraction
-finished successfully with 3,276 bytes of stack watermark intact (820 bytes used,
+finished successfully with 3,272 bytes of stack watermark intact (824 bytes used,
 including the measured OS-call path). Both final file hashes matched the Unix
-reference and all temporary files were removed. Production BSS is 104,220 bytes;
+reference across separate volumes and all temporary files were removed. BSS is about 105 KiB;
 the HUNK executable is approximately 34 KiB. `test_amiga.py` reproduces this test
 after sourcing `amiga/env.sh`. It uses a separate directory and only stops its own
 emulator process.
 
-The installer needs about 12 MiB free disk space in the destination volume
-(excluding the downloaded archive); temporary files are stored on disk there,
-not in RAM:. Final original data totals 2,164,887 bytes.
+Allow 12 MiB free in the temporary directory and 3 MiB at the destination,
+excluding the downloaded archive. The optional third argument selects scratch
+storage; omitting it uses the destination. The Amiga Installer script defaults
+to T: but lets the user select a hard disk drawer. Destination staging is copied
+and verified before renaming, so separate volumes work. Final original data
+totals 2,164,887 bytes.
 
 ## License and references
 

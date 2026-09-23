@@ -21,7 +21,8 @@ def main():
         base=Path(tmp); boot=base/"boot"; (boot/"s").mkdir(parents=True)
         (base/"state").mkdir(); (base/"home").mkdir()
         shutil.copyfile(build/"VetteInstallData.exe",boot/"Extract")
-        (boot/"s/startup-sequence").write_text('CD DH0:\nStack 4096\nExtract "DH1:tmp/VETTE__1.02_and_extras.sit" "DH2:installed"\n')
+        (boot/"scratch").mkdir()
+        (boot/"s/startup-sequence").write_text('CD DH0:\nStack 4096\nExtract "DH1:tmp/VETTE__1.02_and_extras.sit" "DH2:installed" "DH0:scratch"\n')
         sock=socket.socket(); sock.bind(("127.0.0.1",0)); port=sock.getsockname()[1]; sock.close()
         commands=base/"test.gdb"
         commands.write_text(f'''set pagination off
@@ -60,6 +61,8 @@ quit
                 for name,digest in EXPECTED.items():
                     assert hashlib.sha256((base/"installed"/name).read_bytes()).hexdigest()==digest
                 assert not list((base/"installed").glob(".vette-install-*"))
+                assert not list((base/"installed").glob(".vette-publish-*"))
+                assert not list((boot/"scratch").iterdir())
                 print("PASS: Amiga extraction, exact hashes, 4 KiB stack and cleanup")
             finally:
                 emu.terminate()

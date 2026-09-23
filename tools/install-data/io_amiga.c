@@ -65,7 +65,7 @@ int memcmp(const void *a,const void *b,size_t n) { const unsigned char *p=a,*q=b
 size_t strlen(const char *s) { const char *p=s; while(*p) p++; return (size_t)(p-s); }
 int amiga_main(void) {
     struct Process *process; struct Message *message=0;
-    struct RDArgs *args; LONG values[2]={0,0}; int result=20;
+    struct RDArgs *args; LONG values[3]={0,0,0}; int result=20;
     __asm__ volatile("move.l 4.w,%0" : "=r"(SysBase));
     process=(struct Process *)FindTask(0);
 #ifdef INSTALL_STACK_TEST
@@ -75,9 +75,9 @@ int amiga_main(void) {
         WaitPort(&process->pr_MsgPort); message=GetMsg(&process->pr_MsgPort);
         /* This helper is invoked by Installer/CLI, not by opening its own icon. */
     } else if((DOSBase=(struct DosLibrary *)OpenLibrary((CONST_STRPTR)"dos.library",37))) {
-        args=ReadArgs((CONST_STRPTR)"ARCHIVE/A,DESTINATION/A",values,0);
-        if(args) { result=install_data((const char *)values[0],(const char *)values[1]); FreeArgs(args); }
-        else io_message("Usage: VetteInstallData archive.sit destination-directory");
+        args=ReadArgs((CONST_STRPTR)"ARCHIVE/A,DESTINATION/A,TEMPDIR",values,0);
+        if(args) { result=install_data((const char *)values[0],(const char *)values[1],(const char *)(values[2]?values[2]:values[1])); FreeArgs(args); }
+        else io_message("Usage: VetteInstallData archive.sit destination-directory [temporary-directory]");
         CloseLibrary((struct Library *)DOSBase);
     }
 #ifdef INSTALL_STACK_TEST

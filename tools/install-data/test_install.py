@@ -81,10 +81,14 @@ def main():
     with tempfile.TemporaryDirectory(prefix="vette-install-test-") as temp:
         base = Path(temp)
         dest = base / "destination with spaces"
+        scratch = base / "temporary with spaces"
+        scratch.mkdir()
         def run(source, destination=dest, good=False):
-            p = subprocess.run([str(exe), str(source), str(destination)], capture_output=True, text=True, timeout=45)
+            p = subprocess.run([str(exe), str(source), str(destination), str(scratch)], capture_output=True, text=True, timeout=45)
             assert p.returncode == (0 if good else 20), (p.returncode, p.stdout, p.stderr)
             assert not list(destination.glob(".vette-install-*")), p.stdout
+            assert not list(destination.glob(".vette-publish-*")), p.stdout
+            assert not list(scratch.iterdir()), p.stdout
             if not good:
                 assert not (destination / "VETTE!.Data").exists(), p.stdout
             return p.stdout
