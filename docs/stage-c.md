@@ -1472,8 +1472,10 @@ point. The first implementation composited it into the chunky framebuffer, which
 motion to game presentation and needlessly sent cursor pixels through C2P. The shipping Amiga seam
 instead maps the installed 16x16 Cursor to sprite 0. `SetCursor`, `HideCursor`, `ShowCursor`, real
 mouse polling, and scripted garage clicks publish image/visibility/position state; the VBI alone
-writes the live chip-RAM sprite control and data words. Interlace fields take alternating eight-row
-halves, AGA HIRES sprite resolution keeps the pointer at game-pixel scale, and colours 17..19 supply
+writes the live chip-RAM sprite control and data words. Separate even- and odd-field sprite objects
+hold alternating eight-row halves; each VBI rebuilds the upcoming field's object and switches the
+copper `SPR0PT` pair, leaving the currently scanned object untouched. AGA HIRES sprite resolution
+keeps the pointer at game-pixel scale, and colours 17..19 supply
 black, neutral XOR fallback, and white independently of the game's palette. The chunky surface and
 dirty list are now cursor-free, so the pointer remains live at the 50 Hz display cadence even when
 the game has no frame ready. `BPLCON2=$0024` sets both playfield priorities to four, keeping sprite

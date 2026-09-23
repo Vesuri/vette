@@ -95,6 +95,13 @@ copper list writes every pointer pair: `SPR0PT` selects the cursor and all seven
 select that null sprite. The extra cleared terminator pair ensures even an empty channel cannot
 walk beyond the allocation.
 
+The cursor itself is interlaced in memory as well as in row selection. Two independent chip-RAM
+sprite objects hold the cursor's even and odd source rows. Each VBI rebuilds only the object for the
+upcoming field and rewrites the copper's `SPR0PT` pair to it; it never modifies the object the
+current field may still be fetching. The field choice uses the same measured inverted-`LOF`
+polarity as the bitplane pointers: the VBI observes the current field while preparing the list for
+the opposite one.
+
 ⚠ **`AmigaHardware::isLongFrame()` did not LINK** — in the ASSEMBLER configurations it was declared
 `__asm`/bridged and `jsr`ed `_isLongFrame__13AmigaHardwareFv`, a symbol no `.s` ever defined, so the
 *first* caller was an undefined-symbol link error and only an interlaced display needs the field

@@ -91,7 +91,7 @@ private:
     uint16_t  m_ptrIndex = 0;      // copper-list index of the first BPLxPT move
     uint16_t  m_nextPalette[16] = {0};
     volatile bool m_framePending = false;
-    uint16_t* m_mouseSprite = 0;
+    uint16_t* m_mouseSprite[2] = {0, 0}; // even/long-field rows, odd/short-field rows
     uint16_t* m_emptySprite = 0;
     uint16_t  m_cursorImage[16] = {0};
     uint16_t  m_cursorMask[16] = {0};

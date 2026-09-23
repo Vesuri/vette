@@ -255,8 +255,15 @@ bool VetteScreen::initialize(const uint8_t* picture, const uint16_t* palette16)
     m_back = (uint8_t*)AllocMem(kPictureBytes, MEMF_CHIP);
     if (!m_back) { FreeMem(m_chip, kPictureBytes); m_chip = 0; return false; }
 
-    m_mouseSprite = (uint16_t*)AllocMem(kMouseSpriteBytes, MEMF_CHIP | MEMF_CLEAR);
-    if (!m_mouseSprite) {
+    m_mouseSprite[0] = (uint16_t*)AllocMem(kMouseSpriteBytes, MEMF_CHIP | MEMF_CLEAR);
+    if (!m_mouseSprite[0]) {
+        FreeMem(m_back, kPictureBytes); m_back = 0;
+        FreeMem(m_chip, kPictureBytes); m_chip = 0;
+        return false;
+    }
+    m_mouseSprite[1] = (uint16_t*)AllocMem(kMouseSpriteBytes, MEMF_CHIP | MEMF_CLEAR);
+    if (!m_mouseSprite[1]) {
+        FreeMem(m_mouseSprite[0], kMouseSpriteBytes); m_mouseSprite[0] = 0;
         FreeMem(m_back, kPictureBytes); m_back = 0;
         FreeMem(m_chip, kPictureBytes); m_chip = 0;
         return false;
@@ -264,7 +271,8 @@ bool VetteScreen::initialize(const uint8_t* picture, const uint16_t* palette16)
 
     m_emptySprite = (uint16_t*)AllocMem(kEmptySpriteBytes, MEMF_CHIP | MEMF_CLEAR);
     if (!m_emptySprite) {
-        FreeMem(m_mouseSprite, kMouseSpriteBytes); m_mouseSprite = 0;
+        FreeMem(m_mouseSprite[1], kMouseSpriteBytes); m_mouseSprite[1] = 0;
+        FreeMem(m_mouseSprite[0], kMouseSpriteBytes); m_mouseSprite[0] = 0;
         FreeMem(m_back, kPictureBytes); m_back = 0;
         FreeMem(m_chip, kPictureBytes); m_chip = 0;
         return false;
@@ -273,7 +281,8 @@ bool VetteScreen::initialize(const uint8_t* picture, const uint16_t* palette16)
     m_copper = (uint32_t*)AllocMem(VS_CL_LONGS * sizeof(uint32_t), MEMF_CHIP | MEMF_CLEAR);
     if (!m_copper) {
         FreeMem(m_emptySprite, kEmptySpriteBytes); m_emptySprite = 0;
-        FreeMem(m_mouseSprite, kMouseSpriteBytes); m_mouseSprite = 0;
+        FreeMem(m_mouseSprite[1], kMouseSpriteBytes); m_mouseSprite[1] = 0;
+        FreeMem(m_mouseSprite[0], kMouseSpriteBytes); m_mouseSprite[0] = 0;
         FreeMem(m_back, kPictureBytes); m_back = 0;
         FreeMem(m_chip, kPictureBytes); m_chip = 0;
         return false;
@@ -292,7 +301,7 @@ bool VetteScreen::initialize(const uint8_t* picture, const uint16_t* palette16)
         m_copper[VS_CL_PTRS + k * 2 + 1] = copperMove(bpl1ptl + k * 4, 0);
     }
     for (uint16_t channel = 0; channel < 8; ++channel) {
-        uint32_t sprite = (uint32_t)(channel == 0 ? m_mouseSprite : m_emptySprite);
+        uint32_t sprite = (uint32_t)(channel == 0 ? m_mouseSprite[0] : m_emptySprite);
         m_copper[VS_CL_SPRITES + channel * 2]
             = copperMove(spr1pth + channel * 4, (uint16_t)(sprite >> 16));
         m_copper[VS_CL_SPRITES + channel * 2 + 1]
@@ -411,7 +420,8 @@ void VetteScreen::setMouseCursor(const uint8_t* cursor, int16_t x, int16_t y,
 
 void VetteScreen::updateMouseSprite(bool oddField)
 {
-    if (!m_mouseSprite) return;
+    uint16_t* sprite = m_mouseSprite[oddField ? 1 : 0];
+    if (!sprite) return;
 
     int16_t left = (int16_t)(m_cursorX - m_cursorHotX);
     int16_t top = (int16_t)(kMacTop + m_cursorY - m_cursorHotY);
@@ -424,7 +434,7 @@ void VetteScreen::updateMouseSprite(bool oddField)
     uint16_t hstart = (uint16_t)(VS_HSTART + (left > 0 ? left : 0) / 2);
     uint16_t vstart = (uint16_t)(VS_VSTART + firstScreenRow / 2);
     uint16_t vstop = (uint16_t)(vstart + kMouseSpriteFieldRows);
-    uint8_t* control = (uint8_t*)m_mouseSprite;
+    uint8_t* control = (uint8_t*)sprite;
     control[0] = visible ? (uint8_t)vstart : 0;
     control[1] = visible ? (uint8_t)(hstart >> 1) : 0;
     control[2] = visible ? (uint8_t)vstop : 0;
@@ -440,9 +450,16 @@ void VetteScreen::updateMouseSprite(bool oddField)
         uint16_t white = (uint16_t)(~image & mask);
         uint16_t invert = (uint16_t)(image & ~mask);
         // Sprite value 1 -> black, 2 -> neutral XOR fallback, 3 -> white.
-        m_mouseSprite[2 + fieldRow * 2] = (uint16_t)(black | white);
-        m_mouseSprite[3 + fieldRow * 2] = (uint16_t)(white | invert);
+        sprite[2 + fieldRow * 2] = (uint16_t)(black | white);
+        sprite[3 + fieldRow * 2] = (uint16_t)(white | invert);
     }
+
+    // The VBI is preparing the copper list for the NEXT field. Select the
+    // dedicated sprite whose eight DMA rows were just built for that field;
+    // never rewrite the object potentially being fetched by the current one.
+    uint32_t pointer = (uint32_t)sprite;
+    m_copper[VS_CL_SPRITES] = copperMove(spr1pth, (uint16_t)(pointer >> 16));
+    m_copper[VS_CL_SPRITES + 1] = copperMove(spr1ptl, (uint16_t)pointer);
 }
 
 #ifdef VETTE_FILLWATCH
@@ -714,7 +731,8 @@ void VetteScreen::shutdown()
 {
     if (m_copper) { FreeMem(m_copper, VS_CL_LONGS * sizeof(uint32_t)); m_copper = 0; }
     if (m_emptySprite) { FreeMem(m_emptySprite, kEmptySpriteBytes); m_emptySprite = 0; }
-    if (m_mouseSprite) { FreeMem(m_mouseSprite, kMouseSpriteBytes); m_mouseSprite = 0; }
+    if (m_mouseSprite[1]) { FreeMem(m_mouseSprite[1], kMouseSpriteBytes); m_mouseSprite[1] = 0; }
+    if (m_mouseSprite[0]) { FreeMem(m_mouseSprite[0], kMouseSpriteBytes); m_mouseSprite[0] = 0; }
     if (m_back)   { FreeMem(m_back, kPictureBytes); m_back = 0; }
     if (m_chip)   { FreeMem(m_chip, kPictureBytes); m_chip = 0; }
 }
