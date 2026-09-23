@@ -122,8 +122,9 @@ run_session()
   run_case menu-quit 50 driving_menu_quit.gdb \
     'menu-quit restore.*view=1.*selected=1' \
     PROBES=1 SKIP_INTRO=1 GARAGE_CLICK=1 SESSION_CONTROL_ITEM=8
-  run_case emergency-quit 35 quit_path.gdb \
-    'AmigaOS restore complete:.*view=1' PROBES=1 QUIT_PROBE=1
+  run_case emergency-quit 90 quit_path.gdb \
+    'emergency-quit PASS: view=1.*live=0.*pointers=0.*handles=0' \
+    PROBES=1 QUIT_PROBE=1 SKIP_INTRO=1
   run_case scores 45 score_persistence.gdb \
     'score persistence changed=[1-9].*writes=[1-9].*load-valid=1.*saved=[1-9][0-9]*.*view=1' \
     PROBES=1 SKIP_INTRO=1 SCORE_PERSISTENCE_PROBE=1

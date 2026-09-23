@@ -22,6 +22,35 @@ break vetteRestoreComplete
 commands
   silent
   printf "AmigaOS restore complete: DMA saved=$%04x actual=$%04x INTENA saved=$%04x actual=$%04x view=%u\n", g_restoreSavedDmacon, g_restoreActualDmacon, g_restoreSavedIntena, g_restoreActualIntena, g_restoreViewMatches
+  continue
+end
+
+break vetteRuntimeAllocationsReleased
+commands
+  silent
+  set $live = s_memoryManager.allocationCount + s_handleAllocationCount
+  set $i = 0
+  while $i < 5
+    if s_introSamples[$i].chipData != 0
+      set $live = $live + 1
+    end
+    set $i = $i + 1
+  end
+  set $i = 0
+  while $i < 16
+    if s_bogasInstruments[$i].chipData != 0
+      set $live = $live + 1
+    end
+    set $i = $i + 1
+  end
+  set $i = 0
+  while $i < 8
+    if s_gworlds[$i].pixels != 0
+      set $live = $live + 1
+    end
+    set $i = $i + 1
+  end
+  printf "emergency-quit PASS: view=%u DMA=$%04x/$%04x INTENA=$%04x/$%04x live=%u pointers=%u handles=%u freed=%u/%u/%u/%u/%u\n", g_restoreViewMatches, g_restoreSavedDmacon, g_restoreActualDmacon, g_restoreSavedIntena, g_restoreActualIntena, $live, s_memoryManager.allocationCount, s_handleAllocationCount, g_probeReleasedIntroSamples, g_probeReleasedBogasSamples, g_probeReleasedGWorlds, g_probeReleasedPointers, g_probeReleasedHandles
   detach
   quit
 end

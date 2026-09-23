@@ -513,6 +513,7 @@ struct GWorldSlot {
 // not emulated heap exhaustion: a full slot table must never masquerade as a
 // Macintosh memFullErr while Exec still has memory available.
 static GWorldSlot s_gworlds[8];
+static uint32_t s_gworldAllocationBytes[8];
 
 struct FontManagerState {
     bool initialized;
@@ -571,7 +572,10 @@ struct PointerAllocation {
     uint8_t* master;
     uint32_t size;
 };
-static PointerAllocation s_pointerAllocations[128];
+// Initialize keeps substantially more than 128 Ptr blocks live.  Every block
+// must remain represented for RecoverHandle identity and final AmigaOS cleanup;
+// silently allocating beyond this table was the source of unreturnable memory.
+static PointerAllocation s_pointerAllocations[1024];
 
 struct HandleAllocation {
     uint8_t* master;
@@ -581,6 +585,13 @@ struct HandleAllocation {
 };
 static HandleAllocation s_handleAllocations[128];
 static uint16_t s_handleAllocationCount;
+#ifdef VETTE_PROBE
+volatile uint16_t g_probeReleasedIntroSamples;
+volatile uint16_t g_probeReleasedBogasSamples;
+volatile uint16_t g_probeReleasedGWorlds;
+volatile uint16_t g_probeReleasedPointers;
+volatile uint16_t g_probeReleasedHandles;
+#endif
 
 struct Segment { uint8_t* begin; uint8_t* end; const char* name; };
 static Segment s_segments[11] = {
@@ -4828,8 +4839,10 @@ static uint8_t* newGWorld(const uint8_t* bounds, uint16_t depth)
     // bytes through a PixMap advertised as 256 bytes wide, producing the
     // characteristic repeating/cyclic corruption seen on newer Mac systems.
     uint16_t rowBytes = (uint16_t)((((uint32_t)width * pixelDepth + 31) >> 5 << 2) + 4);
-    slot->pixels = (uint8_t*)AllocMem((uint32_t)rowBytes * height, MEMF_CLEAR);
+    uint32_t pixelBytes = (uint32_t)rowBytes * height;
+    slot->pixels = (uint8_t*)AllocMem(pixelBytes, MEMF_CLEAR);
     if (!slot->pixels) return 0;
+    s_gworldAllocationBytes[slot - s_gworlds] = pixelBytes;
     slot->used = true;
     slot->locked = false;
     slot->purgeable = true;
@@ -5230,19 +5243,22 @@ static bool exitChordPressed()
 
 static uint8_t* newPointer(uint32_t size, bool clear)
 {
+    if (s_memoryManager.allocationCount
+        == sizeof(s_pointerAllocations) / sizeof(s_pointerAllocations[0])) {
+        s_memoryManager.error = -108;        // memFullErr
+        return 0;
+    }
     uint8_t* pointer = (uint8_t*)AllocMem(size ? size : 1, clear ? MEMF_CLEAR : 0);
     if (!pointer) {
         s_memoryManager.error = -108;        // memFullErr
         return 0;
     }
     s_memoryManager.error = 0;
-    if (s_memoryManager.allocationCount < sizeof(s_pointerAllocations) / sizeof(s_pointerAllocations[0])) {
-        PointerAllocation& allocation = s_pointerAllocations[s_memoryManager.allocationCount];
-        allocation.pointer = pointer;
-        allocation.master = pointer;
-        allocation.size = size ? size : 1;
-    }
-    ++s_memoryManager.allocationCount;
+    PointerAllocation& allocation
+        = s_pointerAllocations[s_memoryManager.allocationCount++];
+    allocation.pointer = pointer;
+    allocation.master = pointer;
+    allocation.size = size ? size : 1;
     return pointer;
 }
 
@@ -7987,8 +8003,108 @@ bool MacLoader::prepareResourceForks(uint8_t* application, uint32_t applicationS
     return true;
 }
 
+static void releaseRuntimeAllocations()
+{
+#ifdef VETTE_PROBE
+    g_probeReleasedIntroSamples = 0;
+    g_probeReleasedBogasSamples = 0;
+    g_probeReleasedGWorlds = 0;
+    g_probeReleasedPointers = 0;
+    g_probeReleasedHandles = 0;
+#endif
+    for (uint16_t i = 0; i < sizeof(s_introSamples) / sizeof(s_introSamples[0]); ++i) {
+        IntroSample& sample = s_introSamples[i];
+        if (sample.chipData) {
+            FreeMem(sample.chipData, (sample.size + 1) & ~1UL);
+#ifdef VETTE_PROBE
+            ++g_probeReleasedIntroSamples;
+#endif
+        }
+        sample.chipData = 0;
+        sample.size = 0;
+    }
+
+    for (uint16_t i = 0;
+         i < sizeof(s_bogasInstruments) / sizeof(s_bogasInstruments[0]); ++i) {
+        BogasInstrument& instrument = s_bogasInstruments[i];
+        if (instrument.chipData) {
+            uint32_t silentOffset = (instrument.size + 1) & ~1UL;
+            FreeMem(instrument.chipData, silentOffset + 2);
+#ifdef VETTE_PROBE
+            ++g_probeReleasedBogasSamples;
+#endif
+        }
+        instrument.resource = 0;
+        instrument.chipData = 0;
+        instrument.size = 0;
+        instrument.basePeriod = 0;
+        instrument.loopStart = 0;
+        instrument.loopEnd = 0;
+    }
+    s_bogasInstrumentCount = 0;
+
+    for (uint16_t i = 0; i < sizeof(s_gworlds) / sizeof(s_gworlds[0]); ++i) {
+        GWorldSlot& world = s_gworlds[i];
+        if (world.pixels) {
+            FreeMem(world.pixels, s_gworldAllocationBytes[i]);
+#ifdef VETTE_PROBE
+            ++g_probeReleasedGWorlds;
+#endif
+        }
+        world.pixels = 0;
+        s_gworldAllocationBytes[i] = 0;
+        world.used = false;
+        world.locked = false;
+        world.purgeable = false;
+        world.palette = 0;
+    }
+
+    uint32_t pointerCount = s_memoryManager.allocationCount;
+    if (pointerCount > sizeof(s_pointerAllocations) / sizeof(s_pointerAllocations[0]))
+        pointerCount = sizeof(s_pointerAllocations) / sizeof(s_pointerAllocations[0]);
+    for (uint32_t i = 0; i < pointerCount; ++i) {
+        PointerAllocation& allocation = s_pointerAllocations[i];
+        if (allocation.master) {
+            FreeMem(allocation.master, allocation.size ? allocation.size : 1);
+#ifdef VETTE_PROBE
+            ++g_probeReleasedPointers;
+#endif
+        }
+        allocation.pointer = 0;
+        allocation.master = 0;
+        allocation.size = 0;
+    }
+    s_memoryManager.allocationCount = 0;
+
+    for (uint16_t i = 0; i < s_handleAllocationCount; ++i) {
+        HandleAllocation& allocation = s_handleAllocations[i];
+        if (allocation.master) {
+            FreeMem(allocation.master, allocation.size ? allocation.size : 1);
+#ifdef VETTE_PROBE
+            ++g_probeReleasedHandles;
+#endif
+        }
+        allocation.master = 0;
+        allocation.size = 0;
+        allocation.locked = false;
+        allocation.purgeable = false;
+    }
+    s_handleAllocationCount = 0;
+}
+
+#ifdef VETTE_PROBE
+extern "C" __attribute__((noinline)) void vetteRuntimeAllocationsReleased()
+{
+    __asm__ volatile("" : : : "memory");
+}
+#endif
+
 void MacLoader::releaseResourceForks()
 {
+    releaseRuntimeAllocations();
+#ifdef VETTE_PROBE
+    vetteRuntimeAllocationsReleased();
+#endif
     s_resourceForks.close();
     clearResidentSegments();
     g_resourceCount = 0;
