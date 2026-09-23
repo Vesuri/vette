@@ -6,6 +6,12 @@
 (welcome)
 (set #source (pathonly @icon))
 (set @execute-dir #source)
+; RAM: is expandable: filesystem free blocks are not its available capacity.
+; Resolve the device so T: and other assigns/subdrawers are handled too.
+(procedure P_TempSpace
+  (if (= (getdevice #temp) (getdevice "RAM:"))
+    (- (+ (database "total-mem")) 262144)
+    (getdiskspace #temp)))
 (set #parent
   (askdir
     (prompt "Where should Vette! be installed? A Vette! drawer will be created here.")
@@ -16,7 +22,7 @@
     (prompt "Select a temporary drawer with at least 12 MB free.")
     (help "Allow 12 MB free. T: normally uses RAM; choose a hard disk drawer if RAM is insufficient. Temporary files are removed when finished.")
     (default "T:")))
-(while (< (getdiskspace #temp) 12582912)
+(while (< (P_TempSpace) 12582912)
   ((message "The temporary drawer needs 12 MB free. Please select a hard disk drawer or free some space." (all))
    (set #temp
      (askdir

@@ -4,7 +4,7 @@ import argparse
 import hashlib
 import struct
 from pathlib import Path
-from installer_icon import installer_icon
+from installer_icon import installer_icon, drawer_icon
 
 ORIGINAL_HASHES = {
     "77e80078116e6aef0f257381466cf9cfc77108c75404138c002c68fbde7b896b",
@@ -22,7 +22,7 @@ def crc16(data):
 
 def member(name, data):
     # Generic level-zero header, stored data; no host archiver dependency.
-    name = (PREFIX + "/" + name).replace("/", "\\").encode("ascii")
+    name = name.replace("/", "\\").encode("ascii")
     stamp = (((2026 - 1980) << 9) | (9 << 5) | 23) << 16
     body = b"-lh0-" + struct.pack("<III", len(data), len(data), stamp)
     body += bytes((0x20, 0, len(name))) + name + struct.pack("<H", crc16(data))
@@ -52,9 +52,10 @@ def main():
     args.output_directory.mkdir(parents=True, exist_ok=True)
     archive = args.output_directory / f"Vette-{version}.lha"
     temporary = archive.with_suffix(".lha.part")
-    temporary.write_bytes(b"".join(member(name, data) for name, data in sorted(files.items())) + b"\0")
+    temporary.write_bytes(member(PREFIX + '.info', drawer_icon())
+        + b"".join(member(PREFIX + '/' + name, data) for name, data in sorted(files.items())) + b"\0")
     temporary.replace(archive)
-    print(f"{archive}: {len(files)} files, {archive.stat().st_size} bytes")
+    print(f"{archive}: {len(files)} drawer contents plus drawer icon, {archive.stat().st_size} bytes")
 
 if __name__ == "__main__":
     main()

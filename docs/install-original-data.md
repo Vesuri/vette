@@ -8,7 +8,11 @@ names the port opens at startup.
 
 `make dist` builds `dist/Vette-0.90.lha` (also available through the `make release`
 alias). Its `Vette! Install` drawer contains only `Vette`, `Vette.info`,
-`VetteInstallData`, `Install`, `Install.info`, and `README.txt`. The readme
+`VetteInstallData`, `Install`, `Install.info`, and `README.txt`. A sibling
+`Vette! Install.info` supplies the drawer icon from the WHDLoad template.
+`Install.info` reuses the Rescue on Fractalus installer artwork, with APPNAME
+changed to Vette! and its Installer default tool and AVERAGE user level retained.
+The readme
 contains the helper's license and repository source link. No original data,
 sources, emulator configuration, checksum manifest or host tools are bundled.
 The deterministic generic level-zero LH0 archive needs no host compression tool;
@@ -46,6 +50,19 @@ build, or `memory_driving.gdb` with `PROBES=1 SKIP_INTRO=1 GARAGE_CLICK=1`.
 Use a 180-second host ceiling for the full intro and 80 for driving.
 
 ### Installation procedure
+
+Temporary-space checks resolve the selected drawer with Installer's `getdevice`.
+If it matches the device behind `RAM:`, use `(+ (database "total-mem"))` minus
+a 256 KiB helper reserve. Otherwise use `getdiskspace`. This covers `T:` and
+other assigns/subdirectories without assuming that T: is necessarily in RAM.
+Installer 43.3 documents `database` as returning a string and unary `+` as the
+numeric conversion. RAM disk filesystem free blocks do not describe its ability
+to grow, so a zero from `getdiskspace` must not reject it when enough RAM is free.
+Native Installer 43.3 tests confirmed `disk=0` but `usable=26637424` for both
+RAM: and the RAM-backed T: assign. Fresh installations completed through both
+paths with exact final hashes; the T: test also checked inside the guest that
+its private scratch directory had been deleted. `icon.library` verified the
+borrowed project/drawer icons, default tool and application-specific tooltypes.
 
 Double-click `Install` in the release drawer. Choose the parent installation
 drawer, temporary drawer (default `T:`), then the downloaded `.sit`. The script

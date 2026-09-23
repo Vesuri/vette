@@ -15,7 +15,7 @@ import time
 
 ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT/"tools"))
-from installer_icon import installer_icon
+from installer_icon import installer_icon, drawer_icon
 
 def replace_form(text,start,replacement):
     a=text.index(start); depth=0; quoted=False; i=a
@@ -33,6 +33,8 @@ def replace_form(text,start,replacement):
 
 def main():
     installer=Path(sys.argv[1]).resolve()
+    temp_path = 'RAM:' if '--ram-temp' in sys.argv else 'T:' if '--t-temp' in sys.argv else 'DH2:scratch'
+    temp_work = temp_path + ('' if temp_path.endswith(':') else '/') + '.vette-install-00'
     build=ROOT/"build/install-data"
     subprocess.run(["make","-C",str(ROOT/"tools/install-data"),"all","amiga"],check=True)
     subprocess.run(["m68k-amiga-elf-gcc","-O2","-m68000","-nostdlib","-Wno-volatile-register-var",
@@ -58,13 +60,18 @@ def main():
         script=replace_form(script,"(welcome)",'(if 0 (welcome))')
         script=replace_form(script,"(set #archive",'(set #archive "DH1:tmp/VETTE__1.02_and_extras.sit")')
         script=replace_form(script,"(set #parent",'(set #parent "DH2:out")')
-        script=replace_form(script,"(set #temp",'(set #temp "DH2:scratch")')
+        script=replace_form(script,"(set #temp",f'(set #temp "{temp_path}")')
+        script=script.replace('(while (< (P_TempSpace)', '(textfile (dest "DH2:space.txt") (append ("device=%s disk=%ld usable=%ld memory=%s" (getdevice #temp) (getdiskspace #temp) (P_TempSpace) (database "total-mem"))))\n(while (< (P_TempSpace)')
         script=replace_form(script,"(exit)",'(exit (quiet))')
         (boot/"Install").write_text(script); (boot/"Install.info").write_bytes(installer_icon())
         (boot/"Vette.info").write_bytes(installer_icon(game=True))
-        (boot/"s/startup-sequence").write_text('CD DH0:\nStack 16384\nIconTest\nDF0:C/Assign C: DF0:C\nDF0:C/Assign LIBS: DF0:Libs\nC:LoadWB\nInstaller SCRIPT DH0:Install APPNAME Vette! MINUSER NOVICE DEFUSER NOVICE LOGFILE DH2:installer.log NOPRETEND >DH2:installer-console.log\nEcho $RC >DH2:finished\n')
+        (boot/"Package").mkdir()
+        (boot/"Package.info").write_bytes(drawer_icon())
+        (boot/"s/startup-sequence").write_text('CD DH0:\nStack 16384\nIconTest\nDF0:C/Assign C: DF0:C\nDF0:C/Assign LIBS: DF0:Libs\nC:LoadWB\nInstaller SCRIPT DH0:Install APPNAME Vette! MINUSER NOVICE DEFUSER NOVICE LOGFILE DH2:installer.log NOPRETEND >DH2:installer-console.log\n'
+            + f'If EXISTS "{temp_work}"\nEcho leftover >DH2:leftover\nEndIf\nEcho done >DH2:finished\n')
         with (ROOT/"tmp/installer-script-emulator.log").open("w") as log:
-            emu=subprocess.Popen(["fs-uae","--amiga_model=A1200","--chip_memory=2048","--fast_memory=8192",
+            emu=subprocess.Popen(["fs-uae","--amiga_model=A1200/020","--chip_memory=2048","--fast_memory=8192",
+                "--uae_cpu_model=68020","--uae_cpu_24bit_addressing=false","--uae_z3mem_size=16",
                 "--kickstart_file="+os.environ["KICKSTART"],"--hard_drive_0="+str(boot),
                 "--hard_drive_0_priority=10","--floppy_drive_0="+str(ROOT/"tmp/Workbenchv2.04rev37.67Workbench.adf"),
                 "--hard_drive_1="+str(ROOT),"--hard_drive_2="+str(base),"--warp_mode=1",
@@ -77,9 +84,16 @@ def main():
                 report=(base/"installer.log").read_text(errors="replace") if (base/"installer.log").exists() else "No Installer transcript"
                 if (base/"installer-console.log").exists(): report+='\n'+(base/"installer-console.log").read_text(errors="replace")
                 if (base/"finished").exists(): report+='\nReturn: '+(base/"finished").read_text(errors="replace")
+                if (base/"space.txt").exists(): report+='\n'+(base/"space.txt").read_text(errors="replace")
                 (ROOT/"tmp/installer-script.log").write_text(report)
                 assert (base/"icon-ok").exists(), "icon.library rejected the generated icon"
                 assert (base/"finished").exists(), report
+                assert not (base/"leftover").exists(), "Guest scratch directory was not removed"
+                assert (base/"space.txt").exists(), "Space check did not run"
+                if temp_path in ('RAM:', 'T:'):
+                    space=(base/"space.txt").read_text()
+                    assert 'device=RAM disk=0' in space,space
+                    assert int(space.split('usable=')[1].split()[0])>=12582912,space
                 assert (dest/"Vette!").exists(),report
                 assert (dest/"Vette!").read_bytes()==(boot/"Vette").read_bytes(), report
                 assert (dest/"Vette!.info").exists(),report

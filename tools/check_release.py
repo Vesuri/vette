@@ -25,22 +25,27 @@ def main():
         n = header[19]
         assert size == 22 + n
         name = header[20:20 + n].decode("ascii").replace("\\", "/")
-        assert name.startswith(PREFIX + "/"), "wrong installation drawer"
-        name = name[len(PREFIX) + 1:]
-        assert name in REQUIRED and name not in payloads, "unexpected or duplicate file"
+        if name == PREFIX + '.info':
+            name = '@drawer'
+        else:
+            assert name.startswith(PREFIX + "/"), "wrong installation drawer"
+            name = name[len(PREFIX) + 1:]
+        assert name in REQUIRED | {'@drawer'} and name not in payloads, "unexpected or duplicate file"
         pos += size + 2
         data = raw[pos:pos + packed]
         assert len(data) == packed and crc16(data) == struct.unpack_from("<H", header, 20 + n)[0], "bad payload CRC"
         assert hashlib.sha256(data).hexdigest() not in ORIGINAL_HASHES
         payloads[name] = data
         pos += packed
-    assert raw[pos:] == b"\0" and set(payloads) == REQUIRED, "wrong archive contents"
+    assert raw[pos:] == b"\0" and set(payloads) == REQUIRED | {'@drawer'}, "wrong archive contents"
     for name in ("Vette", "VetteInstallData"):
         assert payloads[name][:4] == b"\0\0\3\xf3", "not an Amiga HUNK executable"
-    for name, kind in (("Vette.info", 3), ("Install.info", 4)):
+    for name, kind in (("Vette.info", 3), ("Install.info", 4), ('@drawer', 2)):
         assert payloads[name][:4] == b"\xe3\x10\0\1" and payloads[name][48] == kind
     assert b"$VER: Install 0.90 (23.09.2026)" in payloads["Install"]
-    print("PASS: six files under Vette! Install, valid LHA CRCs, executables and icons")
+    assert b'APPNAME=Vette!\0' in payloads['Install.info']
+    assert b'Rescue on Fractalus' not in payloads['Install.info']
+    print("PASS: six files plus drawer icon, valid LHA CRCs, executables and icons")
 
 if __name__ == "__main__":
     main()

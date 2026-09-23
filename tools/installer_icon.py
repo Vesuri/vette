@@ -1,14 +1,35 @@
-"""Generate an original, minimal classic Workbench project icon for Install."""
+"""Reuse release drawer/project icons and generate the small game tool icon."""
 import struct
+import base64
+from pathlib import Path
+
+def template_icon(name):
+    return base64.b64decode((Path(__file__).resolve().parents[1] / 'release/icons' / name).read_bytes())
+
+def drawer_icon():
+    return template_icon('drawer.info.b64')
+
+def install_project_icon():
+    data = template_icon('install.info.b64')
+    old = b'APPNAME=Rescue on Fractalus!\0'
+    new = b'APPNAME=Vette!\0'
+    field = struct.pack('>I', len(old)) + old
+    assert data.count(field) == 1
+    # Preserve both the classic image and the trailing ColorIcon FORM, as well
+    # as Installer/LOG=FALSE/PRETEND=FALSE/MINUSER=AVERAGE from the source icon.
+    # DEFUSER defaults to MINUSER, per Installer 43.3 documentation.
+    return data.replace(field, struct.pack('>I', len(new)) + new)
 
 def installer_icon(game=False):
+    if not game:
+        return install_project_icon()
     # DiskObject: all pointers are presence markers in the serialized format.
     header=bytearray(78)
     struct.pack_into(">HH",header,0,0xe310,1)
     struct.pack_into(">hhhhHHH",header,8,0,0,32,24,5,1,1)
     struct.pack_into(">I",header,22,1)  # GadgetRender image
-    header[48]=3 if game else 4       # WBTOOL / WBPROJECT
-    struct.pack_into(">IIiiIII",header,50,0 if game else 1,0 if game else 1,-2147483648,-2147483648,0,0,4096)
+    header[48]=3                     # WBTOOL
+    struct.pack_into(">IIiiIII",header,50,0,0,-2147483648,-2147483648,0,0,4096)
     image=struct.pack(">hhhhhIBBI",0,0,32,24,2,1,3,0,0)
     pixels=[[0]*32 for _ in range(24)]
     # A disk with an arrow pointing into it; standard Workbench four pens.
@@ -29,10 +50,4 @@ def installer_icon(game=False):
             value=0
             for p in row: value=(value<<1)|((p>>plane)&1)
             planes.extend(struct.pack(">I",value))
-    def string(s):
-        data=s.encode("ascii")+b"\0"
-        return struct.pack(">I",len(data))+data
-    types=["APPNAME=Vette!","MINUSER=AVERAGE","DEFUSER=AVERAGE"]
-    if game:
-        return bytes(header)+image+planes
-    return bytes(header)+image+planes+string("Installer")+struct.pack(">I",4*(len(types)+1))+b"".join(map(string,types))
+    return bytes(header)+image+planes

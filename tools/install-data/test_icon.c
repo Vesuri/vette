@@ -31,13 +31,22 @@ int amiga_main(void) {
             ok=icon->do_Type==WBPROJECT && equal((const char *)icon->do_DefaultTool,"Installer")
                 && icon->do_ToolTypes && equal((const char *)FindToolType(icon->do_ToolTypes,(CONST_STRPTR)"APPNAME"),"Vette!")
                 && icon->do_StackSize==4096 && icon->do_Gadget.GadgetRender
-                && icon->do_Gadget.Width==32 && icon->do_Gadget.Height==24;
+                && icon->do_Gadget.Width==70 && icon->do_Gadget.Height==26
+                && equal((const char *)FindToolType(icon->do_ToolTypes,(CONST_STRPTR)"MINUSER"),"AVERAGE")
+                && equal((const char *)FindToolType(icon->do_ToolTypes,(CONST_STRPTR)"PRETEND"),"FALSE")
+                && !FindToolType(icon->do_ToolTypes,(CONST_STRPTR)"SCRIPT");
             FreeDiskObject(icon);
         }
         if(ok) {
             icon=GetDiskObject((CONST_STRPTR)"DH0:Vette");
             ok=icon && icon->do_Type==WBTOOL && icon->do_StackSize==4096
                 && icon->do_Gadget.GadgetRender && !icon->do_DefaultTool;
+            if(icon) FreeDiskObject(icon);
+        }
+        if(ok) {
+            icon=GetDiskObject((CONST_STRPTR)"DH0:Package");
+            ok=icon && icon->do_Type==WBDRAWER && icon->do_DrawerData
+                && icon->do_Gadget.GadgetRender;
             if(icon) FreeDiskObject(icon);
         }
         if(ok && (f=Open((CONST_STRPTR)"DH2:icon-ok",MODE_NEWFILE))) { Write(f,(APTR)"OK\n",3); Close(f); }
