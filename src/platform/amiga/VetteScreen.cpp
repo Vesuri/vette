@@ -211,11 +211,12 @@ static_assert(VS_DIWHIGH == ((((VS_HSTOP & 0x100) ? 0x2000 : 0) | (((VS_VSTOP >>
 #define VS_BPLMOD   (2 * VetteScreen::kRowStride - VetteScreen::kBytesPerRow)
 
 // Copper-list layout. Pointers come first so DMA sees complete addresses before
-// the display opens. Sprite 0 uses colours 17..19 independently of the game's
-// sixteen-colour palette.
+// the display opens. Every sprite pointer is owned: sprite 0 uses the cursor,
+// while channels 1..7 share a cleared zero-height sprite. Sprite 0 uses colours
+// 17..19 independently of the game's sixteen-colour palette.
 #define VS_CL_PTRS       0                   /* 8 moves: BPL1PTH..BPL4PTL */
-#define VS_CL_SPRITE     (VS_CL_PTRS + 8)    /* 2 moves: SPR0PTH/SPR0PTL */
-#define VS_CL_COLORS     (VS_CL_SPRITE + 2)  /* 16 moves: COLOR00..COLOR15 */
+#define VS_CL_SPRITES    (VS_CL_PTRS + 8)    /* 16 moves: SPR0PT..SPR7PT */
+#define VS_CL_COLORS     (VS_CL_SPRITES + 16)/* 16 moves: COLOR00..COLOR15 */
 #define VS_CL_SPRCOLORS  (VS_CL_COLORS + 16) /* COLOR17..COLOR19 */
 #define VS_CL_END        (VS_CL_SPRCOLORS + 3)
 #define VS_CL_LONGS  (VS_CL_END + 1)
@@ -224,6 +225,9 @@ static_assert(VS_DIWHIGH == ((((VS_HSTOP & 0x100) ? 0x2000 : 0) | (((VS_VSTOP >>
 // two control words, eight DATA/DATB pairs, and the mandatory zero terminator.
 static const uint16_t kMouseSpriteFieldRows = 8;
 static const uint32_t kMouseSpriteBytes = (kMouseSpriteFieldRows + 2) * 4;
+// Match Rescue on Fractalus's Sprite::allocate(0): control pair plus a zero
+// terminator, both cleared, so DMA cannot walk beyond the null object.
+static const uint32_t kEmptySpriteBytes = 8;
 
 // ⭐ The checksum the Stage A acceptance test compares against a host-computed one
 // (tools/mac_fb_to_amiga.py's blob, same algorithm).  Rotate-then-xor, not a plain sum:
@@ -258,8 +262,17 @@ bool VetteScreen::initialize(const uint8_t* picture, const uint16_t* palette16)
         return false;
     }
 
+    m_emptySprite = (uint16_t*)AllocMem(kEmptySpriteBytes, MEMF_CHIP | MEMF_CLEAR);
+    if (!m_emptySprite) {
+        FreeMem(m_mouseSprite, kMouseSpriteBytes); m_mouseSprite = 0;
+        FreeMem(m_back, kPictureBytes); m_back = 0;
+        FreeMem(m_chip, kPictureBytes); m_chip = 0;
+        return false;
+    }
+
     m_copper = (uint32_t*)AllocMem(VS_CL_LONGS * sizeof(uint32_t), MEMF_CHIP | MEMF_CLEAR);
     if (!m_copper) {
+        FreeMem(m_emptySprite, kEmptySpriteBytes); m_emptySprite = 0;
         FreeMem(m_mouseSprite, kMouseSpriteBytes); m_mouseSprite = 0;
         FreeMem(m_back, kPictureBytes); m_back = 0;
         FreeMem(m_chip, kPictureBytes); m_chip = 0;
@@ -278,9 +291,13 @@ bool VetteScreen::initialize(const uint8_t* picture, const uint16_t* palette16)
         m_copper[VS_CL_PTRS + k * 2 + 0] = copperMove(bpl1pth + k * 4, 0);
         m_copper[VS_CL_PTRS + k * 2 + 1] = copperMove(bpl1ptl + k * 4, 0);
     }
-    uint32_t sprite = (uint32_t)m_mouseSprite;
-    m_copper[VS_CL_SPRITE] = copperMove(spr1pth, (uint16_t)(sprite >> 16));
-    m_copper[VS_CL_SPRITE + 1] = copperMove(spr1ptl, (uint16_t)sprite);
+    for (uint16_t channel = 0; channel < 8; ++channel) {
+        uint32_t sprite = (uint32_t)(channel == 0 ? m_mouseSprite : m_emptySprite);
+        m_copper[VS_CL_SPRITES + channel * 2]
+            = copperMove(spr1pth + channel * 4, (uint16_t)(sprite >> 16));
+        m_copper[VS_CL_SPRITES + channel * 2 + 1]
+            = copperMove(spr1ptl + channel * 4, (uint16_t)sprite);
+    }
     for (uint16_t i = 0; i < 16; i++)
         m_copper[VS_CL_COLORS + i] = copperMove(color00 + i * 2,
                                                 palette16 ? palette16[i] : 0);
@@ -696,6 +713,7 @@ bool VetteScreen::presentMacFrame(const uint8_t* chunky, const uint8_t* colorTab
 void VetteScreen::shutdown()
 {
     if (m_copper) { FreeMem(m_copper, VS_CL_LONGS * sizeof(uint32_t)); m_copper = 0; }
+    if (m_emptySprite) { FreeMem(m_emptySprite, kEmptySpriteBytes); m_emptySprite = 0; }
     if (m_mouseSprite) { FreeMem(m_mouseSprite, kMouseSpriteBytes); m_mouseSprite = 0; }
     if (m_back)   { FreeMem(m_back, kPictureBytes); m_back = 0; }
     if (m_chip)   { FreeMem(m_chip, kPictureBytes); m_chip = 0; }

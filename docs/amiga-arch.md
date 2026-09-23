@@ -88,6 +88,13 @@ The mouse uses sprite 0 and must remain above every nonzero game pixel, not mere
 pairs ahead of both playfields. The earlier `$0000` setting had the priority direction backwards
 and put sprite pair 0/1 behind PF1, making the pointer disappear beneath game artwork.
 
+Enabling sprite DMA makes all eight channels live; leaving `SPR1PT`--`SPR7PT` untouched would let
+them inherit graphics.library pointers and fetch arbitrary chip memory after takeover. Following
+Rescue on Fractalus, Vette allocates one eight-byte, zero-height sprite in cleared chip RAM and the
+copper list writes every pointer pair: `SPR0PT` selects the cursor and all seven unused channels
+select that null sprite. The extra cleared terminator pair ensures even an empty channel cannot
+walk beyond the allocation.
+
 ⚠ **`AmigaHardware::isLongFrame()` did not LINK** — in the ASSEMBLER configurations it was declared
 `__asm`/bridged and `jsr`ed `_isLongFrame__13AmigaHardwareFv`, a symbol no `.s` ever defined, so the
 *first* caller was an undefined-symbol link error and only an interlaced display needs the field

@@ -92,6 +92,7 @@ private:
     uint16_t  m_nextPalette[16] = {0};
     volatile bool m_framePending = false;
     uint16_t* m_mouseSprite = 0;
+    uint16_t* m_emptySprite = 0;
     uint16_t  m_cursorImage[16] = {0};
     uint16_t  m_cursorMask[16] = {0};
     int16_t   m_cursorX = 256;

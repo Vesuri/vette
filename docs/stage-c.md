@@ -1477,8 +1477,10 @@ halves, AGA HIRES sprite resolution keeps the pointer at game-pixel scale, and c
 black, neutral XOR fallback, and white independently of the game's palette. The chunky surface and
 dirty list are now cursor-free, so the pointer remains live at the 50 Hz display cadence even when
 the game has no frame ready. `BPLCON2=$0024` sets both playfield priorities to four, keeping sprite
-0 in front of every nonzero playfield pixel as well as the background. `_DragWindow` is also named
-in the loud stop, so this path could be
+0 in front of every nonzero playfield pixel as well as the background. The same copper list owns
+all eight sprite pointers: channels 1--7 point at a shared cleared, zero-height chip-RAM sprite so
+enabling sprite DMA cannot follow stale OS pointers through arbitrary memory. `_DragWindow` is also
+named in the loud stop, so this path could be
 identified rather than reported as an unknown trap.
 
 A second physical test then clicked the still-visible ACCEPT artwork after the difficulty choices

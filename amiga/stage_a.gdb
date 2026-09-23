@@ -46,6 +46,17 @@ printf "VPOSR[0..7]   = %04X %04X %04X %04X %04X %04X %04X %04X\n", \
     g_lofSamples[4], g_lofSamples[5], g_lofSamples[6], g_lofSamples[7]
 printf "                (bit 15 must ALTERNATE; a constant word = not interlaced, FFFF = bad read)\n"
 printf "BPLCON2       = %04X      (want 0024: every sprite pair ahead of both playfields)\n", *(unsigned short*)0xdff104
+set $emptySprite = (unsigned int)m_emptySprite
+set $spritePointersOk = 1
+set $channel = 1
+while $channel < 8
+  set $spritePointer = ((m_copper[8 + $channel * 2] & 0xffff) << 16) | (m_copper[9 + $channel * 2] & 0xffff)
+  if $spritePointer != $emptySprite
+    set $spritePointersOk = 0
+  end
+  set $channel = $channel + 1
+end
+printf "emptySprite   = %08X words=%04X/%04X/%04X/%04X unused-pointers=%u (want all zero / 1)\n", $emptySprite, m_emptySprite[0], m_emptySprite[1], m_emptySprite[2], m_emptySprite[3], $spritePointersOk
 printf "===================\n\n"
 detach
 quit
