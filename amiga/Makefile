@@ -593,6 +593,10 @@ all: $(OUT).exe
 $(OUT).exe: $(OUT).elf
 	$(info Elf2Hunk $@)
 	@elf2hunk $(OUT).elf $(OUT).exe -s
+	@grep -qa '$$VER: Vette! 0.90 (23.09.2026)' $(OUT).exe || { \
+	  echo "error: the AmigaOS \$$VER: string is missing from $@."; \
+	  echo "       See src/platform/amiga/version.s (SHF_GNU_RETAIN)."; \
+	  $(RM) $@; exit 1; }
 
 $(OUT).elf: $(OBJECTS)
 	$(info Linking $@)
