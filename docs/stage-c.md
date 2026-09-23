@@ -409,6 +409,15 @@ identical 193×100 source and destination extents and needs only translation. Bo
 and the next bounded run completes `DrawPicture` before stopping at the following `$A8A2`
 (`PaintRect`) call at `Main+$173A`.
 
+The PICT relative-text position is the preceding text operation's origin, not the pen position
+after its glyphs have advanced it. Course One exposes the distinction: its `DHDVText(2,22)` record
+for `Finish: Vista Point` follows `Start: San Francisco Zoo`. Advancing the saved origin by the
+fallback glyph widths placed FINISH at the bubble's right edge and clipped its destination. The
+version-1 interpreter now keeps a separate text origin, implements all four `$28..$2B` text
+position opcodes, and reproduces the System 6 layout with both lines left-aligned inside the panel.
+`make course-text-regression` stops immediately after PICT 6398 and verifies the source-derived
+`(314,78)` first glyph position in the target chunky surface.
+
 `amiga/stage_c.gdb` breaks on `VetteScreen::showLoudStop`, after the report is complete, and prints
 the depth, trap identity, selector, runtime `(segment, offset)`, absolute PC, USP and its first
 words, all data/address registers, and nearby instructions. It then exits, so `diag_run.sh` stops

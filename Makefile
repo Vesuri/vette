@@ -5,7 +5,7 @@
 VETTE_APP_RSRC ?= tmp/rsrc_VETTE!_VETTE!_Folder_Folder_Color_VETTE!_Color_VETTE!.rsrc
 VETTE_DATA_RSRC ?= tmp/rsrc_VETTE!_VETTE!_Folder_Folder_Color_VETTE!_VETTE!.Data.rsrc
 
-.PHONY: all todo static-map-check coverage-check gameplay-regression-smoke gameplay-regression install-original-data release release-check fidelity-check driving-sequence-capture driving-sequence-compare driving-motion-reference driving-view-reference driving-view-capture driving-view-compare driving-view-regression driving-f1-reference driving-f1-capture driving-f1-compare driving-audio-reference driving-audio-capture driving-audio-compare driving-audio-countdown-regression driving-audio-regression driving-motion-capture driving-motion-compare driving-motion-viewport-compare driving-cadence-compare driving-control-audit driving-palette-compare driving-profile help
+.PHONY: all todo static-map-check coverage-check gameplay-regression-smoke gameplay-regression install-original-data release release-check fidelity-check course-text-regression driving-sequence-capture driving-sequence-compare driving-motion-reference driving-view-reference driving-view-capture driving-view-compare driving-view-regression driving-f1-reference driving-f1-capture driving-f1-compare driving-audio-reference driving-audio-capture driving-audio-compare driving-audio-countdown-regression driving-audio-regression driving-motion-capture driving-motion-compare driving-motion-viewport-compare driving-cadence-compare driving-control-audit driving-palette-compare driving-profile help
 
 all: help
 
@@ -28,6 +28,7 @@ help:
 	@echo "  make driving-cadence-compare  gate A1200 completed-frame cadence against the Mac"
 	@echo "  make driving-control-audit  gate the input bridge and FS-UAE configuration"
 	@echo "  make driving-palette-compare  gate selector and road CLUTs from shipped resources"
+	@echo "  make course-text-regression   gate PICT relative text placement in the course panel"
 	@echo "  make driving-motion-reference  capture distinct moving frames on the Macintosh oracle"
 	@echo "  make driving-f1-reference      capture moving F1-view frames on the Macintosh oracle"
 	@echo "  make driving-f1-capture        capture matching moving F1-view Amiga frames"
@@ -59,6 +60,15 @@ todo:
 	            ':!src/platform/amiga/framework' ':!docs' 2>/dev/null); \
 	  if [ -n "$$hits" ]; then echo "$$hits"; else echo "none"; fi; \
 	else echo "(not a git repo)"; fi
+
+course-text-regression:
+	@mkdir -p tmp
+	@cd amiga && . ./env.sh && $(MAKE) clean && \
+	  $(MAKE) -j4 SKIP_INTRO=1 GARAGE_CLICK=1 && \
+	  GDBTAIL=100 EXTRA_ARGS="--warp_mode=1" GDBSCRIPT=course_text_layout.gdb \
+	  ./diag_run.sh 90
+	@cp amiga/.run/gdb-out.log tmp/amiga-course-text-layout.log
+	@grep -q "course-text PASS" tmp/amiga-course-text-layout.log
 
 static-map-check:
 	@python3 tools/check_static_map.py

@@ -3299,7 +3299,7 @@ static bool drawVersionOnePicture(const uint8_t* picture, uint32_t size,
     bool drewPixels = false;
     uint8_t pattern[8] = { 0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff };
     int16_t penHeight = 1, penWidth = 1, ovalHeight = 0, ovalWidth = 0;
-    int16_t penV = 0, penH = 0;
+    int16_t textV = 0, textH = 0;
     int16_t lastTop = 0, lastLeft = 0, lastBottom = 0, lastRight = 0;
     int16_t frameTop = (int16_t)read16(frame), frameLeft = (int16_t)read16(frame + 2);
     int16_t frameBottom = (int16_t)read16(frame + 4), frameRight = (int16_t)read16(frame + 6);
@@ -3311,6 +3311,8 @@ static bool drawVersionOnePicture(const uint8_t* picture, uint32_t size,
         || frameRight - frameLeft != targetRight - targetLeft) return false;
     int16_t translateV = (int16_t)(targetTop - frameTop);
     int16_t translateH = (int16_t)(targetLeft - frameLeft);
+    textV = translateV;
+    textH = translateH;
     uint8_t* port = (uint8_t*)read32(s_qdThePort);
     uint8_t** mapHandle = port ? (uint8_t**)read32(port + 2) : 0;
     uint8_t* map = mapHandle ? *mapHandle : 0;
@@ -3400,7 +3402,6 @@ static bool drawVersionOnePicture(const uint8_t* picture, uint32_t size,
                 if (twice >= dy) { error = (int16_t)(error + dy); x = (int16_t)(x + sx); }
                 if (twice <= dx) { error = (int16_t)(error + dx); y = (int16_t)(y + sy); }
             }
-            penV = endV; penH = endH;
             offset += 6; drewPixels = true; continue;
         }
         if (opcode == 0x41 || opcode == 0x48) {
@@ -3436,15 +3437,19 @@ static bool drawVersionOnePicture(const uint8_t* picture, uint32_t size,
                 }
             drewPixels = true; continue;
         }
-        if (opcode == 0x28 || opcode == 0x2b) {
-            uint16_t prefix = opcode == 0x28 ? 4 : 2;
+        if (opcode >= 0x28 && opcode <= 0x2b) {
+            uint16_t prefix = opcode == 0x28 ? 4 : opcode == 0x2b ? 2 : 1;
             if (offset + prefix + 1 > size) return false;
             if (opcode == 0x28) {
-                penV = (int16_t)(read16(picture + offset) + translateV);
-                penH = (int16_t)(read16(picture + offset + 2) + translateH);
-            } else {
-                penH = (int16_t)(penH + (int8_t)picture[offset]);
-                penV = (int16_t)(penV + (int8_t)picture[offset + 1]);
+                textV = (int16_t)(read16(picture + offset) + translateV);
+                textH = (int16_t)(read16(picture + offset + 2) + translateH);
+            } else if (opcode == 0x29) {     // DHText
+                textH = (int16_t)(textH + picture[offset]);
+            } else if (opcode == 0x2a) {     // DVText
+                textV = (int16_t)(textV + picture[offset]);
+            } else {                         // DHDVText
+                textH = (int16_t)(textH + picture[offset]);
+                textV = (int16_t)(textV + picture[offset + 1]);
             }
             uint8_t length = picture[offset + prefix];
             if (offset + prefix + 1UL + length > size) return false;
@@ -3454,14 +3459,16 @@ static bool drawVersionOnePicture(const uint8_t* picture, uint32_t size,
                     uint8_t bits = pictureGlyphRow(text[i], row);
                     for (uint16_t column = 0; column < 5; ++column)
                         if (bits & (16u >> column)) {
-                            int16_t x = (int16_t)(penH + i * 6 + column);
-                            int16_t y = (int16_t)(penV - 7 + row);
+                            int16_t x = (int16_t)(textH + i * 6 + column);
+                            int16_t y = (int16_t)(textV - 7 + row);
                             if (y >= mapTop && y < mapBottom && x >= mapLeft && x < mapRight)
                                 setPackedPixel(pixels, rowBytes, mapTop, mapLeft, x, y, 15);
                         }
                 }
             }
-            penH = (int16_t)(penH + length * 6);
+            // PICT compresses each relative text position against the origin
+            // of the preceding text operation, not the post-DrawText pen.
+            // Keep textH/textV at that origin for DHText/DVText/DHDVText.
             offset += prefix + 1UL + length;
             drewPixels = true; continue;
         }
