@@ -299,6 +299,15 @@ ifeq ($(GARAGE_CLICK),1)
 EXTRA_DEFINES += -DVETTE_GARAGE_CLICK
 endif
 
+# Diagnostic only: run the complete Corvette departure after scripted ACCEPT
+# instead of taking its shipped Button escape on the first iteration.
+ifeq ($(GARAGE_DEPARTURE_FULL),1)
+ifneq ($(GARAGE_CLICK),1)
+$(error GARAGE_DEPARTURE_FULL=1 requires GARAGE_CLICK=1)
+endif
+EXTRA_DEFINES += -DVETTE_GARAGE_DEPARTURE_FULL
+endif
+
 # Diagnostic only: select the garage's index-4 dynamometer control first,
 # allow its original animation to return, then continue the ordinary selector
 # and race-click sequence.
@@ -535,6 +544,12 @@ PROBE_SYMS += g_probePicture140TrapPC g_probePicture140Return \
               g_probeSkipC2P g_probeC2PFrames g_probeC2PRects g_probeC2PPixels \
               g_probeCopyMapIdentity g_probeCopyMapHits g_probeCopyMapMisses \
               g_probeCopyBitsTicks g_probeCopyBitsCalls \
+              g_probeDelayCalls g_probeDelayRequested \
+              g_probeBlockMoveTicks g_probeBlockMoveCalls \
+              g_probeDrawPictureTicks g_probeDrawPictureCalls \
+              g_probeDrawPictureTrace g_probeDrawPictureTraceTicks \
+              g_probeCopyTraceEnabled g_probeCopyTraceCount g_probeCopyTrace \
+              g_probeCopyModeTicks g_probeCopyModeCalls \
               g_macExitState g_macHostReturnSP \
               g_restoreSavedDmacon g_restoreActualDmacon \
               g_restoreSavedIntena g_restoreActualIntena g_restoreViewMatches \

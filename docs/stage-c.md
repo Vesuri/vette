@@ -313,14 +313,26 @@ depth 87, so the next diagnostic is a code-boundary progress probe rather than a
 
 `amiga/garage_transition.gdb` now marks one-shot boundaries through that branch. It proves the
 handler enters its plate animation at `Main+$10AA`; the delay is composition, not a parked event
-loop. The moving image uses a 512×84 background source, a 290×84 plate and a 290×84 mask, with the
-plate destination initially at `(252,105)-(336,395)`. Because source x=0 and destination x=105
-have opposite nibble alignment, both same-PixMap `srcOr` and `srcBic` missed the aligned packed
-path and performed 48,720 pixel operations per frame. `CopyBits` now assembles those shifted
-sources one packed destination byte at a time and chooses horizontal and vertical memmove order
-when the moving destination overlaps its source. The build audits pass. The animation itself
-still intentionally polls `Button`, giving deterministic bring-up a faithful, bounded way to skip
-it after proving this path.
+loop. This is the Corvette departure after choosing TRAINEE, not the earlier ACCEPT action or the
+dynamometer. The moving image uses a 512×84 background source, a 290×84 plate and a 290×84 mask,
+with the plate destination initially at `(252,105)-(336,395)`. Because source x=0 and destination
+x=105 have opposite nibble alignment, both same-PixMap `srcOr` and `srcBic` missed the aligned
+packed path and performed 48,720 pixel operations per frame.
+
+`GARAGE_DEPARTURE_FULL=1` and `amiga/garage_departure_perf.gdb` retain the complete shipped
+198-step loop despite the diagnostic harness's ordinary Button skip. The baseline took 2,689 PAL
+fields (about 53.8 seconds), issued 1,196 `CopyBits` calls, queued 200 frames and converted
+8,525,872 pixels. There are no `Delay` calls: 189,807,314 measured beam units, about 88 percent of
+the run, were inside `CopyBits`. The repeated calls restore the 512×84 strip, apply the 290×84
+`srcBic` mask and `srcOr` image, and publish the strip once; the dirty rectangle was already exact.
+
+The non-overlapping same-PixMap Boolean path now handles the two edge nibbles once per row and
+processes its packed interior four bytes at a time, including the odd-nibble source shift. The
+complete loop reaches the identical final destination `(252,-291)-(336,-1)` in 582 PAL fields
+(about 11.6 seconds), with the same 1,196 calls, 200 frames, 200 rectangles and 8,525,872 converted
+pixels. `CopyBits` falls to 20,933,261 beam units. Thus the 4.6× improvement is composition work,
+not dropped frames, a widened dirty area or a hidden C2P bypass. The animation itself still polls
+`Button`, giving ordinary users and deterministic bring-up the original faithful way to skip it.
 
 For `GARAGE_CLICK=1` only, `Button` now reports one press after the two garage selections. This is
 not a control-flow patch: it takes the exact user-skip branch already present in the shipped plate

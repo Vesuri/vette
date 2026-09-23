@@ -46,6 +46,19 @@ volatile uint32_t g_probeCopyMapHits = 0;
 volatile uint32_t g_probeCopyMapMisses = 0;
 volatile uint32_t g_probeCopyBitsTicks = 0;
 volatile uint32_t g_probeCopyBitsCalls = 0;
+volatile uint32_t g_probeDelayCalls = 0;
+volatile uint32_t g_probeDelayRequested = 0;
+volatile uint32_t g_probeBlockMoveTicks = 0;
+volatile uint32_t g_probeBlockMoveCalls = 0;
+volatile uint32_t g_probeDrawPictureTicks = 0;
+volatile uint32_t g_probeDrawPictureCalls = 0;
+volatile int16_t g_probeDrawPictureTrace[64][5] = {};
+volatile uint32_t g_probeDrawPictureTraceTicks[64] = {};
+volatile uint16_t g_probeCopyTraceEnabled = 0;
+volatile uint16_t g_probeCopyTraceCount = 0;
+volatile int16_t g_probeCopyTrace[32][12] = {};
+volatile uint32_t g_probeCopyModeTicks[7] = {};
+volatile uint32_t g_probeCopyModeCalls[7] = {};
 #endif
 volatile uint32_t g_macDrivingIterations = 0;
 volatile uint32_t g_macDrivingCallbacks = 0;
@@ -3783,6 +3796,53 @@ static __attribute__((noinline)) void shiftPackedCopyRowsC(
     }
 }
 
+static __attribute__((noinline)) void packedLogicRowsC(
+    const uint8_t* source, uint8_t* destination,
+    uint16_t bytesPerRow, uint16_t height,
+    uint16_t sourceModulo, uint16_t destinationModulo,
+    bool shifted, bool sourceBic)
+{
+    while (height--) {
+        uint16_t bytes = bytesPerRow;
+        if (shifted) {
+            uint16_t longs = (uint16_t)(bytes >> 2);
+            uint16_t tail = (uint16_t)(bytes & 3);
+            if (sourceBic) {
+                while (longs--) {
+                    uint32_t value = (*(const uint32_t*)source << 4)
+                        | (uint32_t)(source[4] >> 4);
+                    *(uint32_t*)destination &= ~value;
+                    source += 4;
+                    destination += 4;
+                }
+                while (tail--) {
+                    uint8_t value = (uint8_t)((source[0] << 4) | (source[1] >> 4));
+                    *destination++ &= (uint8_t)~value;
+                    ++source;
+                }
+            } else {
+                while (longs--) {
+                    uint32_t value = (*(const uint32_t*)source << 4)
+                        | (uint32_t)(source[4] >> 4);
+                    *(uint32_t*)destination |= value;
+                    source += 4;
+                    destination += 4;
+                }
+                while (tail--) {
+                    *destination++ |= (uint8_t)((source[0] << 4) | (source[1] >> 4));
+                    ++source;
+                }
+            }
+        } else if (sourceBic) {
+            while (bytes--) *destination++ &= (uint8_t)~*source++;
+        } else {
+            while (bytes--) *destination++ |= *source++;
+        }
+        source += sourceModulo;
+        destination += destinationModulo;
+    }
+}
+
 static bool copyBits(const uint8_t* sourceBitmap, const uint8_t* destinationBitmap,
                      const uint8_t* sourceRect, const uint8_t* destinationRect,
                      uint16_t mode, const uint8_t* maskRegion)
@@ -4032,6 +4092,64 @@ static bool copyBits(const uint8_t* sourceBitmap, const uint8_t* destinationBitm
         uint16_t pixelCount = (uint16_t)(packedRight - packedLeft);
         uint16_t sourceFirstColumn = (uint16_t)(packedSourceLeft - sourceLeft);
         uint16_t destinationFirstColumn = (uint16_t)(packedLeft - destinationLeft);
+        bool rowsOverlap = packedTop < packedSourceTop + (packedBottom - packedTop)
+            && packedBottom > packedSourceTop;
+        if (!rowsOverlap) {
+            uint16_t leadingPixel = (uint16_t)(destinationFirstColumn & 1);
+            uint16_t interiorPixels = (uint16_t)(pixelCount - leadingPixel);
+            uint16_t interiorBytes = (uint16_t)(interiorPixels >> 1);
+            uint16_t trailingPixel = (uint16_t)(interiorPixels & 1);
+            uint16_t interiorSourceColumn = (uint16_t)(sourceFirstColumn + leadingPixel);
+            uint16_t interiorDestinationColumn
+                = (uint16_t)(destinationFirstColumn + leadingPixel);
+
+            for (int16_t y = packedTop; y < packedBottom; ++y) {
+                int16_t sourceY = (int16_t)(packedSourceTop + y - packedTop);
+                const uint8_t* sourceRow = sourcePixels
+                    + multiplyUnsigned16((uint16_t)(sourceY - sourceTop), sourceRowBytes);
+                uint8_t* destinationRow = destinationPixels
+                    + multiplyUnsigned16((uint16_t)(y - destinationTop),
+                                         destinationRowBytes);
+                if (leadingPixel) {
+                    uint8_t sourceByte = sourceRow[sourceFirstColumn >> 1];
+                    uint8_t value = sourceFirstColumn & 1
+                        ? (uint8_t)(sourceByte & 0x0f) : (uint8_t)(sourceByte >> 4);
+                    uint8_t& destinationByte
+                        = destinationRow[destinationFirstColumn >> 1];
+                    if (mode == 1) destinationByte |= value;
+                    else destinationByte &= (uint8_t)~value;
+                }
+                if (trailingPixel) {
+                    uint16_t sourceColumn
+                        = (uint16_t)(sourceFirstColumn + pixelCount - 1);
+                    uint16_t destinationColumn
+                        = (uint16_t)(destinationFirstColumn + pixelCount - 1);
+                    uint8_t sourceByte = sourceRow[sourceColumn >> 1];
+                    uint8_t value = sourceColumn & 1
+                        ? (uint8_t)(sourceByte & 0x0f) : (uint8_t)(sourceByte >> 4);
+                    uint8_t& destinationByte = destinationRow[destinationColumn >> 1];
+                    value <<= 4;
+                    if (mode == 1) destinationByte |= value;
+                    else destinationByte &= (uint8_t)~value;
+                }
+            }
+            if (interiorBytes) {
+                const uint8_t* source = sourcePixels
+                    + multiplyUnsigned16((uint16_t)(packedSourceTop - sourceTop),
+                                         sourceRowBytes)
+                    + (interiorSourceColumn >> 1);
+                uint8_t* destination = destinationPixels
+                    + multiplyUnsigned16((uint16_t)(packedTop - destinationTop),
+                                         destinationRowBytes)
+                    + (interiorDestinationColumn >> 1);
+                packedLogicRowsC(source, destination, interiorBytes,
+                    (uint16_t)(packedBottom - packedTop),
+                    (uint16_t)(sourceRowBytes - interiorBytes),
+                    (uint16_t)(destinationRowBytes - interiorBytes),
+                    (interiorSourceColumn & 1) != 0, mode == 3);
+            }
+            return true;
+        }
         int16_t firstY = packedTop, lastY = packedBottom, stepY = 1;
         if (packedTop > packedSourceTop) {
             firstY = (int16_t)(packedBottom - 1);
@@ -6618,7 +6736,14 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
         return 1;
     }
     if (trap == 0xa02e) {                    // _BlockMove: A0, A1, D0; registers preserved
+#ifdef VETTE_PROBE
+        uint32_t blockMoveStart = vetteProfileBeamEpoch();
+#endif
         blockMove((uint8_t*)regs[8], (uint8_t*)regs[9], regs[0]);
+#ifdef VETTE_PROBE
+        g_probeBlockMoveTicks += vetteProfileBeamEpoch() - blockMoveStart;
+        ++g_probeBlockMoveCalls;
+#endif
         ++g_blockMoveCount;
         return 1;
     }
@@ -7068,6 +7193,10 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
         return 1;
     }
     if (trap == 0xa03b) {                    // Delay(ticks in A0) -> final ticks in D0
+#ifdef VETTE_PROBE
+        ++g_probeDelayCalls;
+        g_probeDelayRequested += regs[8];
+#endif
         uint32_t target = g_macTicks + regs[8];
         while ((int32_t)(g_macTicks - target) < 0) { }
         regs[0] = g_macTicks;
@@ -7472,6 +7601,9 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
         }
 #endif
 #endif
+#ifdef VETTE_GARAGE_DEPARTURE_FULL
+        if (s_garageClickPhase >= kGarageTransitionSkipPhase) pressed = false;
+#endif
         writeBoolean(userStack, pressed);
         if (exitChordPressed()) requestExitAfterTrap(frame);
         if (g_stageCDepth < 64) g_stageCDepth = 64;
@@ -7536,8 +7668,28 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
             }
         }
 #endif
-        if (drawPicture((uint8_t**)read32(userStack + 4),
-                        rectangle)) {
+#ifdef VETTE_PROBE
+        uint32_t drawPictureStart = vetteProfileBeamEpoch();
+        uint16_t drawPictureTraceIndex = (uint16_t)(g_probeDrawPictureCalls & 63);
+        int32_t drawPictureResourceIndex
+            = resourceHandleIndex((uint8_t**)read32(userStack + 4));
+        ResourceForks::Item drawPictureItem;
+        g_probeDrawPictureTrace[drawPictureTraceIndex][0]
+            = drawPictureResourceIndex >= 0
+                && s_resourceForks.item((uint32_t)drawPictureResourceIndex, drawPictureItem)
+              ? drawPictureItem.id : -1;
+        for (uint16_t i = 0; i < 4; ++i)
+            g_probeDrawPictureTrace[drawPictureTraceIndex][1 + i]
+                = rectangle ? (int16_t)read16(rectangle + i * 2) : 0;
+#endif
+        bool pictureDrawn = drawPicture((uint8_t**)read32(userStack + 4), rectangle);
+#ifdef VETTE_PROBE
+        uint32_t drawPictureTicks = vetteProfileBeamEpoch() - drawPictureStart;
+        g_probeDrawPictureTraceTicks[drawPictureTraceIndex] = drawPictureTicks;
+        g_probeDrawPictureTicks += drawPictureTicks;
+        ++g_probeDrawPictureCalls;
+#endif
+        if (pictureDrawn) {
             if (currentPortIsScreen()) markDirty(rectangle);
             if (g_stageCDepth < 57) g_stageCDepth = 57;
             return 9;
@@ -7604,6 +7756,27 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
         const uint8_t* sourceRect = (const uint8_t*)read32(userStack + 10);
         uint16_t mode = read16(userStack + 4);
         const uint8_t* maskRegion = (const uint8_t*)read32(userStack);
+#ifdef VETTE_PROBE
+        bool traceCopy = g_probeCopyTraceEnabled;
+#ifdef VETTE_GARAGE_DEPARTURE_FULL
+        if (s_garageClickPhase >= kGarageTransitionSkipPhase) traceCopy = true;
+#endif
+        if (traceCopy && g_probeCopyTraceCount < 32) {
+            uint16_t trace = g_probeCopyTraceCount++;
+            g_probeCopyTrace[trace][0] = (int16_t)mode;
+            if (sourceRect)
+                for (uint16_t i = 0; i < 4; ++i)
+                    g_probeCopyTrace[trace][1 + i]
+                        = (int16_t)read16(sourceRect + i * 2);
+            if (destinationRect)
+                for (uint16_t i = 0; i < 4; ++i)
+                    g_probeCopyTrace[trace][5 + i]
+                        = (int16_t)read16(destinationRect + i * 2);
+            g_probeCopyTrace[trace][9] = sourceBitmap == destinationBitmap;
+            g_probeCopyTrace[trace][10] = bitmapIsScreen(destinationBitmap);
+            g_probeCopyTrace[trace][11] = bitmapIsScreen(sourceBitmap);
+        }
+#endif
         // CopyBits owns an exact destination rectangle and publishes it once
         // below. Its packed fast paths use BlockMove row by row; letting that
         // generic hook mark the screen would rebuild and merge the same dirty
@@ -7628,8 +7801,13 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
                 copied = copyBits(sourceBitmap, destinationBitmap, sourceRect,
                                   destinationRect, mode, maskRegion);
 #ifdef VETTE_PROBE
-            g_probeCopyBitsTicks += vetteProfileBeamEpoch() - copyBitsStart;
+            uint32_t copyBitsTicks = vetteProfileBeamEpoch() - copyBitsStart;
+            g_probeCopyBitsTicks += copyBitsTicks;
             ++g_probeCopyBitsCalls;
+            if (mode < 7) {
+                g_probeCopyModeTicks[mode] += copyBitsTicks;
+                ++g_probeCopyModeCalls[mode];
+            }
 #endif
         }
         s_suppressDirectScreenDirty = false;
