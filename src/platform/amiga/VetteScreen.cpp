@@ -285,7 +285,8 @@ bool VetteScreen::initialize(const uint8_t* picture, const uint16_t* palette16)
         return false;
     }
 
-    m_copper = (uint32_t*)AllocMem(VS_CL_LONGS * sizeof(uint32_t), MEMF_CHIP | MEMF_CLEAR);
+    m_copperAllocation = (uint32_t*)AllocMem(2 * VS_CL_LONGS * sizeof(uint32_t), MEMF_CHIP | MEMF_CLEAR);
+    m_copper = m_copperAllocation;
     if (!m_copper) {
         FreeMem(m_emptySprite, kEmptySpriteBytes); m_emptySprite = 0;
         FreeMem(m_mouseSprite[1], kMouseSpriteBytes); m_mouseSprite[1] = 0;
@@ -325,7 +326,7 @@ bool VetteScreen::initialize(const uint8_t* picture, const uint16_t* palette16)
     // Fill in a valid set of bitplane pointers for whichever field is next, before anything
     // displays, so the first field out of the gate is a whole picture rather than four
     // dangling pointers.  Which row set that is comes from vbiUpdate()'s LOF test.
-    vbiUpdate();
+    vbiUpdate(false);
 
     writeModeRegisters();
 
@@ -353,48 +354,30 @@ void VetteScreen::writeModeRegisters()
     *bpl2modPointer = VS_BPLMOD;
 }
 
-void VetteScreen::vbiUpdate()
+void VetteScreen::vbiUpdate(bool install)
 {
     if (!m_copper || !m_chip) return;   // the ISR must never see a half-built screen
 
-    if (m_framePending) {
-        // Measure before touching the live list. A publication inside the
-        // 76..267 display window has raced the beam and must never occur.
-        uint16_t line = beamLine();
-        g_beamPresentLine = line;
-        if (line < g_beamPresentMin) g_beamPresentMin = line;
-        if (line > g_beamPresentMax) g_beamPresentMax = line;
-        ++g_beamPresents;
-        if (line >= VS_VSTART && line < VS_VSTOP) ++g_beamPresentsLate;
-
+    // Never modify instructions the Copper may already be fetching. Preserve
+    // unchanged colours and sprite pointers in the inactive list as well.
+    uint32_t* previous = m_copper;
+    m_copper = previous == m_copperAllocation
+        ? m_copperAllocation + VS_CL_LONGS : m_copperAllocation;
+    for (uint16_t i = 0; i < VS_CL_LONGS; ++i) m_copper[i] = previous[i];
+    bool present = m_framePending;
+    if (present) {
         uint8_t* oldFront = m_chip;
         m_chip = m_back;
         m_back = oldFront;
         for (uint16_t i = 0; i < 16; ++i)
             m_copper[VS_CL_COLORS + i] = copperMove(color00 + i * 2, m_nextPalette[i]);
-        m_framePending = false;
-        ++g_macFramesPresented;
     }
 
-    // ⭐ Which field the copper is ABOUT TO DISPLAY decides which of the two row sets the
-    // bitplane pointers name: the long field shows rows 0, 2, 4, ..., the short field
-    // rows 1, 3, 5, ..., so the pointers move by one kRowStride between them.
-    // ⚠⚠ [MEASURED] POLARITY, AND IT IS THE OPPOSITE OF THE OBVIOUS READING OF LOF.
-    // VPOSR bit 15 (LOF) is set for the long field, but what this handler reads is the
-    // parity of the field whose vertical blank it is standing in -- ALREADY ENTERED, not
-    // the one the list it is writing will serve.  The copper list is re-fetched from
-    // COP1LC at the top of the NEXT field, so writing `long rows when LOF is set` serves
-    // the long field's pointers to the short field and vice versa.  Shipped that way
-    // first: the intro's copyright overlay rendered DOUBLED, each thin horizontal stroke
-    // repeated one scanline down, because both fields were showing each other's rows.
-    // ⚠ It does NOT blank or tear, so it cannot be caught by a frame-boundary probe or
-    // by the long/lace ratio (still exactly 0.500 either way) -- only on the glass.
-    // ⚠ AmigaHardware::isLongFrame() used to be an undefined symbol at LINK time in this
-    // build's GCC+ASSEMBLER configuration (its bridge `jsr`ed a routine no .s defined);
-    // it is fixed and unconditional now, and it is exactly this test.
-    bool oddField = AmigaHardware::isLongFrame();
+    // COPJMP1 below makes this list serve the CURRENT field, independent of
+    // CPU speed. LOF names that field: long = even rows, short = odd rows.
+    bool oddField = !AmigaHardware::isLongFrame();
     uint32_t base = (uint32_t)m_chip;
-    if (oddField) base += kRowStride;   // LOF set here => SHORT field next
+    if (oddField) base += kRowStride;
 
     for (uint16_t k = 0; k < kPlanes; k++) {
         uint32_t p = base + (uint32_t)k * kBytesPerRow;
@@ -408,6 +391,26 @@ void VetteScreen::vbiUpdate()
     // game has not called GetNextEvent (or any Toolbox trap) for a long time.
     vetteMacMouseVBI();
     updateMouseSprite(oddField);
+    if (install) {
+        // Measure the actual handoff on EVERY field, not merely entry to
+        // the handler on fields that happen to have a new game frame.
+        uint16_t line = beamLine();
+        g_beamPresentLine = line;
+        if (line < g_beamPresentMin) g_beamPresentMin = line;
+        if (line > g_beamPresentMax) g_beamPresentMax = line;
+        ++g_beamPresents;
+        if (line >= 16) ++g_beamPresentsLate;
+        // Both halves of COP1LC are ready before the explicit restart. The
+        // old list remains immutable until this handoff, and all pointer
+        // MOVEs execute in blanking, before sprite/bitplane DMA fetches.
+        *cop1lcPointer = m_copper;
+        *copjmp1Pointer = 0;
+    }
+    // Only now may the main thread reuse the former front bitmap.
+    if (present) {
+        ++g_macFramesPresented;
+        m_framePending = false;
+    }
 }
 
 void VetteScreen::setMouseCursor(const uint8_t* cursor, int16_t x, int16_t y,
@@ -473,9 +476,7 @@ void VetteScreen::updateMouseSprite(bool oddField)
         sprite[3 + fieldRow * 2] = (uint16_t)(white | invert);
     }
 
-    // The VBI is preparing the copper list for the NEXT field. Select the
-    // dedicated sprite whose eight DMA rows were just built for that field;
-    // never rewrite the object potentially being fetched by the current one.
+    // Select this field's sprite before its DMA fetches begin in blanking.
     uint32_t pointer = (uint32_t)sprite;
     m_copper[VS_CL_SPRITES] = copperMove(spr1pth, (uint16_t)(pointer >> 16));
     m_copper[VS_CL_SPRITES + 1] = copperMove(spr1ptl, (uint16_t)pointer);
@@ -767,7 +768,11 @@ bool VetteScreen::presentMacFrame(const uint8_t* chunky, const uint8_t* colorTab
 
 void VetteScreen::shutdown()
 {
-    if (m_copper) { FreeMem(m_copper, VS_CL_LONGS * sizeof(uint32_t)); m_copper = 0; }
+    if (m_copperAllocation) {
+        FreeMem(m_copperAllocation, 2 * VS_CL_LONGS * sizeof(uint32_t));
+        m_copperAllocation = 0;
+        m_copper = 0;
+    }
     if (m_emptySprite) { FreeMem(m_emptySprite, kEmptySpriteBytes); m_emptySprite = 0; }
     if (m_mouseSprite[1]) { FreeMem(m_mouseSprite[1], kMouseSpriteBytes); m_mouseSprite[1] = 0; }
     if (m_mouseSprite[0]) { FreeMem(m_mouseSprite[0], kMouseSpriteBytes); m_mouseSprite[0] = 0; }

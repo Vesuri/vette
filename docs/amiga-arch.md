@@ -81,7 +81,11 @@ One PAL field carries **half** the picture.  With the rows interleaved (all 4 pl
 then all 4 of row *y+1*; stride 256 B), the long field's plane *k* starts at `base + k*64` and the
 short field's at `base + 256 + k*64`.  A bitplane pointer advances 64 B as it fetches a line, and
 must reach the same plane **two** rows down, so `BPL1MOD = BPL2MOD = 2*256 - 64 = 448`.
-The pointers are re-pointed **first** in the VERTB handler, every field.
+The VERTB handler builds an inactive Copper list every field, selects the CURRENT field's
+rows from LOF, then installs it with COP1LC/COPJMP1 before sprite and bitplane fetching.
+Only after that handoff is the former front bitmap released for C2P. The two lists occupy
+352 bytes total and remain immutable while active; field selection no longer depends on
+whether the CPU wins a race with the Copper's automatic vertical-blank restart.
 
 The mouse uses sprite 0 and must remain above every nonzero game pixel, not merely above
 `COLOR00`. `VetteScreen` therefore owns `BPLCON2=$0024`: `PF1P=PF2P=4` places all four sprite

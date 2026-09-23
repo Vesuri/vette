@@ -143,15 +143,27 @@ Two things follow:
   (`amiga/beam_watch.gdb`, `g_beamPresentsLate` — a standing check that must read 0), not the
   bytes afterwards.
 
-### ⭐⭐ In INTERLACED mode the VBI's LOF read names the field that is ENDING — Vette, 2026-09-17
+### Interlaced parity must follow an explicit Copper handoff
 
-A handler that re-points bitplanes per field has to know which of the two row sets to name, and
-`VPOSR` bit 15 (LOF, set for the long field) is the only source.  The obvious code —
-`if (isLongFrame()) point at the long field's rows` — is **backwards**.  The copper list the
-handler writes is not re-fetched from `COP1LC` until the top of the *next* field, and by the time
-the VERTB handler runs LOF already names the field whose vertical blank this is.  Invert the test.
+The former single-list implementation assumed the Copper had already fetched every pointer
+before the VBI rewrote it, and selected rows for the next field. That was a timing dependency,
+not a hardware guarantee: a faster CPU could race those fetches.
 
-⚠⚠ **And no probe can catch it**, which is why it is here.  Nothing blanks, tears or drops: both
+Vette now prepares an inactive list, writes COP1LC and strobes COPJMP1 in the VBI.
+This list serves the CURRENT field: LOF set selects even rows, LOF clear selects odd rows.
+The sprite uses the same parity. The previously displayed bitmap is released only after
+the explicit handoff. Both lists share one owned allocation (352 bytes), freed on shutdown.
+No active Copper instructions are edited. Unchanged palette entries are copied too.
+
+`beam_watch.gdb` now measures actual handoffs on every field, with a conservative line-16
+deadline ahead of sprite DMA, rather than merely checking handler entry against the display
+window. This replaces the older single-list publication measurements above.
+Regression runs (production build, PAL, warp): default A1200 observed 179 handoffs
+at lines 2..3; `68030` and `68040-NOMMU` each observed 128 at line 1. All had zero
+late handoffs. These are local timing checks, not reproduction of the user's other
+FS-UAE installation or a substitute for visually checking field parity there.
+
+Timing counters alone cannot establish parity. Nothing need blank, tear or drop: both
 fields still display, each simply showing the other's rows.  A long/short field ratio — the
 standard headless proof that LACE is alive at all — reads exactly 0.500 with the polarity right
 *and* wrong.  **A measurement of *whether* the fields alternate cannot measure *which is which*.**

@@ -53,8 +53,8 @@ public:
     // ⭐ Called FIRST in the VERTB handler, before any other work: an interlaced
     // display needs the bitplane pointers re-pointed at the other field's rows
     // every field, and a torn pointer garbages the whole viewport for a frame
-    // (CLAUDE.md).  Cheap by construction: four 32-bit stores into the copper list.
-    void vbiUpdate();
+    // (CLAUDE.md). Builds the inactive list and restarts the Copper in blanking.
+    void vbiUpdate(bool install = true);
 
     // Convert a Macintosh 4-bpp chunky surface and ColorTable into the Amiga's
     // interleaved planes.  The completed frame is swapped in by vbiUpdate(), so
@@ -88,6 +88,7 @@ private:
     void updateMouseSprite(bool oddField);
 
     uint32_t* m_copper = 0;
+    uint32_t* m_copperAllocation = 0;
     uint8_t*  m_chip = 0;
     uint8_t*  m_back = 0;
     uint32_t  m_checksum = 0;
