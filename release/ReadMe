@@ -53,12 +53,10 @@
 
  Display:
  --------
- HIRES is off by default: 368x288 lores follows each screen's useful area.
- Crop origins are 80,0 for intro/driving, 128,24 for the garage, 144,0 for
- opponent selection and 80,32 for course selection. The mouse follows the
- visible area. Enable HIRES in WHDLoad's options (CUSTOM1=1) for
- the full 512x320 image in an interlaced display. AGA uses hires sprites in
- HIRES mode; ECS retains lores sprites in this screen mode.
+ HIRES is off by default: 368x283 lores follows each screen's useful area.
+ Enable HIRES in WHDLoad's options (CUSTOM1=1) for the full 512x320 image
+ in an interlaced display. The mouse pointer is shown on selection screens;
+ its proportions are preserved on OCS, ECS and AGA systems.
 
 
  Quitting:
@@ -90,7 +88,8 @@
  A               automatic shift
  Z               horn
  P               pause/options
- Escape or Q     menu
+ Escape          quit race to garage
+ Q               menu
 
  If using an emulator, set port 0 to Mouse and port 1 to Nothing. Keyboard
  joystick emulation may otherwise consume the cursor keys.
@@ -98,6 +97,13 @@
 
  History:
  --------
+ version 0.91 (25.09.2026):
+ - added cropped lores display and optional interlaced hires mode
+ - improved mouse pointer and course selection button layout
+ - Escape now returns to the garage and silences race sounds
+ - fixed sample looping and sound playback
+ - fixed the white stripe in the water recovery picture
+
  version 0.90 (23.09.2026):
  - initial Amiga release
  - WHDLoad installation with automatic extraction from the downloaded archive
