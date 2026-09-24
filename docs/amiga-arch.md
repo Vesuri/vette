@@ -111,9 +111,22 @@ share four hardware voices. Source volume range 0..300 maps to Paula 0..64;
 relative volume matters, not RMS normalization. Preserve voice ownership,
 finite sample completion, looping semantics and clean channel retirement.
 
+Intro and gameplay share header-aware INST preparation and the Paula restart
+sequence. The initial segment ends at the defined loop end; aligned loops reuse
+that buffer. Odd boundaries use an aligned copy (two repetitions for odd loop
+lengths), rotated when the initial DMA word consumes the first loop byte. No
+header, tail beyond the loop, dropped byte or inserted silence enters a loop.
+One-shots reload a silent word; the raw opening song repeats intentionally.
+`make paula-sample-test` checks the resulting stream byte for byte, including
+all boundary parities. `amiga/intro_sample_layout.gdb` verifies the real intro
+engine and signature buffers with a full-intro `PROBES=1` build.
+
 Paula restarts and idle-channel clearing must not move ahead of copper work.
-Stopped channels output digital zero. Timed events continue while the main
-thread waits for refresh.
+Restart waits cover two sample periods (RKM 5-2-7), using the largest period
+since the previous stop because a pitch change need not reload the current
+counter immediately. Direct silent output clears the pending audio interrupt
+before writing AUDxDAT. Stopped channels output digital zero. Timed events
+continue while the main thread waits for refresh.
 
 ## Lifecycle
 

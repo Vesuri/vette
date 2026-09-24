@@ -49,11 +49,13 @@ class Voice:
         value = self.instrument.pcm[index]
         self.phase += PAULA_CLOCK / (self.period * output_rate)
         size = len(self.instrument.pcm)
-        if self.attack and self.phase >= size:
+        looped = 0 <= self.instrument.loop_start < self.instrument.loop_end <= size
+        attack_end = self.instrument.loop_end if looped else size
+        if self.attack and self.phase >= attack_end:
             self.attack = False
-            if self.instrument.loop_end > self.instrument.loop_start:
+            if looped:
                 length = self.instrument.loop_end - self.instrument.loop_start
-                self.phase = self.instrument.loop_start + (self.phase - size) % length
+                self.phase = self.instrument.loop_start + (self.phase - attack_end) % length
             else:
                 self.finished = True
         elif not self.attack:

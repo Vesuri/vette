@@ -11,6 +11,7 @@
 #include "platform/amiga/framework/AmigaHardware.h"
 #include "../m68k_math.h"
 #include "CourseButtons.h"
+#include "PaulaSample.h"
 
 extern "C" {
 void vette_line_a_handler();
@@ -447,6 +448,7 @@ struct IntroSample {
     int16_t resourceID;
     uint8_t* chipData;
     uint32_t size;
+    PaulaSample::Layout dma;
 };
 static IntroSample s_introSamples[] = {
     {1425, 0, 0},                         // Opening song
@@ -471,6 +473,7 @@ struct BogasInstrument {
     uint16_t basePeriod;
     uint16_t loopStart;
     uint16_t loopEnd;
+    PaulaSample::Layout dma;
 };
 static BogasInstrument s_bogasInstruments[16];
 static uint16_t s_bogasInstrumentCount;
@@ -1400,21 +1403,11 @@ static IntroSample* introSample(uint16_t index)
     ResourceForks::Item item;
     if (!s_resourceForks.find(1, 0x494e5354UL, sample.resourceID, item) || !item.size)
         return 0;
-    const uint8_t* source = item.data;
-    uint32_t size = item.size;
-    // Short Bogas instruments carry an eight-byte instrument header.  Its
-    // final word is the exact PCM byte count; the long samples are bare PCM.
-    if (size > 8 && read32(source) == 0 && read16(source + 6) == size - 8) {
-        source += 8;
-        size -= 8;
-    }
-    uint32_t allocated = (size + 1) & ~1UL;
-    if (!size || allocated > 131070UL) return 0;
-    sample.chipData = (uint8_t*)AllocMem(allocated, MEMF_CHIP);
+    if (!PaulaSample::describe(item.data, item.size, index == 0, sample.dma)) return 0;
+    sample.chipData = (uint8_t*)AllocMem(sample.dma.allocated, MEMF_CHIP);
     if (!sample.chipData) return 0;
-    sample.size = size;
-    for (uint32_t i = 0; i < size; ++i) sample.chipData[i] = source[i] ^ 0x80;
-    if (allocated != size) sample.chipData[size] = 0;
+    sample.size = sample.dma.size;
+    PaulaSample::convert(sample.dma, sample.chipData);
     return &sample;
 }
 
@@ -1442,46 +1435,79 @@ static void waitPaulaDmaLines(uint16_t lines)
     }
 }
 
+// AUDxPER is write-only and its current countdown can still use an older
+// value after a pitch change. Keep a conservative ceiling until DMA stops.
+static uint16_t s_paulaPeriodCeiling[4] = {65535, 65535, 65535, 65535};
+
+static void setPaulaPeriod(uint16_t channel, uint16_t period)
+{
+    if (period > s_paulaPeriodCeiling[channel]) s_paulaPeriodCeiling[channel] = period;
+    *(volatile uint16_t*)(0xdff0a6UL + channel * 16) = period;
+}
+
+static void disablePaulaChannel(uint16_t channel)
+{
+    *dmaconPointer = (uint16_t)(DMAF_AUD0 << channel);
+    // RKM 5-2-7: DMA must remain off for at least two SAMPLE periods.
+    // PAL lines contain at least 227 colour clocks. Add a full line because
+    // the first observed raster transition can occur immediately.
+    uint16_t lines = (uint16_t)(vette_divu16((uint32_t)s_paulaPeriodCeiling[channel] << 1, 227) + 2);
+    waitPaulaDmaLines(lines);
+    s_paulaPeriodCeiling[channel] = 0;
+}
+
 static void quiescePaulaChannel(uint16_t channel)
 {
     if (channel > 3) return;
-    uint16_t dma = (uint16_t)(DMAF_AUD0 << channel);
     volatile uint8_t* audio = (volatile uint8_t*)(0xdff0a0UL + channel * 16);
 
     // DMA-off and volume zero merely mute a Paula channel: they do not clear
     // the two sample bytes held in AUDxDAT.  Let Agnus observe the disable,
     // then explicitly load signed PCM zero so emulator/hardware hand-off does
     // not expose the previous nonzero DAC value as a shutdown click.
-    *dmaconPointer = dma;
     *(volatile uint16_t*)(audio + 8) = 0;
-    waitPaulaDmaLines(2);
+    disablePaulaChannel(channel);
     // Direct (non-DMA) output advances the two bytes in AUDxDAT at AUDxPER.
     // Use the documented minimum period, then allow both zero bytes to reach
     // and settle in the DAC rather than merely leaving zero in its holding
     // register. This also gives never-used channels a valid period.
-    *(volatile uint16_t*)(audio + 6) = 124;
+    setPaulaPeriod(channel, 124);
+    // Direct output only leaves idle when its previous interrupt is cleared.
+    *intreqPointer = (uint16_t)(0x0080U << channel);
     *(volatile uint16_t*)(audio + 10) = 0;
-    waitPaulaDmaLines(2);
+    waitPaulaDmaLines(3);
 #ifdef VETTE_PROBE
     g_probePaulaZeroedMask |= (uint16_t)(1U << channel);
 #endif
+}
+
+// Shared restart protocol for intro and gameplay. The reload contains only
+// the defined loop, or a silent word for one-shot samples.
+static void startPaulaSample(uint8_t* data, const PaulaSample::Layout& layout,
+                             uint16_t channel, uint16_t period, uint16_t volume)
+{
+    uint16_t dma = (uint16_t)(DMAF_AUD0 << channel);
+    volatile uint8_t* audio = (volatile uint8_t*)(0xdff0a0UL + channel * 16);
+    disablePaulaChannel(channel);
+    *(volatile uint32_t*)(audio + 0) = (uint32_t)data;
+    *(volatile uint16_t*)(audio + 4) = (uint16_t)(layout.attackBytes >> 1);
+    setPaulaPeriod(channel, period);
+    *(volatile uint16_t*)(audio + 8) = volume;
+#ifdef VETTE_PROBE
+    g_probePaulaZeroedMask &= (uint16_t)~(1U << channel);
+#endif
+    *dmaconPointer = (uint16_t)(DMAF_SETCLR | DMAF_MASTER | dma);
+    // Let DMA latch the attack before publishing the next segment (RKM 5-3-1).
+    waitPaulaDmaLines(2);
+    *(volatile uint32_t*)(audio + 0) = (uint32_t)(data + layout.reloadOffset);
+    *(volatile uint16_t*)(audio + 4) = (uint16_t)(layout.reloadBytes >> 1);
 }
 
 static void playIntroSample(uint16_t sampleIndex, uint16_t channel, uint16_t volume)
 {
     IntroSample* sample = introSample(sampleIndex);
     if (!sample || channel > 3) { g_introAudioState = 3; return; }
-    uint16_t dma = (uint16_t)(DMAF_AUD0 << channel);
-    volatile uint8_t* audio = (volatile uint8_t*)(0xdff0a0UL + channel * 16);
-    *dmaconPointer = dma;
-    *(volatile uint32_t*)(audio + 0) = (uint32_t)sample->chipData;
-    *(volatile uint16_t*)(audio + 4) = (uint16_t)((sample->size + 1) / 2);
-    *(volatile uint16_t*)(audio + 6) = 319; // 11,118.8 Hz; Mac nominal 11.127 kHz
-    *(volatile uint16_t*)(audio + 8) = volume;
-#ifdef VETTE_PROBE
-    g_probePaulaZeroedMask &= (uint16_t)~(1U << channel);
-#endif
-    *dmaconPointer = (uint16_t)(DMAF_SETCLR | DMAF_MASTER | dma);
+    startPaulaSample(sample->chipData, sample->dma, channel, 319, volume);
 }
 
 static void stopIntroChannel(uint16_t channel)
@@ -1720,33 +1746,15 @@ static BogasInstrument* bogasInstrument(uint16_t ordinal)
     }
     if (!found || !item.size) return 0;
 
-    const uint8_t* source = item.data;
-    uint32_t size = item.size;
-    uint16_t sampleRate = 0;
-    // Short INST resources have a four-word Bogas header: loop start/end,
-    // source sample rate, PCM byte count. Looped samples legitimately have
-    // nonzero first words, so the byte-count field is the structural test.
-    if (size > 8 && read16(source + 6) == size - 8) {
-        instrument.loopStart = read16(source);
-        instrument.loopEnd = read16(source + 2);
-        sampleRate = read16(source + 4);
-        source += 8;
-        size -= 8;
-    }
-    // Reserve one aligned silent word after every sample. Paula always reloads
-    // a DMA voice; non-looped Bogas instruments point that reload at this word
-    // instead of accidentally repeating their complete PCM body forever.
-    uint32_t silentOffset = (size + 1) & ~1UL;
-    uint32_t allocated = silentOffset + 2;
-    if (!size || allocated > 131070UL) return 0;
-    instrument.chipData = (uint8_t*)AllocMem(allocated, MEMF_CHIP);
+    if (!PaulaSample::describe(item.data, item.size, false, instrument.dma)) return 0;
+    instrument.chipData = (uint8_t*)AllocMem(instrument.dma.allocated, MEMF_CHIP);
     if (!instrument.chipData) return 0;
-    instrument.size = size;
+    instrument.size = instrument.dma.size;
+    instrument.loopStart = (uint16_t)instrument.dma.loopStart;
+    instrument.loopEnd = (uint16_t)instrument.dma.loopEnd;
+    uint16_t sampleRate = instrument.dma.rate;
     instrument.basePeriod = sampleRate ? vette_divu16(3546895UL, sampleRate) : 319;
-    for (uint32_t i = 0; i < size; ++i) instrument.chipData[i] = source[i] ^ 0x80;
-    if (silentOffset != size) instrument.chipData[size] = 0;
-    instrument.chipData[silentOffset] = 0;
-    instrument.chipData[silentOffset + 1] = 0;
+    PaulaSample::convert(instrument.dma, instrument.chipData);
     return &instrument;
 }
 
@@ -1781,45 +1789,8 @@ static void startBogasVoice(uint16_t ordinal, uint16_t channel,
 {
     BogasInstrument* instrument = bogasInstrument(ordinal);
     if (!instrument || channel > 3) return;
-    uint16_t dma = (uint16_t)(DMAF_AUD0 << channel);
-    volatile uint8_t* audio = (volatile uint8_t*)(0xdff0a0UL + channel * 16);
-    *dmaconPointer = dma;
-    // Paula samples an audio DMA transition at its DMA slots, not at the CPU
-    // write which changes DMACON. Clearing and setting the same channel in one
-    // uninterrupted burst can therefore leave the old sample running. Wait
-    // two raster lines after disable before installing and enabling the new
-    // attack, as required by the hardware restart sequence.
-    waitPaulaDmaLines(2);
-    *(volatile uint32_t*)(audio + 0) = (uint32_t)instrument->chipData;
-    *(volatile uint16_t*)(audio + 4) = (uint16_t)((instrument->size + 1) / 2);
-    *(volatile uint16_t*)(audio + 6) = period;
-    *(volatile uint16_t*)(audio + 8) = volume;
+    startPaulaSample(instrument->chipData, instrument->dma, channel, period, volume);
     s_bogasVoiceVolume[channel] = volume;
-#ifdef VETTE_PROBE
-    g_probePaulaZeroedMask &= (uint16_t)~(1U << channel);
-#endif
-    *dmaconPointer = (uint16_t)(DMAF_SETCLR | DMAF_MASTER | dma);
-
-    // Paula also needs time to latch that initial location and length. Writing
-    // the loop/silent reload on the next arbitrary Line-A trap was racy: a
-    // nearby trap could replace the registers before the first audio DMA slot,
-    // intermittently turning the third countdown cue directly into silence.
-    // After two more lines the attack is latched and the reload is safe.
-    uint32_t silentOffset = (instrument->size + 1) & ~1UL;
-    uint8_t* reloadData = instrument->chipData + silentOffset;
-    uint16_t reloadWords = 1;
-    if (instrument->loopEnd > instrument->loopStart
-        && instrument->loopEnd <= instrument->size) {
-        uint16_t loopStart = (uint16_t)(instrument->loopStart & ~1U);
-        uint16_t loopBytes = (uint16_t)((instrument->loopEnd - loopStart) & ~1U);
-        if (loopBytes >= 2) {
-            reloadData = instrument->chipData + loopStart;
-            reloadWords = (uint16_t)(loopBytes / 2);
-        }
-    }
-    waitPaulaDmaLines(2);
-    *(volatile uint32_t*)(audio + 0) = (uint32_t)reloadData;
-    *(volatile uint16_t*)(audio + 4) = reloadWords;
 #ifdef VETTE_PROBE
     ++g_probeBogasDmaRestarts[channel];
 #endif
@@ -1978,11 +1949,10 @@ static void bogasPlay(uint32_t pitch, uint16_t contextIndex)
     if (!context.playing || s_bogasSuspended) return;
     uint16_t period = bogasPeriod(319, pitch);
     if (contextIndex == 0) {
-        *(volatile uint16_t*)0xdff0a6 = period;
-        *(volatile uint16_t*)0xdff0b6 = period;
+        setPaulaPeriod(0, period);
+        setPaulaPeriod(1, period);
     } else {
-        volatile uint8_t* audio = (volatile uint8_t*)(0xdff0a0UL + context.channel * 16);
-        *(volatile uint16_t*)(audio + 6) = period;
+        setPaulaPeriod(context.channel, period);
     }
 }
 
@@ -8126,7 +8096,7 @@ static void releaseRuntimeAllocations()
     for (uint16_t i = 0; i < sizeof(s_introSamples) / sizeof(s_introSamples[0]); ++i) {
         IntroSample& sample = s_introSamples[i];
         if (sample.chipData) {
-            FreeMem(sample.chipData, (sample.size + 1) & ~1UL);
+            FreeMem(sample.chipData, sample.dma.allocated);
 #ifdef VETTE_PROBE
             ++g_probeReleasedIntroSamples;
 #endif
@@ -8139,8 +8109,7 @@ static void releaseRuntimeAllocations()
          i < sizeof(s_bogasInstruments) / sizeof(s_bogasInstruments[0]); ++i) {
         BogasInstrument& instrument = s_bogasInstruments[i];
         if (instrument.chipData) {
-            uint32_t silentOffset = (instrument.size + 1) & ~1UL;
-            FreeMem(instrument.chipData, silentOffset + 2);
+            FreeMem(instrument.chipData, instrument.dma.allocated);
 #ifdef VETTE_PROBE
             ++g_probeReleasedBogasSamples;
 #endif

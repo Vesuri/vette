@@ -46,6 +46,11 @@ break VetteScreen::presentMacFrame if $seenContext1 && $seenCrash
 commands
   silent
   if !$tripleSeen && s_bogasContexts[0].playing && s_bogasContexts[0].instrument == 4 && s_bogasContexts[1].playing && s_bogasContexts[1].instrument == 6 && s_bogasContexts[2].playing && s_bogasContexts[2].instrument == 8
+    if s_bogasInstruments[6].dma.attackBytes != 4990 || s_bogasInstruments[6].dma.reloadBytes != 7122 || s_bogasInstruments[6].dma.reloadOffset != 4990
+      printf "overlap FAIL horn loop alignment\n"
+      detach
+      quit
+    end
     set $tripleSeen = 1
     printf "overlap triple tick=%u iterations=%u level=%u contexts=%u/%u/%u channels=%u/%u/%u volumes=%u/%u/%u/%u deadlines=%u/%u/%u/%u dma=$%04x\n", g_macTicks, g_macDrivingIterations, s_bogasMixLevel, s_bogasContexts[0].instrument, s_bogasContexts[1].instrument, s_bogasContexts[2].instrument, s_bogasContexts[0].channel, s_bogasContexts[1].channel, s_bogasContexts[2].channel, s_bogasVoiceVolume[0], s_bogasVoiceVolume[1], s_bogasVoiceVolume[2], s_bogasVoiceVolume[3], s_bogasVoiceEndTick[0], s_bogasVoiceEndTick[1], s_bogasVoiceEndTick[2], s_bogasVoiceEndTick[3], *(unsigned short*)0xdff002
   end

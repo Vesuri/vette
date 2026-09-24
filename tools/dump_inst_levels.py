@@ -12,7 +12,7 @@ def instruments(path: Path):
         if item.kind != b"INST":
             continue
         body = item.body
-        if (len(body) > 8 and body[:4] == b"\0\0\0\0"
+        if (len(body) > 8
                 and int.from_bytes(body[6:8], "big") == len(body) - 8):
             body = body[8:]
         yield item.rid, item.name, body
