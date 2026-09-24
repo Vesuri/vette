@@ -11,10 +11,10 @@ commands
   set $mouseFailures = $mouseFailures + 1
  end
  printf "CROP phase=%u origin=%u,%u mouse=%d,%d sprite=%04x,%04x pending=%u\n",s_garageClickPhase,s_screen->m_cropLeft,s_screen->m_cropTop,s_mouseX,s_mouseY,s_screen->m_mouseSprite[0][0],s_screen->m_mouseSprite[0][1],s_screen->m_framePending
- if s_screen->m_cropLeft == 128 && s_screen->m_cropTop == 24
+ if s_screen->m_cropLeft == 128 && s_screen->m_cropTop == 26
   set $seen = $seen | 1
  end
- if s_screen->m_cropLeft == 144 && s_screen->m_cropTop == 0
+ if s_screen->m_cropLeft == 144 && s_screen->m_cropTop == 8
   set $seen = $seen | 2
  end
  if s_screen->m_cropLeft == 64 && s_screen->m_cropTop == 37

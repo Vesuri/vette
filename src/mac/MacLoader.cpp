@@ -5552,9 +5552,9 @@ static void presentMacRuntime()
     if (front && !front->dialog) {
         switch (front->resourceID) {
         case 140: // garage
-            cropLeft = 128; cropTop = 24; mouseAllowed = true; break;
+            cropLeft = 128; cropTop = 26; mouseAllowed = true; break;
         case 131: // opponent/difficulty
-            cropLeft = 144; mouseAllowed = true; break;
+            cropLeft = 144; cropTop = 8; mouseAllowed = true; break;
         case 129: // driving
             cropTop = 32;
             break;

@@ -50,8 +50,8 @@ viewport; it does not infer scenes from pixels or change game decisions.
 | Screen | WIND | Crop left, top |
 | --- | --- | --- |
 | Intro | 333 / 222 | 80, 0 |
-| Garage | 140 | 128, 24 |
-| Opponent / difficulty | 131 | 144, 0 |
+| Garage | 140 | 128, 26 |
+| Opponent / difficulty | 131 | 144, 8 |
 | Course | 150 | 64, 37 |
 | In-game | 129 | 80, 32 |
 

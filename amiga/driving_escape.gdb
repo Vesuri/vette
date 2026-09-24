@@ -13,7 +13,7 @@ break VetteScreen::showLoudStop
 break nextEvent if g_sessionControlProbePhase == 3 && $garage_command != 0
 continue
 printf "ESC garage commands=%u phase=%u driving=%u iterations=%u crop=%u,%u mouse=%u state=%u\n",$garage_command,g_sessionControlProbePhase,*(unsigned short*)(s_currentA5-21316),g_macDrivingIterations,s_screen->m_cropLeft,s_screen->m_cropTop,s_screen->m_mouseAllowed,g_stageBState
-if $garage_command == 1 && *(unsigned short*)(s_currentA5-21316) == 0 && s_screen->m_cropLeft == 128 && s_screen->m_cropTop == 24 && s_screen->m_mouseAllowed && g_stageBState != 3
+if $garage_command == 1 && *(unsigned short*)(s_currentA5-21316) == 0 && s_screen->m_cropLeft == 128 && s_screen->m_cropTop == 26 && s_screen->m_mouseAllowed && g_stageBState != 3
  echo PASS Escape returns to garage\n
 else
  echo FAIL Escape to garage\n
