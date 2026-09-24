@@ -4,13 +4,13 @@ import argparse
 import hashlib
 import struct
 from pathlib import Path
-from installer_icon import installer_icon, drawer_icon
+from installer_icon import installer_icon, drawer_icon, readme_icon
 
 ORIGINAL_HASHES = {
     "77e80078116e6aef0f257381466cf9cfc77108c75404138c002c68fbde7b896b",
     "e3db29fcc7b51a5275857bb06ff4ffb082d9aebb9f4045eb71ce23ba243a075f",
 }
-PREFIX = "Vette! Install"
+PREFIX = "Vette Install"
 
 def crc16(data):
     crc = 0
@@ -38,13 +38,14 @@ def main():
     files = {
         "Vette": args.executable.read_bytes(),
         "Vette.slave": (root / "build/whdload/Vette.slave").read_bytes(),
-        "Vette.info": installer_icon(game=True),
+        "Vette.inf": installer_icon(game=True),
         "VetteInstallData": (root / "build/install-data/VetteInstallData.exe").read_bytes(),
         "Install": (root / "release/Install").read_bytes(),
         "Install.info": installer_icon(),
         # Keep the helper's license with its binary without adding another file.
-        "README.txt": (root / "release/README.txt").read_bytes()
-            + b"\n\nINSTALLER HELPER LICENSE\n\n"
+        "ReadMe.info": readme_icon(),
+        "ReadMe": (root / "release/ReadMe").read_bytes()
+            + b"\n\n Installer helper license:\n -------------------------\n\n"
             + (root / "tools/install-data/COPYING.LIB").read_bytes(),
     }
     for name, data in files.items():

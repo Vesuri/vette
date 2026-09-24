@@ -5,8 +5,9 @@ import hashlib
 import struct
 from pathlib import Path
 from package_release import ORIGINAL_HASHES, PREFIX, crc16
+from installer_icon import installer_icon, readme_icon
 
-REQUIRED = {"Vette", "Vette.slave", "Vette.info", "VetteInstallData", "Install", "Install.info", "README.txt"}
+REQUIRED = {"Vette", "Vette.slave", "Vette.inf", "VetteInstallData", "Install", "Install.info", "ReadMe", "ReadMe.info"}
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
@@ -41,14 +42,17 @@ def main():
     for name in ("Vette", "VetteInstallData", "Vette.slave"):
         assert payloads[name][:4] == b"\0\0\3\xf3", "not an Amiga HUNK executable"
     assert b'WHDLOADS' in payloads['Vette.slave'], 'missing WHDLoad slave header'
-    for name, kind in (("Vette.info", 4), ("Install.info", 4), ('@drawer', 2)):
+    for name, kind in (("Vette.inf", 4), ("ReadMe.info", 4), ("Install.info", 4), ('@drawer', 2)):
         assert payloads[name][:4] == b"\xe3\x10\0\1" and payloads[name][48] == kind
     assert b"$VER: Install 0.90 (23.09.2026)" in payloads["Install"]
     assert b'APPNAME=Vette!\0' in payloads['Install.info']
     assert b'Rescue on Fractalus' not in payloads['Install.info']
-    assert b'WHDLoad\0' in payloads['Vette.info'] and b'SLAVE=Vette.slave\0' in payloads['Vette.info']
-    assert b'PRELOAD\0' in payloads['Vette.info']
-    print("PASS: WHDLoad release, seven files plus drawer icon, valid LHA CRCs, executables and icons")
+    assert payloads['Vette.inf'] == installer_icon(game=True)
+    assert payloads['ReadMe.info'] == readme_icon() and b'MultiView\0' in payloads['ReadMe.info']
+    assert b'(settooltype "Slave" "Vette.slave")' in payloads['Install']
+    assert b'(settooltype "PreLoad" "")' in payloads['Install']
+    assert b' Requirements:\n -------------' in payloads['ReadMe']
+    print("PASS: WHDLoad release, eight files plus drawer icon, valid LHA CRCs and reference icons")
 
 if __name__ == "__main__":
     main()

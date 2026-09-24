@@ -1,0 +1,111 @@
+
+ THIS PACKAGE COMES WITH ABSOLUTELY NO WARRANTY OF ANY KIND, EITHER EXPRESS OR
+ IMPLIED, STATUTORY OR OTHERWISE. THE ENTIRE RISK AS TO USE, RESULTS AND
+ PERFORMANCE OF THE PACKAGE IS ASSUMED BY YOU AND IF THE PACKAGE SHOULD PROVE
+ TO BE DEFECTIVE, YOU ASSUME THE ENTIRE COST OF ALL NECESSARY SERVICING,
+ REPAIR OR OTHER REMEDIATION.
+ UNDER NO CIRCUMSTANCES, CAN THE AUTHOR BE HELD RESPONSIBLE FOR ANY DAMAGE
+ CAUSED IN ANY USUAL, SPECIAL, OR ACCIDENTAL WAY, ALSO IF THE OWNER OR A THIRD
+ PARTY HAS BEEN POINTED AT SUCH POSSIBILITIES OF DAMAGE.
+
+ This install applies to "Vette!", an unofficial Amiga port of the 1991
+ Macintosh game by Sphere, Inc., published by Spectrum HoloByte.
+
+
+ Requirements:
+ -------------
+ This install requires WHDLoad version 17.0 or better, Kickstart 2.04 or later,
+ and a 68020 or better. A 68030 or better and AGA are recommended.
+ The installed program reserves 1024 KB ChipMem and 4608 KB OtherMem, including
+ its Kickstart image. Allow additional memory for the host system, WHDLoad
+ and PRELOAD. Installation requires Installer V43 or later and 3 MB disk space.
+
+ The game also requires a legally obtained Kickstart 3.1 image and matching
+ relocation file in "Devs:Kickstarts" or "WHDCOMMON:". Supported pairs are:
+
+   kick40063.A600  and kick40063.A600.RTB
+   kick40068.A1200 and kick40068.A1200.RTB
+   kick40068.A4000 and kick40068.A4000.RTB
+
+ These filenames do not require a particular Amiga model. The relocation files
+ are available in the Aminet archive "util/boot/skick346.lha". Neither the
+ Kickstart images nor the original game data are included in this package.
+
+
+ Installation:
+ -------------
+ Before running the install, download "VETTE__1.02_and_extras.sit" from:
+
+ https://www.macintoshrepository.org/4948-vette-
+
+ Leave the downloaded file compressed. Run the Install icon, select where
+ to install the game, choose a temporary drawer, and select the downloaded
+ archive when asked. The installer creates a Vette drawer and extracts and
+ verifies the required game data. The downloaded archive is not changed.
+
+ Allow at least 12 MB free in the temporary drawer. The default is T:, which
+ normally uses RAM; choose a hard disk drawer if there is insufficient memory.
+ Extraction can take several minutes. Temporary files are removed afterwards.
+
+ Start the installed game using its Vette icon. PRELOAD is enabled by default;
+ disable that Tooltype if there is insufficient memory to cache the files.
+
+
+ Quitting:
+ ---------
+ Control + left mouse button quits normally and saves pending score changes.
+ WHDLoad's QuitKey (F10, changeable with Tooltype "QuitKey=") exits immediately
+ without running the game's save-on-exit code.
+
+
+ Features:
+ ---------
+ - single-player game with all four courses
+ - animated introduction with music and sound effects
+ - native Amiga display, hardware mouse pointer and Paula sound
+ - cursor-key aliases for steering, acceleration and braking
+ - scores saved on normal exit
+
+ Network play is not supported.
+
+
+ Controls:
+ ---------
+ Up / I          accelerator
+ Down / M        brake
+ Left / Right    steering
+ 1 through 6     select forward gear
+ 0 / R           neutral / reverse
+ + / -           shift up / down
+ A               automatic shift
+ Z               horn
+ P               pause/options
+ Escape or Q     menu
+
+ If using an emulator, set port 0 to Mouse and port 1 to Nothing. Keyboard
+ joystick emulation may otherwise consume the cursor keys.
+
+
+ History:
+ --------
+ version 0.90 (23.09.2026):
+ - initial Amiga release
+ - WHDLoad installation with automatic extraction from the downloaded archive
+
+
+ Contact:
+ --------
+ Updates, source code and bug reports for this port:
+ https://github.com/Vesuri/vette
+
+ For the full WHDLoad package, other installs and updates refer to:
+ https://www.whdload.de/
+ or Aminet: dev/misc/whdload#? and game/patch/
+
+
+ Installer helper:
+ -----------------
+ VetteInstallData is LGPL-2.1-or-later. Source and build instructions:
+ https://github.com/Vesuri/vette/tree/main/tools/install-data
+ Its archive format tables are copyright 2017-present MacPaw Way Ltd.
+ The helper's license follows below.

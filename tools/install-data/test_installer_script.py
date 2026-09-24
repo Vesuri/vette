@@ -15,7 +15,7 @@ import time
 
 ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT/"tools"))
-from installer_icon import installer_icon, drawer_icon
+from installer_icon import installer_icon, drawer_icon, readme_icon
 
 def replace_form(text,start,replacement):
     a=text.index(start); depth=0; quoted=False; i=a
@@ -43,7 +43,7 @@ def main():
     subprocess.run(["elf2hunk",str(build/"test-icon.elf"),str(build/"test-icon.exe"),"-s"],check=True)
     with tempfile.TemporaryDirectory(prefix="vette-installer-script-",dir=ROOT/"tmp") as temp:
         base=Path(temp); boot=base/"boot"; (boot/"s").mkdir(parents=True)
-        (base/"state").mkdir(); dest=base/"out/Vette!"; (base/"out").mkdir()
+        (base/"state").mkdir(); dest=base/"out/Vette"; (base/"out").mkdir()
         (base/"scratch").mkdir()
         # Already-verified files exercise safe repeat installation and avoid a
         # second full decompression; test_amiga.py separately tests that path.
@@ -54,7 +54,7 @@ def main():
                 (build/"test-icon.exe","IconTest"),(ROOT/"amiga/out/Vette.exe","Vette"),
                 (ROOT/"build/whdload/Vette.slave","Vette.slave"),
                 (Path.home()/".local/share/amiga/WHDLoad/C/WHDLoad","WHDLoad"),
-                (ROOT/"release/README.txt","README.txt")):
+                (ROOT/"release/ReadMe","ReadMe")):
             shutil.copyfile(source,boot/name)
         (boot/"devs/Kickstarts").mkdir(parents=True)
         for source in (Path.home()/"Documents/RetroPie/BIOS/kick40063.A600",
@@ -70,11 +70,13 @@ def main():
         script=script.replace('(while (< (P_TempSpace)', '(textfile (dest "DH2:space.txt") (append ("device=%s disk=%ld usable=%ld memory=%s" (getdevice #temp) (getdiskspace #temp) (P_TempSpace) (database "total-mem"))))\n(while (< (P_TempSpace)')
         script=replace_form(script,"(exit)",'(exit (quiet))')
         (boot/"Install").write_text(script); (boot/"Install.info").write_bytes(installer_icon())
-        (boot/"Vette.info").write_bytes(installer_icon(game=True))
+        (boot/"Vette.inf").write_bytes(installer_icon(game=True))
+        (boot/"GameTemplate.info").write_bytes(installer_icon(game=True))
+        (boot/"ReadMe.info").write_bytes(readme_icon())
         (boot/"Package").mkdir()
         (boot/"Package.info").write_bytes(drawer_icon())
         (boot/"s/startup-sequence").write_text('CD DH0:\nStack 16384\nIconTest\nDF0:C/Assign C: DF0:C\nDF0:C/Assign LIBS: DF0:Libs\nDF0:C/Assign DEVS: DH0:devs\nPath DH0: ADD\nC:LoadWB\nInstaller SCRIPT DH0:Install APPNAME Vette! MINUSER NOVICE DEFUSER NOVICE LOGFILE DH2:installer.log NOPRETEND >DH2:installer-console.log\n'
-            + f'If EXISTS "{temp_work}"\nEcho leftover >DH2:leftover\nEndIf\nEcho done >DH2:finished\n')
+            + f'IconTest\nIf EXISTS "{temp_work}"\nEcho leftover >DH2:leftover\nEndIf\nEcho done >DH2:finished\n')
         with (ROOT/"tmp/installer-script-emulator.log").open("w") as log:
             emu=subprocess.Popen(["fs-uae","--amiga_model=A1200/020","--chip_memory=2048","--fast_memory=8192",
                 "--uae_cpu_model=68020","--uae_cpu_24bit_addressing=false","--uae_z3mem_size=16",
@@ -102,9 +104,11 @@ def main():
                     assert int(space.split('usable=')[1].split()[0])>=12582912,space
                 assert (dest/"data/Vette").read_bytes()==(boot/"Vette").read_bytes(), report
                 assert (dest/"Vette.slave").read_bytes()==(boot/"Vette.slave").read_bytes(), report
-                assert (dest/"Vette!.info").exists(),report
+                assert (dest/"Vette.info").exists(),report
+                assert (base/"installed-icon-ok").exists(), "Installed WHDLoad icon failed native validation"
                 assert dest.with_suffix(".info").exists(),report
-                assert (dest/"README.txt").read_bytes()==(boot/"README.txt").read_bytes(), report
+                assert (dest/"ReadMe").read_bytes()==(boot/"ReadMe").read_bytes(), report
+                assert (dest/"ReadMe.info").read_bytes()==(boot/"ReadMe.info").read_bytes(), report
                 from test_install import EXPECTED
                 import hashlib
                 for name, digest in EXPECTED.items():

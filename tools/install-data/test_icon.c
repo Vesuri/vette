@@ -38,11 +38,15 @@ int amiga_main(void) {
             FreeDiskObject(icon);
         }
         if(ok) {
-            icon=GetDiskObject((CONST_STRPTR)"DH0:Vette");
-            ok=icon && icon->do_Type==WBPROJECT && icon->do_StackSize==10240
-                && icon->do_Gadget.GadgetRender && equal((const char *)icon->do_DefaultTool,"WHDLoad")
-                && equal((const char *)FindToolType(icon->do_ToolTypes,(CONST_STRPTR)"SLAVE"),"Vette.slave")
-                && FindToolType(icon->do_ToolTypes,(CONST_STRPTR)"PRELOAD");
+            icon=GetDiskObject((CONST_STRPTR)"DH0:GameTemplate");
+            ok=icon && icon->do_Type==WBPROJECT && icon->do_StackSize==4096
+                && icon->do_Gadget.GadgetRender && !icon->do_DefaultTool;
+            if(icon) FreeDiskObject(icon);
+        }
+        if(ok) {
+            icon=GetDiskObject((CONST_STRPTR)"DH0:ReadMe");
+            ok=icon && icon->do_Type==WBPROJECT && icon->do_Gadget.GadgetRender
+                && equal((const char *)icon->do_DefaultTool,"MultiView");
             if(icon) FreeDiskObject(icon);
         }
         if(ok) {
@@ -52,6 +56,22 @@ int amiga_main(void) {
             if(icon) FreeDiskObject(icon);
         }
         if(ok && (f=Open((CONST_STRPTR)"DH2:icon-ok",MODE_NEWFILE))) { Write(f,(APTR)"OK\n",3); Close(f); }
+        /* Called again after Installer: check its configured game icon too. */
+        if(ok) {
+            BPTR lock=Lock((CONST_STRPTR)"DH2:out/Vette/Vette.info",ACCESS_READ);
+            if(lock) {
+                UnLock(lock);
+                icon=GetDiskObject((CONST_STRPTR)"DH2:out/Vette/Vette");
+                ok=icon && icon->do_Type==WBPROJECT && icon->do_StackSize==10240
+                    && equal((const char *)icon->do_DefaultTool,"WHDLoad")
+                    && equal((const char *)FindToolType(icon->do_ToolTypes,(CONST_STRPTR)"SLAVE"),"Vette.slave")
+                    && FindToolType(icon->do_ToolTypes,(CONST_STRPTR)"PRELOAD");
+                if(icon) FreeDiskObject(icon);
+                if(ok && (f=Open((CONST_STRPTR)"DH2:installed-icon-ok",MODE_NEWFILE))) {
+                    Write(f,(APTR)"OK\n",3); Close(f);
+                }
+            }
+        }
     }
     if(IconBase) CloseLibrary(IconBase);
     if(DOSBase) CloseLibrary((struct Library *)DOSBase);

@@ -18,7 +18,7 @@
    (if (and (exists "WHDCOMMON:kick40068.A4000") (exists "WHDCOMMON:kick40068.A4000.RTB")) (set #kick-ready 1))
    (if (and (exists "WHDCOMMON:kick40063.A600") (exists "WHDCOMMON:kick40063.A600.RTB")) (set #kick-ready 1))))
 (if (= #kick-ready 0)
-  (message "WHDLoad needs a Kickstart 3.1 image and matching .RTB file in Devs:Kickstarts or WHDCOMMON: before playing. See README.txt for supported image names." (all)))
+  (message "WHDLoad needs a Kickstart 3.1 image and matching .RTB file in Devs:Kickstarts or WHDCOMMON: before playing. See ReadMe for supported image names." (all)))
 ; RAM: is expandable: filesystem free blocks are not its available capacity.
 ; Resolve the device so T: and other assigns/subdrawers are handled too.
 (procedure P_TempSpace
@@ -27,7 +27,7 @@
     (getdiskspace #temp)))
 (set #parent
   (askdir
-    (prompt "Where should Vette! be installed? A Vette! drawer will be created here.")
+    (prompt "Where should Vette! be installed? A Vette drawer will be created here.")
     (help "Choose a hard disk drawer with at least 3 MB free for the game and its original data.")
     (default @default-dest)))
 (set #temp
@@ -47,7 +47,7 @@
     (prompt "Select the downloaded VETTE__1.02_and_extras.sit archive.")
     (help "Choose VETTE__1.02_and_extras.sit downloaded from the Vette! page at Macintosh Repository. Leave it compressed.")
     (default "VETTE__1.02_and_extras.sit")))
-(set #dest (tackon #parent "Vette!"))
+(set #dest (tackon #parent "Vette"))
 (set #data (tackon #dest "data"))
 (makedir #dest (infos) (help @makedir-help))
 (makedir #data (help @makedir-help))
@@ -68,21 +68,22 @@
   (dest #dest)
   (help @copyfiles-help))
 (copyfiles
-  (source (tackon #source "Vette.info"))
+  (source (tackon #source "Vette.inf"))
   (dest #dest)
-  (newname "Vette!.info")
+  (newname "Vette.info")
   (help @copyfiles-help))
 ; Keep these explicit, as in the WHDLoad install template.
 (tooltype
-  (dest (tackon #dest "Vette!"))
+  (dest (tackon #dest "Vette"))
   (setdefaulttool "WHDLoad")
   (settooltype "Slave" "Vette.slave")
   (settooltype "PreLoad" "")
   (setstack 10240)
   (noposition))
 (copyfiles
-  (source (tackon #source "README.txt"))
+  (source (tackon #source "ReadMe"))
   (dest #dest)
+  (infos)
   (help @copyfiles-help))
 (set @default-dest #dest)
 (complete 100)
