@@ -61,6 +61,7 @@ def main():
     assert payloads['ReadMe'] == (root / 'release/ReadMe').read_bytes()
     assert payloads['LICENSE.LGPL.txt'] == (root / 'tools/install-data/COPYING.LIB').read_bytes()
     assert b'helper tool only' in payloads['ReadMe']
+    assert b'LICENSE.LGPL.txt' not in payloads['Install']
     assert b'https://github.com/Vesuri/vette' in payloads['ReadMe']
     print("PASS: WHDLoad release, nine files plus drawer icon, valid LHA CRCs, reference icons and separate helper license")
 

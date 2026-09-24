@@ -17,7 +17,8 @@ changed to Vette! and its Installer default tool and AVERAGE user level retained
 Installer renames the game icon to `Vette.info` and sets its WHDLoad tooltypes;
 ReadMe keeps MultiView as its default tool. The WHDLoad-style ReadMe links to
 the source repository and identifies `LICENSE.LGPL.txt` as applying only to the
-installer helper. Installer copies the separate license without an icon. No original data,
+installer helper. The license stays in the release drawer; Installer does not
+copy it to the installed game. No original data,
 sources, emulator configuration, checksum manifest or host tools are bundled.
 The deterministic generic level-zero archive uses LH5 for every member. Packaging
 requires [LHa for UNIX](https://github.com/jca02266/lha), not the extraction-only
