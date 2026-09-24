@@ -19,8 +19,9 @@ inline int animationPaceStream(uint16_t segment, uint32_t offset, uint16_t trap)
     if (segment == 8 && offset == 0x0224 && trap == 0xa974) return kPaceIntro;
     if (segment == 2) {
         if (offset == 0x11ac && trap == 0xa974) return kPaceGarageDeparture;
-        // Mutually exclusive alternating car images, one CopyBits per loop.
-        if ((offset == 0x0e86 || offset == 0x0eac) && trap == 0xa8ec)
+        // The car alternates 22 times per curve increment. Pace only the
+        // completed graph reveal, after its CopyBits has finished.
+        if (offset == 0x0ef0 && trap == 0xa8ec)
             return kPaceGarageTest;
         if (offset == 0x1a34 && trap == 0xa8ec) return kPaceOpponent;
     }

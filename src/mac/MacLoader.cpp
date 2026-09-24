@@ -6516,13 +6516,15 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
     // Caller-specific boundaries verified against the original Color CODE
     // loops. Never pace generic CopyBits/Button calls: most are partial draws
     // or unrelated input polling. No original instructions are replaced.
+    int paceStream = -1;
     static const uint16_t pacedSegments[] = { 1, 2, 8 };
     for (uint16_t i = 0; (trap == 0xa974 || trap == 0xa8ec) && i != 3; ++i) {
         uint16_t segment = pacedSegments[i];
         uint32_t begin = (uint32_t)s_segments[segment].begin;
         if (pc < begin || pc >= (uint32_t)s_segments[segment].end) continue;
-        int stream = animationPaceStream(segment, pc - begin, trap);
-        if (stream >= 0) paceMacFrame((uint16_t)stream);
+        paceStream = animationPaceStream(segment, pc - begin, trap);
+        if (paceStream >= 0 && paceStream != kPaceGarageTest)
+            paceMacFrame((uint16_t)paceStream);
         break;
     }
 #ifdef VETTE_SCORE_PERSISTENCE_PROBE
@@ -7962,6 +7964,8 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
                 // dirty rectangle.
                 if (!fullDrivingPublish) markDirty(destinationRect);
             }
+            // TEST is complete only after both the car and curve were drawn.
+            if (paceStream == kPaceGarageTest) paceMacFrame(kPaceGarageTest);
             if (g_stageCDepth < 61) g_stageCDepth = 61;
             return 23;
         }

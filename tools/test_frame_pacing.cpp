@@ -18,12 +18,12 @@ int main()
     assert(!other.needsWait(65535)); // Independent scene clocks.
     assert(animationPaceStream(8, 0x224, 0xa974) == kPaceIntro);
     assert(animationPaceStream(2, 0x11ac, 0xa974) == kPaceGarageDeparture);
-    assert(animationPaceStream(2, 0xe86, 0xa8ec) == kPaceGarageTest);
-    assert(animationPaceStream(2, 0xeac, 0xa8ec) == kPaceGarageTest);
+    assert(animationPaceStream(2, 0xe86, 0xa8ec) == -1);
+    assert(animationPaceStream(2, 0xeac, 0xa8ec) == -1);
     assert(animationPaceStream(2, 0x1a34, 0xa8ec) == kPaceOpponent);
     assert(animationPaceStream(1, 0x1ab8, 0xa974) == kPacePreview);
     assert(animationPaceStream(2, 0x1a0e, 0xa8ec) == -1); // Background copy.
-    assert(animationPaceStream(2, 0xef0, 0xa8ec) == -1); // Test graph reveal.
+    assert(animationPaceStream(2, 0xef0, 0xa8ec) == kPaceGarageTest); // Test graph reveal.
     assert(animationPaceStream(1, 0xfe4, 0xa974) == -1); // Recovery prompt.
     assert(animationPaceStream(1, 0x224, 0xa974) == -1); // Wrong segment.
     assert(animationPaceStream(8, 0x224, 0xa8ec) == -1); // Wrong instruction.
