@@ -58,11 +58,11 @@ continue
 EOF
 
 env HOME="$GDBHOME" XDG_CACHE_HOME="$GDBHOME" \
-  "$GDB" -q -l 10 -x "$RUN/connect.gdb" -x "${GDBSCRIPT:-diag_timing.gdb}" out/Vette.elf \
+  "$GDB" -q -l 10 -x "$RUN/connect.gdb" -x "${GDBSCRIPT:-runtime_status.gdb}" out/Vette.elf \
   > "$RUN/gdb-out.log" 2>&1 &
 GDB_PID=$!
 echo "gdb pid=$GDB_PID; running for ${DELAY}s..."
-# Finish immediately when an event-driven gdb script (such as stage_c.gdb)
+# Finish immediately when an event-driven gdb script (such as gameplay_smoke.gdb)
 # prints its result and exits; snapshot/profiling scripts still run until the
 # wall-time ceiling and receive SIGINT below.
 for i in $(seq 1 "$DELAY"); do
@@ -81,6 +81,6 @@ echo "=== gdb output (filtered) ==="
 # `=== vbi=... loopFrames=... ===` header, `phase 0` and `FRAME = ... ms`.  The parked-comparison
 # protocol (amiga/Makefile §SPANFILL) *requires* phase 0, whose tick count is bit-identical
 # across runs of the same trajectory, so raise this for any run you intend to compare:
-#   GDBTAIL=200 EXTRA_ARGS="--warp_mode=1" GDBSCRIPT=phase4_prof.gdb ./diag_run.sh 30
+#   GDBTAIL=200 EXTRA_ARGS="--warp_mode=1" GDBSCRIPT=driving_phase_profile.gdb ./diag_run.sh 30
 # ⚠ and raise it for BOTH arms — never diff two runs captured with different amounts of output.
 grep -v "Internal error: pc" "$RUN/gdb-out.log" | grep -vE "^warning:" | tail -"${GDBTAIL:-40}"

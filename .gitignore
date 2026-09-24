@@ -102,9 +102,8 @@ __pycache__/
 # cover a .zip romset, a device ROM named *.bin, or a boot image.
 /ref/
 
-# Stage A's generated assets — derived from the copyrighted game byte for byte
-# (a Macintosh framebuffer capture repacked as Amiga bitplanes), so they are LOCAL ONLY,
-# exactly like tmp/ and ref/.  src/platform/amiga/incbin.s carries the regeneration command.
+# Local framebuffer/planar captures may contain original game artwork.
+# Keep historical capture directories and generated assets out of Git.
 /amiga/assets/
 *.planes
 *.palbin

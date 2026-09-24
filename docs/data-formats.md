@@ -131,8 +131,7 @@ long  OBJS runtime descriptor
 
 The routine reads the object's unsigned long metric at object offset `$1E`, takes the first entry
 whose maximum is at least that metric, and advances 12 bytes between entries. Metrics above 65535
-go directly to the `-1` fallback. The live trace in `amiga/objs_lod_runtime.gdb` independently
-records the same table, metric and chosen-model inputs at the routine boundary.
+go directly to the `-1` fallback.
 
 The initialized A5 world contains 20 such tables. Car examples are `1500:Porche -> 2500:P928S ->
 -1:Simplecar`, `1500:F40 -> 2500:F40S1 -> -1:Simplecar`, `1500:GenericC -> 2500:GenericS ->
@@ -151,8 +150,7 @@ python3 tools/dump_objs.py \
   --compare 'tmp/rsrc_VETTE!_VETTE!_Folder_Folder_B&W_VETTE!_VETTE!.Data.rsrc'
 ```
 
-Add `--runtime-globals tmp/objs_runtime_globals.raw --runtime-a5 0x4861f4` (using the A5 printed
-by `amiga/objs_runtime.gdb`) to enumerate the initialized LOD tables by resource name.
+Add `--runtime-globals tmp/objs_runtime_globals.raw --runtime-a5 0x4861f4` (using a matching live A5/global-memory capture) to enumerate the initialized LOD tables by resource name.
 
 ## `QUAD` map-cell descriptors
 
@@ -229,8 +227,7 @@ python3 tools/dump_quad.py \
   --compare 'tmp/rsrc_VETTE!_VETTE!_Folder_Folder_B&W_VETTE!_VETTE!.Data.rsrc'
 ```
 
-Add `--runtime-globals tmp/objs_runtime_globals.raw --runtime-a5 0x4861f4` (using the A5 printed
-by `amiga/objs_runtime.gdb`) to validate the 108 initialized static-collision bounds lists.
+Add `--runtime-globals tmp/objs_runtime_globals.raw --runtime-a5 0x4861f4` (using a matching live A5/global-memory capture) to validate the 108 initialized static-collision bounds lists.
 
 ## `MAPS`: world, navigation and map-display grids
 
@@ -623,19 +620,10 @@ quadrant is multiplied by 90 and copied to the new object's current heading +$0C
 +$A2 and saved heading +$BA. This proves both the fixed-point cell size and that byte 6 is a cardinal
 direction, not a speed value.
 
-`amiga/driving_freeway_spawn.gdb` records the selected key/triplet, optional link and constructed
-object for the first two naturally reached spawns. The deterministic UI harness selects Course Two
-and steers with ordinary KeyMap input down the source-defined local-X `0..383` corridor. Crossing
-the selector-16 rectangle in Main Map cell `(2,6)` naturally dispatches export 212. The measured
-tick-8514 call moved the player from `($1085,$3204)` to `($1400,$15800)` and changed A5-$3764 from
-0 to 1; at tick 8517 `Traffic+$2302` then ran naturally with a full `15/15` pool and freeway player
-cell `(2,42)`. `amiga/driving_freeway_activation.gdb` is the focused observer for this chain.
-
-The full `15/15` pool is transient, not the blocker. Every 35 ticks `Traffic+$252C` scans active
-objects, computes Manhattan distance from the player, and selects objects beyond `$1400` at
-`$257A`; `$1FB6` removes the selected object and decrements the count. A natural Course Two run
-repeatedly exercised that path, after which the ordinary city branch immediately restored the
-pool. `amiga/driving_freeway_movement.gdb` records the bounded retirement and movement evidence.
+The maintained `amiga/driving_freeway_activation.gdb` observer exercises the
+Course Two transition through normal steering. Every 35 ticks, `Traffic+$252C`
+scans active objects and removes those beyond Manhattan distance `$1400` from
+the player, allowing new traffic to spawn.
 
 The mode word is established by shipped special-collision responses selected through MAPS/QUAD
 data. For example, Main Map cell `(2,6)` uses QUAD 21 and collision selector 16; its first rectangle
@@ -673,14 +661,6 @@ object's saved pointer by two, sign-extend both components, add them to world X/
 shared position/update calls. The active `CLST` streams reference IDs 90..129, `FWTM` reaches
 90..130, and dormant selector 5 at `$1226` selects ID 134 directly. No active consumer found so far
 selects 131..133.
-
-The natural Course Two transition validates this entire join dynamically. The first post-transition
-object was JHPF id 126 at cell `(2,40)`, world `($13D5,$14800)`, heading 180. Projecting it selected
-NavigationMap key `$0078`; the matching FWTM record contained direction ids
-`(125,125,126,126)`, and heading 180 selected FREE id 126 with movement selector 10. Its first
-signed pair `(0,-64)` advanced the saved cursor by two and set the target from
-`($13D5,$14800)` to `($13D5,$147C0)`. `amiga/driving_freeway_object.gdb` binds the created pointer
-and preserves the identity across every one of those calls.
 
 Validate the outer shapes and Color/B&W equality with:
 

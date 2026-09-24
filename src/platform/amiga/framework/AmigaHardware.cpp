@@ -187,7 +187,7 @@ void AmigaHardware::setInterrupts(uint16_t interrupts, bool enabled)
 // ever called synchronously, blitterWait() polls DMACONR BLTBUSY and blitterDrain() spin-drains.
 // So an armed blit-done is pure overhead — a level-3 autovector dispatch into graphics.library's
 // queue handler ($F901C0) that does nothing for us, ~52us apiece, measured 6 per flight iteration
-// (amiga/int_probe.gdb).  Hence: leave INTF_BLIT DISABLED.  `make BLIT_IRQ=1` restores the
+// in the measured trace. Hence: leave INTF_BLIT DISABLED. `make BLIT_IRQ=1` restores the
 // original arming for A/B (it also flips BLIT_IRQ_ARM in AmigaHardwareAssembler.s, which is the
 // copy that actually runs while ASSEMBLER is on).
 static inline void blitIrqArm()

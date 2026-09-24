@@ -17,7 +17,7 @@
 --
 -- WHY frame counts and not seconds: this is the only clock that is a ratio of
 -- emulated quantities, so a capture stays reproducible across host speeds
--- (docs/perf-method.md's rule, same reason as FS-UAE's --warp_mode=1).
+-- (see docs/mac-reference-loop.md; FS-UAE warp also advances emulated time).
 
 local frames = {}
 local spec = os.getenv("VETTE_SNAP_FRAMES") or "900,1500"

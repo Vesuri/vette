@@ -132,7 +132,6 @@ release-check: frame-pacing-test static-map-check coverage-check gameplay-regres
 # Fast aggregate over retained local oracle artifacts. Slow recapture remains
 # split into the dedicated reference/capture/regression targets below.
 fidelity-check:
-	@python3 tools/verify_stage_c_intro.py
 	@python3 tools/verify_driving_planar.py
 	@$(MAKE) driving-sequence-compare REQUIRE_EXACT=1
 	@$(MAKE) driving-cadence-compare

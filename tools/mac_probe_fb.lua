@@ -73,7 +73,7 @@ mac.run(function()
 	-- The garage screen is static, so snapshotting either side of the dump proves
 	-- nothing moved while it was being read.
 	-- ⭐ WHICH MOMENT: $VETTE_FB_AT is an ABSOLUTE frame number, the same clock
-	-- docs/trap-log.md quotes, so a capture can be aimed at a measured event.
+	-- used by the reference runner; pair captures by game state, not frame alone.
 	--   4218 = the garage screen (static, the default, and what the pixel-format
 	--          proof was taken on)
 	--   1770 = the INTRO art complete and the overlay not yet drawn (art done at

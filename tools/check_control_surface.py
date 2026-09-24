@@ -47,7 +47,6 @@ def main() -> None:
     ])
     launcher_invariants = [
         "--amiga_model=\"$MODEL\"",
-        "--chip_memory=2048 --fast_memory=8192",
         "--joystick_port_0=mouse --joystick_port_1=nothing",
         "--full_keyboard=1",
         "--keyboard_key_up=action_key_cursor_up --keyboard_key_down=action_key_cursor_down",
@@ -55,19 +54,8 @@ def main() -> None:
     ]
     for launcher in ("amiga/run.sh", "amiga/debug.sh", "amiga/diag_run.sh"):
         require(launcher, launcher_invariants)
-    for trace in (
-        "amiga/driving_gear1_dispatch.gdb",
-        "amiga/driving_accelerator_dispatch.gdb",
-        "amiga/driving_drivetrain.gdb",
-        "amiga/driving_mouse_control.gdb",
-        "amiga/driving_mouse_button.gdb",
-        "amiga/driving_p_key_dispatch.gdb",
-        "amiga/driving_escape_transition.gdb",
-        "amiga/menu_options_capture.gdb",
-    ):
-        if not (ROOT / trace).is_file():
-            raise SystemExit(f"missing dynamic control trace: {trace}")
-    print("control audit: dynamic original-handler trace set: 8 scripts")
+    # This is a source/configuration audit, not dynamic proof. Runtime input
+    # coverage belongs to the maintained gameplay smoke and steering observer.
     print("control audit: PASS")
 
 

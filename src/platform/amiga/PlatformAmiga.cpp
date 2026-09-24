@@ -284,7 +284,7 @@ static uint32_t vbiHandler()
     // ⭐⭐ THE COPPER BITPLANE POINTERS GO FIRST, before any other ISR work.  "In the VBI
     // ISR" is not "in the vblank": anything behind another 100+ scanlines of handler lands
     // inside the displayed picture, and a torn pointer garbages the whole field.
-    // (docs/amiga-lessons.md)
+    // (docs/amiga-arch.md)
     if (s_screen) s_screen->vbiUpdate();
 
     // ⭐ Sample the RAW VPOSR for the first 8 fields.  The long/total ratio alone cannot

@@ -31,14 +31,13 @@
 #   ./debug.sh           source-level debug via the FS-UAE GDB stub
 #   ./diag_run.sh [secs] headless probe run (needs PROBES=1)
 #
-# Scope: Stage A display takeover plus the completed Stage B resident-code loader and loud
-# Line-A stop (docs/stage-b.md).  The source lists remain wildcarded for the Stage C trap layer.
+# Builds the native runtime and Macintosh service layer; see docs/development.md.
 #
 # ⚠⚠ `make clean` BEFORE any PROBES=1 build and AFTER editing a widely-included header.
 # This Makefile tracks neither the flag nor header deps, so a partial rebuild links stale
 # objects into a WORKING-BUT-WRONG binary with silent runtime breakage.  On both prior ports
 # that trap cost multiple debugging sessions: treat any unexplained regression right after a
-# header edit or a PROBES toggle as a stale build FIRST.  (docs/headless-fsuae.md)
+# header edit or a PROBES toggle as a stale build FIRST.  (docs/development.md)
 #
 # Structure: explicit/wildcarded source lists mapped to objects in a flat obj/ (keyed by
 # basename — KEEP BASENAMES UNIQUE across the source trees), sources located via vpath.
@@ -119,7 +118,7 @@ FRAMEWORK_ASM_SRCS := \
 # the C oracle back-to-back on identical state EVERY CALL and compares, read via
 # amiga/<name>_verify.gdb.  ⭐ That in-process differential is the ONLY valid way to price an asm
 # twin — a cross-run comparison changes the workload and measures a different thing.
-# See docs/perf-method.md Rule 2.
+# See docs/development.md.
 
 # Palette-remapped packed-pixel copy.  The C implementation remains the oracle;
 # the default 68000 twin keeps the 256-byte lookup table in an address register.
@@ -249,7 +248,7 @@ EXTRA_DEFINES += -DVETTE_HORN_PROBE
 endif
 
 # `make FPSCOUNT=1` — the honest framerate build: one increment per painted frame and the
-# headless auto-run, no instrumentation.  docs/perf-method.md Rule 1.
+# headless auto-run, no instrumentation.  docs/development.md.
 ifdef FPSCOUNT
 EXTRA_DEFINES += -DVETTE_FPSCOUNT
 endif
@@ -421,7 +420,7 @@ endif
 # same emulated window frame for frame — and the freeze must PRINT the proof that it fired.
 # ⚠⚠ THE PARTIAL-FREEZE TRAP: the freeze stops the accumulators, not the program, so every counter
 # bumped elsewhere keeps climbing and any row mixing the two is FICTION.  Snapshot what you cannot
-# stop.  docs/perf-method.md §Lessons — measurement.
+# stop.  docs/development.md.
 ifdef PROBEFIELDS
 EXTRA_DEFINES += -DVETTE_PROBE_FIELDS=$(PROBEFIELDS)
 endif
@@ -498,9 +497,7 @@ VASMFLAGS = -m68010 -Felf -quiet -x -no-opt -nowarn=62 $(EXTRA_VASMDEFS)
 # ⚠ Keep a symbol in the CONFIGURATION its script is run against: a counter that only EXISTS
 # under PROBES must be added under `ifdef PROBES`, or `--undefined=` is unsatisfiable and a plain
 # `make` fails at probe-audit — which is the audit working, not a bug in it.
-# Stage A's acceptance globals (src/platform/amiga/PlatformAmiga.cpp).  These are read by
-# amiga/stage_a.gdb in a PLAIN build -- the display path is not probe instrumentation, so
-# they are unconditional rather than under `ifdef PROBES`.
+# Display and loud-stop diagnostics are available in production builds too.
 PROBE_SYMS = g_vbiCount g_planeChecksum g_screenReady g_laceFields g_longFields g_lofSamples \
              g_stageBState g_trapWord g_trapSelector g_trapSegment g_trapOffset \
              g_trapPC g_trapRegisters g_trapUserStack g_resourceCount g_jumpEntryCount \
@@ -613,7 +610,7 @@ $(OUT).elf: $(OBJECTS)
 # the moment it is introduced, not months later.
 muldiv-audit:
 	@if $(OBJDUMP) -d $(OUT).elf | grep -qE '__(u?div|u?mod|mul)si3'; then \
-	  echo "*** 32-bit software mul/div linked in — see docs/m68k-optimisation.md:"; \
+	  echo "*** 32-bit software mul/div linked in — see src/m68k_math.h:"; \
 	  $(OBJDUMP) -d $(OUT).elf | grep -E '__(u?div|u?mod|mul)si3' | head; \
 	  exit 1; \
 	else echo "muldiv-audit: clean"; fi

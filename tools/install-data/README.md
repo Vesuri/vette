@@ -51,8 +51,10 @@ totals 2,164,887 bytes.
 
 This helper (all C, headers and startup assembly in this directory) is available
 under LGPL-2.1-or-later; see COPYING.LIB. It is separate from the game executable.
-The release includes its complete source and build files so it can be modified
-and rebuilt without the game or any XAD library.
+Complete source and build files are available at https://github.com/Vesuri/vette
+so it can be modified and rebuilt independently. The release includes the helper
+binary and LICENSE.LGPL.txt, not the sources; Installer does not copy that license
+to the installed game drawer.
 
 StuffIt 5 layout and method 13 decoding were implemented with reference to:
 

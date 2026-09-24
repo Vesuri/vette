@@ -4,8 +4,7 @@
  * and BPL1MOD/BPL2MOD are write-only and mutually constrained: the display window,
  * the fetch window and the row modulo have to agree by CONSTRUCTION, not because
  * two files happen to hold matching literals.  Every one of them is derived here
- * from the constants below and written in one place.  (Revs learned this the hard
- * way; docs/amiga-lessons.md.)
+ * from the constants below and written in one place.  (See docs/amiga-arch.md.)
  *
  * ⚠ THE FRAMEWORK CAN NOW EXPRESS THIS MODE -- IT COULD NOT BEFORE, AND SILENTLY.
  * AmigaHardware::setPlayfield() and CopperList::setPlayfield() both took an `interlace`
@@ -78,7 +77,7 @@ public:
     uint32_t* copperList() const { return m_copper; }
     uint8_t*  picture() const    { return m_chip; }
 
-    // Stage A evidence, read by amiga/stage_a.gdb.  The checksum is computed from
+    // Display diagnostics. The checksum is computed from
     // the bytes IN CHIP RAM after the copy, so it proves the initialized display
     // surface rather than merely proving that host data exists.
     uint32_t pictureChecksum() const { return m_checksum; }

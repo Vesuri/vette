@@ -1,364 +1,87 @@
-# Amiga architecture decisions
+# Amiga architecture
 
-> ⚑ Carried over from the *Rescue on Fractalus!* and *Revs* ports, where each of these was chosen
-> with a measurement behind it.  The rationale is kept because it is what stops the decision being
-> re-litigated. The takeover is implemented in `src/platform/amiga/PlatformAmiga.cpp`; the
-> sections below retain the measured rationale and call out any remaining fallback or framework
-> work explicitly.
+## Original game and compatibility layer
 
-## Display: takeover, not OS-friendly
+The executable loads the two original resource forks from disk before hardware
+takeover. All eleven Color CODE resources are resident. The loader allocates
+31,272 bytes below A5 and 4,104 above, patches all 509 jump-table entries to
+absolute jumps, runs the shipped %A5Init initializer and installs the Line-A
+handler on vector $28. See [static-map.md](static-map.md).
 
-### Loaded-code cache coherency
+Macintosh low-memory references are byte-checked and redirected to semantic
+shadows in/near the A5 allocation; Page 0 never overwrites Amiga vectors or Exec.
+The Resource Manager supplies original resources, not a repacked custom bundle.
+QuickDraw, input, timers and sound implement the services actually used by the
+game. Unknown traps produce a named loud stop rather than a guessed success.
 
-`MacLoader::run` calls Exec `CacheClearU()` after all resident CODE patches and A5
-jump-table construction, immediately before the original entry stub executes.
-This publishes dirty data-cache lines and invalidates stale instructions without
-disabling caches or assuming a particular CPU. The call requires Exec V37, matching
-the release's OS 2.04 baseline. See the
-[Exec autodoc](https://amigadev.elowar.com/read/ADCD_2.1/Includes_and_Autodocs_2._guide/node0339.html).
-This fixes a missing coherency boundary; it does not yet establish the cause of the
-reported `68040-NOMMU` + SetPatch black screen on the other installation.
+The port deliberately bypasses copy protection and removes the Macintosh menu
+bar/desktop. Window dragging is inert. Optional desktop UI and network play
+are not implemented. Original physics, resource interpretation and game decisions
+remain in the shipped instructions.
 
-### Hardware ownership
+## Display
 
-- `LoadView(NULL)` + `WaitTOF()` × 2 to suspend the OS display.
-- Our own copper list pointed at by `COP1LC` directly (not `MakeScreen`/`LoadRGB4`).
-- `*dmaconPointer = DMAF_SETCLR | DMAF_MASTER | DMAF_COPPER | …` — copper DMA only at first;
-  bitplane/blitter DMA enabled as needed.
-- On exit: stop VERTB and display DMA; restore and run `GfxBase->copinit`; drain the blitter;
-  only then free Vette's copper/bitplanes; restore the original VERTB vector and the exact saved
-  DMA/interrupt masks; `Permit()`; `LoadView(savedView)`; `WaitTOF()` × 2; close libraries. This is
-  the measured Rescue on Fractalus handback order. `LoadView` alone does not restore COP1LC or DMA,
-  and the former free-before-disable sequence could return to a live but all-white Workbench.
+`src/platform/amiga/VetteScreen.*` owns the custom display registers.
 
-**Why takeover:** a port like this needs per-scanline copper rewrites (colour splits, sprite
-pointer patches) every frame.  The OS-friendly route (`OpenScreen CUSTOMBITMAP` +
-`AddIntServer`) re-inserts the system copper list after every `WaitTOF`, which would clobber ours
-or require `MrgCop` overhead.  Takeover also lets us write Paula registers directly instead of
-going through the audio device.
+- PAL 512×384, high-resolution interlace, four bitplanes / 16 colors.
+- The game's 512×320 surface is centered vertically with 32-row margins.
+- Each row has four consecutive 64-byte planes: 256-byte interleaved stride.
+- Double-buffered chip-memory bitmaps and copper lists; fixed 512-pixel fetch.
+- Explicit dirty-rectangle list (up to 32), normalized to C2P alignment.
+  No shadow framebuffer, tile cache or full-screen pixel comparison.
+- The back buffer inherits uncovered rectangles changed in the previous update
+  before new conversion; partial updates must not leave two-frame-old pixels.
+- Completed buffers are published in VBI. Interlace pointer offsets and modulos
+  must agree with field parity. Build the inactive copper list, then install it
+  during blanking; never edit active pointer words mid-field.
+- Copper/plane/sprite publication comes first in the VBI, before input and audio.
 
-⚠ Order matters at bring-up: install the copper list **while display DMA is off**.  Enable copper
-DMA before the scene's one-time register setup and the OS copper will run through it and
-intermittently reset those registers — a bug that only shows up when an OS-copper frame happens
-to land after your write.
+The mouse pointer uses interlaced even/odd hardware-sprite images and is updated
+each field independently of game rendering. Unused sprite channels point to empty
+sprites, and sprite priority keeps the pointer in front of the playfield.
 
-## ⭐ `setPlayfield()` COULD NOT PRODUCE THIS PORT'S MODE — the three defects, and the fix
+Source ColorTables and Palette Manager operations determine index translation.
+Do not infer palette fixes from car identity or screenshots. The original
+Macintosh gamma/display model is described in [mac-hardware.md](mac-hardware.md).
 
-`[MEASURED]` by reading both implementations, building the mode by hand, and then re-deriving the
-framework's formulas from the **Amiga Hardware Reference Manual ch. 3** ("Forming a Basic
-Playfield", ADCD 2.1 `REFERENCE/HTML/HARDWARE_MANUAL_GUIDE`).  Three defects, the first of the
-dangerous kind — all three are now **fixed in the vendored framework** rather than routed around
-(`src/platform/amiga/framework/UPSTREAM.md` carries them for upstream):
+## Timing and input
 
-1. ⭐⭐ **Both took an `interlace` argument and both `(void)`-discarded it.**  Neither ever wrote
-   BPLCON0's LACE bit (bit 2), and neither added the extra row of modulo an interlaced field needs
-   — each field displays every *other* row, so the modulo has to skip one ("you use a modulo of 40
-   to skip the lines in the other field", HRM §Modulo in Interlaced Mode).  `PROJECT.md` locks this
-   port's display to **4 bitplanes, hires interlaced**, so the call would have produced a plausible
-   half-resolution picture out of 320 rows of data with nothing reporting a problem — exactly
-   `CLAUDE.md`'s "a silent no-op is the most expensive translation choice", inside the framework
-   rather than in our own code.
-2. **The DIW window was hardcoded to 320 lores / 640 hires** (`0x81`…`0x1c1`, DIWHIGH `0x2100`),
-   and `height` was taken as field lines whatever the mode.  ⚠⚠ **DIWSTRT/DIWSTOP are ALWAYS in
-   lores, non-interlaced units** — "if you select high resolution mode or interlaced mode, the
-   starting position does not change" (HRM §Setting Display Window Starting Position) — so a hires
-   width halves and an interlaced height halves *before* reaching the display window.  It now
-   derives both corners from `width`/`height`/`centerY` and centres them in the standard window.
-3. **The hires DDF pair used the LORES formulas.**  DDFSTRT trails HSTART by 4.5 colour clocks in
-   hires against 8.5 in lores, and the fetch steps 4 clocks per word against 8:
-   `DDFSTRT = DDFSTOP - 8*(words-1)` lores, `= DDFSTOP - 4*(words-2)` hires (normal pairs
-   `$38/$D0` and `$3C/$D4`).  The old "hires" branch produced the *lores* `$38`, i.e. eight hires
-   pixels of every line fetched before the window opened: a picture shifted left with its last word
-   cut off.
+The VBI advances `g_vbiCount` once per PAL field and Macintosh ticks at 60 Hz
+(one extra tick every fifth field). CIA input updates the live KeyMap and mouse
+state. Original VBL callbacks run at safe user-mode trap-return boundaries,
+never directly from the hardware ISR.
 
-⚠ A fourth, found while fixing the third: **DIWHIGH must be computed and written, never inherited.**
-On ECS/AGA it carries the ninth horizontal and upper vertical bits of *both* corners and overrides
-the old rules (DIWSTOP H8 forced to 1, V8 the complement of V7) — and once anything has written it,
-it stays written.  Kickstart's own copper list writes `$2100`, but a takeover must still derive
-that value rather than inherit it. `VetteScreen` now also writes `$2100`, derived from its 512×384
-corners.
-⚠ The **AGA** DDF branch is left exactly as inherited and is `[ASSUMED]`: FMODE 3 fetches four
-words per access, the documented OCS formulas do not apply, and nothing here exercises it.
+Presentation does not itself stall original code: a pending buffer causes the
+present call to return. Selected animation loops and the driving loop therefore
+have explicit maximum-rate pacing. See [frame-pacing.md](frame-pacing.md);
+slow rendering incurs no additional wait.
 
-**Who owns the registers:** still `src/platform/amiga/VetteScreen.cpp`, the **single owner** of
-BPLCON0-3, FMODE, DIWSTRT/DIWSTOP/DIWHIGH, DDFSTRT/DDFSTOP and BPL1MOD/BPL2MOD.  Two reasons
-survive the fix — it centres the [MEASURED] 512×320 Macintosh surface inside the chosen 512×384
-Amiga display, and this port pins FMODE to 0 so an AGA machine fetches like an A500, which
-the framework's AGA branch deliberately does not.  ⭐ But the two derivations are no longer
-independent: `VetteScreen.cpp` `static_assert`s its constants **against the framework's formulas**,
-so a future change to either one fails the build instead of moving the picture sideways on the glass.
+Cursor aliases coexist with original keyboard bindings. Do not consume physical
+key state solely through an event queue: held steering/throttle keys are sampled
+by original code independently of event delivery.
 
-### ⭐ The interlaced-field arithmetic, since it is not obvious
+## Audio
 
-One PAL field carries **half** the picture.  With the rows interleaved (all 4 planes of row *y*,
-then all 4 of row *y+1*; stride 256 B), the long field's plane *k* starts at `base + k*64` and the
-short field's at `base + 256 + k*64`.  A bitplane pointer advances 64 B as it fetches a line, and
-must reach the same plane **two** rows down, so `BPL1MOD = BPL2MOD = 2*256 - 64 = 448`.
-The VERTB handler builds an inactive Copper list every field, selects the CURRENT field's
-rows from LOF, then installs it with COP1LC/COPJMP1 before sprite and bitplane fetching.
-Only after that handoff is the former front bitmap released for C2P. The two lists occupy
-352 bytes total and remain immutable while active; field selection no longer depends on
-whether the CPU wins a race with the Copper's automatic vertical-blank restart.
+Bogas is bridged to Paula rather than software-mixed. Three logical contexts
+share four hardware voices. Source volume range 0..300 maps to Paula 0..64;
+relative volume matters, not RMS normalization. Preserve voice ownership,
+finite sample completion, looping semantics and clean channel retirement.
 
-The mouse uses sprite 0 and must remain above every nonzero game pixel, not merely above
-`COLOR00`. `VetteScreen` therefore owns `BPLCON2=$0024`: `PF1P=PF2P=4` places all four sprite
-pairs ahead of both playfields. The earlier `$0000` setting had the priority direction backwards
-and put sprite pair 0/1 behind PF1, making the pointer disappear beneath game artwork.
+Paula restarts and idle-channel clearing must not move ahead of copper work.
+Stopped channels output digital zero. Timed events continue while the main
+thread waits for refresh.
 
-Enabling sprite DMA makes all eight channels live; leaving `SPR1PT`--`SPR7PT` untouched would let
-them inherit graphics.library pointers and fetch arbitrary chip memory after takeover. Following
-Rescue on Fractalus, Vette allocates one eight-byte, zero-height sprite in cleared chip RAM and the
-copper list writes every pointer pair: `SPR0PT` selects the cursor and all seven unused channels
-select that null sprite. The extra cleared terminator pair ensures even an empty channel cannot
-walk beyond the allocation.
+## Lifecycle
 
-The cursor itself is interlaced in memory as well as in row selection. Two independent chip-RAM
-sprite objects hold the cursor's even and odd source rows. Each VBI rebuilds only the object for the
-upcoming field and rewrites the copper's `SPR0PT` pair to it; it never modifies the object the
-current field may still be fetching. The field choice uses the same measured inverted-`LOF`
-polarity as the bitplane pointers: the VBI observes the current field while preparing the list for
-the opposite one.
+Startup supports both Shell and Workbench. The Workbench startup message is
+replied to using the protected final handback path. Resource files and score
+state are loaded before takeover; pending score writes happen after OS restoration.
+Allocation ledgers and shutdown release resident code/resources, pointer/handle
+storage, display, sprite and audio buffers and input/OS resources.
 
-Mouse tracking is also a VBI responsibility. After the field's time-critical bitplane pointers are
-written, the handler samples `JOY0DAT` and the left button, integrates the signed 8-bit counter
-deltas, updates the redirected Macintosh `MTemp`, `RawMouse`, `Mouse`, and `MBState` globals, and
-publishes the position directly to sprite 0 before its field object is built. Toolbox event polling
-only consumes this asynchronous state; it cannot throttle the visible pointer or mouse steering.
+Normal Control+left-mouse exit runs game cleanup and saves scores. WHDLoad F10
+aborts immediately and cannot perform deferred game saves. The slave supplies
+Kickstart/DOS and its own stack; see [whdload.md](whdload.md).
 
-⚠ **`AmigaHardware::isLongFrame()` did not LINK** — in the ASSEMBLER configurations it was declared
-`__asm`/bridged and `jsr`ed `_isLongFrame__13AmigaHardwareFv`, a symbol no `.s` ever defined, so the
-*first* caller was an undefined-symbol link error and only an interlaced display needs the field
-parity.  **Fixed** by taking it out of the bridged set altogether: the body is one register read and
-a bit test (`VPOSR` bit 15), and it is now unconditional on both compilers.
-
-⚠⚠ **AND THE POLARITY IS THE OPPOSITE OF THE OBVIOUS READING OF LOF** — `[MEASURED]`, on the
-glass, after shipping it the other way round first.  LOF (`VPOSR` bit 15) is set for the long
-field, so `if (isLongFrame()) use the long field's rows` looks right and is wrong: by the time the
-VERTB handler runs, the bit already names **the field whose vertical blank this is**, while the
-copper list the handler is writing is not re-fetched from `COP1LC` until the top of the **next**
-field.  So the test must be inverted — `LOF set` here means *the short field is next*.
-⚠ **Nothing headless can catch this.** It does not blank, tear or drop a frame, and the long/short
-ratio stays exactly 0.500 either way, because both fields are still being displayed — just with
-each other's rows.  What it looks like on the glass is **doubling**: every thin horizontal feature
-repeated one scanline down (the intro's one-pixel copyright overlay was unreadable), and a solid
-picture merely looking soft.  ⭐ The general lesson is in `docs/amiga-lessons.md`: a probe that
-measures *whether* the two fields alternate cannot measure *which is which*.
-
-### ⚠ How the field parity is verified, and the wrong answer it gave twice
-
-There is no headless screenshot on FS-UAE, so the program records what it did and
-`amiga/stage_a.gdb` reads it (§Build).  **Not** by reading BPLCON0 back: it is write-only and
-reads as `0xFFFF`, a test that can never fail.  The evidence is the long/short **field ratio**,
-which a display that ignored LACE cannot produce — plus the raw VPOSR words, which separate "LACE
-is dead" (a constant `A000`) from "the read is wrong" (`FFFF`).
-⚠⚠ **And the ratio must be counted from when the mode registers are written, not from boot.** The
-VERTB vector is ours ~68 fields earlier, while the display is still the OS's non-interlaced one
-where LOF is always 1.  Measured over the whole run that read **0.636** — not 1.0, so it does not
-look dead; not 0.5, so it does not look right either.  Counted from the takeover it is 0.500.
-
-### ⭐ The picture on the glass — `[MEASURED]`, and it took a human plus a screenshot
-
-The last part of Stage A that no probe could reach.  Measured off an FS-UAE **Full**-frame capture
-(754×576 — the whole PAL frame at hires × interlaced resolution, so one captured pixel is one
-displayed pixel), by taking the bounding box of everything that is not border:
-
-| | measured | wanted |
-|---|---|---|
-| window size | **512 × 320** | 512 × 320, the `[MEASURED]` Macintosh window |
-| horizontal centre | lores **289** | 289 — the centre of the standard PAL window `$81..$1C1` |
-| vertical centre | line **172** | 172 (`VS_CENTER_Y`) |
-
-So the mode is 1:1 and undistorted: no clipped row or column, no doubled or dropped line, square
-pixels (hires × interlaced), and the window centred where the derivation put it.
-⚠ **Do not read the capture's own margins as off-centring.** They are asymmetric — 138 hires px of
-border on the left, 104 on the right — because FS-UAE's capture region starts at lores hpos 92 /
-line 26 and is itself 8.5 lores left of the standard window's centre.  Derive the window's position
-from the *register units* the bounding box implies, not from the PNG's margins.
-
-⭐⭐ **Two defects were found here and NEITHER was visible to any headless check** — the Macintosh
-cursor composited into the captured asset, and the interlace field polarity inverted (§above).  That
-is the argument for keeping a human-eyeball step with a written list of what to look for, rather
-than treating a green probe run as the end of a display bring-up.
-
-The live pointer is now deliberately outside the game framebuffer. Amiga sprite 0 owns it, uses
-AGA HIRES sprite resolution, and is rebuilt at the start of every VBI from the latest Macintosh
-Cursor image, hot spot, position, and visibility. Each field receives the corresponding eight of
-the cursor's sixteen rows, so the interlaced output remains 16 full-raster pixels high. Colours
-17..19 are reserved for black, a neutral stand-in for QuickDraw XOR, and white. Cursor movement
-therefore neither dirties chunky pixels nor waits for a completed C2P presentation.
-
-## VBI: take over the VERTB IntVector
-
-Not `AddIntServer(INTB_VERTB, …)`.  Replacing exec's `IntVector` wholesale drops
-graphics.library / gameport.device / timer.device off the vblank — measured **~780 µs per 20 ms
-frame ≈ 3.9% of all wall clock** on the Atari port.
-
-Two obligations that come with it, both of which will bite immediately if missed:
-- **The handler must clear `INTREQ` itself.**  Exec's chain walker used to do that; miss it and
-  level 3 re-triggers forever.
-- **`WaitTOF()` stops working** (it is signalled by graphics.library's VERTB server).  Wait on
-  your own vblank counter, and hand the vector back *before* the closing `LoadView`/`WaitTOF`
-  pair.
-
-A `VERTB_SERVER=1`-style A/B fallback to the old `AddIntServer` chain is worth keeping for
-bisecting an interrupt-delivery regression.
-
-### ⭐⭐ …but the GAME BODY does NOT run in that handler (Revs, 2026-08-14, measured)
-
-⭐ **The general rule, before the worked example: if the original machine ran its periodic body
-once per DRAWN frame and the port draws far slower than the original, the body must not run in the
-port's vblank ISR.** It will run many times per painted frame and the renderer will be drawing a
-scene that changes under it. Drive it from main-loop context at the points where the game is
-provably not drawing. ⚠ Whether this applies to Vette depends on what its Mac original does per
-frame and how far off 1:1 the Amiga framerate lands — it is a question to answer in Phase 0, not an
-assumption to inherit.
-
-The Revs evidence, because the failure mode is hard to recognise from the symptom:
-the obvious shape — Amiga VERTB drives the game's own IRQ1V band cycle, whose last band is
-`tick_wheel_spin` — is what that port shipped first, and it produced a visible
-artefact roughly once a minute: one or two display lines drawn with the road's left edge tens of
-pixels off, leaving grass green where the road belongs.
-
-**Why, and it is not a bug in anything.** The body *draws*: it writes the frame buffer at
-`$6E00-$70FF`, display lines 120-143 — the road just below the horizon. On a BBC the main loop is
-vsync-locked, so the body runs **once per drawn frame** and always at the same point in the drawing
-sequence. Here a frame takes ~50 fields, so the body ran ~50 times per painted frame, landing
-anywhere: the rasteriser was drawing a scene that changed under it, and the decode was reading one.
-Measured over 198 painted frames with the body in the ISR: **238 frames where a character row moved
-under the decode, 327 line-instances where the decoded bitplanes no longer matched `mem[]`**, plus
-the green/black horizon runs. Everything else was provably intact — A/X/Y preserved, flags
-preserved, the two-level-RTS flag preserved, zero page untouched by the body (it writes exactly one
-byte there, `$FC`, and that is the port's own ISR shim), no writes to the engine's code, the column
-sources or the `$7B00` overlay.
-
-**The model now:** `Revs::vbi()` *counts* fields; `Revs::drainTicks()` runs them, from main-loop
-context, at the two points where the engine is provably not drawing — its own frame hook (`$1701`,
-before the decode) and its own frame-wait spin (`$1760`, which is exactly where a BBC's main loop
-sits waiting for this interrupt). Same 50 ticks per second of wall clock, same fixed-step
-trajectory; what changes is only that the drawing is atomic with respect to them. After: **0 rows
-moved, 0 decode mismatches, 0 horizon runs**, and the reporter stopped seeing broken frames.
-
-`make BODY_IN_ISR=1` restores the old model for A/B; `amiga/fill_catch.gdb` is the detector.
-⚠ As the framerate rises the burst shrinks — at 25-50 FPS it is one or two ticks per frame, i.e. it
-converges on the BBC's own interleaving rather than diverging from it.
-
-`Forbid()`/`Permit()` around the whole run window: nothing here needs exec's scheduler and we
-never `Wait()`.  ⚠ Everything between them must be `Wait()`-free — the `WaitTOF()` pairs and every
-library open/close stay outside.
-
-## ⭐ Chunky → planar: what Kalms' collection does and does not give us
-
-⭐ **This port is a c2p problem** in a way neither prior port was: the game's drawing surface is
-**chunky 4 bpp, two palette indices per byte, high nibble = left pixel** (`docs/mac-hardware.md`),
-and the Amiga is planar. `https://github.com/Kalmalyzer/kalms-c2p` is the reference collection
-(public domain outside its `others/` subdirectory).
-
-⭐ **There IS a 4-bitplane routine: `normal/c2p1x1_4_c5_gen.s`** (plus a 2-bitplane one). Signature
-`c2p1x1_4_c5_gen(void *chunky in a0, void *bitplanes in a1)` after a `_init(chunkyx, chunkyy,
-scroffsy)`. ⚠ The collection targets **68020-68060**, CPU-only — consistent with the supported
-A1200 package target. There is no separate OCS display fallback; the port's own packed-nibble C2P
-retains 68000-compatible code generation for expanded-machine experiments except for the measured
-C2P hot loop, whose scaled table index now explicitly targets the supported 68020-class machine.
-
-⚠⚠ **But its input is ONE BYTE PER PIXEL, low nibble used — not our packed two-per-byte.** `[DERIVED]`
-from the source: `_init` computes `mulu.w d0,d1` (width × height, no halving) and stores that as a
-**byte** count which the main loop adds straight onto the source pointer as an end sentinel; the
-inner loop fetches eight longwords per pass and emits 32 pixels, so 32 source bytes → 32 pixels.
-
-⭐⭐ **And here is the trap worth knowing before anyone "just skips the first stage".** The routine's
-own first step is a nibble merge, which looks exactly like what our data already is:
-
-```
-move.l  (a0)+,d0        ; Merge 4x1
-lsl.l   #4,d0
-or.l    (a0)+,d0
-```
-
-⚠ It is **not** the same packing. That pairs pixel *i* with pixel *i+4* — the first longword's four
-pixels against the *next* longword's four — because the later transposition stages are built around
-that shuffle. Ours pairs **adjacent** pixels. So our format is neither the routine's input nor its
-first intermediate, and entering one stage in would transpose the picture wrongly while still
-producing a plausible-looking image. `[DERIVED]` from those three instructions, **not yet run.**
-
-⭐ **How to settle it cheaply when it matters:** the repo ships a `_test.c` per routine. Feed it a
-known ramp and read the planes back — that answers the pairing question by measurement instead of by
-reading shifts, and it is the kind of thing to do *before* building on the answer.
-
-⚠ **So the options are re-derive the early merge stages for nibble-packed input, or pre-expand
-nibbles to bytes** (doubling source reads and the buffer). ⛔ **Do not pick one by argument.** Both
-are measurable, and the measurement belongs in the optimisation phase, not in front of the first
-frame. ⚠⚠ **Nor is it yet known that c2p is on the critical path at all** — if the driving view is
-built from QuickDraw primitives, a planar-native trap layer skips chunky entirely
-(`docs/open-work.md` §"The two display questions that are still open").
-
-## Two-layer split
-
-| Layer | Source | What we take |
-|---|---|---|
-| **Hardware** | dA JoRMaS Template/C++ (vendored, `framework/`) | `AmigaHardware`, `Bitmap`, `CopperList`, `Sprite`, `Palette`, `Util` — hand-written m68k asm via vasm with GCC bridges; `Sprite`/`Palette` are C++ |
-| **App skeleton** | the PETSCII-Robots / WHDLoad-menu pattern | `main()` + the VBI handler + `while(!quit){poll; update; render; waitVBI}` |
-
-Deliberately **not** used: the framework's `Production`/`Part`/`Script`/`ProductionRunner`
-timeline, and its `ModulePlayer` / TrackerPacker replay.
-
-**Audio: Bogas-driven intro cues over four Paula voices.**
-
-⚠⚠ **CORRECTED.** This section originally said Vette's original drives the Mac Sound Manager / Sound
-Driver directly, making it structurally unlike both prior ports (RoF drove POKEY directly; Revs
-reached the SN76489 only through the MOS sound scheduler, so `src/platform/sound.c` reproduced the
-*scheduler*). The resource inventory says otherwise: `VETTE!.Data` ships **`BGAS 128
-"Bogas Driver v2.1"`** plus 16 named `INST` samples — 72% of the whole data file — and the `sound`
-code segment is **732 bytes in both builds**.
-
-The `sound` segment is now disassembled far enough to identify its 12 exported wrappers and command
-block. The intro opens three Bogas contexts, resolves the named instruments during initialization,
-and sets one-shot globals immediately after each load. The current Paula seam follows those original
-flags for `Opening song`, `cable car bell`, `Engine`, `mic`, and `Signature`, so cues stay synchronized
-with the original animation state. The opening music occupies a centred pair and loops until the logo;
-the one-shot `Signature` replaces it there, while the remaining pair layers the earlier effects over
-the opening. For gameplay, all twelve resident Bogas wrapper entries now route through private
-Line-A calls which preserve their Pascal stack/results contract. Initialize's actual named-resource
-calls build the sixteen-entry instrument table. An indefinite context-0 load starts the centred
-engine pair, subsequent context-0 plays apply the game's live 16.16 pitch stream, and context-2
-loads replace that fixed effect voice on AUD2. Context 1 independently owns AUD3, preserving all
-three Bogas inputs in hardware; incidental effects accept Paula's fixed left/right placement rather
-than spending six channels that the machine does not have or adding a software mixer. The shipped driver
-advances three fixed inputs, combines them through its mix table, and writes the same mixed byte to
-both Macintosh output channels. Short INST headers provide their own
-PCM length, source rate, and optional loop bounds. Direct effect contexts convert that rate to a
-PAL Paula period. Context 0 instead matches Bogas's fixed 11.127 kHz software-mixer output and uses
-the original 16.16 phase step supplied by Load/Play. The bridge plays the attack once, then changes
-Paula's reload registers to the declared sustain range.
-BGAS command `$08`, reached through the resident `BogasPurge` wrapper with Vette's value 300,
-constructs the driver's 768-byte clipping table with a per-input coefficient of
-`floor(300/3)/128`. A complete resident-CODE reference sweep finds exactly one call to this wrapper,
-at `Initialize+$009C`, and no other authored level: Vette's used Bogas level range is therefore
-0..300. The Paula boundary maps that range linearly to 0..64, so the shipped value 300 always uses
-volume 64. This mapping is deliberately independent of the PCM bytes; the same samples supply their
-own relative amplitude on both machines.
-This is still an incremental Bogas backend: intro mixing remains on its proven flag-driven path,
-and later gameplay cues still require scenario verification. Real P and Escape transitions have
-now established that leaving live driving does not call Stop, Deactivate, Dispose, or Close; the
-driver remains started across the resulting waiting state. Static BGAS command flow additionally
-proves that Stop/Deactivate preserve the three voice records while Dispose destroys them; the
-Paula bridge now preserves that same context ownership and freezes finite deadlines while output
-is suspended. → `docs/source-inventory.md` §Audio.
-⚠ Inherited placement rule that will apply whatever the backend is: audio work goes **AFTER** the
-copper work in the handler, because a Paula DMA restart busy-waits on the beam and nothing that
-waits on the beam may precede the copper writes.
-
-Local modifications to the vendored framework are recorded in `framework/UPSTREAM.md` — keep that
-current, it is what makes a future upstream re-sync possible.
-
-## Build
-
-Fast-CPU animation pacing is described in [frame-pacing.md](frame-pacing.md):
-caller-specific intro, garage, selector and driving boundaries consume at most
-one step per PAL field. Pending planar presentation alone does not pace the
-original game; generic drawing traps must not each wait for a field.
-
-`make` from `amiga/` (ASSEMBLER is on by default — vasm assembles the framework `*Assembler.s`;
-`-DNO_ASSEMBLER` selects the portable C++ bodies).  Toolchain on PATH via `. amiga/env.sh`.
-
-Every hand-asm twin gets a `VETTE_<NAME>_ASM` seam, a `make <NAME>_C=1` C-fallback, and a
-`make VERIFY=1 PROBES=1` in-process differential — the template is in `amiga/Makefile`.
+Framework modifications and upstream provenance remain documented in
+[`framework/UPSTREAM.md`](../src/platform/amiga/framework/UPSTREAM.md).

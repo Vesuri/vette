@@ -20,7 +20,7 @@
 ; ISR (processBlitterQueue is only ever called synchronously, blitterWait polls DMACONR BLTBUSY
 ; and blitterDrain spin-drains), so an armed blit-done interrupt is pure overhead: measured 6
 ; interrupts per flight iteration, each dispatching into graphics.library's queue handler
-; ($F901C0) via the level-3 autovector for nothing (~52us apiece, amiga/int_probe.gdb).
+; ($F901C0) via the level-3 autovector for nothing (~52us apiece in the measured trace).
 ; So the "re-arm" writes assemble as another DISABLE by default; `make BLIT_IRQ=1` restores the
 ; original arming behaviour for A/B.  Keeping the write (instead of deleting it) leaves the
 ; instruction sequence and cycle count of these routines untouched.

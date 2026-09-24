@@ -236,8 +236,7 @@ static const uint32_t kMouseSpriteBytes = (kMouseSpriteFieldRows + 2) * 4;
 // terminator, both cleared, so DMA cannot walk beyond the null object.
 static const uint32_t kEmptySpriteBytes = 8;
 
-// ⭐ The checksum the Stage A acceptance test compares against a host-computed one
-// (tools/mac_fb_to_amiga.py's blob, same algorithm).  Rotate-then-xor, not a plain sum:
+// Buffer diagnostics use rotate-then-xor rather than a plain sum:
 // a sum is blind to byte ORDER, and a plane blob loaded with the wrong stride or with the
 // two interleave halves swapped has exactly the right bytes in the wrong places.
 static uint32_t rotXorChecksum(const uint8_t* p, uint32_t n)
