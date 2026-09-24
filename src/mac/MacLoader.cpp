@@ -2510,21 +2510,6 @@ static uint32_t resourceHandleSize(uint8_t** handle)
     return index >= 0 && s_resourceForks.item((uint32_t)index, item) ? item.size : 0;
 }
 
-static void fillColorRect(int16_t top, int16_t left, int16_t bottom, int16_t right,
-                          uint8_t color)
-{
-    if (top < 0) top = 0;
-    if (left < 0) left = 0;
-    if (bottom > 320) bottom = 320;
-    if (right > 512) right = 512;
-    for (int16_t y = top; y < bottom; ++y)
-        for (int16_t x = left; x < right; ++x) {
-            uint8_t* pixel = s_colorScreen + (uint32_t)y * (512 / 2) + (x >> 1);
-            if (x & 1) *pixel = (uint8_t)((*pixel & 0xf0) | (color & 0x0f));
-            else *pixel = (uint8_t)((*pixel & 0x0f) | ((color & 0x0f) << 4));
-        }
-}
-
 static bool drawDialog(uint8_t* dialog)
 {
     WindowSlot* slot = windowSlot(dialog);
@@ -2546,8 +2531,12 @@ static bool drawDialog(uint8_t* dialog)
     slot->dialogDrawn = true;
     dialog[110] = 1;
     write32(s_qdThePort, (uint32_t)dialog);
-    fillColorRect((int16_t)read16(dialog + 16), (int16_t)read16(dialog + 18),
-                  (int16_t)read16(dialog + 20), (int16_t)read16(dialog + 22), 0);
+    // DrawDialog draws items, not the window background. The recovery and
+    // model-preview DITLs contain only a null userItem, so they draw nothing;
+    // the original code supplies their picture separately with DrawPicture.
+    // Clearing here used global window bounds while the picture uses local
+    // coordinates, corrupting background exposed by word-aligned C2P.
+    // Text/control rendering remains outside this compatibility subset.
     return true;
 }
 
