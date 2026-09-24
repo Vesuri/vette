@@ -55,6 +55,15 @@ viewport; it does not infer scenes from pixels or change game decisions.
 | Course | 150 | 64, 37 |
 | In-game | 129 | 96, 32 |
 
+The course selector's five 64-pixel buttons start at X=82,154,226,298,370,
+with eight-pixel gaps and COURSE 3 fixed at its original X=226. All retain
+Y=297..316. The port verifies and updates the original A5-$53FC hit/highlight
+rectangles and rearranges PICT 26478's baked button strip after decoding.
+Button pixels are copied unchanged; only the map/water gaps and outer margins
+within those twenty rows are horizontally resampled. The original resource
+file and game selection logic remain unchanged. `make course-buttons-test`
+checks the image placement and preserved surroundings.
+
 Other windows use 80,0. A changed viewport forces a complete C2P of its newly
 visible area and drops the previous crop's synchronization rectangles. VBI
 publishes the new bitmap, origin and mouse visibility together. The pointer is

@@ -10,6 +10,7 @@
 #include "platform/amiga/PerfProbe.h"
 #include "platform/amiga/framework/AmigaHardware.h"
 #include "../m68k_math.h"
+#include "CourseButtons.h"
 
 extern "C" {
 void vette_line_a_handler();
@@ -3518,7 +3519,7 @@ static bool drawVersionOnePicture(const uint8_t* picture, uint32_t size,
     return false;
 }
 
-static bool drawPicture(uint8_t** pictureHandle, const uint8_t* targetRect)
+static bool drawPictureContents(uint8_t** pictureHandle, const uint8_t* targetRect)
 {
     uint32_t size = resourceHandleSize(pictureHandle);
     if (!pictureHandle || !*pictureHandle || !targetRect || size < 12) return false;
@@ -3575,6 +3576,42 @@ static bool currentPortPixels(uint8_t*& pixels, uint16_t& rowBytes,
     top = (int16_t)read16(map + 6); left = (int16_t)read16(map + 8);
     bottom = (int16_t)read16(map + 10); right = (int16_t)read16(map + 12);
     return pixels && rowBytes;
+}
+
+static bool drawPicture(uint8_t** pictureHandle, const uint8_t* targetRect)
+{
+    if (!drawPictureContents(pictureHandle, targetRect)) return false;
+    int32_t index = resourceHandleIndex(pictureHandle);
+    ResourceForks::Item item;
+    if (index >= 0 && s_resourceForks.item((uint32_t)index, item)
+        && item.type == 0x50494354UL && item.id == 26478) {
+        uint8_t* pixels;
+        uint16_t rowBytes;
+        int16_t top, left, bottom, right;
+        if (read16(targetRect) != 0 || read16(targetRect + 2) != 0
+            || read16(targetRect + 4) != 322 || read16(targetRect + 6) != 512
+            || !currentPortPixels(pixels, rowBytes, top, left, bottom, right)
+            || top != 0 || left != 0 || bottom < CourseButtons::bottom
+            || right != 512 || rowBytes < 256) return false;
+        // Initialize+$1816 passes this authored rectangle table to the original
+        // hit-test/highlight routine. Verify all five before changing any entries.
+        for (uint16_t i = 0; i < CourseButtons::count; ++i) {
+            uint8_t* rect = s_currentA5 - 0x53fc + i * 8;
+            uint16_t left = read16(rect + 2);
+            if (read16(rect) != CourseButtons::top
+                || (left != CourseButtons::originalLeft[i] && left != CourseButtons::left[i])
+                || read16(rect + 4) != CourseButtons::bottom
+                || read16(rect + 6) != left + CourseButtons::width)
+                return false;
+        }
+        for (uint16_t i = 0; i < CourseButtons::count; ++i) {
+            uint8_t* rect = s_currentA5 - 0x53fc + i * 8;
+            write16(rect + 2, CourseButtons::left[i]);
+            write16(rect + 6, CourseButtons::left[i] + CourseButtons::width);
+        }
+        CourseButtons::arrange(pixels, rowBytes);
+    }
+    return true;
 }
 
 static bool frameRect(const uint8_t* rectangle)
@@ -6321,7 +6358,7 @@ static bool nextEvent(uint16_t mask, uint8_t* event)
         466,
 #endif
         289, 293, 413, selectedOpponentX, 212,
-        (int16_t)(70 + 94 * (VETTE_GARAGE_COURSE - 1)), 445
+        (int16_t)(CourseButtons::left[VETTE_GARAGE_COURSE - 1] + 32), 402
     };
     const int16_t clickY[] = {
 #ifdef VETTE_GARAGE_DYNO
@@ -6336,7 +6373,7 @@ static bool nextEvent(uint16_t mask, uint8_t* event)
 #ifdef VETTE_GARAGE_DYNO
         466,
 #endif
-        289, 293, 413, selectedOpponentX, 212, 445
+        289, 293, 413, selectedOpponentX, 212, 402
     };
     const int16_t clickY[] = {
 #ifdef VETTE_GARAGE_DYNO
@@ -6351,7 +6388,7 @@ static bool nextEvent(uint16_t mask, uint8_t* event)
         466,
 #endif
         293, 413, selectedOpponentX, 212,
-        (int16_t)(70 + 94 * (VETTE_GARAGE_COURSE - 1)), 445
+        (int16_t)(CourseButtons::left[VETTE_GARAGE_COURSE - 1] + 32), 402
     };
     const int16_t clickY[] = {
 #ifdef VETTE_GARAGE_DYNO
@@ -6364,7 +6401,7 @@ static bool nextEvent(uint16_t mask, uint8_t* event)
 #ifdef VETTE_GARAGE_DYNO
         466,
 #endif
-        293, 413, selectedOpponentX, 212, 445
+        293, 413, selectedOpponentX, 212, 402
     };
     const int16_t clickY[] = {
 #ifdef VETTE_GARAGE_DYNO

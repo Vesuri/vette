@@ -9,6 +9,12 @@ VETTE_DATA_RSRC ?= tmp/rsrc_VETTE!_VETTE!_Folder_Folder_Color_VETTE!_VETTE!.Data
 
 all: help
 
+.PHONY: course-buttons-test
+course-buttons-test:
+	@mkdir -p build/tests
+	@$(CXX) -std=c++11 tools/test_course_buttons.cpp -o build/tests/course-buttons
+	@build/tests/course-buttons
+
 .PHONY: frame-pacing-test
 frame-pacing-test:
 	@mkdir -p build/tests
