@@ -509,6 +509,7 @@ PROBE_SYMS += g_stageCDepth
 PROBE_SYMS += SysBase
 PROBE_SYMS += g_macTicks
 PROBE_SYMS += g_macDrivingIterations
+PROBE_SYMS += g_framePaceSteps g_framePaceWaits g_framePaceViolations
 PROBE_SYMS += g_macDrivingCallbacks
 PROBE_SYMS += g_macFramesQueued g_macFramesPresented
 PROBE_SYMS += g_beamPresentLine g_beamPresentMin g_beamPresentMax \

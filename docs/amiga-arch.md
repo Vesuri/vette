@@ -352,6 +352,11 @@ current, it is what makes a future upstream re-sync possible.
 
 ## Build
 
+Fast-CPU animation pacing is described in [frame-pacing.md](frame-pacing.md):
+caller-specific intro, garage, selector and driving boundaries consume at most
+one step per PAL field. Pending planar presentation alone does not pace the
+original game; generic drawing traps must not each wait for a field.
+
 `make` from `amiga/` (ASSEMBLER is on by default — vasm assembles the framework `*Assembler.s`;
 `-DNO_ASSEMBLER` selects the portable C++ bodies).  Toolchain on PATH via `. amiga/env.sh`.
 

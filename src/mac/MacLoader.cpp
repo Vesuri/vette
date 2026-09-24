@@ -4,6 +4,7 @@
 
 #include "MacLoader.h"
 #include "ResourceForks.h"
+#include "FramePacing.h"
 #include "platform/amiga/VetteScreen.h"
 #include "platform/amiga/MacInput.h"
 #include "platform/amiga/PerfProbe.h"
@@ -16,6 +17,10 @@ void vette_call_mac_code(void* entry, void* a5);
 void vette_user_exit_request();
 void vette_user_exit_trampoline();
 extern volatile uint16_t g_macFramesPresented;
+extern volatile uint16_t g_vbiCount;
+volatile uint32_t g_framePaceSteps[kPaceCount] = {};
+volatile uint32_t g_framePaceWaits[kPaceCount] = {};
+volatile uint32_t g_framePaceViolations[kPaceCount] = {};
 #ifdef VETTE_MAPPED_COPY_ASM
 void vetteMappedCopyRowsAsm(const uint8_t* source, uint8_t* destination,
                             const uint8_t* map, uint32_t rowBytes, uint32_t height,
@@ -5515,6 +5520,23 @@ extern "C" void vetteVBLCallbackComplete()
         write32((uint8_t*)g_macTicksAddress, g_macTicks);
 }
 
+static void paceMacFrame(uint16_t stream)
+{
+    static FramePacer pacers[kPaceCount] = {};
+    FramePacer& pacer = pacers[stream];
+    // Line-A runs with the caller's interrupt mask: VERTB and Paula remain
+    // enabled. Do not use WaitTOF (the OS VBI chain is detached), or dispatch
+    // Macintosh callbacks recursively from this supervisor-mode wait.
+    if (pacer.needsWait(g_vbiCount)) {
+        ++g_framePaceWaits[stream];
+        while (pacer.needsWait(g_vbiCount)) __asm__ volatile ("nop");
+    }
+    uint16_t field = g_vbiCount;
+    if (pacer.needsWait(field)) ++g_framePaceViolations[stream];
+    pacer.advance(field);
+    ++g_framePaceSteps[stream];
+}
+
 static void presentMacRuntime()
 {
     if (!s_screenDirty || !s_loudStopScreen) return;
@@ -6463,6 +6485,18 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
 #endif
     uint32_t pc = read32(frame + 2);
     uint16_t trap = read16((const uint8_t*)pc);
+    // Caller-specific boundaries verified against the original Color CODE
+    // loops. Never pace generic CopyBits/Button calls: most are partial draws
+    // or unrelated input polling. No original instructions are replaced.
+    static const uint16_t pacedSegments[] = { 1, 2, 8 };
+    for (uint16_t i = 0; (trap == 0xa974 || trap == 0xa8ec) && i != 3; ++i) {
+        uint16_t segment = pacedSegments[i];
+        uint32_t begin = (uint32_t)s_segments[segment].begin;
+        if (pc < begin || pc >= (uint32_t)s_segments[segment].end) continue;
+        int stream = animationPaceStream(segment, pc - begin, trap);
+        if (stream >= 0) paceMacFrame((uint16_t)stream);
+        break;
+    }
 #ifdef VETTE_SCORE_PERSISTENCE_PROBE
     // The High Screen clear command first asks for confirmation with
     // CautionAlert 141. Dialog UI remains deliberately unimplemented in the
@@ -6729,6 +6763,7 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
         refreshDrivingKeyMap();
         bool driving = read16(s_currentA5 - 21316) != 0;
         if (driving) {
+            paceMacFrame(kPaceDriving);
             ++g_macDrivingIterations;
             if (s_drivingFrameStarted) {
                 uint16_t rasterBoundCount = g_drivingRasterBoundCount;

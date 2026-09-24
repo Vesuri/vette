@@ -9,6 +9,12 @@ VETTE_DATA_RSRC ?= tmp/rsrc_VETTE!_VETTE!_Folder_Folder_Color_VETTE!_VETTE!.Data
 
 all: help
 
+.PHONY: frame-pacing-test
+frame-pacing-test:
+	@mkdir -p build/tests
+	@$(CXX) -std=c++11 tools/test_frame_pacing.cpp -o build/tests/frame-pacing
+	@build/tests/frame-pacing
+
 help:
 	@echo "Vette! — Macintosh 68000 -> Amiga port"
 	@echo
@@ -111,7 +117,7 @@ dist:
 	@python3 tools/package_release.py amiga/out/Vette.exe dist
 	@python3 tools/check_release.py dist/Vette-$$(cat VERSION).lha
 
-release-check: static-map-check coverage-check gameplay-regression-smoke
+release-check: frame-pacing-test static-map-check coverage-check gameplay-regression-smoke
 	@$(MAKE) install-data-helper-amiga install-data-test
 	@$(MAKE) -C whdload
 	@cd amiga && . ./env.sh && \
