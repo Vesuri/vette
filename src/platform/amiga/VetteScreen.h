@@ -40,7 +40,7 @@ public:
     static const uint16_t kLoresLeft = 80;
     static const uint16_t kLoresWidth = 368;
     static const uint16_t kLoresRight = kLoresLeft + kLoresWidth;
-    static const uint16_t kLoresHeight = 288;
+    static const uint16_t kLoresHeight = 283;
     static const uint16_t kPlanes = 4;
     static const uint16_t kBytesPerRow = kWidth / 8;                 // 64
     static const uint16_t kRowStride   = kBytesPerRow * kPlanes;     // 256, interleaved

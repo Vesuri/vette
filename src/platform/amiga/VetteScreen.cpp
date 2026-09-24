@@ -222,7 +222,11 @@ static_assert(VetteScreen::kLoresLeft % 16 == 0 && VetteScreen::kLoresWidth % 16
               "lores crop must be word aligned");
 static_assert(0x00d8 == 0x0028 + 8 * (VetteScreen::kLoresWidth / 16 - 1),
               "lores DDF must fetch exactly the cropped width");
-static_assert(312 - 24 == VetteScreen::kLoresHeight, "lores PAL window height");
+// RKM table 3-13: PAL blanking stops at $1d, leaving 312 - 29 = 283
+// displayable lines. The display stop is exclusive.
+static const uint16_t kLoresVStart = 0x1d;
+static const uint16_t kLoresVStop = kLoresVStart + VetteScreen::kLoresHeight;
+static_assert(kLoresVStop == 312, "lores PAL window height");
 
 // Copper-list layout. Pointers come first so DMA sees complete addresses before
 // the display opens. Every sprite pointer is owned: sprite 0 uses the cursor,
@@ -346,7 +350,7 @@ bool VetteScreen::initialize(const uint8_t* picture, const uint16_t* palette16)
 
 void VetteScreen::writeModeRegisters()
 {
-    // Lores: window (97,24)..(465,312), 23 fetched words per plane.
+    // Lores: window (97,29)..(465,312), 23 fetched words per plane.
     // Word-aligned pointers select each scene's 368-pixel crop without scrolling.
     // Both modes have HSTOP/VSTOP bit 8 set (DIWHIGH=$2100).
     // ⭐⭐ ONE PLACE, ONE TIME.  Nothing else in the port writes any of these.
@@ -355,8 +359,8 @@ void VetteScreen::writeModeRegisters()
     *bplcon1Pointer = 0; // no scrolling in either mode
     *bplcon2Pointer = VS_BPLCON2;  // all sprite pairs in front of both playfields
     *bplcon3Pointer = m_hires ? 0x0c80 : 0x0c40; // AGA SPRRES: hires / lores (ECS ignores these bits)
-    *diwstrtPointer = m_hires ? VS_DIWSTRT : 0x1861;
-    *diwstopPointer = m_hires ? VS_DIWSTOP : 0x38d1;
+    *diwstrtPointer = m_hires ? VS_DIWSTRT : (kLoresVStart << 8) | 0x61;
+    *diwstopPointer = m_hires ? VS_DIWSTOP : ((kLoresVStop & 0xff) << 8) | 0xd1;
     *diwhighPointer = VS_DIWHIGH;  // ⚠ must be written, not inherited -- see above
     *ddfstrtPointer = m_hires ? VS_DDFSTRT : 0x0028;
     *ddfstopPointer = m_hires ? VS_DDFSTOP : 0x00d8;
@@ -505,7 +509,7 @@ void VetteScreen::updateMouseSprite(bool oddField)
         && left < (m_hires ? (int16_t)kWidth : (int16_t)kLoresWidth)
         && left + 16 > 0 && rows;
     uint16_t hstart = (uint16_t)((m_hires ? VS_HSTART : 97) + ((left > 0 ? left : 0) >> shift));
-    uint16_t vstart = (uint16_t)((m_hires ? VS_VSTART : 24) + ((top + firstSourceRow) >> shift));
+    uint16_t vstart = (uint16_t)((m_hires ? VS_VSTART : kLoresVStart) + ((top + firstSourceRow) >> shift));
     uint16_t vstop = (uint16_t)(vstart + rows);
     uint8_t* control = (uint8_t*)sprite;
     control[0] = visible ? (uint8_t)vstart : 0;

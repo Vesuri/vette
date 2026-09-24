@@ -25,10 +25,12 @@ remain in the shipped instructions.
 
 - Four bitplanes / 16 colors, selected once from the retained HIRES word.
 - HIRES: PAL 512×384 interlaced; the 512×320 game has 32-row vertical margins.
-- Default lores: 368×288 with a window-specific origin in the 512×320 game
+- Default lores: 368×283 with a window-specific origin in the 512×320 game
   surface (table below). Fetch 46 bytes per plane from `(32 + top) * 256 + left/8`;
   modulo 210 advances one 256-byte bitmap row.
-  DIW is (97,24)..(465,312), DDF $28..$d8, with no horizontal scroll.
+  DIW is (97,29)..(465,312), DDF $28..$d8, with no horizontal scroll.
+  RKM table 3-13 places PAL blanking stop at $1D: lines 29–311 provide
+  the full 283-row window, with stop line 312 exclusive.
 - Lores C2P and dirty synchronization touch only that crop; both assembly and
   C conversion retain the full source/destination strides.
 - Each row has four consecutive 64-byte planes: 256-byte interleaved stride.
@@ -50,8 +52,8 @@ viewport; it does not infer scenes from pixels or change game decisions.
 | Intro | 333 / 222 | 80, 0 |
 | Garage | 140 | 128, 24 |
 | Opponent / difficulty | 131 | 144, 0 |
-| Course | 150 | 64, 32 |
-| In-game | 129 | 80, 0 |
+| Course | 150 | 64, 37 |
+| In-game | 129 | 80, 32 |
 
 Other windows use 80,0. A changed viewport forces a complete C2P of its newly
 visible area and drops the previous crop's synchronization rectangles. VBI

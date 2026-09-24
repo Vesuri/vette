@@ -15,7 +15,7 @@ parser.add_argument('dump', type=Path)
 parser.add_argument('--hires', action='store_true', help='decode an interlaced HIRES run')
 args = parser.parse_args()
 p = args.dump
-width, height = (512, 384) if args.hires else (368, 288)
+width, height = (512, 384) if args.hires else (368, 283)
 raw = (p/'.whdl_memory').read_bytes()
 seen = set()
 lists = []

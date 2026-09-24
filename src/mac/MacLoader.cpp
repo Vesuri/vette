@@ -5546,7 +5546,7 @@ static void presentMacRuntime()
     uint16_t cropLeft = 80, cropTop = 0;
     bool mouseAllowed = false;
     // Color 1.02's actual WIND identities, observed at GetNewCWindow and
-    // retained by the Window Manager. Intro, driving and other windows use
+    // retained by the Window Manager. Intro and other windows use
     // the default crop. This changes presentation only, never game decisions.
     WindowSlot* front = windowSlot(s_windowList);
     if (front && !front->dialog) {
@@ -5555,8 +5555,13 @@ static void presentMacRuntime()
             cropLeft = 128; cropTop = 24; mouseAllowed = true; break;
         case 131: // opponent/difficulty
             cropLeft = 144; mouseAllowed = true; break;
+        case 129: // driving
+            cropTop = 32;
+            break;
         case 150: // course
-            cropLeft = 64; cropTop = 32; mouseAllowed = true; break;
+            cropLeft = 64;
+            cropTop = VetteScreen::kMacHeight - VetteScreen::kLoresHeight;
+            mouseAllowed = true; break;
         }
     }
     if (!s_screenDirty && s_loudStopScreen->matchesViewport(cropLeft, cropTop)
