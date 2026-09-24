@@ -52,8 +52,14 @@ def main():
             subprocess.run([str(build/"VetteInstallData"),str(ROOT/"tmp/VETTE__1.02_and_extras.sit"),str(dest/"data"),str(base/"scratch")],check=True)
         for source,name in ((installer,"Installer"),(build/"VetteInstallData.exe","VetteInstallData"),
                 (build/"test-icon.exe","IconTest"),(ROOT/"amiga/out/Vette.exe","Vette"),
+                (ROOT/"build/whdload/Vette.slave","Vette.slave"),
+                (Path.home()/".local/share/amiga/WHDLoad/C/WHDLoad","WHDLoad"),
                 (ROOT/"release/README.txt","README.txt")):
             shutil.copyfile(source,boot/name)
+        (boot/"devs/Kickstarts").mkdir(parents=True)
+        for source in (Path.home()/"Documents/RetroPie/BIOS/kick40063.A600",
+                Path.home()/"Documents/amiberry/whdboot/save-data/Kickstarts/kick40063.A600.RTB"):
+            shutil.copyfile(source,boot/"devs/Kickstarts"/source.name)
         script=(ROOT/"release/Install").read_text()
         # Installer detects welcome syntactically. Omitting it would cause an
         # automatic startup requester; retain it in an unexecuted branch.
@@ -67,7 +73,7 @@ def main():
         (boot/"Vette.info").write_bytes(installer_icon(game=True))
         (boot/"Package").mkdir()
         (boot/"Package.info").write_bytes(drawer_icon())
-        (boot/"s/startup-sequence").write_text('CD DH0:\nStack 16384\nIconTest\nDF0:C/Assign C: DF0:C\nDF0:C/Assign LIBS: DF0:Libs\nC:LoadWB\nInstaller SCRIPT DH0:Install APPNAME Vette! MINUSER NOVICE DEFUSER NOVICE LOGFILE DH2:installer.log NOPRETEND >DH2:installer-console.log\n'
+        (boot/"s/startup-sequence").write_text('CD DH0:\nStack 16384\nIconTest\nDF0:C/Assign C: DF0:C\nDF0:C/Assign LIBS: DF0:Libs\nDF0:C/Assign DEVS: DH0:devs\nPath DH0: ADD\nC:LoadWB\nInstaller SCRIPT DH0:Install APPNAME Vette! MINUSER NOVICE DEFUSER NOVICE LOGFILE DH2:installer.log NOPRETEND >DH2:installer-console.log\n'
             + f'If EXISTS "{temp_work}"\nEcho leftover >DH2:leftover\nEndIf\nEcho done >DH2:finished\n')
         with (ROOT/"tmp/installer-script-emulator.log").open("w") as log:
             emu=subprocess.Popen(["fs-uae","--amiga_model=A1200/020","--chip_memory=2048","--fast_memory=8192",
@@ -94,8 +100,8 @@ def main():
                     space=(base/"space.txt").read_text()
                     assert 'device=RAM disk=0' in space,space
                     assert int(space.split('usable=')[1].split()[0])>=12582912,space
-                assert (dest/"Vette!").exists(),report
-                assert (dest/"Vette!").read_bytes()==(boot/"Vette").read_bytes(), report
+                assert (dest/"data/Vette").read_bytes()==(boot/"Vette").read_bytes(), report
+                assert (dest/"Vette.slave").read_bytes()==(boot/"Vette.slave").read_bytes(), report
                 assert (dest/"Vette!.info").exists(),report
                 assert dest.with_suffix(".info").exists(),report
                 assert (dest/"README.txt").read_bytes()==(boot/"README.txt").read_bytes(), report

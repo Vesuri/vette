@@ -1,4 +1,4 @@
-"""Reuse release drawer/project icons and generate the small game tool icon."""
+"""Reuse release icons and generate the WHDLoad game project icon."""
 import struct
 import base64
 from pathlib import Path
@@ -28,8 +28,8 @@ def installer_icon(game=False):
     struct.pack_into(">HH",header,0,0xe310,1)
     struct.pack_into(">hhhhHHH",header,8,0,0,32,24,5,1,1)
     struct.pack_into(">I",header,22,1)  # GadgetRender image
-    header[48]=3                     # WBTOOL
-    struct.pack_into(">IIiiIII",header,50,0,0,-2147483648,-2147483648,0,0,4096)
+    header[48]=4                     # WBPROJECT: opened by WHDLoad
+    struct.pack_into(">IIiiIII",header,50,1,1,-2147483648,-2147483648,0,0,10240)
     image=struct.pack(">hhhhhIBBI",0,0,32,24,2,1,3,0,0)
     pixels=[[0]*32 for _ in range(24)]
     # A disk with an arrow pointing into it; standard Workbench four pens.
@@ -50,4 +50,10 @@ def installer_icon(game=False):
             value=0
             for p in row: value=(value<<1)|((p>>plane)&1)
             planes.extend(struct.pack(">I",value))
-    return bytes(header)+image+planes
+    def string(value):
+        raw=value.encode('ascii')+b'\0'
+        return struct.pack('>I',len(raw))+raw
+    tooltypes=('SLAVE=Vette.slave','PRELOAD')
+    return (bytes(header)+image+planes+string('WHDLoad')
+        +struct.pack('>I',4*(len(tooltypes)+1))
+        +b''.join(string(t) for t in tooltypes))

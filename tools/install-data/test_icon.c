@@ -39,8 +39,10 @@ int amiga_main(void) {
         }
         if(ok) {
             icon=GetDiskObject((CONST_STRPTR)"DH0:Vette");
-            ok=icon && icon->do_Type==WBTOOL && icon->do_StackSize==4096
-                && icon->do_Gadget.GadgetRender && !icon->do_DefaultTool;
+            ok=icon && icon->do_Type==WBPROJECT && icon->do_StackSize==10240
+                && icon->do_Gadget.GadgetRender && equal((const char *)icon->do_DefaultTool,"WHDLoad")
+                && equal((const char *)FindToolType(icon->do_ToolTypes,(CONST_STRPTR)"SLAVE"),"Vette.slave")
+                && FindToolType(icon->do_ToolTypes,(CONST_STRPTR)"PRELOAD");
             if(icon) FreeDiskObject(icon);
         }
         if(ok) {

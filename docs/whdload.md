@@ -59,6 +59,8 @@ Confirmed with WHDLoad 19.2.6941 and the local A600 40.063 ROM:
   was decoded from its actual planar buffers, not a reference framebuffer.
 - A scripted garage-to-driving build reaches the dashboard with PRELOAD disabled;
   both original files are read through kickfs and the planar display was checked.
+- Native Installer 43.3 completes installation with T: scratch storage, preserves
+  the verified original-file hashes, and produces valid WHDLoad project icons.
 
 Two startup faults were in the slave setup, not the game:
 

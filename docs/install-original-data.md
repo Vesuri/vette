@@ -7,7 +7,7 @@ directory: it writes the two original resource forks, byte for byte, under the
 names the port opens at startup.
 
 `make dist` builds `dist/Vette-0.90.lha` (also available through the `make release`
-alias). Its `Vette! Install` drawer contains only `Vette`, `Vette.info`,
+alias). Its `Vette! Install` drawer contains only `Vette`, `Vette.slave`, `Vette.info`,
 `VetteInstallData`, `Install`, `Install.info`, and `README.txt`. A sibling
 `Vette! Install.info` supplies the drawer icon from the WHDLoad template.
 `Install.info` reuses the Rescue on Fractalus installer artwork, with APPNAME
@@ -18,7 +18,12 @@ sources, emulator configuration, checksum manifest or host tools are bundled.
 The deterministic generic level-zero LH0 archive needs no host compression tool;
 its CRCs and file listing were independently verified with Lhasa.
 
-## Native Amiga installation
+## WHDLoad installation (the supported release)
+
+Install WHDLoad 17 or later and a supported legal Kickstart 3.1 image with its
+matching RTB before playing. See `docs/whdload.md` for the cross-build, memory
+reservation, slave tests and startup diagnostics. No standalone installation is
+offered by the release script.
 
 ### Hardware and OS requirements audit
 
@@ -33,7 +38,8 @@ The API baseline is OS 2.04; runtime tests use 3.1. An attempted 2.04/ECS debugg
 run failed during remote symbol relocation (`E01`, unrelocated breakpoint), so
 it establishes neither compatibility nor a game defect on 2.04.
 
-Reduced-memory tests passed with **1 MiB chip + 4 MiB fast RAM**, not the old
+The earlier standalone developer build's reduced-memory tests passed with
+**1 MiB chip + 4 MiB fast RAM**, not the old
 2+8 MiB recommendation. `memory_requirements.gdb` samples Exec's memory lists
 at each frame boundary. The full production intro reached garage setup (depth
 68), with minima of 472,680 free chip bytes and 68,544 free fast bytes. A clean
@@ -41,8 +47,9 @@ scripted-driving build reached depth 93 with 681,200 free chip bytes and 26,776
 free fast bytes. These are separate minima, not necessarily simultaneous.
 They include AmigaOS usage, and do not measure every transient allocation or
 every game route; the readme calls this a tested configuration, not an exact
-minimum. Both runs used a clean emulated system; other resident programs need
-additional headroom.
+minimum. Both runs used a clean emulated system. The WHDLoad release additionally
+reserves 512 KiB for its Kickstart image, plus host/WHDLoad/PRELOAD headroom; these
+standalone figures are not a total-system memory requirement for that release.
 
 Reproduce using `CHIP_MEMORY=1024 FAST_MEMORY=4096 EXTRA_ARGS=--warp_mode=1`
 with `amiga/diag_run.sh`, `memory_requirements.gdb` for a normal production
@@ -66,12 +73,15 @@ borrowed project/drawer icons, default tool and application-specific tooltypes.
 
 Double-click `Install` in the release drawer. Choose the parent installation
 drawer, temporary drawer (default `T:`), then the downloaded `.sit`. The script
-creates `Vette!` with a drawer icon, `Vette!` executable and icon, and `data`.
+creates `Vette!` with a drawer icon, `Vette.slave`, a `Vette!` WHDLoad project icon,
+and `data`. The unchanged executable is `data/Vette`, alongside the two original
+files. The icon uses WHDLoad with `SLAVE=Vette.slave`, `PRELOAD` and a 10,240-byte
+launcher stack. Saved scores live in `data/Vette.scores`.
 Standard Amiga Installer V43 or later is
 required for this graphical script. The included `VetteInstallData` helper does
 all extraction on the Amiga; no xadmaster, Python, Deark or Mac emulator is needed.
 
-For Shell use, invoke the helper directly, then place `Vette` in the destination:
+For developer/helper diagnostics only (not an alternative supported installation):
 
 ```
 VetteInstallData "Work:Downloads/VETTE__1.02_and_extras.sit" "Work:Games/Vette!/data" "Work:Temp"

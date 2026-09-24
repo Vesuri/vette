@@ -1,4 +1,4 @@
-; Vette! native installation. Standard Commodore Installer V43 or newer.
+; Vette! WHDLoad installation. Standard Commodore Installer V43 or newer.
 ; $VER: Install 0.90 (23.09.2026)
 (set @app-name "Vette!")
 (if (< @installer-version (* 43 65536))
@@ -6,6 +6,19 @@
 (welcome)
 (set #source (pathonly @icon))
 (set @execute-dir #source)
+; Same prerequisite check as the WHDLoad/Rescue on Fractalus install template.
+(if (<> 0 (run "cd SYS:\nWhich WHDLoad >NIL:"))
+  (abort "Install WHDLoad 17 or newer first. It must be accessible via the command path. See https://www.whdload.de/"))
+(set #kick-ready 0)
+(if (and (exists "Devs:Kickstarts/kick40068.A1200") (exists "Devs:Kickstarts/kick40068.A1200.RTB")) (set #kick-ready 1))
+(if (and (exists "Devs:Kickstarts/kick40068.A4000") (exists "Devs:Kickstarts/kick40068.A4000.RTB")) (set #kick-ready 1))
+(if (and (exists "Devs:Kickstarts/kick40063.A600") (exists "Devs:Kickstarts/kick40063.A600.RTB")) (set #kick-ready 1))
+(if (<> (getassign "WHDCOMMON") "")
+  ((if (and (exists "WHDCOMMON:kick40068.A1200") (exists "WHDCOMMON:kick40068.A1200.RTB")) (set #kick-ready 1))
+   (if (and (exists "WHDCOMMON:kick40068.A4000") (exists "WHDCOMMON:kick40068.A4000.RTB")) (set #kick-ready 1))
+   (if (and (exists "WHDCOMMON:kick40063.A600") (exists "WHDCOMMON:kick40063.A600.RTB")) (set #kick-ready 1))))
+(if (= #kick-ready 0)
+  (message "WHDLoad needs a Kickstart 3.1 image and matching .RTB file in Devs:Kickstarts or WHDCOMMON: before playing. See README.txt for supported image names." (all)))
 ; RAM: is expandable: filesystem free blocks are not its available capacity.
 ; Resolve the device so T: and other assigns/subdrawers are handled too.
 (procedure P_TempSpace
@@ -48,10 +61,25 @@
 (complete 90)
 (copyfiles
   (source (tackon #source "Vette"))
-  (dest #dest)
-  (newname "Vette!")
-  (infos)
+  (dest #data)
   (help @copyfiles-help))
+(copyfiles
+  (source (tackon #source "Vette.slave"))
+  (dest #dest)
+  (help @copyfiles-help))
+(copyfiles
+  (source (tackon #source "Vette.info"))
+  (dest #dest)
+  (newname "Vette!.info")
+  (help @copyfiles-help))
+; Keep these explicit, as in the WHDLoad install template.
+(tooltype
+  (dest (tackon #dest "Vette!"))
+  (setdefaulttool "WHDLoad")
+  (settooltype "Slave" "Vette.slave")
+  (settooltype "PreLoad" "")
+  (setstack 10240)
+  (noposition))
 (copyfiles
   (source (tackon #source "README.txt"))
   (dest #dest)

@@ -6,7 +6,7 @@ import struct
 from pathlib import Path
 from package_release import ORIGINAL_HASHES, PREFIX, crc16
 
-REQUIRED = {"Vette", "Vette.info", "VetteInstallData", "Install", "Install.info", "README.txt"}
+REQUIRED = {"Vette", "Vette.slave", "Vette.info", "VetteInstallData", "Install", "Install.info", "README.txt"}
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
@@ -38,14 +38,17 @@ def main():
         payloads[name] = data
         pos += packed
     assert raw[pos:] == b"\0" and set(payloads) == REQUIRED | {'@drawer'}, "wrong archive contents"
-    for name in ("Vette", "VetteInstallData"):
+    for name in ("Vette", "VetteInstallData", "Vette.slave"):
         assert payloads[name][:4] == b"\0\0\3\xf3", "not an Amiga HUNK executable"
-    for name, kind in (("Vette.info", 3), ("Install.info", 4), ('@drawer', 2)):
+    assert b'WHDLOADS' in payloads['Vette.slave'], 'missing WHDLoad slave header'
+    for name, kind in (("Vette.info", 4), ("Install.info", 4), ('@drawer', 2)):
         assert payloads[name][:4] == b"\xe3\x10\0\1" and payloads[name][48] == kind
     assert b"$VER: Install 0.90 (23.09.2026)" in payloads["Install"]
     assert b'APPNAME=Vette!\0' in payloads['Install.info']
     assert b'Rescue on Fractalus' not in payloads['Install.info']
-    print("PASS: six files plus drawer icon, valid LHA CRCs, executables and icons")
+    assert b'WHDLoad\0' in payloads['Vette.info'] and b'SLAVE=Vette.slave\0' in payloads['Vette.info']
+    assert b'PRELOAD\0' in payloads['Vette.info']
+    print("PASS: WHDLoad release, seven files plus drawer icon, valid LHA CRCs, executables and icons")
 
 if __name__ == "__main__":
     main()

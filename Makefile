@@ -106,12 +106,14 @@ release: dist
 
 dist:
 	@cd amiga && . ./env.sh && $(MAKE) clean && $(MAKE) -j4
+	@$(MAKE) -C whdload
 	@$(MAKE) install-data-helper-amiga
 	@python3 tools/package_release.py amiga/out/Vette.exe dist
 	@python3 tools/check_release.py dist/Vette-$$(cat VERSION).lha
 
 release-check: static-map-check coverage-check gameplay-regression-smoke
 	@$(MAKE) install-data-helper-amiga install-data-test
+	@$(MAKE) -C whdload
 	@cd amiga && . ./env.sh && \
 	  $(MAKE) clean >/dev/null && $(MAKE) -j4 >/dev/null 2>&1 && \
 	  first=$$(shasum -a 256 out/Vette.exe | cut -d' ' -f1) && \

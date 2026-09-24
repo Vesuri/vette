@@ -37,6 +37,7 @@ def main():
     version = (root / "VERSION").read_text().strip()
     files = {
         "Vette": args.executable.read_bytes(),
+        "Vette.slave": (root / "build/whdload/Vette.slave").read_bytes(),
         "Vette.info": installer_icon(game=True),
         "VetteInstallData": (root / "build/install-data/VetteInstallData.exe").read_bytes(),
         "Install": (root / "release/Install").read_bytes(),

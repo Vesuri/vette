@@ -35,7 +35,9 @@ restart, return, normal and emergency quit, score writing, and AmigaOS restorati
 deterministic and contains no copyrighted game data; its installer derives the two required raw
 resource forks directly from the user's original StuffIt archive and validates the exact release.
 The native `VetteInstallData` helper is self-contained; the older Python tools also accept NDIF
-or raw HFS images. Native installation details and verification are in `docs/install-original-data.md`.
+or raw HFS images. WHDLoad is the only supported release installation and launch
+method; its native host cross-build and startup verification are documented in
+`docs/whdload.md`. Data installation details are in `docs/install-original-data.md`.
 
 ## Deferred until a real caller or later phase requires it
 
