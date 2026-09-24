@@ -27,7 +27,7 @@
     (getdiskspace #temp)))
 (set #parent
   (askdir
-    (prompt "Where should Vette! be installed? A Vette drawer will be created here.")
+    (prompt "Where should Vette! be installed? A Vette! drawer will be created here.")
     (help "Choose a hard disk drawer with at least 3 MB free for the game and its original data.")
     (default @default-dest)))
 (set #temp
@@ -47,7 +47,7 @@
     (prompt "Select the downloaded VETTE__1.02_and_extras.sit archive.")
     (help "Choose VETTE__1.02_and_extras.sit downloaded from the Vette! page at Macintosh Repository. Leave it compressed.")
     (default "VETTE__1.02_and_extras.sit")))
-(set #dest (tackon #parent "Vette"))
+(set #dest (tackon #parent "Vette!"))
 (set #data (tackon #dest "data"))
 (makedir #dest (infos) (help @makedir-help))
 (makedir #data (help @makedir-help))

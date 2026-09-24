@@ -43,7 +43,7 @@ def main():
     subprocess.run(["elf2hunk",str(build/"test-icon.elf"),str(build/"test-icon.exe"),"-s"],check=True)
     with tempfile.TemporaryDirectory(prefix="vette-installer-script-",dir=ROOT/"tmp") as temp:
         base=Path(temp); boot=base/"boot"; (boot/"s").mkdir(parents=True)
-        (base/"state").mkdir(); dest=base/"out/Vette"; (base/"out").mkdir()
+        (base/"state").mkdir(); dest=base/"out/Vette!"; (base/"out").mkdir()
         (base/"scratch").mkdir()
         # Already-verified files exercise safe repeat installation and avoid a
         # second full decompression; test_amiga.py separately tests that path.

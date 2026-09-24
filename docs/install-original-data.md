@@ -7,9 +7,9 @@ directory: it writes the two original resource forks, byte for byte, under the
 names the port opens at startup.
 
 `make dist` builds `dist/Vette-0.90.lha` (also available through the `make release`
-alias). Its `Vette Install` drawer contains only `Vette`, `Vette.slave`, `Vette.inf`,
+alias). Its `Vette! Install` drawer contains only `Vette`, `Vette.slave`, `Vette.inf`,
 `VetteInstallData`, `Install`, `Install.info`, `ReadMe`, and `ReadMe.info`. A sibling
-`Vette Install.info` supplies the drawer icon from the WHDLoad template.
+`Vette! Install.info` supplies the drawer icon from the WHDLoad template.
 `Install.info` reuses the Rescue on Fractalus installer artwork, with APPNAME
 changed to Vette! and its Installer default tool and AVERAGE user level retained.
 `Vette.inf` and `ReadMe.info` reuse the released Rescue on Fractalus artwork.
@@ -98,7 +98,7 @@ borrowed project/drawer icons, default tool and application-specific tooltypes.
 
 Double-click `Install` in the release drawer. Choose the parent installation
 drawer, temporary drawer (default `T:`), then the downloaded `.sit`. The script
-creates `Vette` with a drawer icon, `Vette.slave`, a `Vette` WHDLoad project icon,
+creates `Vette!` with a drawer icon, `Vette.slave`, a `Vette` WHDLoad project icon,
 and `data`. The unchanged executable is `data/Vette`, alongside the two original
 files. The icon uses WHDLoad with `SLAVE=Vette.slave`, `PRELOAD` and a 10,240-byte
 launcher stack. Saved scores live in `data/Vette.scores`.

@@ -55,6 +55,7 @@ def main():
     assert payloads['ReadMe.info'] == readme_icon() and b'MultiView\0' in payloads['ReadMe.info']
     assert b'(settooltype "Slave" "Vette.slave")' in payloads['Install']
     assert b'(settooltype "PreLoad" "")' in payloads['Install']
+    assert b'(set #dest (tackon #parent "Vette!"))' in payloads['Install']
     assert b' Requirements:\n -------------' in payloads['ReadMe']
     print("PASS: WHDLoad release, eight files plus drawer icon, valid LHA CRCs and reference icons")
 

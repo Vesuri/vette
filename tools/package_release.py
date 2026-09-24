@@ -14,7 +14,7 @@ ORIGINAL_HASHES = {
     "77e80078116e6aef0f257381466cf9cfc77108c75404138c002c68fbde7b896b",
     "e3db29fcc7b51a5275857bb06ff4ffb082d9aebb9f4045eb71ce23ba243a075f",
 }
-PREFIX = "Vette Install"
+PREFIX = "Vette! Install"
 
 def crc16(data):
     crc = 0
