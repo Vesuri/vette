@@ -5544,20 +5544,26 @@ static void presentMacRuntime()
 {
     if (!s_loudStopScreen) return;
     uint16_t cropLeft = 80, cropTop = 0;
+    bool mouseAllowed = false;
     // Color 1.02's actual WIND identities, observed at GetNewCWindow and
     // retained by the Window Manager. Intro, driving and other windows use
     // the default crop. This changes presentation only, never game decisions.
     WindowSlot* front = windowSlot(s_windowList);
     if (front && !front->dialog) {
         switch (front->resourceID) {
-        case 140: cropLeft = 128; cropTop = 24; break; // garage
-        case 131: cropLeft = 144; break;               // opponent/difficulty
-        case 150: cropTop = 32; break;                // course
+        case 140: // garage
+            cropLeft = 128; cropTop = 24; mouseAllowed = true; break;
+        case 131: // opponent/difficulty
+            cropLeft = 144; mouseAllowed = true; break;
+        case 150: // course
+            cropTop = 32; mouseAllowed = true; break;
         }
     }
-    if (!s_screenDirty && s_loudStopScreen->matchesViewport(cropLeft, cropTop)) return;
+    if (!s_screenDirty && s_loudStopScreen->matchesViewport(cropLeft, cropTop)
+        && s_loudStopScreen->matchesMouseVisibility(mouseAllowed)) return;
     bool presented = s_loudStopScreen->presentMacFrame(
-        s_colorScreen, s_windowManagerColors, s_dirtyRects, s_dirtyRectCount, cropLeft, cropTop);
+        s_colorScreen, s_windowManagerColors, s_dirtyRects, s_dirtyRectCount,
+        cropLeft, cropTop, mouseAllowed);
     if (presented) {
         s_screenDirty = false;
         s_pixelsDirty = false;

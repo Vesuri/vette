@@ -381,6 +381,7 @@ void VetteScreen::vbiUpdate(bool install)
         m_back = oldFront;
         m_cropLeft = m_nextCropLeft;
         m_cropTop = m_nextCropTop;
+        m_mouseAllowed = m_nextMouseAllowed;
         for (uint16_t i = 0; i < 16; ++i)
             m_copper[VS_CL_COLORS + i] = copperMove(color00 + i * 2, m_nextPalette[i]);
     }
@@ -489,7 +490,8 @@ void VetteScreen::updateMouseSprite(bool oddField)
     int16_t height = m_hires ? kHeight : kLoresHeight;
     while (firstSourceRow + (rows << shift) < 16
            && top + firstSourceRow + (rows << shift) < height) ++rows;
-    bool visible = m_cursorVisible && left < (m_hires ? (int16_t)kWidth : (int16_t)kLoresWidth)
+    bool visible = m_mouseAllowed && m_cursorVisible
+        && left < (m_hires ? (int16_t)kWidth : (int16_t)kLoresWidth)
         && left + 16 > 0 && rows;
     uint16_t hstart = (uint16_t)((m_hires ? VS_HSTART : 97) + ((left > 0 ? left : 0) >> shift));
     uint16_t vstart = (uint16_t)((m_hires ? VS_VSTART : 24) + ((top + firstSourceRow) >> shift));
@@ -592,7 +594,7 @@ static bool rectanglesMergeLosslessly(const VetteScreen::DirtyRect& a,
 
 bool VetteScreen::presentMacFrame(const uint8_t* chunky, const uint8_t* colorTable,
                                   const DirtyRect* dirtyRects, uint16_t dirtyRectCount,
-                                  uint16_t cropLeft, uint16_t cropTop)
+                                  uint16_t cropLeft, uint16_t cropTop, bool mouseAllowed)
 {
     if (!chunky || !colorTable || !m_back) return false;
     if (m_framePending) {
@@ -826,6 +828,7 @@ bool VetteScreen::presentMacFrame(const uint8_t* chunky, const uint8_t* colorTab
 #endif
     m_nextCropLeft = cropLeft;
     m_nextCropTop = cropTop;
+    m_nextMouseAllowed = mouseAllowed;
     ++g_macFramesQueued;
     m_framePending = true;
     return true;

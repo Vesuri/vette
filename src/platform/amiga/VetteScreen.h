@@ -64,11 +64,14 @@ public:
     // the copper never scans a half-converted picture.
     bool presentMacFrame(const uint8_t* chunky, const uint8_t* colorTable,
                          const DirtyRect* dirtyRects, uint16_t dirtyRectCount,
-                         uint16_t cropLeft = kLoresLeft, uint16_t cropTop = 0);
+                         uint16_t cropLeft = kLoresLeft, uint16_t cropTop = 0,
+                         bool mouseAllowed = false);
 
     bool matchesViewport(uint16_t left, uint16_t top) const {
         return m_hires || (m_cropLeft == left && m_cropTop == top);
     }
+
+    bool matchesMouseVisibility(bool allowed) const { return m_mouseAllowed == allowed; }
 
     // VBI-only: preserve physical pointer position across viewport changes,
     // apply hardware movement, and clamp the hotspot to the displayed area.
@@ -100,6 +103,7 @@ private:
     uint16_t m_nextCropLeft = kLoresLeft, m_nextCropTop = 0;
     uint16_t m_mouseCropLeft = kLoresLeft, m_mouseCropTop = 0;
     bool m_mouseCoordinatesInitialized = false;
+    bool m_mouseAllowed = false, m_nextMouseAllowed = false;
     bool m_hires = false; // Snapshotted from the loader word at startup.
     void writeModeRegisters();
     void updateMouseSprite(bool oddField);
