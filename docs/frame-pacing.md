@@ -9,7 +9,7 @@ limits the following source-defined loops to one step per PAL field (50 Hz).
 | --- | --- | --- |
 | Intro | Intro (8)+$0224, Button | Outer loop polls before visiting the four actor callbacks; returns through $020E after composition |
 | Garage departure | Initialize (2)+$11AC, Button | After the complete car composite/copy, before the two-pixel move and branch back to $10AA |
-| Garage Test | Initialize (2)+$0EF0, after CopyBits | Completed curve increment, after the repeated car-image copies at $0E86/$0EAC |
+| Garage Test | Initialize (2)+$0E86 or $0EAC, CopyBits | Mutually exclusive alternating car images; graph reveal at $0EF0 is not another frame |
 | Opponent | Initialize (2)+$1A34, CopyBits | Final screen copy after one angle increment, background restoration and 3D draw; background copy at $1A0E is not paced |
 | Separate model preview | Main (1)+$1AB8, Button | End of the model-preview loop, before its back edge to $19C4 |
 | Driving | Main (1)+$1FD2, existing private hook | One full driving iteration, only while the original driving predicate is true |
@@ -37,16 +37,17 @@ on a loud stop. Build normally for intro; add `SKIP_INTRO=1 GARAGE_CLICK=1
 GARAGE_DYNO=1 GARAGE_DEPARTURE_FULL=1` for the scripted test/departure/selector/
 driving sequence. Use `PROBES=1` for both runtime diagnostic builds.
 
-The TEST loop alternates the car image 22 times per curve increment. Waiting
-on each car copy stretched its 59-increment curve reveal to over 26 seconds.
-Only the completed curve copy now consumes a pacing step; the repeated car
-copies remain untouched and incur no wait. Garage departure still waits at
-its complete car-composite boundary.
+Verified in FS-UAE with `--cpu=68040 --warp_mode=1`: intro 451 steps / 238 waits
+in a 775-field snapshot; complete garage Test 1,320 steps / 1,319 waits and
+departure 198 steps / 38 waits, followed by the opponent selector and driving.
+A separate driving run reached 137 iterations with zero waits (rendering was
+already slower than refresh). All recorded same-field violations were zero;
+all runs retained running state 1, with no loud stop. The selector was exercised
+for four steps per scripted traversal but was already slower than refresh, so
+its waiting branch is covered by the shared limiter tests rather than claimed
+as observed in that runtime fixture. The separate preview boundary is source-
+verified and unit-tested, not reached by this scripted garage path.
 
-`amiga/garage_pacing.gdb` checks the full scripted TEST/departure path with the
-same diagnostic flags. In FS-UAE (`--cpu=68040 --warp_mode=1`), TEST completed
-in 107 PAL fields (2.14 seconds), with 59 pacing steps, no added waits and no
-same-field violations. Departure retained 198 steps, including 74 waits, and
-the fixture reached four driving iterations without a loud stop. Timing is for
-the diagnostic build; the limiter still caps faster execution at one completed
-curve increment per field.
+At 50 steps/second the Test loop's 1,320 alternating car frames take at least
+26.4 seconds. This follows its original roughly 22 car-image iterations per
+graph increment; the graph copy itself does not incur an extra wait.
