@@ -8,7 +8,7 @@ from pathlib import Path
 from package_release import ORIGINAL_HASHES, PREFIX, crc16
 from installer_icon import installer_icon, readme_icon
 
-REQUIRED = {"Vette", "Vette.slave", "Vette.inf", "VetteInstallData", "Install", "Install.info", "ReadMe", "ReadMe.info"}
+REQUIRED = {"Vette", "Vette.slave", "Vette.inf", "VetteInstallData", "Install", "Install.info", "ReadMe", "ReadMe.info", "LICENSE.LGPL.txt"}
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
@@ -57,7 +57,12 @@ def main():
     assert b'(settooltype "PreLoad" "")' in payloads['Install']
     assert b'(set #dest (tackon #parent "Vette!"))' in payloads['Install']
     assert b' Requirements:\n -------------' in payloads['ReadMe']
-    print("PASS: WHDLoad release, eight files plus drawer icon, valid LHA CRCs and reference icons")
+    root = Path(__file__).resolve().parent.parent
+    assert payloads['ReadMe'] == (root / 'release/ReadMe').read_bytes()
+    assert payloads['LICENSE.LGPL.txt'] == (root / 'tools/install-data/COPYING.LIB').read_bytes()
+    assert b'helper tool only' in payloads['ReadMe']
+    assert b'https://github.com/Vesuri/vette' in payloads['ReadMe']
+    print("PASS: WHDLoad release, nine files plus drawer icon, valid LHA CRCs, reference icons and separate helper license")
 
 if __name__ == "__main__":
     main()

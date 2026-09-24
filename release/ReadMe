@@ -105,7 +105,8 @@
 
  Installer helper:
  -----------------
- VetteInstallData is LGPL-2.1-or-later. Source and build instructions:
- https://github.com/Vesuri/vette/tree/main/tools/install-data
+ LICENSE.LGPL.txt is the LGPL-2.1-or-later license for the VetteInstallData
+ helper tool only. It does not license the game or its original data.
+ The helper's source code is available at:
+ https://github.com/Vesuri/vette
  Its archive format tables are copyright 2017-present MacPaw Way Ltd.
- The helper's license follows below.

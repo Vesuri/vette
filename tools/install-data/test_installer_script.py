@@ -54,7 +54,8 @@ def main():
                 (build/"test-icon.exe","IconTest"),(ROOT/"amiga/out/Vette.exe","Vette"),
                 (ROOT/"build/whdload/Vette.slave","Vette.slave"),
                 (Path.home()/".local/share/amiga/WHDLoad/C/WHDLoad","WHDLoad"),
-                (ROOT/"release/ReadMe","ReadMe")):
+                (ROOT/"release/ReadMe","ReadMe"),
+                (ROOT/"tools/install-data/COPYING.LIB","LICENSE.LGPL.txt")):
             shutil.copyfile(source,boot/name)
         (boot/"devs/Kickstarts").mkdir(parents=True)
         for source in (Path.home()/"Documents/RetroPie/BIOS/kick40063.A600",
@@ -109,6 +110,8 @@ def main():
                 assert dest.with_suffix(".info").exists(),report
                 assert (dest/"ReadMe").read_bytes()==(boot/"ReadMe").read_bytes(), report
                 assert (dest/"ReadMe.info").read_bytes()==(boot/"ReadMe.info").read_bytes(), report
+                assert (dest/"LICENSE.LGPL.txt").read_bytes()==(boot/"LICENSE.LGPL.txt").read_bytes(), report
+                assert not (dest/"LICENSE.LGPL.txt.info").exists(), report
                 from test_install import EXPECTED
                 import hashlib
                 for name, digest in EXPECTED.items():

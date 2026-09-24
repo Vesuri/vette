@@ -86,5 +86,9 @@
   (infos)
   (help @copyfiles-help))
 (set @default-dest #dest)
+(copyfiles
+  (source (tackon #source "LICENSE.LGPL.txt"))
+  (dest #dest)
+  (help @copyfiles-help))
 (complete 100)
 (exit)

@@ -65,11 +65,9 @@ def main():
         "VetteInstallData": (root / "build/install-data/VetteInstallData.exe").read_bytes(),
         "Install": (root / "release/Install").read_bytes(),
         "Install.info": installer_icon(),
-        # Keep the helper's license with its binary without adding another file.
         "ReadMe.info": readme_icon(),
-        "ReadMe": (root / "release/ReadMe").read_bytes()
-            + b"\n\n Installer helper license:\n -------------------------\n\n"
-            + (root / "tools/install-data/COPYING.LIB").read_bytes(),
+        "ReadMe": (root / "release/ReadMe").read_bytes(),
+        "LICENSE.LGPL.txt": (root / "tools/install-data/COPYING.LIB").read_bytes(),
     }
     for name, data in files.items():
         if hashlib.sha256(data).hexdigest() in ORIGINAL_HASHES:
