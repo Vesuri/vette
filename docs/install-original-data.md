@@ -17,8 +17,31 @@ Installer renames the game icon to `Vette.info` and sets its WHDLoad tooltypes;
 ReadMe keeps MultiView as its default tool. The WHDLoad-style ReadMe contains
 the helper's license and repository source link. No original data,
 sources, emulator configuration, checksum manifest or host tools are bundled.
-The deterministic generic level-zero LH0 archive needs no host compression tool;
-its CRCs and file listing were independently verified with Lhasa.
+The deterministic generic level-zero archive uses LH5 for every member. Packaging
+requires [LHa for UNIX](https://github.com/jca02266/lha), not the extraction-only
+Lhasa supplied by Homebrew. Install the encoder as `lha-compress` on PATH, or set
+`LHA` to its absolute path. The independent release audit uses `lha` (Lhasa) to
+decode each member and verify its original length, CRC and contents.
+
+For example, build the host encoder locally (requires a C compiler, autoconf and
+automake; no compressor is included in the Amiga release):
+
+```
+git clone https://github.com/jca02266/lha.git tmp/lha-compressor
+cd tmp/lha-compressor
+git checkout 16619b066b189ef289bb8b07b37d1c38d550da99
+autoreconf -is
+./configure
+make -j4
+cd ../..
+LHA="$PWD/tmp/lha-compressor/src/lha" make dist
+```
+
+The packager takes only the compressed payload from the encoder and supplies
+fixed generic headers, paths, ordering and timestamps itself. It fails rather
+than silently falling back to uncompressed storage. Lhasa extraction of the LH5
+release was byte-identical to the previous LH0 release; repeated packaging was
+byte-identical as well.
 
 ## WHDLoad installation (the supported release)
 

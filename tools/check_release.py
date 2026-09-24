@@ -3,6 +3,7 @@
 import argparse
 import hashlib
 import struct
+import subprocess
 from pathlib import Path
 from package_release import ORIGINAL_HASHES, PREFIX, crc16
 from installer_icon import installer_icon, readme_icon
@@ -20,12 +21,12 @@ def main():
         size = raw[pos]
         header = raw[pos + 2:pos + 2 + size]
         assert len(header) == size and sum(header) & 255 == raw[pos + 1], "bad header checksum"
-        assert header[:5] == b"-lh0-" and header[18] == 0, "unsupported header"
+        assert header[:5] == b"-lh5-" and header[18] == 0, "expected level-zero LH5"
         packed, unpacked = struct.unpack_from("<II", header, 5)
-        assert packed == unpacked
         n = header[19]
         assert size == 22 + n
         name = header[20:20 + n].decode("ascii").replace("\\", "/")
+        archive_name = name
         if name == PREFIX + '.info':
             name = '@drawer'
         else:
@@ -33,8 +34,11 @@ def main():
             name = name[len(PREFIX) + 1:]
         assert name in REQUIRED | {'@drawer'} and name not in payloads, "unexpected or duplicate file"
         pos += size + 2
-        data = raw[pos:pos + packed]
-        assert len(data) == packed and crc16(data) == struct.unpack_from("<H", header, 20 + n)[0], "bad payload CRC"
+        assert len(raw[pos:pos + packed]) == packed, "truncated payload"
+        # Decode independently with Lhasa, without extracting paths to disk.
+        data = subprocess.run(["lha", "pq", str(args.archive.resolve()), archive_name],
+                              check=True, capture_output=True).stdout
+        assert len(data) == unpacked and crc16(data) == struct.unpack_from("<H", header, 20 + n)[0], "bad payload CRC"
         assert hashlib.sha256(data).hexdigest() not in ORIGINAL_HASHES
         payloads[name] = data
         pos += packed

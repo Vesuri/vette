@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
-"""Create the minimal deterministic Amiga LHA distribution (portable LH0)."""
+"""Create the minimal deterministic Amiga LHA distribution (LH5)."""
 import argparse
 import hashlib
+import os
+import shutil
 import struct
+import subprocess
+import tempfile
 from pathlib import Path
 from installer_icon import installer_icon, drawer_icon, readme_icon
 
@@ -21,12 +25,31 @@ def crc16(data):
     return crc
 
 def member(name, data):
-    # Generic level-zero header, stored data; no host archiver dependency.
+    # Use the established UNIX LHa encoder, but own the generic header so host
+    # timestamps, permissions and paths cannot affect release reproducibility.
+    encoder = os.environ.get("LHA", shutil.which("lha-compress") or "lha")
+    with tempfile.TemporaryDirectory(prefix="vette-lh5-") as directory:
+        work = Path(directory)
+        (work / "payload").write_bytes(data)
+        try:
+            subprocess.run([encoder, "ao5g0", "member.lha", "payload"],
+                           cwd=work, check=True, capture_output=True)
+        except (OSError, subprocess.CalledProcessError) as error:
+            raise SystemExit("LH5 packaging requires LHa for UNIX (not Lhasa); "
+                             "set LHA to its absolute path. See docs/install-original-data.md") from error
+        raw = (work / "member.lha").read_bytes()
+    header = raw[2:2 + raw[0]]
+    if header[:5] != b"-lh5-" or header[18] != 0:
+        raise ValueError("compressor did not produce a level-zero LH5 member")
+    packed, unpacked = struct.unpack_from("<II", header, 5)
+    payload = raw[2 + raw[0]:2 + raw[0] + packed]
+    if unpacked != len(data) or len(payload) != packed:
+        raise ValueError("invalid compressor output lengths")
     name = name.replace("/", "\\").encode("ascii")
     stamp = (((2026 - 1980) << 9) | (9 << 5) | 23) << 16
-    body = b"-lh0-" + struct.pack("<III", len(data), len(data), stamp)
+    body = b"-lh5-" + struct.pack("<III", len(payload), len(data), stamp)
     body += bytes((0x20, 0, len(name))) + name + struct.pack("<H", crc16(data))
-    return bytes((len(body), sum(body) & 255)) + body + data
+    return bytes((len(body), sum(body) & 255)) + body + payload
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
