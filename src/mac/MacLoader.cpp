@@ -5732,13 +5732,17 @@ extern "C" void vetteMacRawKeyChanged(uint8_t rawKey, bool down)
 static void updateDrivingInputProbe()
 {
 #ifdef VETTE_SESSION_CONTROL_ITEM
-    // Reach suspension through the shipped physical P pause/options path.
-    // Main's event loop supplies the requested menu command below.
+    // Reach suspension through the physical P or Escape path.
+    // Main's event loop dispatches the requested menu command.
     bool sessionRaceUnderway = s_currentA5
         && (int16_t)read16(s_currentA5 - 13296) >= 3
         && g_macDrivingIterations >= 30;
     if (g_sessionControlProbePhase == 0 && sessionRaceUnderway) {
+#if VETTE_SESSION_CONTROL_ITEM == 7
+        vetteInputInjectProbeKey(0x45, true);  // Escape: native Quit to Garage
+#else
         vetteInputInjectProbeKey(0x19, true);  // P
+#endif
         g_sessionControlProbePhase = 1;
     }
 #endif
@@ -6416,6 +6420,15 @@ static bool nextEvent(uint16_t mask, uint8_t* event)
         what = keyWhat;
         modifiers = (uint16_t)(keyModifiers | (buttonDown ? 0 : 0x0080));
         uint8_t character = (keyModifiers & 0x0200) ? key.shiftedCharacter : key.character;
+        // Escape's physical key already suspends the original driving loop.
+        // Once its event reaches Main, select the enabled Quit to Garage
+        // command through the normal menu dispatcher instead of exposing the
+        // hidden Macintosh menus. Leave Escape alone in other screens.
+        if (rawKey == 0x45 && keyDown && (menuKey('G') & 0xffff) == 7) {
+            key.virtualKey = 0x05; // Macintosh G
+            character = 'g';
+            modifiers |= 0x0100; // cmdKey
+        }
         message = ((uint32_t)key.virtualKey << 8) | character;
         transition = true;
     }
@@ -6475,15 +6488,18 @@ static bool validatePermanentHandle(uint8_t** handle)
 extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* userStack)
 {
 #ifdef VETTE_SESSION_CONTROL_ITEM
-    // The driving-boundary trap stops once P clears the game's driving flag.
-    // Complete the physical release at the very next Mac trap, then leave the
-    // ordered P and Command-key edges for GetNextEvent.
+    // The driving-boundary trap stops when the pause key clears the driving
+    // flag. Release it at the next Mac trap; Escape needs no extra command
+    // injection, while the other fixtures supply their Command-key edges.
     if (g_sessionControlProbePhase == 1 && s_currentA5
         && read16(s_currentA5 - 21316) == 0) {
         // Restart is disabled while the session is suspended. Its real path
         // first selects Quit to Garage (Command-G); that transition enables
         // Restart Race. Return (Command-R) and Quit (Command-Q) are immediately
         // available.
+#if VETTE_SESSION_CONTROL_ITEM == 7
+        vetteInputInjectProbeKey(0x45, false);
+#else
 #if VETTE_SESSION_CONTROL_ITEM == 5
         const uint8_t rawKey = 0x24; // G
 #elif VETTE_SESSION_CONTROL_ITEM == 8
@@ -6496,6 +6512,7 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
         vetteInputInjectProbeKey(rawKey, true);
         vetteInputInjectProbeKey(rawKey, false);
         vetteInputInjectProbeKey(0x66, false);
+#endif
         g_sessionControlProbePhase = 3;
     }
 #if VETTE_SESSION_CONTROL_ITEM == 5

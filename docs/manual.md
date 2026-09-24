@@ -18,6 +18,7 @@ automatic transmission, and accelerate. There is no separate ignition command.
 | Shift up / down | + / - |
 | Automatic / cruise control | A / C |
 | Horn / pause | Z / P |
+| Quit race to garage | Esc |
 | Sound / engine sound | S / E |
 | Buildings / damage / navigation | B / D / H |
 | Left / forward / right / helicopter view | F1 / F2 / F3 / F4 |
@@ -60,7 +61,8 @@ Courses are Zoo → Vista Point, Golden Gate Bridge → Bay Bridge, Bay Bridge �
 Zoo, and all three legs in sequence. Routes are not prescribed. Cross the
 finish **between the poles**, beneath the checkerboard.
 
-P suspends the session. Original Command-R resumes it; Restart Race is enabled
+Esc quits the current race and returns to the garage through the original
+Quit to Garage command. P suspends the session. Original Command-R resumes it; Restart Race is enabled
 after Quit to Garage, not in the paused race. Tour Mode relocates the retained
 player rather than starting another race.
 

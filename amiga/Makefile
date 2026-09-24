@@ -224,13 +224,13 @@ endif
 
 # Diagnostic only: suspend a live race with the shipped physical P edge, then
 # select one shipped File-menu session control through its real Command-key
-# equivalent. Item 5 is Restart Race, item 6 Return to Game, and item 8 Quit.
+# equivalent. Item 7 tests Escape to Garage; 5/6/8 test Restart/Return/Quit.
 ifdef SESSION_CONTROL_ITEM
 ifndef GARAGE_CLICK
 $(error SESSION_CONTROL_ITEM requires GARAGE_CLICK=1)
 endif
-ifneq ($(filter $(SESSION_CONTROL_ITEM),5 6 8),$(SESSION_CONTROL_ITEM))
-$(error SESSION_CONTROL_ITEM must be 5 (Restart), 6 (Return), or 8 (Quit))
+ifneq ($(filter $(SESSION_CONTROL_ITEM),5 6 7 8),$(SESSION_CONTROL_ITEM))
+$(error SESSION_CONTROL_ITEM must be 5 (Restart), 6 (Return), 7 (Escape to Garage), or 8 (Quit))
 endif
 EXTRA_DEFINES += -DVETTE_SESSION_CONTROL_ITEM=$(SESSION_CONTROL_ITEM)
 endif
