@@ -1815,16 +1815,21 @@ static uint32_t s_bogasVoiceEndTick[4];
 static bool s_bogasSuspended;
 static uint32_t s_bogasSuspendTick;
 
-static void stopBogasAudio()
+static void resetBogasVoices()
 {
     for (uint16_t channel = 0; channel < 4; ++channel) {
         stopBogasVoice(channel);
         s_bogasVoiceEndTick[channel] = 0;
     }
     for (uint16_t i = 0; i < 3; ++i) s_bogasContexts[i].playing = false;
-    s_bogasStarted = false;
     s_bogasSuspended = false;
     s_bogasSuspendTick = 0;
+}
+
+static void stopBogasAudio()
+{
+    resetBogasVoices();
+    s_bogasStarted = false;
 }
 
 static void suspendBogasAudio()
@@ -1833,9 +1838,9 @@ static void suspendBogasAudio()
     for (uint16_t channel = 0; channel < 4; ++channel) {
         stopBogasVoice(channel);
     }
-    // BGAS Stop/Deactivate inhibit output without freeing its three voice
-    // records or their sample positions.  Keep the corresponding Paula-side
-    // contexts and finite countdowns intact for a later Start.
+    // Inhibit output without discarding voice records. Keep the Paula-side
+    // contexts and finite countdowns for command $01 to resume; command $11
+    // instead resets them before the game loads replacement sounds.
     s_bogasSuspended = true;
     s_bogasSuspendTick = g_macTicks;
 }
@@ -5722,10 +5727,16 @@ static void setCursorDrivingAliases(uint8_t raw, bool down)
     }
 }
 
+// Retain the native quit request across the original asynchronous key scan
+// and the later menu-enabling/event-dispatch steps, including a short tap.
+static volatile bool s_escapeGaragePending;
+
 extern "C" void vetteMacRawKeyChanged(uint8_t rawKey, bool down)
 {
     KeyTranslation key;
     if (!s_currentA5 || !translateAmigaKey(rawKey, key)) return;
+    if (rawKey == 0x45 && down && read16(s_currentA5 - 21316))
+        s_escapeGaragePending = true;
     setDrivingKeyState(key.virtualKey, down);
     setCursorDrivingAliases(rawKey, down);
 }
@@ -5740,7 +5751,8 @@ static void updateDrivingInputProbe()
         && g_macDrivingIterations >= 30;
     if (g_sessionControlProbePhase == 0 && sessionRaceUnderway) {
 #if VETTE_SESSION_CONTROL_ITEM == 7
-        vetteInputInjectProbeKey(0x45, true);  // Escape: native Quit to Garage
+        vetteInputInjectProbeKey(0x45, true);  // A complete tap between game scans.
+        vetteInputInjectProbeKey(0x45, false);
 #else
         vetteInputInjectProbeKey(0x19, true);  // P
 #endif
@@ -5876,6 +5888,8 @@ static void refreshDrivingKeyMap()
         setDrivingKeyState(key.virtualKey, true);
         setCursorDrivingAliases((uint8_t)raw, true);
     }
+    if (s_escapeGaragePending && read16(s_currentA5 - 21316))
+        setDrivingKeyState(0x35, true);
 #ifdef VETTE_GARAGE_CLICK
     // The selected car begins in neutral.  Hold top-row + (upshift) in the KeyMap that
     // the original scanner is about to consume, then release it on the first
@@ -6412,19 +6426,27 @@ static bool nextEvent(uint16_t mask, uint8_t* event)
     uint8_t rawKey;
     bool keyDown;
     uint16_t keyModifiers;
+    if (!transition && s_escapeGaragePending && !read16(s_currentA5 - 21316)
+        && (mask & (1u << 3)) && (menuKey('G') & 0xffff) == 7) {
+        what = 3;
+        message = 0x0567; // Macintosh G / 'g'
+        modifiers |= 0x0100;
+        transition = true;
+        s_escapeGaragePending = false;
+    }
     while (!transition && vetteInputPopKey(rawKey, keyDown, keyModifiers)) {
         KeyTranslation key;
         uint16_t keyWhat = keyDown ? 3 : 4;
         if (!translateAmigaKey(rawKey, key)) continue;
+        if (rawKey == 0x45 && s_escapeGaragePending) continue;
         setDrivingKeyState(key.virtualKey, keyDown);
         if (!(mask & (1u << keyWhat))) continue;
         what = keyWhat;
         modifiers = (uint16_t)(keyModifiers | (buttonDown ? 0 : 0x0080));
         uint8_t character = (keyModifiers & 0x0200) ? key.shiftedCharacter : key.character;
-        // Escape's physical key already suspends the original driving loop.
-        // Once its event reaches Main, select the enabled Quit to Garage
-        // command through the normal menu dispatcher instead of exposing the
-        // hidden Macintosh menus. Leave Escape alone in other screens.
+        // Escape pressed after suspension can use the enabled garage command
+        // directly. In-race presses use the pending request above so consuming
+        // their event before menu setup cannot lose the command.
         if (rawKey == 0x45 && keyDown && (menuKey('G') & 0xffff) == 7) {
             key.virtualKey = 0x05; // Macintosh G
             character = 'g';
@@ -6613,10 +6635,16 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
         write32(userStack + 6, 0);
         return returnFromBogasTrap(frame, userStack, 2);
     }
-    if (trap == kBogasSetTrap && pc == (uint32_t)(sound + 0x21c))
+    if (trap == kBogasSetTrap && pc == (uint32_t)(sound + 0x21c)) {
+        // Command $11 resets the PCM mixer (BGAS $2AE -> $1EBC -> $27EE),
+        // clearing its active voices. It is not a no-op: race suspension and
+        // effect replacement both rely on it to silence the previous sound.
+        if (s_bogasStarted) resetBogasVoices();
         return returnFromBogasTrap(frame, userStack, 0);
+    }
     if (trap == kBogasStartTrap && pc == (uint32_t)(sound + 0x24c)) {
-        resumeBogasAudio();
+        // Command $13 inhibits PCM output while switching mixer modes.
+        suspendBogasAudio();
         return returnFromBogasTrap(frame, userStack, 0);
     }
     if (trap == kBogasStopTrap && pc == (uint32_t)(sound + 0x27c)) {
@@ -6624,7 +6652,8 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
         return returnFromBogasTrap(frame, userStack, 0);
     }
     if (trap == kBogasDeactivateTrap && pc == (uint32_t)(sound + 0x2ac)) {
-        suspendBogasAudio();
+        // Command $01 clears the inhibit set by command $03 (CODE 9+$27C).
+        resumeBogasAudio();
         return returnFromBogasTrap(frame, userStack, 0);
     }
 #if defined(VETTE_DAMAGE_REPAIR_CHECKPOINT) || defined(VETTE_TERMINAL_DAMAGE_CHECKPOINT) \

@@ -128,6 +128,20 @@ counter immediately. Direct silent output clears the pending audio interrupt
 before writing AUDxDAT. Stopped channels output digital zero. Timed events
 continue while the main thread waits for refresh.
 
+The CODE 9 wrapper names are historical; the BGAS command numbers determine
+behavior. Command $11 (CODE 9+$21C) resets PCM voices: BGAS $2AE calls
+$1EBC, which clears voice increments at $27EE and installs silent pointers at
+$3476. Command $13 (CODE 9+$24C) inhibits PCM while selecting the other mixer
+mode. Commands $03/$01 (CODE 9+$27C/$2AC) inhibit/resume output. Preserve the
+loaded instrument registry and gameplay bridge across mixer resets so later
+loads, including Return to Game and recovery cues, can start new voices.
+
+Escape's native Quit to Garage request is latched from its physical down edge
+while driving. The key map retains it until the original game suspends; the
+event bridge then delivers Command-G when that menu item becomes enabled.
+`amiga/driving_escape.gdb` checks a complete short tap and silent garage;
+`amiga/driving_session_control.gdb` also checks engine audio after resuming.
+
 ## Lifecycle
 
 Startup supports both Shell and Workbench. The Workbench startup message is

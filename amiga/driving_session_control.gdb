@@ -51,6 +51,11 @@ break *(s_segments[1].begin+0x1fd2) if $handler == g_sessionControlProbeItem
 commands
   silent
   printf "session-control resumed tick=%u item=%u handler=%u phase=%u iterations=%u race-state=%d driving-global=%u bridge=%u\n", g_macTicks, g_sessionControlProbeItem, $handler, g_sessionControlProbePhase, g_macDrivingIterations, *(signed short*)(s_currentA5-13296), *(unsigned short*)(s_currentA5-21316), s_drivingFrameStarted
+  if !s_bogasContexts[0].playing || s_bogasSuspended || (*(unsigned short*)0xdff002 & 3) != 3 || s_bogasVoiceVolume[0] == 0 || s_bogasVoiceVolume[1] == 0
+    echo FAIL resumed race engine audio\n
+  else
+    echo PASS resumed race engine audio\n
+  end
   detach
   quit
 end
