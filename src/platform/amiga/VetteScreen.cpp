@@ -475,6 +475,17 @@ void VetteScreen::setMousePositionFromVBI(int16_t x, int16_t y)
     m_cursorY = y;
 }
 
+// Pack source columns 0,2,...,14 into the left eight sprite pixels. On
+// OCS/ECS each sprite pixel spans two hires pixels, so this restores the
+// cursor's original width without changing its logical hotspot.
+static uint16_t halfWidthCursorRow(uint16_t row)
+{
+    uint16_t result = 0;
+    for (uint16_t column = 0; column < 8; ++column)
+        result |= (uint16_t)((row & (0x8000u >> (column * 2))) << column);
+    return result;
+}
+
 void VetteScreen::updateMouseSprite(bool oddField)
 {
     uint16_t* sprite = m_mouseSprite[oddField ? 1 : 0];
@@ -509,6 +520,10 @@ void VetteScreen::updateMouseSprite(bool oddField)
         uint16_t image = m_cursorImage[sourceRow];
         uint16_t mask = m_cursorMask[sourceRow];
         if (left < 0 && left > -16) { image <<= -left; mask <<= -left; }
+        if (m_hires && !AmigaHardware::hasAGAChipSet) {
+            image = halfWidthCursorRow(image);
+            mask = halfWidthCursorRow(mask);
+        }
         uint16_t black = (uint16_t)(image & mask);
         uint16_t white = (uint16_t)(~image & mask);
         uint16_t invert = (uint16_t)(image & ~mask);

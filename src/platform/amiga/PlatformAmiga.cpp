@@ -320,6 +320,9 @@ bool PlatformAmiga::run()
     // for why none of this is in a constructor.
     GfxBase = (struct GfxBase*)OpenLibrary((CONST_STRPTR)"graphics.library", 33);
     if (!GfxBase) return false;     // nothing has been changed yet, so there is nothing to undo
+    // Use the OS chipset report: OCS has no reliable DENISEID register.
+    AmigaHardware::hasAGAChipSet = GfxBase->LibNode.lib_Version >= 39
+        && (GfxBase->ChipRevBits0 & GFXF_AA_LISA) != 0;
     DOSBase = (struct DosLibrary*)OpenLibrary((CONST_STRPTR)"dos.library", 33);
     if (!DOSBase) {
         CloseLibrary((struct Library*)GfxBase);

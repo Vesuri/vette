@@ -65,10 +65,13 @@ The mouse pointer uses interlaced even/odd images in HIRES and all sixteen rows
 in lores, with coordinates offset by the crop. Crop changes preserve its physical
 screen position while adjusting Macintosh coordinates and redirected mouse
 globals together. The hotspot is clamped to the visible viewport. It updates each
-field independently of game rendering. AGA uses matching HIRES/LORES SPRRES settings. ECS cannot force
-HIRES sprites in a HIRES playfield; it retains its hardware lores sprite
-resolution. Unused sprite channels point to empty
-sprites, and sprite priority keeps the pointer in front of the playfield.
+field independently of game rendering. AGA uses matching HIRES/LORES SPRRES
+settings. OCS/ECS hires cursors sample every second source column into eight
+lores sprite pixels to preserve their proportions; ECS cannot force hires
+sprites in a hires playfield. The logical hotspot is unchanged. The chipset is
+identified through graphics.library before takeover. Unused sprite channels
+point to empty sprites, and sprite priority keeps the pointer in front of the
+playfield.
 
 Source ColorTables and Palette Manager operations determine index translation.
 Do not infer palette fixes from car identity or screenshots. The original
