@@ -5556,7 +5556,7 @@ static void presentMacRuntime()
         case 131: // opponent/difficulty
             cropLeft = 144; mouseAllowed = true; break;
         case 150: // course
-            cropTop = 32; mouseAllowed = true; break;
+            cropLeft = 64; cropTop = 32; mouseAllowed = true; break;
         }
     }
     if (!s_screenDirty && s_loudStopScreen->matchesViewport(cropLeft, cropTop)

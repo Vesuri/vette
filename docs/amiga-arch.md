@@ -50,7 +50,7 @@ viewport; it does not infer scenes from pixels or change game decisions.
 | Intro | 333 / 222 | 80, 0 |
 | Garage | 140 | 128, 24 |
 | Opponent / difficulty | 131 | 144, 0 |
-| Course | 150 | 80, 32 |
+| Course | 150 | 64, 32 |
 | In-game | 129 | 80, 0 |
 
 Other windows use 80,0. A changed viewport forces a complete C2P of its newly

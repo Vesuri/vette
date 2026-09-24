@@ -17,7 +17,7 @@ commands
  if s_screen->m_cropLeft == 144 && s_screen->m_cropTop == 0
   set $seen = $seen | 2
  end
- if s_screen->m_cropLeft == 80 && s_screen->m_cropTop == 32
+ if s_screen->m_cropLeft == 64 && s_screen->m_cropTop == 32
   set $seen = $seen | 4
  end
  continue
