@@ -30,7 +30,7 @@ DOS save. Scores are stored in `data/Vette.scores`.
 
 HIRES is a boolean WHDLoad option (`CUSTOM1=1`). Off by default, it selects
 368×283 lores with per-screen crops (see [display geometry](amiga-arch.md#display)).
-The intro crop starts at 80,0; driving starts at 80,32. Enabling HIRES restores
+The intro crop starts at 80,0; driving starts at 96,32. Enabling HIRES restores
 the complete 512×320 image in the existing interlaced display. Standalone builds
 can select the startup default with `make -C amiga HIRES=1`, without WHDLoad.
 Use `HIRES=0` (the default) for lores. Switching this option rebuilds the startup

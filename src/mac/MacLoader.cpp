@@ -5545,7 +5545,7 @@ static void presentMacRuntime()
         case 131: // opponent/difficulty
             cropLeft = 144; cropTop = 8; mouseAllowed = true; break;
         case 129: // driving
-            cropTop = 32;
+            cropLeft = 96; cropTop = 32;
             break;
         case 150: // course
             cropLeft = 64;

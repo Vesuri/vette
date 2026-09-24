@@ -27,7 +27,7 @@ break VetteScreen::presentMacFrame if g_macDrivingIterations >= 4
 continue
 printf "RESULT seen=%u state=%u driving=%u crop=%u,%u verify=%u failures=%u fillbad=%u\n",$seen,g_stageBState,g_macDrivingIterations,s_screen->m_cropLeft,s_screen->m_cropTop,g_c2pVerifyCalls,g_c2pVerifyFailures,g_fillBadPixels
 printf "MOUSE selector failures=%u driving allowed=%u\n",$mouseFailures,s_screen->m_mouseAllowed
-if $mouseFailures == 0 && !s_screen->m_mouseAllowed && $seen == 7 && g_stageBState != 3 && g_macDrivingIterations >= 4 && s_screen->m_cropLeft == 80 && s_screen->m_cropTop == 32 && g_c2pVerifyFailures == 0 && g_fillBadPixels == 0
+if $mouseFailures == 0 && !s_screen->m_mouseAllowed && $seen == 7 && g_stageBState != 3 && g_macDrivingIterations >= 4 && s_screen->m_cropLeft == 96 && s_screen->m_cropTop == 32 && g_c2pVerifyFailures == 0 && g_fillBadPixels == 0
  echo PASS dynamic crops and C2P\n
 else
  echo FAIL dynamic crops\n

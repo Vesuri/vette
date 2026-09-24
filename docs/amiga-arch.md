@@ -53,7 +53,7 @@ viewport; it does not infer scenes from pixels or change game decisions.
 | Garage | 140 | 128, 26 |
 | Opponent / difficulty | 131 | 144, 8 |
 | Course | 150 | 64, 37 |
-| In-game | 129 | 80, 32 |
+| In-game | 129 | 96, 32 |
 
 Other windows use 80,0. A changed viewport forces a complete C2P of its newly
 visible area and drops the previous crop's synchronization rectangles. VBI
