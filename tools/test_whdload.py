@@ -24,6 +24,7 @@ def main():
     p.add_argument('--seconds', type=int, default=90, help='host safety ceiling')
     p.add_argument('--ticks', type=int, default=1500, help='WHDLoad timeout in PAL fields')
     p.add_argument('--cpu', default='68020')
+    p.add_argument('--hires', action='store_true', help='enable the slave Custom1 HIRES option')
     p.add_argument('--no-preload', action='store_true')
     args = p.parse_args()
     if args.mode != 'smoke' and (not args.rom or not args.rtb):
@@ -49,7 +50,7 @@ def main():
     (boot/'s/startup-sequence').write_text(
         'DF0:C/Assign C: DF0:C\nDF0:C/Assign LIBS: DF0:Libs\n'
         'DF0:C/Assign DEVS: DH0:devs\nStack 16384\nFailAt 999\n'
-        f'CD DH1:\nWHDLoad Vette.slave {preload}SPLASHDELAY=0 NOREQ COREDUMP FILELOG TIMEOUT={args.ticks} >DH0:result\n'
+        f'CD DH1:\nWHDLoad Vette.slave {preload}CUSTOM1={int(args.hires)} SPLASHDELAY=0 NOREQ COREDUMP FILELOG TIMEOUT={args.ticks} >DH0:result\n'
         'If WARN\nEcho failed >DH0:failed\nElse\nEcho passed >DH0:passed\nEndIf\n')
     with (base/'emulator.log').open('w') as log:
         emu = subprocess.Popen(['fs-uae', '--amiga_model=A1200', '--cpu='+args.cpu,
@@ -74,7 +75,12 @@ def main():
                 files = (game/'.whdl_log').read_text(encoding='latin1')
                 for name in ('Color VETTE!', 'VETTE!.Data'):
                     assert any('[ReadOff]' in line and 'name='+name in line for line in files.splitlines()), files
-                print('PASS: timed run loaded both originals; inspect retained core for display/game state')
+                memory = (game/'.whdl_expmem').read_bytes()
+                magic = b'VET!HIRE'
+                assert memory.count(magic) == 1, 'Expected one loaded HIRES block'
+                offset = memory.index(magic) + len(magic)
+                assert memory[offset:offset+4] == bytes((0, int(args.hires), 0, 0)), 'HIRES word was not patched'
+                print(f'PASS: timed run loaded both originals; HIRES={int(args.hires)} startup word verified')
             else:
                 assert (boot/'passed').exists() and 'Return OK.' in report, report + output
                 if args.mode == 'smoke':

@@ -10,7 +10,9 @@ redistributed.
 `whdload/VetteSlave.s` uses the SDK's public-domain `kick31.s` / `kickfs.s`.
 Vette uses Exec, graphics, DOS and CIA resources, so a plain loader with no OS is
 insufficient. The slave boots Kickstart 3.1, mounts its `data` drawer as the
-emulated filesystem, and uses DOS LoadSeg on the **unchanged** Vette executable.
+emulated filesystem, and uses DOS LoadSeg on the Vette executable. Before entry, it scans the loaded hunks for the
+12-byte retained `VET!HIRE` block and patches its word at offset 8 from Custom1.
+The following reserved word must be zero; an absent/invalid block fails explicitly.
 It establishes PROGDIR using a real directory lock, switches to an allocated
 16 KiB stack with Exec StackSwap, and calls the entry point. On normal return it
 restores the stack and program directory, frees its stack, unloads the executable,
@@ -25,6 +27,11 @@ Macintosh trap vector at $28 despite WHDLoad's relocated VBR.
 F10 is WHDLoad's immediate quit. Use the game's normal Control+left-mouse exit
 to save pending score changes; abrupt WHDLoad exit cannot run the game's deferred
 DOS save. Scores are stored in `data/Vette.scores`.
+
+HIRES is a boolean WHDLoad option (`CUSTOM1=1`). Off by default, it selects
+368×288 lores using original columns 80–447 and rows 0–287. Enabling it restores
+the complete 512×320 image in the existing interlaced display. Standalone builds
+can select the startup default with `make HIRES=1` after a clean build.
 
 ## Cross-compilation
 
@@ -51,7 +58,7 @@ test slaves. `tools/test_whdload.py --mode smoke` runs without any ROM or game.
 For other modes supply `--rom /local/kick40063.A600 --rtb /local/kick40063.A600.RTB`.
 Modes `boot` and `load` exit before executing Vette. `quit` expects a clean
 `QUIT_PROBE=1` game build. `timed` runs the production or gameplay regression build
-until WHDLoad's TIMEOUT, saving COREDUMP and FILELOG. `--no-preload` tests live disk
+until WHDLoad's TIMEOUT, saving COREDUMP and FILELOG. `--hires` tests the Custom1 startup patch; `--no-preload` tests live disk
 reads. Each invocation retains an isolated fixture under `tmp/whdload-test-*`
 and terminates only its own emulator. No test configuration enters the release.
 
@@ -79,5 +86,6 @@ Two startup faults were in the slave setup, not the game:
 
 WHDLoad's own dumps isolated these faults after emulator-debugger traces proved
 misleading. `tools/inspect_whdload.py DUMP_DIR` prints waiting tasks;
-`tools/whdload_picture.py DUMP_DIR` decodes this port's planar buffers from the dump.
+`tools/whdload_picture.py DUMP_DIR` decodes the lores planar buffers from the dump;
+pass `--hires` for an interlaced run.
 These tools and all dumps are developer-only.

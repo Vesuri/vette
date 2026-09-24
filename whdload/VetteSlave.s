@@ -36,7 +36,7 @@ slv_copy dc.b "1991 Sphere, Inc.",0
 slv_info dc.b "Amiga port by Vesuri",10
         dc.b "Version 0.90 (23.09.2026)",10
         dc.b "F10 quits",0
-slv_config dc.b 0
+slv_config dc.b "C1:B:HIRES (512x320 interlaced);",0
         dc.b "$VER: Vette.slave 0.90 (23.09.2026)",0
 _program dc.b "Vette",0
 _args dc.b 10
@@ -44,6 +44,8 @@ _args dc.b 10
 
 _bootdos
         move.l (_resload,pc),a2
+        lea (_config_tags,pc),a0
+        jsr (resload_Control,a2)
         IFD BOOTONLY
         pea TDREASON_OK
         jmp (resload_Abort,a2)
@@ -67,6 +69,8 @@ _bootdos
         lea (_loadmark,pc),a0
         bsr _mark
         ENDC
+        bsr _patch_hires
+        jsr (resload_FlushCache,a2)
         ; Establish PROGDIR as a Shell would. Calling a LoadSeg entry alone
         ; does not set pr_HomeDir, which the game's resource loader uses.
         lea (_current,pc),a0
@@ -172,3 +176,43 @@ _loadmark dc.b "test-loaded",0
 _exitmark dc.b "test-returned",0
         EVEN
         ENDC
+
+; Find a complete, aligned 12-byte retained block in the LoadSeg chain.
+; The word is GAS .word (Motorola dc.w), with no executable offsets baked in.
+_patch_hires
+        move.l d7,d0
+.seg    tst.l d0
+        beq .missing
+        add.l d0,d0
+        add.l d0,d0
+        move.l d0,a0
+        move.l (-4,a0),d1
+        move.l (a0)+,d0
+        sub.l #20,d1
+        bmi .seg
+        move.l a0,a1
+        add.l d1,a1
+.scan   cmpa.l a1,a0
+        bhi .seg
+        cmp.l #$56455421,(a0)+
+        bne .scan
+        cmp.l #$48495245,(a0)
+        bne .scan
+        cmp.w #1,(4,a0)
+        bhi .scan
+        tst.w (6,a0)
+        bne .scan
+        move.l (_hires,pc),d1
+        sne d1
+        and.w #1,d1
+        move.w d1,(4,a0)
+        rts
+.missing
+        pea (_config_missing,pc)
+        pea TDREASON_FAILMSG
+        jmp (resload_Abort,a2)
+_config_missing dc.b "Vette HIRES configuration block missing or invalid.",0
+        EVEN
+_config_tags dc.l WHDLTAG_CUSTOM1_GET
+_hires dc.l 0
+        dc.l 0

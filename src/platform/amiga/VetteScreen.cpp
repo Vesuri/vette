@@ -16,6 +16,7 @@
 #include "mac/MacLoader.h"
 
 extern "C" {
+extern volatile uint16_t vette_hires_value;
 #ifdef VETTE_C2P_ASM
 void vetteC2PRectAsm(const uint8_t* source, uint8_t* destination,
                      const uint32_t* table, uint16_t groups, uint16_t rows);
@@ -145,7 +146,7 @@ static void initializePairToPlanes()
  * and DIWSTOP's H field drops bit 8 (the hardware forces it), so 417 -> 0xA1 as well.
  * Vertical.  192 field lines centred at line 172: VSTART=76=$4C, VSTOP=268=$10C.
  *
- * ⚠ DDF IS NOT THE SAME FORMULA IN HIRES.  DDFSTRT = (HSTART - 9) / 2 holds for both, but
+ * ⚠ DDF IS NOT THE SAME FORMULA IN HIRES.  DDFSTRT = (HSTART - 9) / 2 for hires, (HSTART - 17) / 2 for lores;
  * the fetch step is 4 colour clocks per word in hires and 8 in lores, so
  * DDFSTOP = DDFSTRT + 4*(words - 2).  (Amiga Hardware Reference Manual ch. 3, §Telling the
  * System How to Fetch and Display Data: the normal pairs are $38/$D0 lores, $3C/$D4 hires.)
@@ -217,6 +218,12 @@ static_assert(VS_DIWHIGH == ((((VS_HSTOP & 0x100) ? 0x2000 : 0) | (((VS_VSTOP >>
  * framework now uses: (interlace ? 2 : 1) * rowBytes - bytesPerRow. */
 #define VS_BPLMOD   (2 * VetteScreen::kRowStride - VetteScreen::kBytesPerRow)
 
+static_assert(VetteScreen::kLoresLeft % 16 == 0 && VetteScreen::kLoresWidth % 16 == 0,
+              "lores crop must be word aligned");
+static_assert(0x00d8 == 0x0028 + 8 * (VetteScreen::kLoresWidth / 16 - 1),
+              "lores DDF must fetch exactly the cropped width");
+static_assert(312 - 24 == VetteScreen::kLoresHeight, "lores PAL window height");
+
 // Copper-list layout. Pointers come first so DMA sees complete addresses before
 // the display opens. Every sprite pointer is owned: sprite 0 uses the cursor,
 // while channels 1..7 share a cleared zero-height sprite. Sprite 0 uses colours
@@ -228,9 +235,9 @@ static_assert(VS_DIWHIGH == ((((VS_HSTOP & 0x100) ? 0x2000 : 0) | (((VS_VSTOP >>
 #define VS_CL_END        (VS_CL_SPRCOLORS + 3)
 #define VS_CL_LONGS  (VS_CL_END + 1)
 
-// One interlaced field displays eight of the cursor's sixteen rows. Layout is
-// two control words, eight DATA/DATB pairs, and the mandatory zero terminator.
-static const uint16_t kMouseSpriteFieldRows = 8;
+// Allocate all sixteen cursor rows for lores; hires uses eight per field.
+// Include the control pair and a mandatory zero terminator.
+static const uint16_t kMouseSpriteFieldRows = 16;
 static const uint32_t kMouseSpriteBytes = (kMouseSpriteFieldRows + 2) * 4;
 // Match Rescue on Fractalus's Sprite::allocate(0): control pair plus a zero
 // terminator, both cleared, so DMA cannot walk beyond the null object.
@@ -251,6 +258,7 @@ static uint32_t rotXorChecksum(const uint8_t* p, uint32_t n)
 
 bool VetteScreen::initialize(const uint8_t* picture, const uint16_t* palette16)
 {
+    m_hires = vette_hires_value != 0;
     initializePairToPlanes();
     // ⚠ The picture MUST live in chip RAM: FS-UAE runs this port with --fast_memory=8192, so
     // a linked-in blob lands in fast RAM, which the display DMA cannot reach.  The failure is
@@ -338,19 +346,22 @@ bool VetteScreen::initialize(const uint8_t* picture, const uint16_t* palette16)
 
 void VetteScreen::writeModeRegisters()
 {
+    // Lores: window (97,24)..(465,312), 23 fetched words from x=80.
+    // Word-aligned pointers expose exactly x=80..447 without scrolling.
+    // Both modes have HSTOP/VSTOP bit 8 set (DIWHIGH=$2100).
     // ⭐⭐ ONE PLACE, ONE TIME.  Nothing else in the port writes any of these.
     *fmodePointer   = 0x0000;      // OCS fetch mode, so an AGA machine behaves like an A500
-    *bplcon0Pointer = VS_BPLCON0;
-    *bplcon1Pointer = 0x0000;      // no scroll
+    *bplcon0Pointer = m_hires ? VS_BPLCON0 : 0x4201;
+    *bplcon1Pointer = 0; // no scrolling in either mode
     *bplcon2Pointer = VS_BPLCON2;  // all sprite pairs in front of both playfields
-    *bplcon3Pointer = 0x0c80;      // AGA HIRES sprites, palette bank 0
-    *diwstrtPointer = VS_DIWSTRT;
-    *diwstopPointer = VS_DIWSTOP;
+    *bplcon3Pointer = m_hires ? 0x0c80 : 0x0c40; // AGA SPRRES: hires / lores (ECS ignores these bits)
+    *diwstrtPointer = m_hires ? VS_DIWSTRT : 0x1861;
+    *diwstopPointer = m_hires ? VS_DIWSTOP : 0x38d1;
     *diwhighPointer = VS_DIWHIGH;  // ⚠ must be written, not inherited -- see above
-    *ddfstrtPointer = VS_DDFSTRT;
-    *ddfstopPointer = VS_DDFSTOP;
-    *bpl1modPointer = VS_BPLMOD;
-    *bpl2modPointer = VS_BPLMOD;
+    *ddfstrtPointer = m_hires ? VS_DDFSTRT : 0x0028;
+    *ddfstopPointer = m_hires ? VS_DDFSTOP : 0x00d8;
+    *bpl1modPointer = m_hires ? VS_BPLMOD : kRowStride - kLoresWidth / 8;
+    *bpl2modPointer = m_hires ? VS_BPLMOD : kRowStride - kLoresWidth / 8;
 }
 
 void VetteScreen::vbiUpdate(bool install)
@@ -374,9 +385,10 @@ void VetteScreen::vbiUpdate(bool install)
 
     // COPJMP1 below makes this list serve the CURRENT field, independent of
     // CPU speed. LOF names that field: long = even rows, short = odd rows.
-    bool oddField = !AmigaHardware::isLongFrame();
+    bool oddField = m_hires && !AmigaHardware::isLongFrame();
     uint32_t base = (uint32_t)m_chip;
     if (oddField) base += kRowStride;
+    if (!m_hires) base += kMacTop * kRowStride + kLoresLeft / 8;
 
     for (uint16_t k = 0; k < kPlanes; k++) {
         uint32_t p = base + (uint32_t)k * kBytesPerRow;
@@ -444,17 +456,21 @@ void VetteScreen::updateMouseSprite(bool oddField)
     uint16_t* sprite = m_mouseSprite[oddField ? 1 : 0];
     if (!sprite) return;
 
-    int16_t left = (int16_t)(m_cursorX - m_cursorHotX);
-    int16_t top = (int16_t)(kMacTop + m_cursorY - m_cursorHotY);
-    uint16_t firstSourceRow = (uint16_t)(((top & 1) == (oddField ? 1 : 0)) ? 0 : 1);
-    int16_t firstScreenRow = (int16_t)(top + firstSourceRow);
-    bool visible = m_cursorVisible && left < (int16_t)kWidth
-        && left + 16 > 0 && firstScreenRow >= 0
-        && firstScreenRow + 14 < (int16_t)kHeight;
-
-    uint16_t hstart = (uint16_t)(VS_HSTART + (left > 0 ? left : 0) / 2);
-    uint16_t vstart = (uint16_t)(VS_VSTART + firstScreenRow / 2);
-    uint16_t vstop = (uint16_t)(vstart + kMouseSpriteFieldRows);
+    int16_t left = (int16_t)(m_cursorX - m_cursorHotX - (m_hires ? 0 : kLoresLeft));
+    int16_t top = (int16_t)((m_hires ? kMacTop : 0) + m_cursorY - m_cursorHotY);
+    uint16_t shift = m_hires ? 1 : 0;
+    uint16_t step = (uint16_t)(1u << shift);
+    uint16_t firstSourceRow = m_hires && ((top & 1) != (oddField ? 1 : 0)) ? 1 : 0;
+    while (firstSourceRow < 16 && top + firstSourceRow < 0) firstSourceRow += step;
+    uint16_t rows = 0;
+    int16_t height = m_hires ? kHeight : kLoresHeight;
+    while (firstSourceRow + (rows << shift) < 16
+           && top + firstSourceRow + (rows << shift) < height) ++rows;
+    bool visible = m_cursorVisible && left < (m_hires ? (int16_t)kWidth : (int16_t)kLoresWidth)
+        && left + 16 > 0 && rows;
+    uint16_t hstart = (uint16_t)((m_hires ? VS_HSTART : 97) + ((left > 0 ? left : 0) >> shift));
+    uint16_t vstart = (uint16_t)((m_hires ? VS_VSTART : 24) + ((top + firstSourceRow) >> shift));
+    uint16_t vstop = (uint16_t)(vstart + rows);
     uint8_t* control = (uint8_t*)sprite;
     control[0] = visible ? (uint8_t)vstart : 0;
     control[1] = visible ? (uint8_t)(hstart >> 1) : 0;
@@ -463,10 +479,11 @@ void VetteScreen::updateMouseSprite(bool oddField)
                                    | ((vstop >> 8) & 1) << 1
                                    | (hstart & 1)) : 0;
 
-    for (uint16_t fieldRow = 0; fieldRow < kMouseSpriteFieldRows; ++fieldRow) {
-        uint16_t sourceRow = (uint16_t)(firstSourceRow + fieldRow * 2);
+    for (uint16_t fieldRow = 0; fieldRow < rows; ++fieldRow) {
+        uint16_t sourceRow = (uint16_t)(firstSourceRow + (fieldRow << shift));
         uint16_t image = m_cursorImage[sourceRow];
         uint16_t mask = m_cursorMask[sourceRow];
+        if (left < 0 && left > -16) { image <<= -left; mask <<= -left; }
         uint16_t black = (uint16_t)(image & mask);
         uint16_t white = (uint16_t)(~image & mask);
         uint16_t invert = (uint16_t)(image & ~mask);
@@ -475,6 +492,8 @@ void VetteScreen::updateMouseSprite(bool oddField)
         sprite[3 + fieldRow * 2] = (uint16_t)(white | invert);
     }
 
+    sprite[2 + rows * 2] = sprite[3 + rows * 2] = 0;
+
     // Select this field's sprite before its DMA fetches begin in blanking.
     uint32_t pointer = (uint32_t)sprite;
     m_copper[VS_CL_SPRITES] = copperMove(spr1pth, (uint16_t)(pointer >> 16));
@@ -482,7 +501,7 @@ void VetteScreen::updateMouseSprite(bool oddField)
 }
 
 #ifdef VETTE_FILLWATCH
-static void validateConvertedFrame(const uint8_t* chunky, const uint8_t* planar)
+static void validateConvertedFrame(const uint8_t* chunky, const uint8_t* planar, bool hires)
 {
     static uint16_t nextRow = 0;
     bool bad = false;
@@ -498,6 +517,9 @@ static void validateConvertedFrame(const uint8_t* chunky, const uint8_t* planar)
         for (uint16_t x = 0; x < VetteScreen::kWidth; ++x) {
             uint8_t packed = source[x >> 1];
             uint8_t expected = (x & 1) ? (packed & 15) : (packed >> 4);
+            // Lores must leave the initial black bytes outside its crop untouched.
+            if (!hires && (x < VetteScreen::kLoresLeft || x >= VetteScreen::kLoresRight
+                           || y >= VetteScreen::kLoresHeight)) expected = 0;
             uint8_t mask = (uint8_t)(0x80u >> (x & 7));
             uint8_t actual = 0;
             for (uint16_t plane = 0; plane < VetteScreen::kPlanes; ++plane)
@@ -591,6 +613,12 @@ bool VetteScreen::presentMacFrame(const uint8_t* chunky, const uint8_t* colorTab
         if (rectangle.right > (int16_t)kWidth) rectangle.right = kWidth;
         rectangle.left &= (int16_t)~15;
         rectangle.right = (int16_t)((rectangle.right + 15) & ~15);
+        // Clip AFTER alignment so neither edge converts outside the lores crop.
+        if (!m_hires) {
+            if (rectangle.left < kLoresLeft) rectangle.left = kLoresLeft;
+            if (rectangle.right > kLoresRight) rectangle.right = kLoresRight;
+            if (rectangle.bottom > kLoresHeight) rectangle.bottom = kLoresHeight;
+        }
         if (rectangle.top >= rectangle.bottom || rectangle.left >= rectangle.right) continue;
 
         // Horizontal C2P alignment can make two source rectangles overlap.
@@ -663,19 +691,18 @@ bool VetteScreen::presentMacFrame(const uint8_t* chunky, const uint8_t* colorTab
 #endif
         for (uint16_t rectangle = 0; rectangle < normalizedCount; ++rectangle) {
             const DirtyRect& dirty = normalized[rectangle];
-            uint16_t firstWord = (uint16_t)dirty.left / 16;
-            uint16_t finalWord = (uint16_t)dirty.right / 16;
-            uint16_t groups = (uint16_t)((finalWord - firstWord) * 2);
+            uint16_t firstByte = (uint16_t)dirty.left / 8;
+            uint16_t groups = (uint16_t)(dirty.right - dirty.left) / 8;
 #ifdef VETTE_C2P_ASM
             const uint8_t* rectangleSource = chunky + (uint32_t)dirty.top * (kWidth / 2)
                                            + (uint16_t)dirty.left / 2;
             uint8_t* rectangleDestination = m_back
                                           + (uint32_t)(dirty.top + kMacTop) * kRowStride
-                                          + firstWord * 2;
+                                          + firstByte;
 #ifdef VETTE_C2P_SPLIT
             uint8_t* fastDestination = s_c2pSplitFast
                                      + (uint32_t)(dirty.top + kMacTop) * kRowStride
-                                     + firstWord * 2;
+                                     + firstByte;
             uint32_t splitStart = vetteProfileBeamEpoch();
 #endif
 #ifdef VETTE_C2P_VERIFY
@@ -704,7 +731,7 @@ bool VetteScreen::presentMacFrame(const uint8_t* chunky, const uint8_t* colorTab
                 const uint8_t* source = chunky + (uint32_t)y * (kWidth / 2)
                                       + (uint16_t)dirty.left / 2;
                 uint8_t* destination = m_back + (uint32_t)(y + kMacTop) * kRowStride
-                                     + firstWord * 2;
+                                     + firstByte;
 #ifdef VETTE_C2P_ASM
 #ifdef VETTE_C2P_VERIFY
                 for (uint16_t plane = 0; plane < kPlanes; ++plane)
@@ -758,7 +785,7 @@ bool VetteScreen::presentMacFrame(const uint8_t* chunky, const uint8_t* colorTab
     // Rolling validation is intentionally diagnostic: it proves that dirty
     // synchronization plus the converted rectangle leave the back buffer an
     // exact planar encoding of the game's complete 4-bit chunky surface.
-    validateConvertedFrame(chunky, m_back);
+    validateConvertedFrame(chunky, m_back, m_hires);
 #endif
     ++g_macFramesQueued;
     m_framePending = true;

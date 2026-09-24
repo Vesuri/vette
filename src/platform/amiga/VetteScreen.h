@@ -37,6 +37,10 @@ public:
     static const uint16_t kHeight = 384;
     static const uint16_t kMacHeight = 320;
     static const uint16_t kMacTop = (kHeight - kMacHeight) / 2;
+    static const uint16_t kLoresLeft = 80;
+    static const uint16_t kLoresWidth = 368;
+    static const uint16_t kLoresRight = kLoresLeft + kLoresWidth;
+    static const uint16_t kLoresHeight = 288;
     static const uint16_t kPlanes = 4;
     static const uint16_t kBytesPerRow = kWidth / 8;                 // 64
     static const uint16_t kRowStride   = kBytesPerRow * kPlanes;     // 256, interleaved
@@ -83,6 +87,7 @@ public:
     uint32_t pictureChecksum() const { return m_checksum; }
 
 private:
+    bool m_hires = false; // Snapshotted from the loader word at startup.
     void writeModeRegisters();
     void updateMouseSprite(bool oddField);
 

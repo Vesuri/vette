@@ -51,6 +51,14 @@
  disable that Tooltype if there is insufficient memory to cache the files.
 
 
+ Display:
+ --------
+ HIRES is off by default: 368x288 lores shows columns 80-447 and rows 0-287
+ of the original image. Enable HIRES in WHDLoad's options (CUSTOM1=1) for
+ the full 512x320 image in an interlaced display. AGA uses hires sprites in
+ HIRES mode; ECS retains lores sprites in this screen mode.
+
+
  Quitting:
  ---------
  Control + left mouse button quits normally and saves pending score changes.

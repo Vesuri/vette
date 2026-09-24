@@ -23,10 +23,15 @@ remain in the shipped instructions.
 
 `src/platform/amiga/VetteScreen.*` owns the custom display registers.
 
-- PAL 512×384, high-resolution interlace, four bitplanes / 16 colors.
-- The game's 512×320 surface is centered vertically with 32-row margins.
+- Four bitplanes / 16 colors, selected once from the retained HIRES word.
+- HIRES: PAL 512×384 interlaced; the 512×320 game has 32-row vertical margins.
+- Default lores: 368×288, original columns 80–447 and rows 0–287. Fetch 46 bytes
+  per plane from row 32, byte 10; modulo 210 advances one 256-byte bitmap row.
+  DIW is (97,24)..(465,312), DDF $28..$d8, with no horizontal scroll.
+- Lores C2P and dirty synchronization touch only that crop; both assembly and
+  C conversion retain the full source/destination strides.
 - Each row has four consecutive 64-byte planes: 256-byte interleaved stride.
-- Double-buffered chip-memory bitmaps and copper lists; fixed 512-pixel fetch.
+- Double-buffered chip-memory bitmaps and copper lists.
 - Explicit dirty-rectangle list (up to 32), normalized to C2P alignment.
   No shadow framebuffer, tile cache or full-screen pixel comparison.
 - The back buffer inherits uncovered rectangles changed in the previous update
@@ -36,8 +41,11 @@ remain in the shipped instructions.
   during blanking; never edit active pointer words mid-field.
 - Copper/plane/sprite publication comes first in the VBI, before input and audio.
 
-The mouse pointer uses interlaced even/odd hardware-sprite images and is updated
-each field independently of game rendering. Unused sprite channels point to empty
+The mouse pointer uses interlaced even/odd images in HIRES and all sixteen rows
+in lores, with coordinates offset by the crop. It updates each field independently
+of game rendering. AGA uses matching HIRES/LORES SPRRES settings. ECS cannot force
+HIRES sprites in a HIRES playfield; it retains its hardware lores sprite
+resolution. Unused sprite channels point to empty
 sprites, and sprite priority keeps the pointer in front of the playfield.
 
 Source ColorTables and Palette Manager operations determine index translation.

@@ -162,6 +162,13 @@ endif
 EXTRA_DEFINES += -DVETTE_C2P_SPLIT
 endif
 
+# Startup default only: WHDLoad Custom1 overrides this retained word before entry.
+HIRES ?= 0
+ifneq ($(filter $(HIRES),0 1),$(HIRES))
+$(error HIRES must be 0 or 1)
+endif
+obj/StartupConfig.o: ASFLAGS += --defsym VETTE_HIRES=$(HIRES)
+
 # `make PROBES=1` — the sub-frame timing accumulators, read via the gdb stub (amiga/diag_run.sh).
 # OFF by default: the probes read chip registers several times per iteration, which is exactly
 # what a framerate build must not do.  ⚠ NEVER quote a framerate from a PROBES build.
