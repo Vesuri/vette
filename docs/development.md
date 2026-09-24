@@ -28,7 +28,9 @@ make dist
 
 Outputs are `amiga/out/Vette.exe`, `build/whdload/Vette.slave` and
 `dist/Vette-0.90.lha`. The production build needs no copyrighted game input.
-Always clean when changing build flags or shared headers.
+Use `make -C amiga HIRES=1` for a standalone hires-interlaced executable, or
+`HIRES=0` for lores. This option automatically updates an existing build.
+Always clean when changing other build flags or shared headers.
 
 ## Running a development build
 

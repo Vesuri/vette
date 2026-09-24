@@ -2,6 +2,7 @@
 #
 # Usage (from amiga/ with the toolchain on PATH via `. env.sh`):
 #   make                 build out/Vette.exe
+#   make HIRES=1         default to hires interlaced, including standalone launches
 #   make clean           remove obj/ and out/
 #   make PROBES=1        + the timing probes (diag_run.sh needs this)
 #   make FPSCOUNT=1      the HONEST framerate build: one counter, no probe instrumentation
@@ -595,6 +596,17 @@ LDFLAGS   = -Wl,--emit-relocs,--gc-sections,-Ttext=0,-Map=$(OUT).map \
 .PHONY: all clean muldiv-audit probe-audit
 
 all: $(OUT).exe
+
+# Track this loader-patchable word independently of compiler flags. A forced
+# rebuild handles even back-to-back mode changes within one clock tick.
+ifneq ($(shell cat obj/hires.config 2>/dev/null),$(HIRES))
+.PHONY: obj/StartupConfig.o $(OUT).elf $(OUT).exe
+endif
+
+obj/StartupConfig.o: $(AMIGA_SRC)/StartupConfig.s
+	@mkdir -p obj
+	@$(AS) $(ASFLAGS) -o $@ "$(AMIGA_SRC)/StartupConfig.s"
+	@printf '%s\n' '$(HIRES)' > obj/hires.config
 
 $(OUT).exe: $(OUT).elf
 	$(info Elf2Hunk $@)

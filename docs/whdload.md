@@ -32,7 +32,9 @@ HIRES is a boolean WHDLoad option (`CUSTOM1=1`). Off by default, it selects
 368×288 lores with per-screen crops (see [display geometry](amiga-arch.md#display)).
 The intro and driving crop starts at 80,0. Enabling HIRES restores
 the complete 512×320 image in the existing interlaced display. Standalone builds
-can select the startup default with `make HIRES=1` after a clean build.
+can select the startup default with `make -C amiga HIRES=1`, without WHDLoad.
+Use `HIRES=0` (the default) for lores. Switching this option rebuilds the startup
+word automatically; no clean build is needed.
 
 ## Cross-compilation
 
