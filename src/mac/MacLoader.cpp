@@ -309,6 +309,7 @@ struct WindowSlot {
     uint8_t title[256];
     uint8_t* titleMaster;
     int16_t procID;
+    int16_t resourceID; // Original WIND/DLOG identity, retained for presentation.
     uint8_t** palette;
     bool paletteUpdates;
     bool updating;
@@ -2256,6 +2257,7 @@ static uint8_t* newColorWindow(int16_t id, uint8_t* storage, uint8_t* behind)
     if (!slot) return 0;
     slot->used = true;
     slot->dialog = false;
+    slot->resourceID = id;
     slot->palette = 0;
     slot->paletteUpdates = false;
     slot->updating = false;
@@ -2312,6 +2314,7 @@ static uint8_t* newDialog(int16_t id, uint8_t* storage, uint8_t* behind)
     if (!slot) return 0;
     slot->used = true;
     slot->dialog = true;
+    slot->resourceID = id;
     slot->palette = 0;
     slot->paletteUpdates = false;
     slot->updating = false;
@@ -5539,9 +5542,22 @@ static void paceMacFrame(uint16_t stream)
 
 static void presentMacRuntime()
 {
-    if (!s_screenDirty || !s_loudStopScreen) return;
+    if (!s_loudStopScreen) return;
+    uint16_t cropLeft = 80, cropTop = 0;
+    // Color 1.02's actual WIND identities, observed at GetNewCWindow and
+    // retained by the Window Manager. Intro, driving and other windows use
+    // the default crop. This changes presentation only, never game decisions.
+    WindowSlot* front = windowSlot(s_windowList);
+    if (front && !front->dialog) {
+        switch (front->resourceID) {
+        case 140: cropLeft = 128; cropTop = 24; break; // garage
+        case 131: cropLeft = 144; break;               // opponent/difficulty
+        case 150: cropTop = 32; break;                // course
+        }
+    }
+    if (!s_screenDirty && s_loudStopScreen->matchesViewport(cropLeft, cropTop)) return;
     bool presented = s_loudStopScreen->presentMacFrame(
-        s_colorScreen, s_windowManagerColors, s_dirtyRects, s_dirtyRectCount);
+        s_colorScreen, s_windowManagerColors, s_dirtyRects, s_dirtyRectCount, cropLeft, cropTop);
     if (presented) {
         s_screenDirty = false;
         s_pixelsDirty = false;
@@ -6086,7 +6102,7 @@ static void refreshDrivingKeyMap()
 #endif
 }
 
-static int16_t addClampedMouseDelta(int16_t value, int8_t delta, int16_t maximum)
+static int16_t addClampedMouseDelta(int16_t value, int16_t delta, int16_t maximum)
 {
     int16_t changed = (int16_t)(value + delta);
     if (changed < 0) return 0;
@@ -6100,33 +6116,39 @@ extern "C" void vetteMacMouseVBI()
     uint8_t counterX = (uint8_t)counters;
     uint8_t counterY = (uint8_t)(counters >> 8);
     bool buttonDown = AmigaHardware::isLeftMouseButtonPressed();
-    if (!s_mouseInitialized) {
-        s_mouseCounterX = counterX;
-        s_mouseCounterY = counterY;
-        s_mouseInitialized = true;
-    } else {
-        int8_t deltaX = (int8_t)(counterX - s_mouseCounterX);
-        int8_t deltaY = (int8_t)(counterY - s_mouseCounterY);
-        s_mouseX = addClampedMouseDelta(s_mouseX, deltaX, 511);
-        s_mouseY = addClampedMouseDelta(s_mouseY, deltaY, 319);
-        if (s_currentA5 && (deltaX || deltaY)) {
-            const int16_t verticals[] = {
-                kShadowMTempV, kShadowRawMouseV, kShadowMouseV
-            };
-            const int16_t horizontals[] = {
-                kShadowMTempH, kShadowRawMouseH, kShadowMouseH
-            };
-            for (uint16_t i = 0; i < 3; ++i) {
-                volatile uint16_t* v = (volatile uint16_t*)(s_currentA5 + verticals[i]);
-                volatile uint16_t* h = (volatile uint16_t*)(s_currentA5 + horizontals[i]);
-                *v = (uint16_t)addClampedMouseDelta((int16_t)*v, deltaY, 479);
-                *h = (uint16_t)addClampedMouseDelta((int16_t)*h, deltaX, 639);
-            }
-        }
-        if (deltaX || deltaY) ++g_mouseVBIMoves;
-        s_mouseCounterX = counterX;
-        s_mouseCounterY = counterY;
+    int16_t deltaX = 0, deltaY = 0;
+    if (s_mouseInitialized) {
+        deltaX = (int8_t)(counterX - s_mouseCounterX);
+        deltaY = (int8_t)(counterY - s_mouseCounterY);
     }
+    s_mouseInitialized = true;
+    s_mouseCounterX = counterX;
+    s_mouseCounterY = counterY;
+    int16_t oldX = s_mouseX, oldY = s_mouseY;
+    int16_t x = oldX, y = oldY;
+    if (s_loudStopScreen)
+        s_loudStopScreen->updateMouseCoordinates(x, y, deltaX, deltaY);
+    else {
+        x = addClampedMouseDelta(x, deltaX, 511);
+        y = addClampedMouseDelta(y, deltaY, 319);
+    }
+    s_mouseX = x;
+    s_mouseY = y;
+    // Include viewport motion and edge clamping in all redirected Mac mouse
+    // globals, keeping GetMouse/EventRecord and the hardware sprite aligned.
+    deltaX = x - oldX;
+    deltaY = y - oldY;
+    if (s_currentA5 && (deltaX || deltaY)) {
+        const int16_t verticals[] = { kShadowMTempV, kShadowRawMouseV, kShadowMouseV };
+        const int16_t horizontals[] = { kShadowMTempH, kShadowRawMouseH, kShadowMouseH };
+        for (uint16_t i = 0; i < 3; ++i) {
+            volatile uint16_t* v = (volatile uint16_t*)(s_currentA5 + verticals[i]);
+            volatile uint16_t* h = (volatile uint16_t*)(s_currentA5 + horizontals[i]);
+            *v = (uint16_t)addClampedMouseDelta((int16_t)*v, deltaY, 479);
+            *h = (uint16_t)addClampedMouseDelta((int16_t)*h, deltaX, 639);
+        }
+    }
+    if (deltaX || deltaY) ++g_mouseVBIMoves;
     if (s_currentA5 && s_mouseGlobalsA5 != s_currentA5) {
         // Mouse sampling begins as soon as the Amiga screen is live, before
         // the Macintosh A5 world exists. Initialize its redirected globals on

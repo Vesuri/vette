@@ -53,8 +53,10 @@
 
  Display:
  --------
- HIRES is off by default: 368x288 lores shows columns 80-447 and rows 0-287
- of the original image. Enable HIRES in WHDLoad's options (CUSTOM1=1) for
+ HIRES is off by default: 368x288 lores follows each screen's useful area.
+ Crop origins are 80,0 for intro/driving, 128,24 for the garage, 144,0 for
+ opponent selection and 80,32 for course selection. The mouse follows the
+ visible area. Enable HIRES in WHDLoad's options (CUSTOM1=1) for
  the full 512x320 image in an interlaced display. AGA uses hires sprites in
  HIRES mode; ECS retains lores sprites in this screen mode.
 

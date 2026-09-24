@@ -63,7 +63,16 @@ public:
     // interleaved planes.  The completed frame is swapped in by vbiUpdate(), so
     // the copper never scans a half-converted picture.
     bool presentMacFrame(const uint8_t* chunky, const uint8_t* colorTable,
-                         const DirtyRect* dirtyRects, uint16_t dirtyRectCount);
+                         const DirtyRect* dirtyRects, uint16_t dirtyRectCount,
+                         uint16_t cropLeft = kLoresLeft, uint16_t cropTop = 0);
+
+    bool matchesViewport(uint16_t left, uint16_t top) const {
+        return m_hires || (m_cropLeft == left && m_cropTop == top);
+    }
+
+    // VBI-only: preserve physical pointer position across viewport changes,
+    // apply hardware movement, and clamp the hotspot to the displayed area.
+    void updateMouseCoordinates(int16_t& x, int16_t& y, int16_t dx, int16_t dy);
 
     // Publish the Macintosh cursor shape/state to Amiga sprite 0. Physical
     // position is sampled by the VBI independently of game/Toolbox polling.
@@ -87,6 +96,10 @@ public:
     uint32_t pictureChecksum() const { return m_checksum; }
 
 private:
+    uint16_t m_cropLeft = kLoresLeft, m_cropTop = 0;
+    uint16_t m_nextCropLeft = kLoresLeft, m_nextCropTop = 0;
+    uint16_t m_mouseCropLeft = kLoresLeft, m_mouseCropTop = 0;
+    bool m_mouseCoordinatesInitialized = false;
     bool m_hires = false; // Snapshotted from the loader word at startup.
     void writeModeRegisters();
     void updateMouseSprite(bool oddField);

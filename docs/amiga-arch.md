@@ -25,8 +25,9 @@ remain in the shipped instructions.
 
 - Four bitplanes / 16 colors, selected once from the retained HIRES word.
 - HIRES: PAL 512×384 interlaced; the 512×320 game has 32-row vertical margins.
-- Default lores: 368×288, original columns 80–447 and rows 0–287. Fetch 46 bytes
-  per plane from row 32, byte 10; modulo 210 advances one 256-byte bitmap row.
+- Default lores: 368×288 with a window-specific origin in the 512×320 game
+  surface (table below). Fetch 46 bytes per plane from `(32 + top) * 256 + left/8`;
+  modulo 210 advances one 256-byte bitmap row.
   DIW is (97,24)..(465,312), DDF $28..$d8, with no horizontal scroll.
 - Lores C2P and dirty synchronization touch only that crop; both assembly and
   C conversion retain the full source/destination strides.
@@ -41,9 +42,27 @@ remain in the shipped instructions.
   during blanking; never edit active pointer words mid-field.
 - Copper/plane/sprite publication comes first in the VBI, before input and audio.
 
+The Window Manager retains the original WIND resource ID to choose the lores
+viewport; it does not infer scenes from pixels or change game decisions.
+
+| Screen | WIND | Crop left, top |
+| --- | --- | --- |
+| Intro | 333 / 222 | 80, 0 |
+| Garage | 140 | 128, 24 |
+| Opponent / difficulty | 131 | 144, 0 |
+| Course | 150 | 80, 32 |
+| In-game | 129 | 80, 0 |
+
+Other windows use 80,0. A changed viewport forces a complete C2P of its newly
+visible area and drops the previous crop's synchronization rectangles. VBI
+publishes the new bitmap and origin together; the cursor uses that same origin.
+Bytes outside the current crop retain their previous contents.
+
 The mouse pointer uses interlaced even/odd images in HIRES and all sixteen rows
-in lores, with coordinates offset by the crop. It updates each field independently
-of game rendering. AGA uses matching HIRES/LORES SPRRES settings. ECS cannot force
+in lores, with coordinates offset by the crop. Crop changes preserve its physical
+screen position while adjusting Macintosh coordinates and redirected mouse
+globals together. The hotspot is clamped to the visible viewport. It updates each
+field independently of game rendering. AGA uses matching HIRES/LORES SPRRES settings. ECS cannot force
 HIRES sprites in a HIRES playfield; it retains its hardware lores sprite
 resolution. Unused sprite channels point to empty
 sprites, and sprite priority keeps the pointer in front of the playfield.

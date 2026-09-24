@@ -101,6 +101,12 @@ The runner stops early when an event-driven observer finishes. Otherwise its
 seconds argument is a safety ceiling, not proof of success. It preserves output
 in `amiga/.run/gdb-out.log` and stops only the emulator it owns.
 
+For lores crop transitions and C2P verification, build cleanly with
+`PROBES=1 VERIFY=1 FILLWATCH=1 SKIP_INTRO=1 GARAGE_CLICK=1`, then run
+`GDBSCRIPT=viewport_verify.gdb EXTRA_ARGS="--warp_mode=1" ./diag_run.sh 55`
+from `amiga/`. Require `PASS dynamic crops and C2P`; the time limit alone is not
+success. The observer checks all selectors and the return to the driving crop.
+
 Useful reusable observers include `frame_pacing.gdb`, `intro_probe.gdb`,
 `driving_phase_profile.gdb`, `memory_requirements.gdb`, `memory_driving.gdb`,
 `wbstartup.gdb` and the C2P/mapped-copy/driving-copy verification scripts.

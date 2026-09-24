@@ -29,7 +29,8 @@ to save pending score changes; abrupt WHDLoad exit cannot run the game's deferre
 DOS save. Scores are stored in `data/Vette.scores`.
 
 HIRES is a boolean WHDLoad option (`CUSTOM1=1`). Off by default, it selects
-368×288 lores using original columns 80–447 and rows 0–287. Enabling it restores
+368×288 lores with per-screen crops (see [display geometry](amiga-arch.md#display)).
+The intro and driving crop starts at 80,0. Enabling HIRES restores
 the complete 512×320 image in the existing interlaced display. Standalone builds
 can select the startup default with `make HIRES=1` after a clean build.
 

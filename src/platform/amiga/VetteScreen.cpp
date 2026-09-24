@@ -346,8 +346,8 @@ bool VetteScreen::initialize(const uint8_t* picture, const uint16_t* palette16)
 
 void VetteScreen::writeModeRegisters()
 {
-    // Lores: window (97,24)..(465,312), 23 fetched words from x=80.
-    // Word-aligned pointers expose exactly x=80..447 without scrolling.
+    // Lores: window (97,24)..(465,312), 23 fetched words per plane.
+    // Word-aligned pointers select each scene's 368-pixel crop without scrolling.
     // Both modes have HSTOP/VSTOP bit 8 set (DIWHIGH=$2100).
     // ⭐⭐ ONE PLACE, ONE TIME.  Nothing else in the port writes any of these.
     *fmodePointer   = 0x0000;      // OCS fetch mode, so an AGA machine behaves like an A500
@@ -379,6 +379,8 @@ void VetteScreen::vbiUpdate(bool install)
         uint8_t* oldFront = m_chip;
         m_chip = m_back;
         m_back = oldFront;
+        m_cropLeft = m_nextCropLeft;
+        m_cropTop = m_nextCropTop;
         for (uint16_t i = 0; i < 16; ++i)
             m_copper[VS_CL_COLORS + i] = copperMove(color00 + i * 2, m_nextPalette[i]);
     }
@@ -388,7 +390,7 @@ void VetteScreen::vbiUpdate(bool install)
     bool oddField = m_hires && !AmigaHardware::isLongFrame();
     uint32_t base = (uint32_t)m_chip;
     if (oddField) base += kRowStride;
-    if (!m_hires) base += kMacTop * kRowStride + kLoresLeft / 8;
+    if (!m_hires) base += (uint32_t)(kMacTop + m_cropTop) * kRowStride + m_cropLeft / 8;
 
     for (uint16_t k = 0; k < kPlanes; k++) {
         uint32_t p = base + (uint32_t)k * kBytesPerRow;
@@ -445,6 +447,27 @@ void VetteScreen::setMouseCursor(const uint8_t* cursor, int16_t x, int16_t y,
     Enable();
 }
 
+void VetteScreen::updateMouseCoordinates(int16_t& x, int16_t& y, int16_t dx, int16_t dy)
+{
+    int16_t left = m_hires ? 0 : m_cropLeft;
+    int16_t top = m_hires ? 0 : m_cropTop;
+    if (m_mouseCoordinatesInitialized) {
+        dx += left - m_mouseCropLeft;
+        dy += top - m_mouseCropTop;
+    }
+    m_mouseCoordinatesInitialized = true;
+    m_mouseCropLeft = left;
+    m_mouseCropTop = top;
+    int16_t right = left + (m_hires ? kWidth : kLoresWidth) - 1;
+    int16_t bottom = top + (m_hires ? kMacHeight : kLoresHeight) - 1;
+    x += dx;
+    y += dy;
+    if (x < left) x = left;
+    if (x > right) x = right;
+    if (y < top) y = top;
+    if (y > bottom) y = bottom;
+}
+
 void VetteScreen::setMousePositionFromVBI(int16_t x, int16_t y)
 {
     m_cursorX = x;
@@ -456,8 +479,8 @@ void VetteScreen::updateMouseSprite(bool oddField)
     uint16_t* sprite = m_mouseSprite[oddField ? 1 : 0];
     if (!sprite) return;
 
-    int16_t left = (int16_t)(m_cursorX - m_cursorHotX - (m_hires ? 0 : kLoresLeft));
-    int16_t top = (int16_t)((m_hires ? kMacTop : 0) + m_cursorY - m_cursorHotY);
+    int16_t left = (int16_t)(m_cursorX - m_cursorHotX - (m_hires ? 0 : m_cropLeft));
+    int16_t top = (int16_t)((m_hires ? (int16_t)kMacTop : -(int16_t)m_cropTop) + m_cursorY - m_cursorHotY);
     uint16_t shift = m_hires ? 1 : 0;
     uint16_t step = (uint16_t)(1u << shift);
     uint16_t firstSourceRow = m_hires && ((top & 1) != (oddField ? 1 : 0)) ? 1 : 0;
@@ -501,25 +524,22 @@ void VetteScreen::updateMouseSprite(bool oddField)
 }
 
 #ifdef VETTE_FILLWATCH
-static void validateConvertedFrame(const uint8_t* chunky, const uint8_t* planar, bool hires)
+static void validateConvertedFrame(const uint8_t* chunky, const uint8_t* planar, bool hires, uint16_t cropLeft, uint16_t cropTop)
 {
     static uint16_t nextRow = 0;
     bool bad = false;
-    // Decode eight complete rows per frame.  Forty successive frames therefore
-    // audit every one of the 163,840 pixels without turning the diagnostic into
-    // the dominant workload on a 68020.
+    // Decode eight visible rows per frame: a complete lores crop in 36
+    // frames, or the full HIRES game image in 40, without dominating runtime.
     for (uint16_t checked = 0; checked < 8; ++checked) {
-        uint16_t y = nextRow++;
-        if (nextRow == VetteScreen::kMacHeight) nextRow = 0;
+        uint16_t y = (hires ? 0 : cropTop) + nextRow++;
+        if (nextRow >= (hires ? VetteScreen::kMacHeight : VetteScreen::kLoresHeight)) nextRow = 0;
         const uint8_t* source = chunky + (uint32_t)y * (VetteScreen::kWidth / 2);
         const uint8_t* row = planar
             + (uint32_t)(y + VetteScreen::kMacTop) * VetteScreen::kRowStride;
-        for (uint16_t x = 0; x < VetteScreen::kWidth; ++x) {
+        for (uint16_t x = hires ? 0 : cropLeft;
+             x < (hires ? VetteScreen::kWidth : cropLeft + VetteScreen::kLoresWidth); ++x) {
             uint8_t packed = source[x >> 1];
             uint8_t expected = (x & 1) ? (packed & 15) : (packed >> 4);
-            // Lores must leave the initial black bytes outside its crop untouched.
-            if (!hires && (x < VetteScreen::kLoresLeft || x >= VetteScreen::kLoresRight
-                           || y >= VetteScreen::kLoresHeight)) expected = 0;
             uint8_t mask = (uint8_t)(0x80u >> (x & 7));
             uint8_t actual = 0;
             for (uint16_t plane = 0; plane < VetteScreen::kPlanes; ++plane)
@@ -571,7 +591,8 @@ static bool rectanglesMergeLosslessly(const VetteScreen::DirtyRect& a,
 }
 
 bool VetteScreen::presentMacFrame(const uint8_t* chunky, const uint8_t* colorTable,
-                                  const DirtyRect* dirtyRects, uint16_t dirtyRectCount)
+                                  const DirtyRect* dirtyRects, uint16_t dirtyRectCount,
+                                  uint16_t cropLeft, uint16_t cropTop)
 {
     if (!chunky || !colorTable || !m_back) return false;
     if (m_framePending) {
@@ -603,6 +624,21 @@ bool VetteScreen::presentMacFrame(const uint8_t* chunky, const uint8_t* colorTab
     return true;
 #endif
 
+    // A newly exposed area may never have been converted. Rebuild the whole
+    // new viewport, then publish its origin with the completed buffer in VBI.
+    if (cropLeft > kWidth - kLoresWidth || cropTop > kMacHeight - kLoresHeight
+        || (cropLeft & 15)) return false;
+    DirtyRect fullCrop = { (int16_t)cropTop, (int16_t)cropLeft,
+                          (int16_t)(cropTop + kLoresHeight),
+                          (int16_t)(cropLeft + kLoresWidth) };
+    if (!matchesViewport(cropLeft, cropTop)) {
+        dirtyRects = &fullCrop;
+        dirtyRectCount = 1;
+        // The full new crop supersedes any pending synchronization. Never
+        // carry rectangles from the old crop into the new conversion bounds.
+        m_syncRectCount = 0;
+    }
+
     DirtyRect normalized[kMaxDirtyRects];
     uint16_t normalizedCount = 0;
     for (uint16_t i = 0; i < dirtyRectCount && i < kMaxDirtyRects; ++i) {
@@ -615,9 +651,10 @@ bool VetteScreen::presentMacFrame(const uint8_t* chunky, const uint8_t* colorTab
         rectangle.right = (int16_t)((rectangle.right + 15) & ~15);
         // Clip AFTER alignment so neither edge converts outside the lores crop.
         if (!m_hires) {
-            if (rectangle.left < kLoresLeft) rectangle.left = kLoresLeft;
-            if (rectangle.right > kLoresRight) rectangle.right = kLoresRight;
-            if (rectangle.bottom > kLoresHeight) rectangle.bottom = kLoresHeight;
+            if (rectangle.left < fullCrop.left) rectangle.left = fullCrop.left;
+            if (rectangle.right > fullCrop.right) rectangle.right = fullCrop.right;
+            if (rectangle.top < fullCrop.top) rectangle.top = fullCrop.top;
+            if (rectangle.bottom > fullCrop.bottom) rectangle.bottom = fullCrop.bottom;
         }
         if (rectangle.top >= rectangle.bottom || rectangle.left >= rectangle.right) continue;
 
@@ -784,9 +821,11 @@ bool VetteScreen::presentMacFrame(const uint8_t* chunky, const uint8_t* colorTab
 #ifdef VETTE_FILLWATCH
     // Rolling validation is intentionally diagnostic: it proves that dirty
     // synchronization plus the converted rectangle leave the back buffer an
-    // exact planar encoding of the game's complete 4-bit chunky surface.
-    validateConvertedFrame(chunky, m_back, m_hires);
+    // exact planar encoding of the visible part of the 4-bit chunky surface.
+    validateConvertedFrame(chunky, m_back, m_hires, cropLeft, cropTop);
 #endif
+    m_nextCropLeft = cropLeft;
+    m_nextCropTop = cropTop;
     ++g_macFramesQueued;
     m_framePending = true;
     return true;
