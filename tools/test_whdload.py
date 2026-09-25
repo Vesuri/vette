@@ -29,19 +29,19 @@ def main():
     args = p.parse_args()
     if args.mode != 'smoke' and (not args.rom or not args.rtb):
         p.error('--rom and --rtb are required except for smoke mode')
-    slave = {'smoke':'Smoke.slave', 'boot':'BootTest.slave', 'load':'LoadTest.slave'}.get(args.mode, 'Vette.slave')
+    slave = {'smoke':'Smoke.slave', 'boot':'BootTest.slave', 'load':'LoadTest.slave'}.get(args.mode, 'Vette!.slave')
     base = Path(tempfile.mkdtemp(prefix='whdload-test-', dir=ROOT/'tmp'))
     print('Fixture:', base, flush=True)
     boot, game = base/'boot', base/'game'
     for d in (boot/'s', boot/'devs/Kickstarts', game/'data', base/'state'):
         d.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(args.whdload, game/'WHDLoad')
-    shutil.copyfile(ROOT/'build/whdload'/slave, game/'Vette.slave')
+    shutil.copyfile(ROOT/'build/whdload'/slave, game/'Vette!.slave')
     if args.mode != 'smoke':
         shutil.copyfile(args.rom, boot/'devs/Kickstarts'/args.rom.name)
         shutil.copyfile(args.rtb, boot/'devs/Kickstarts'/(args.rom.name+'.RTB'))
     if args.mode in ('load', 'quit', 'timed'):
-        shutil.copyfile(args.exe, game/'data/Vette')
+        shutil.copyfile(args.exe, game/'data/Vette!')
     if args.mode in ('quit', 'timed'):
         subprocess.run(['bash', '-c', '. ./stage_original_data.sh; stage_vette_original_data "$1"',
                         'stage', str(game/'data')], cwd=ROOT/'amiga', check=True)
@@ -50,7 +50,7 @@ def main():
     (boot/'s/startup-sequence').write_text(
         'DF0:C/Assign C: DF0:C\nDF0:C/Assign LIBS: DF0:Libs\n'
         'DF0:C/Assign DEVS: DH0:devs\nStack 16384\nFailAt 999\n'
-        f'CD DH1:\nWHDLoad Vette.slave {preload}CUSTOM1={int(args.hires)} SPLASHDELAY=0 NOREQ COREDUMP FILELOG TIMEOUT={args.ticks} >DH0:result\n'
+        f'CD DH1:\nWHDLoad Vette!.slave {preload}CUSTOM1={int(args.hires)} SPLASHDELAY=0 NOREQ COREDUMP FILELOG TIMEOUT={args.ticks} >DH0:result\n'
         'If WARN\nEcho failed >DH0:failed\nElse\nEcho passed >DH0:passed\nEndIf\n')
     with (base/'emulator.log').open('w') as log:
         emu = subprocess.Popen(['fs-uae', '--amiga_model=A1200', '--cpu='+args.cpu,

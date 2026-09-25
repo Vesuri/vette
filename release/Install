@@ -60,23 +60,23 @@
      (abort "Original game data could not be installed. Check the archive, free disk space and any existing game files. See the helper's error message for details."))))
 (complete 90)
 (copyfiles
-  (source (tackon #source "Vette"))
+  (source (tackon #source "Vette!"))
   (dest #data)
   (help @copyfiles-help))
 (copyfiles
-  (source (tackon #source "Vette.slave"))
+  (source (tackon #source "Vette!.slave"))
   (dest #dest)
   (help @copyfiles-help))
 (copyfiles
-  (source (tackon #source "Vette.inf"))
+  (source (tackon #source "Vette!.inf"))
   (dest #dest)
-  (newname "Vette.info")
+  (newname "Vette!.info")
   (help @copyfiles-help))
 ; Keep these explicit, as in the WHDLoad install template.
 (tooltype
-  (dest (tackon #dest "Vette"))
+  (dest (tackon #dest "Vette!"))
   (setdefaulttool "WHDLoad")
-  (settooltype "Slave" "Vette.slave")
+  (settooltype "Slave" "Vette!.slave")
   (settooltype "PreLoad" "")
   (setstack 10240)
   (noposition))

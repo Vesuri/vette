@@ -47,10 +47,10 @@ filenames. The small slave is always reassembled, avoiding stale build options.
 
 `make dist` builds the production game, slave and native extraction helper, then
 creates `dist/Vette-0.90.lha`. Installer sets the game icon's default tool to
-WHDLoad, with `SLAVE=Vette.slave` and `PRELOAD`.
+WHDLoad, with `SLAVE=Vette!.slave` and `PRELOAD`.
 The archive follows the released Rescue on Fractalus conventions: `Vette! Install`
-drawer, `Vette.inf` game-icon template, lowercase `.slave`, and `ReadMe` with its
-MultiView `ReadMe.info`. Installer creates `Vette!/Vette.info` and copies ReadMe
+drawer, `Vette!.inf` game-icon template, lowercase `.slave`, and `ReadMe` with its
+MultiView `ReadMe.info`. Installer creates `Vette!/Vette!.info` and copies ReadMe
 with its icon. The game, installer and readme artwork comes from that reference;
 the package drawer artwork is the WHDLoad template's drawer.
 

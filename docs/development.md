@@ -26,7 +26,7 @@ make -C whdload
 make dist
 ```
 
-Outputs are `amiga/out/Vette.exe`, `build/whdload/Vette.slave` and
+Outputs are `amiga/out/Vette.exe`, `build/whdload/Vette!.slave` and
 `dist/Vette-0.91.lha`. The production build needs no copyrighted game input.
 Use `make -C amiga HIRES=1` for a standalone hires-interlaced executable, or
 `HIRES=0` for lores. This option automatically updates an existing build.

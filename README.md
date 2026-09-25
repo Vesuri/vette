@@ -21,7 +21,7 @@ Network play is not supported.
 The release is `Vette-0.91.lha`. Open its **Vette! Install** drawer and run
 **Install**. Select the destination, temporary drawer and your
 `VETTE__1.02_and_extras.sit` archive. Leave that archive compressed; the included
-helper extracts and validates the required data. Start the installed **Vette** icon.
+helper extracts and validates the required data. Start the installed **Vette!** icon.
 
 No original game code/data, Kickstart image or WHDLoad binary is distributed.
 See [the release ReadMe](release/ReadMe) for supported ROM filenames and full

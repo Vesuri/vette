@@ -5,7 +5,7 @@ VASM ?= $(HOME)/.local/vasmm68k_mot
 OUT := ../build/whdload
 
 .PHONY: all test smoke boot-test load-test FORCE
-all: $(OUT)/Vette.slave
+all: $(OUT)/Vette!.slave
 test: $(OUT)/VetteTest.slave
 smoke: $(OUT)/Smoke.slave
 boot-test: $(OUT)/BootTest.slave
@@ -21,7 +21,7 @@ $(OUT)/VetteTest.slave: VASMFLAGS += -DTEST=1
 
 # Reassemble the small slave on every invocation: SDK includes and assembler
 # options must never leave an old diagnostic slave in a release package.
-$(OUT)/Vette.slave $(OUT)/VetteTest.slave $(OUT)/BootTest.slave $(OUT)/LoadTest.slave: VetteSlave.s FORCE
+$(OUT)/Vette!.slave $(OUT)/VetteTest.slave $(OUT)/BootTest.slave $(OUT)/LoadTest.slave: VetteSlave.s FORCE
 	@mkdir -p $(OUT)/include/lvo
 	@for lib in dos exec graphics expansion; do ln -sf "$(NDK)/lvo/$${lib}_lib.i" "$(OUT)/include/lvo/$$lib.i"; done
 	$(VASM) -m68020 -pic -x -devpac -Fhunkexe -nosym $(VASMFLAGS) -I$(OUT)/include -I"$(WHDLOAD)/Include" -I"$(WHDLOAD)/Src/sources" -I"$(NDK)" -o $@ $<

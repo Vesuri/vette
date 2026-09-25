@@ -51,8 +51,8 @@ def main():
             (dest/"data").mkdir(parents=True)
             subprocess.run([str(build/"VetteInstallData"),str(ROOT/"tmp/VETTE__1.02_and_extras.sit"),str(dest/"data"),str(base/"scratch")],check=True)
         for source,name in ((installer,"Installer"),(build/"VetteInstallData.exe","VetteInstallData"),
-                (build/"test-icon.exe","IconTest"),(ROOT/"amiga/out/Vette.exe","Vette"),
-                (ROOT/"build/whdload/Vette.slave","Vette.slave"),
+                (build/"test-icon.exe","IconTest"),(ROOT/"amiga/out/Vette.exe","Vette!"),
+                (ROOT/"build/whdload/Vette!.slave","Vette!.slave"),
                 (Path.home()/".local/share/amiga/WHDLoad/C/WHDLoad","WHDLoad"),
                 (ROOT/"release/ReadMe","ReadMe"),
                 (ROOT/"tools/install-data/COPYING.LIB","LICENSE.LGPL.txt")):
@@ -71,7 +71,7 @@ def main():
         script=script.replace('(while (< (P_TempSpace)', '(textfile (dest "DH2:space.txt") (append ("device=%s disk=%ld usable=%ld memory=%s" (getdevice #temp) (getdiskspace #temp) (P_TempSpace) (database "total-mem"))))\n(while (< (P_TempSpace)')
         script=replace_form(script,"(exit)",'(exit (quiet))')
         (boot/"Install").write_text(script); (boot/"Install.info").write_bytes(installer_icon())
-        (boot/"Vette.inf").write_bytes(installer_icon(game=True))
+        (boot/"Vette!.inf").write_bytes(installer_icon(game=True))
         (boot/"GameTemplate.info").write_bytes(installer_icon(game=True))
         (boot/"ReadMe.info").write_bytes(readme_icon())
         (boot/"Package").mkdir()
@@ -103,9 +103,9 @@ def main():
                     space=(base/"space.txt").read_text()
                     assert 'device=RAM disk=0' in space,space
                     assert int(space.split('usable=')[1].split()[0])>=12582912,space
-                assert (dest/"data/Vette").read_bytes()==(boot/"Vette").read_bytes(), report
-                assert (dest/"Vette.slave").read_bytes()==(boot/"Vette.slave").read_bytes(), report
-                assert (dest/"Vette.info").exists(),report
+                assert (dest/"data/Vette!").read_bytes()==(boot/"Vette!").read_bytes(), report
+                assert (dest/"Vette!.slave").read_bytes()==(boot/"Vette!.slave").read_bytes(), report
+                assert (dest/"Vette!.info").exists(),report
                 assert (base/"installed-icon-ok").exists(), "Installed WHDLoad icon failed native validation"
                 assert dest.with_suffix(".info").exists(),report
                 assert (dest/"ReadMe").read_bytes()==(boot/"ReadMe").read_bytes(), report

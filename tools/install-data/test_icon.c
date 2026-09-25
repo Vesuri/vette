@@ -58,13 +58,13 @@ int amiga_main(void) {
         if(ok && (f=Open((CONST_STRPTR)"DH2:icon-ok",MODE_NEWFILE))) { Write(f,(APTR)"OK\n",3); Close(f); }
         /* Called again after Installer: check its configured game icon too. */
         if(ok) {
-            BPTR lock=Lock((CONST_STRPTR)"DH2:out/Vette!/Vette.info",ACCESS_READ);
+            BPTR lock=Lock((CONST_STRPTR)"DH2:out/Vette!/Vette!.info",ACCESS_READ);
             if(lock) {
                 UnLock(lock);
-                icon=GetDiskObject((CONST_STRPTR)"DH2:out/Vette!/Vette");
+                icon=GetDiskObject((CONST_STRPTR)"DH2:out/Vette!/Vette!");
                 ok=icon && icon->do_Type==WBPROJECT && icon->do_StackSize==10240
                     && equal((const char *)icon->do_DefaultTool,"WHDLoad")
-                    && equal((const char *)FindToolType(icon->do_ToolTypes,(CONST_STRPTR)"SLAVE"),"Vette.slave")
+                    && equal((const char *)FindToolType(icon->do_ToolTypes,(CONST_STRPTR)"SLAVE"),"Vette!.slave")
                     && FindToolType(icon->do_ToolTypes,(CONST_STRPTR)"PRELOAD");
                 if(icon) FreeDiskObject(icon);
                 if(ok && (f=Open((CONST_STRPTR)"DH2:installed-icon-ok",MODE_NEWFILE))) {

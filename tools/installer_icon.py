@@ -14,7 +14,7 @@ def readme_icon():
 
 def installer_icon(game=False):
     if game:
-        # Distributed as Vette.inf, renamed and configured by Installer, exactly
+        # Distributed as Vette!.inf, renamed and configured by Installer, exactly
         # as RoF.inf in the reference package. No synthetic replacement artwork.
         return template_icon('game.inf.b64')
     data = template_icon('install.info.b64')

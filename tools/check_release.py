@@ -8,7 +8,7 @@ from pathlib import Path
 from package_release import ORIGINAL_HASHES, PREFIX, crc16
 from installer_icon import installer_icon, readme_icon
 
-REQUIRED = {"Vette", "Vette.slave", "Vette.inf", "VetteInstallData", "Install", "Install.info", "ReadMe", "ReadMe.info", "LICENSE.LGPL.txt"}
+REQUIRED = {"Vette!", "Vette!.slave", "Vette!.inf", "VetteInstallData", "Install", "Install.info", "ReadMe", "ReadMe.info", "LICENSE.LGPL.txt"}
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
@@ -43,24 +43,24 @@ def main():
         payloads[name] = data
         pos += packed
     assert raw[pos:] == b"\0" and set(payloads) == REQUIRED | {'@drawer'}, "wrong archive contents"
-    for name in ("Vette", "VetteInstallData", "Vette.slave"):
+    for name in ("Vette!", "VetteInstallData", "Vette!.slave"):
         assert payloads[name][:4] == b"\0\0\3\xf3", "not an Amiga HUNK executable"
-    assert b'WHDLOADS' in payloads['Vette.slave'], 'missing WHDLoad slave header'
-    for name, kind in (("Vette.inf", 4), ("ReadMe.info", 4), ("Install.info", 4), ('@drawer', 2)):
+    assert b'WHDLOADS' in payloads['Vette!.slave'], 'missing WHDLoad slave header'
+    for name, kind in (("Vette!.inf", 4), ("ReadMe.info", 4), ("Install.info", 4), ('@drawer', 2)):
         assert payloads[name][:4] == b"\xe3\x10\0\1" and payloads[name][48] == kind
     assert b"$VER: Install 0.90 (23.09.2026)" in payloads["Install"]
     assert b'APPNAME=Vette!\0' in payloads['Install.info']
     assert b'Rescue on Fractalus' not in payloads['Install.info']
-    assert payloads['Vette.inf'] == installer_icon(game=True)
+    assert payloads['Vette!.inf'] == installer_icon(game=True)
     assert payloads['ReadMe.info'] == readme_icon() and b'MultiView\0' in payloads['ReadMe.info']
-    assert b'(settooltype "Slave" "Vette.slave")' in payloads['Install']
+    assert b'(settooltype "Slave" "Vette!.slave")' in payloads['Install']
     assert b'(settooltype "PreLoad" "")' in payloads['Install']
     assert b'(set #dest (tackon #parent "Vette!"))' in payloads['Install']
     assert b' Requirements:\n -------------' in payloads['ReadMe']
     root = Path(__file__).resolve().parent.parent
     version = (root / 'VERSION').read_text().strip().encode('ascii')
-    assert b'$VER: Vette! ' + version + b' (' in payloads['Vette'], 'wrong game version'
-    assert b'$VER: Vette.slave ' + version + b' (' in payloads['Vette.slave'], 'wrong slave version'
+    assert b'$VER: Vette! ' + version + b' (' in payloads['Vette!'], 'wrong game version'
+    assert b'$VER: Vette!.slave ' + version + b' (' in payloads['Vette!.slave'], 'wrong slave version'
     assert payloads['ReadMe'] == (root / 'release/ReadMe').read_bytes()
     assert payloads['LICENSE.LGPL.txt'] == (root / 'tools/install-data/COPYING.LIB').read_bytes()
     assert b'helper tool only' in payloads['ReadMe']

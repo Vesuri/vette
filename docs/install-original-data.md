@@ -8,12 +8,12 @@ drawer, and creates:
 
 ```text
 Vette!/
-  Vette.slave
-  Vette.info          WHDLoad icon: SLAVE=Vette.slave, PRELOAD
+  Vette!.slave
+  Vette!.info          WHDLoad icon: SLAVE=Vette!.slave, PRELOAD
   ReadMe
   ReadMe.info
   data/
-    Vette             unchanged game executable
+    Vette!            game executable
     Color VETTE!      original application resource fork
     VETTE!.Data       original game-data resource fork
     Vette.scores      created when changed scores are saved on normal exit
@@ -71,7 +71,7 @@ Do not use the unidentified NDIF checksum as a validation gate.
 ## Release archive
 
 `make dist` produces `dist/Vette-0.90.lha`, with a `Vette! Install` drawer
-and sibling drawer icon. It contains the game executable, slave, `Vette.inf`
+and sibling drawer icon. It contains the game executable, slave, `Vette!.inf`
 icon template, extraction helper, Install with its icon, ReadMe with its icon,
 and `LICENSE.LGPL.txt` without an icon. The LGPL text applies only to the helper
 and remains in the release drawer; Installer does not copy it.
