@@ -58,6 +58,9 @@ def main():
     assert b'(set #dest (tackon #parent "Vette!"))' in payloads['Install']
     assert b' Requirements:\n -------------' in payloads['ReadMe']
     root = Path(__file__).resolve().parent.parent
+    version = (root / 'VERSION').read_text().strip().encode('ascii')
+    assert b'$VER: Vette! ' + version + b' (' in payloads['Vette'], 'wrong game version'
+    assert b'$VER: Vette.slave ' + version + b' (' in payloads['Vette.slave'], 'wrong slave version'
     assert payloads['ReadMe'] == (root / 'release/ReadMe').read_bytes()
     assert payloads['LICENSE.LGPL.txt'] == (root / 'tools/install-data/COPYING.LIB').read_bytes()
     assert b'helper tool only' in payloads['ReadMe']

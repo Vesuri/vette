@@ -18,7 +18,7 @@ Network play is not supported.
   Allow extra memory for the host system and PRELOAD.
 - Installer V43+, 3 MB destination space and 12 MB temporary space.
 
-The release is `Vette-0.90.lha`. Open its **Vette! Install** drawer and run
+The release is `Vette-0.91.lha`. Open its **Vette! Install** drawer and run
 **Install**. Select the destination, temporary drawer and your
 `VETTE__1.02_and_extras.sit` archive. Leave that archive compressed; the included
 helper extracts and validates the required data. Start the installed **Vette** icon.
@@ -56,7 +56,7 @@ and an LH5-capable LHa encoder.
 make dist
 ```
 
-This builds `dist/Vette-0.90.lha` without original game data. Tool paths, tests
+This builds `dist/Vette-0.91.lha` without original game data. Tool paths, tests
 and local emulator setup are documented in [development.md](docs/development.md).
 The [documentation index](docs/README.md) covers architecture and data formats.
 

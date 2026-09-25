@@ -39,7 +39,7 @@ help:
 	@echo "  make install-data-helper       standalone Unix installer for the original .sit"
 	@echo "  make install-data-helper-amiga standalone Amiga installer (no dependencies)"
 	@echo "  make install-data-test         original archive and corruption regression tests"
-	@echo "  make dist                     clean production build + Vette-0.90.lha"
+	@echo "  make dist                     clean production build + Vette-0.91.lha"
 	@echo "  make release-check            static/coverage/smoke, deterministic build, LHA audit"
 	@echo "  make fidelity-check  gate the completed local fidelity evidence set"
 	@echo "  make driving-sequence-compare  compare saved MAME/Amiga driving frames"
