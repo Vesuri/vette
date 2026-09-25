@@ -1,5 +1,5 @@
 ; Vette! WHDLoad installation. Standard Commodore Installer V43 or newer.
-; $VER: Install 0.90 (23.09.2026)
+; $VER: Install 0.91 (25.09.2026)
 (set @app-name "Vette!")
 (if (< @installer-version (* 43 65536))
   (abort "This installation requires Amiga Installer 43 or newer."))
@@ -30,34 +30,65 @@
     (prompt "Where should Vette! be installed? A Vette! drawer will be created here.")
     (help "Choose a hard disk drawer with at least 3 MB free for the game and its original data.")
     (default @default-dest)))
-(set #temp
-  (askdir
-    (prompt "Select a temporary drawer with at least 12 MB free.")
-    (help "Allow 12 MB free. T: normally uses RAM; choose a hard disk drawer if RAM is insufficient. Temporary files are removed when finished.")
-    (default "T:")))
-(while (< (P_TempSpace) 12582912)
-  ((message "The temporary drawer needs 12 MB free. Please select a hard disk drawer or free some space." (all))
-   (set #temp
-     (askdir
-       (prompt "Select a temporary drawer with at least 12 MB free.")
-       (help "Choose an existing hard disk drawer. Temporary files are removed when finished.")
-       (default #temp)))))
-(set #archive
-  (askfile
-    (prompt "Select the downloaded VETTE__1.02_and_extras.sit archive.")
-    (help "Choose VETTE__1.02_and_extras.sit downloaded from the Vette! page at Macintosh Repository. Leave it compressed.")
-    (default "VETTE__1.02_and_extras.sit")))
 (set #dest (tackon #parent "Vette!"))
 (set #data (tackon #dest "data"))
+(if (exists #dest)
+  ((set #remove-existing
+     (askbool
+       (prompt ("The drawer \"%s\" already exists. Remove it, including saved scores, before installing?" #dest))
+       (help "Remove deletes the whole Vette! drawer, including saved scores. Keep updates the installation in place.")
+       (choices "Remove" "Keep")
+       (default 0)))
+   (if #remove-existing
+     (delete #dest (all) (infos) (optional "force") (help @delete-help)))))
+(set #install-data 1)
+(if (and (= (exists (tackon #data "Color VETTE!")) 1)
+         (= (exists (tackon #data "VETTE!.Data")) 1))
+  (set #install-data
+    (askbool
+      (prompt "The original game data files are already installed. Reinstall them or use the existing files?")
+      (help "Use existing skips the archive and temporary drawer questions. Reinstall extracts fresh data from your downloaded archive. Saved scores are kept.")
+      (choices "Reinstall" "Use existing")
+      (default 0))))
 (makedir #dest (infos) (help @makedir-help))
 (makedir #data (help @makedir-help))
 (complete 10)
-(if (= @pretend 0)
-  ((working "Extracting and checking the game data. This may take several minutes. Temporary files are removed when finished.")
-   (set #result
-     (run ("\"%s\" \"%s\" \"%s\" \"%s\"" (tackon #source "VetteInstallData") #archive #data #temp)))
-   (if (<> #result 0)
-     (abort "Original game data could not be installed. Check the archive, free disk space and any existing game files. See the helper's error message for details."))))
+(if #install-data
+  (
+    (set #temp
+      (askdir
+        (prompt "Select a temporary drawer with at least 12 MB free.")
+        (help "Allow 12 MB free. T: normally uses RAM; choose a hard disk drawer if RAM is insufficient. Temporary files are removed when finished.")
+        (default "T:")))
+    (while (< (P_TempSpace) 12582912)
+      ((message "The temporary drawer needs 12 MB free. Please select a hard disk drawer or free some space." (all))
+       (set #temp
+         (askdir
+           (prompt "Select a temporary drawer with at least 12 MB free.")
+           (help "Choose an existing hard disk drawer. Temporary files are removed when finished.")
+           (default #temp)))))
+    (set #archive
+      (askfile
+        (prompt "Select the downloaded VETTE__1.02_and_extras.sit archive.")
+        (help "Choose VETTE__1.02_and_extras.sit downloaded from the Vette! page at Macintosh Repository. Leave it compressed.")
+        (default "VETTE__1.02_and_extras.sit")))
+    (if (= @pretend 0)
+      ((working "Extracting and checking the game data. This may take several minutes. Temporary files are removed when finished.")
+       ; Extract into a fresh drawer: the helper deliberately preserves existing
+       ; originals. Publish replacements only after extraction has succeeded.
+       (set #attempt 0)
+       (set #stage (tackon #temp (".vette-data-%ld" #attempt)))
+       (while (exists #stage)
+         ((set #attempt (+ #attempt 1))
+          (set #stage (tackon #temp (".vette-data-%ld" #attempt)))))
+       (set #result
+         (run ("\"%s\" \"%s\" \"%s\" \"%s\"" (tackon #source "VetteInstallData") #archive #stage #temp)))
+       (if (<> #result 0)
+         ((if (exists #stage) (delete #stage (all) (optional "force")))
+          (abort "Original game data could not be installed. Check the archive and free disk space. Existing data files have not been replaced. See the helper's error message for details.")))
+       (copyfiles (source (tackon #stage "Color VETTE!")) (dest #data) (help @copyfiles-help))
+       (copyfiles (source (tackon #stage "VETTE!.Data")) (dest #data) (help @copyfiles-help))
+       (delete #stage (all) (optional "force"))))))
 (complete 90)
 (copyfiles
   (source (tackon #source "Vette!"))

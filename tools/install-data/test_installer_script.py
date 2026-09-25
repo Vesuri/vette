@@ -35,6 +35,10 @@ def main():
     installer=Path(sys.argv[1]).resolve()
     temp_path = 'RAM:' if '--ram-temp' in sys.argv else 'T:' if '--t-temp' in sys.argv else 'DH2:scratch'
     temp_work = temp_path + ('' if temp_path.endswith(':') else '/') + '.vette-install-00'
+    fresh = '--fresh' in sys.argv
+    remove = '--remove' in sys.argv
+    reinstall = '--reinstall' in sys.argv
+    install_data = fresh or remove or reinstall
     build=ROOT/"build/install-data"
     subprocess.run(["make","-C",str(ROOT/"tools/install-data"),"all","amiga"],check=True)
     subprocess.run(["m68k-amiga-elf-gcc","-O2","-m68000","-nostdlib","-Wno-volatile-register-var",
@@ -45,11 +49,20 @@ def main():
         base=Path(temp); boot=base/"boot"; (boot/"s").mkdir(parents=True)
         (base/"state").mkdir(); dest=base/"out/Vette!"; (base/"out").mkdir()
         (base/"scratch").mkdir()
-        # Already-verified files exercise safe repeat installation and avoid a
-        # second full decompression; test_amiga.py separately tests that path.
-        if "--fresh" not in sys.argv:
+        # Seed the existing-install branches. Reinstall deliberately damages
+        # both originals to prove that they are extracted again, not reused.
+        if not fresh:
             (dest/"data").mkdir(parents=True)
             subprocess.run([str(build/"VetteInstallData"),str(ROOT/"tmp/VETTE__1.02_and_extras.sit"),str(dest/"data"),str(base/"scratch")],check=True)
+            (dest/'keep-marker').write_text('old installation')
+            (dest/'data/Vette.scores').write_bytes(b'saved scores')
+            for name in ('data/Vette!', 'Vette!.slave', 'ReadMe'):
+                (dest/name).write_bytes(b'old release')
+            if reinstall:
+                (dest/'data/Color VETTE!').write_bytes(b'damaged original')
+                (dest/'data/VETTE!.Data').write_bytes(b'damaged original')
+        (base/'out/other-drawer').mkdir()
+        (base/'out/other-drawer/keep').write_text('unrelated')
         for source,name in ((installer,"Installer"),(build/"VetteInstallData.exe","VetteInstallData"),
                 (build/"test-icon.exe","IconTest"),(ROOT/"amiga/out/Vette.exe","Vette!"),
                 (ROOT/"build/whdload/Vette!.slave","Vette!.slave"),
@@ -65,6 +78,10 @@ def main():
         # Installer detects welcome syntactically. Omitting it would cause an
         # automatic startup requester; retain it in an unexecuted branch.
         script=replace_form(script,"(welcome)",'(if 0 (welcome))')
+        script=replace_form(script,"(set #remove-existing",
+            f'((textfile (dest "DH2:remove-choice") (append "asked")) (set #remove-existing {int(remove)}))')
+        script=replace_form(script,"(set #install-data\n    (askbool",
+            f'((textfile (dest "DH2:data-choice") (append "asked")) (set #install-data {int(reinstall)}))')
         script=replace_form(script,"(set #archive",'(set #archive "DH1:tmp/VETTE__1.02_and_extras.sit")')
         script=replace_form(script,"(set #parent",'(set #parent "DH2:out")')
         script=replace_form(script,"(set #temp",f'(set #temp "{temp_path}")')
@@ -86,7 +103,7 @@ def main():
                 "--hard_drive_1="+str(ROOT),"--hard_drive_2="+str(base),"--warp_mode=1",
                 "--fullscreen=0","--window_width=720","--window_height=568","--state_dir="+str(base/"state")],stdout=log,stderr=log)
             try:
-                deadline=time.monotonic()+(900 if "--fresh" in sys.argv else 240)
+                deadline=time.monotonic()+(900 if install_data else 240)
                 while time.monotonic()<deadline and not (base/"finished").exists():
                     if emu.poll() is not None: raise RuntimeError("Emulator exited")
                     time.sleep(.5)
@@ -98,8 +115,16 @@ def main():
                 assert (base/"icon-ok").exists(), "icon.library rejected the generated icon"
                 assert (base/"finished").exists(), report
                 assert not (base/"leftover").exists(), "Guest scratch directory was not removed"
-                assert (base/"space.txt").exists(), "Space check did not run"
-                if temp_path in ('RAM:', 'T:'):
+                assert (base/'remove-choice').exists() == (not fresh), 'Wrong remove prompt path'
+                assert (base/'data-choice').exists() == (not fresh and not remove), 'Wrong data prompt path'
+                assert (base/"space.txt").exists() == install_data, 'Temporary drawer prompt was not conditional'
+                assert (base/'out/other-drawer/keep').read_text() == 'unrelated'
+                assert (dest/'keep-marker').exists() == (not fresh and not remove)
+                if not fresh and not remove:
+                    assert (dest/'data/Vette.scores').read_bytes() == b'saved scores'
+                else:
+                    assert not (dest/'data/Vette.scores').exists()
+                if install_data and temp_path in ('RAM:', 'T:'):
                     space=(base/"space.txt").read_text()
                     assert 'device=RAM disk=0' in space,space
                     assert int(space.split('usable=')[1].split()[0])>=12582912,space
@@ -117,8 +142,9 @@ def main():
                 for name, digest in EXPECTED.items():
                     assert hashlib.sha256((dest/"data"/name).read_bytes()).hexdigest()==digest
                 assert not list((base/"scratch").glob(".vette-install-*"))
+                assert not list((base/"scratch").glob(".vette-data-*"))
                 assert not list((dest/"data").glob(".vette-publish-*"))
-                print("PASS: native icon.library reads Install.info; Installer runs helper and copies release files")
+                print(f"PASS: native Installer fresh={fresh} remove={remove} reinstall={reinstall}; conditional prompts, data, scores, release files and icons verified")
             finally:
                 emu.terminate()
                 try: emu.wait(timeout=5)

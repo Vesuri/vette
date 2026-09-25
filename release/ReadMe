@@ -34,18 +34,23 @@
 
  Installation:
  -------------
- Before running the install, download "VETTE__1.02_and_extras.sit" from:
+ To install or reinstall the original data, download
+ "VETTE__1.02_and_extras.sit" from:
 
  https://www.macintoshrepository.org/4948-vette-
 
- Leave the downloaded file compressed. Run the Install icon, select where
- to install the game, choose a temporary drawer, and select the downloaded
- archive when asked. The installer creates a Vette! drawer and extracts and
- verifies the required game data. The downloaded archive is not changed.
+ Leave the downloaded file compressed. Run the Install icon and select the
+ destination. If a Vette! drawer exists, choose whether to remove it first;
+ removing it also removes saved scores. Keeping it preserves saved scores.
+
+ If both original data files are installed, choose Reinstall or Use existing.
+ Only data installation asks for a temporary drawer and the downloaded archive.
+ The executable, slave, icon and ReadMe are always reinstalled.
 
  Allow at least 12 MB free in the temporary drawer. The default is T:, which
  normally uses RAM; choose a hard disk drawer if there is insufficient memory.
- Extraction can take several minutes. Temporary files are removed afterwards.
+ Extraction can take several minutes. Data is verified before replacing the
+ installed files, and temporary files are removed afterwards.
 
  Start the installed game using its Vette! icon. PRELOAD is enabled by default;
  disable that Tooltype if there is insufficient memory to cache the files.

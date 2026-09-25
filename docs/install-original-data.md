@@ -19,6 +19,13 @@ Vette!/
     Vette.scores      created when changed scores are saved on normal exit
 ```
 
+An existing Vette! drawer can be removed first or updated in place. Keeping
+it preserves scores. If both original data files exist, the installer offers
+Reinstall or Use existing; reusing them skips temporary-directory and archive
+selection. Other release files are always copied. Data reinstall extracts into
+a unique temporary drawer and verifies both originals before copying them over
+the installed data; failed extraction leaves the installed files unchanged.
+
 The executable first tries `PROGDIR:data/`, then adjacent original files in
 `PROGDIR:`. The WHDLoad slave mounts the data drawer and sets PROGDIR correctly.
 Missing/unreadable or unsupported originals produce a DOS error and return code
@@ -70,7 +77,7 @@ Do not use the unidentified NDIF checksum as a validation gate.
 
 ## Release archive
 
-`make dist` produces `dist/Vette-0.90.lha`, with a `Vette! Install` drawer
+`make dist` produces `dist/Vette-0.91.lha`, with a `Vette! Install` drawer
 and sibling drawer icon. It contains the game executable, slave, `Vette!.inf`
 icon template, extraction helper, Install with its icon, ReadMe with its icon,
 and `LICENSE.LGPL.txt` without an icon. The LGPL text applies only to the helper

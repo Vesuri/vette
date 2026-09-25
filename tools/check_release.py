@@ -48,7 +48,7 @@ def main():
     assert b'WHDLOADS' in payloads['Vette!.slave'], 'missing WHDLoad slave header'
     for name, kind in (("Vette!.inf", 4), ("ReadMe.info", 4), ("Install.info", 4), ('@drawer', 2)):
         assert payloads[name][:4] == b"\xe3\x10\0\1" and payloads[name][48] == kind
-    assert b"$VER: Install 0.90 (23.09.2026)" in payloads["Install"]
+    assert b"$VER: Install 0.91 (25.09.2026)" in payloads["Install"]
     assert b'APPNAME=Vette!\0' in payloads['Install.info']
     assert b'Rescue on Fractalus' not in payloads['Install.info']
     assert payloads['Vette!.inf'] == installer_icon(game=True)

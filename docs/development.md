@@ -85,8 +85,11 @@ Native installation testing:
 python3 tools/install-data/test_installer_script.py /path/to/Installer --t-temp
 ```
 
-It also needs the local Workbench floppy and ROM/RTB paths declared in that
-script. These are not redistributed. WHDLoad's isolated smoke/load/quit tests
+The default checks updating an existing installation while reusing its data.
+Use `--reinstall` to replace deliberately damaged data while keeping scores,
+`--remove` to remove the old drawer first, or `--fresh` for a new installation.
+The tests also check conditional prompts, release files and native icon tooltypes.
+They need the local Workbench floppy and ROM/RTB paths declared in that script. These are not redistributed. WHDLoad's isolated smoke/load/quit tests
 are described in [whdload.md](whdload.md).
 
 ## Debugging and profiling
