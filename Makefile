@@ -406,3 +406,11 @@ direct-c2p-fallback-check:
 	  GDBTAIL=60 EXTRA_ARGS="--warp_mode=1" GDBSCRIPT=direct_c2p_fallback.gdb ./diag_run.sh 90
 	@grep -q 'PASS direct C2P fallback;' amiga/.run/gdb-out.log
 	@python3 tools/check_direct_c2p.py
+
+.PHONY: game-raster-check
+game-raster-check:
+	@mkdir -p tmp
+	@cd amiga && . ./env.sh && $(MAKE) clean && \
+	  $(MAKE) -j4 GAME_RASTER_VERIFY=1 SKIP_INTRO=1 GARAGE_CLICK=1 && \
+	  GDBTAIL=30 EXTRA_ARGS="--warp_mode=1" GDBSCRIPT=game_raster_verify.gdb ./diag_run.sh 90
+	@grep -q 'PASS game raster differential' amiga/.run/gdb-out.log

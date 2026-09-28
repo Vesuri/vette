@@ -200,3 +200,11 @@ publication. The old driving-copy differential needs `DRIVING_COPY_LEGACY=1
 VERIFY=1 PROBES=1`. Never compare performance with `VERIFY`, `FILLWATCH`, or
 `DRIVING_COPY_SHADOW` enabled. Capture tools must use the active source and stride;
 `s_colorScreen` can intentionally be stale during direct driving.
+
+### Measured renderer optimization
+
+See [performance.md](performance.md) for the frame-aligned comparison, baseline
+switches, and reproduction commands. `make game-raster-check` compares the
+byte-guarded Traffic copy-row replacement against its original operations over
+866 memory/register/CCR cases. The replacement is specific to the supported
+68020 target and leaves the game's decisions and outer rendering routine intact.

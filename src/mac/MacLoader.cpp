@@ -1064,6 +1064,10 @@ static bool installDrivingBoundaryTrap()
     return true;
 }
 
+extern "C" void vetteGameCopyRow();
+#ifdef VETTE_GAME_RASTER_VERIFY
+extern "C" bool vetteCheckGameRaster();
+#endif
 static bool installDrivingRasterTraps()
 {
     // Traffic+$67A4 and +$67FA are the game's two packed-byte rectangle
@@ -1071,6 +1075,21 @@ static bool installDrivingRasterTraps()
     // width and height, so these are the authoritative dirty bounds for the
     // independently changing dashboard pieces. Replace their common first
     // ASL.L #2,D2 and emulate it in the dispatcher.
+#ifdef VETTE_GAME_RASTER_VERIFY
+    if (!vetteCheckGameRaster()) return false;
+#endif
+#ifdef VETTE_GAME_RASTER
+    // Optimize only this measured copy kernel. Preserve the original routine's
+    // clipping, address calculation, row strides, dirty hook and all outputs;
+    // replace only its byte-at-a-time row loop after checking every old word.
+    static const uint16_t originalRow[] = { 0x2002, 0x14db, 0x51c8, 0xfffc };
+    uint8_t* row = s_segments[6].begin + 0x67e6;
+    for (uint16_t i = 0; i < 4; ++i)
+        if (read16(row + i * 2) != originalRow[i]) return false;
+    write16(row, 0x4eb9); // JSR absolute long; original row stepping follows.
+    write32(row + 2, (uint32_t)vetteGameCopyRow);
+    write16(row + 6, 0x4e71);
+#endif
     static const uint32_t offsets[] = { 0x67a4, 0x67fa };
     for (uint16_t i = 0; i < sizeof(offsets) / sizeof(offsets[0]); ++i) {
         uint8_t* entry = s_segments[6].begin + offsets[i];

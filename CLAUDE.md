@@ -7,8 +7,10 @@ short queue, not a completed-stage log.
 
 ## Scope and correctness
 
-- Keep the original 68000 game instructions. Implement the documented services
-  they call; do not replace game decisions with screen-specific guesses.
+- Preserve original game decisions. Implement their documented services; do not
+  replace decisions with screen-specific guesses. Measured renderer-kernel
+  replacements require original-byte guards and memory/register/CCR differential
+  verification. See docs/performance.md for the approved copy-row optimization.
 - Attribute code addresses as **(segment, offset)** in the Color build; offsets
   include the four-byte segment header. B&W CODE is a different program.
 - Original Macintosh execution is the fidelity reference. State-pair captures;

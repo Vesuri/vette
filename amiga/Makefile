@@ -132,6 +132,13 @@ EXTRA_DEFINES += -DVETTE_MAPPED_COPY_VERIFY
 endif
 endif
 
+ifneq ($(GAME_RASTER_ORIGINAL),1)
+EXTRA_DEFINES += -DVETTE_GAME_RASTER
+endif
+ifeq ($(GAME_RASTER_VERIFY),1)
+EXTRA_DEFINES += -DVETTE_GAME_RASTER_VERIFY
+endif
+
 # Paired-measurement fallback for port bookkeeping before optimization.
 ifeq ($(PORT_WORK_LEGACY),1)
 EXTRA_DEFINES += -DVETTE_PORT_WORK_LEGACY
@@ -512,9 +519,10 @@ CPPFLAGS  = $(CCFLAGS) -fno-rtti -fno-exceptions -fno-use-cxa-atexit -std=gnu++1
             -I"$(REPO)/src/platform" \
             -I"$(CURDIR)"
 ASFLAGS   = -mcpu=68000 -g --register-prefix-optional -I"$(SDKDIR)" -I"$(CURDIR)"
-# The supported package target is an A1200.  Only the measured C2P hot loop
-# uses 68020 scaled indexing; resident Macintosh code and all other port
-# assembly retain the broader 68000 setting.
+# The supported package target is an A1200. C2P uses scaled indexing;
+# GameRaster uses unaligned longwords and unprivileged CCR reads. All other
+# assembly and resident Macintosh code retain the broader 68000 setting.
+obj/GameRaster.o: ASFLAGS := $(filter-out -mcpu=68000,$(ASFLAGS)) -mcpu=68020
 obj/C2P.o: ASFLAGS := $(filter-out -mcpu=68000,$(ASFLAGS)) -mcpu=68020
 # vasm (Motorola syntax) for the framework *Assembler.s.  -m68010: the only >68000 instruction in
 # the vendored framework is `movec vbr,d0` in getVBR, which is behaviour-neutral on the A500.
@@ -538,6 +546,12 @@ PROBE_SYMS = g_vbiCount g_planeChecksum g_screenReady g_laceFields g_longFields 
              g_stageBState g_trapWord g_trapSelector g_trapSegment g_trapOffset \
              g_trapPC g_trapRegisters g_trapUserStack g_resourceCount g_jumpEntryCount \
              g_blockMoveCount g_trapManager g_trapRoutine
+ifeq ($(GAME_RASTER_VERIFY),1)
+PROBE_SYMS += g_gameRasterVerifyCases g_gameRasterVerifyFailures
+endif
+ifeq ($(PARKED_PROFILE),1)
+PROBE_SYMS += g_parkedProfileIteration
+endif
 PROBE_SYMS += g_stageCDepth
 PROBE_SYMS += SysBase
 PROBE_SYMS += g_macTicks
