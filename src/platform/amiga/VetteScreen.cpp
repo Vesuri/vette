@@ -19,7 +19,7 @@ extern "C" {
 extern volatile uint16_t vette_hires_value;
 #ifdef VETTE_C2P_ASM
 void vetteC2PRectAsm(const uint8_t* source, uint8_t* destination,
-                     const uint32_t* table, uint16_t groups, uint16_t rows);
+                     const uint32_t* table, uint16_t groups, uint16_t rows, uint16_t sourceRowBytes);
 #endif
 #ifdef VETTE_C2P_VERIFY
 volatile uint32_t g_c2pAsmTicks = 0;
@@ -545,7 +545,7 @@ void VetteScreen::updateMouseSprite(bool oddField)
 }
 
 #ifdef VETTE_FILLWATCH
-static void validateConvertedFrame(const uint8_t* chunky, const uint8_t* planar, bool hires, uint16_t cropLeft, uint16_t cropTop)
+static void validateConvertedFrame(const uint8_t* chunky, const uint8_t* planar, bool hires, uint16_t cropLeft, uint16_t cropTop, uint16_t chunkyRowBytes)
 {
     static uint16_t nextRow = 0;
     bool bad = false;
@@ -554,7 +554,7 @@ static void validateConvertedFrame(const uint8_t* chunky, const uint8_t* planar,
     for (uint16_t checked = 0; checked < 8; ++checked) {
         uint16_t y = (hires ? 0 : cropTop) + nextRow++;
         if (nextRow >= (hires ? VetteScreen::kMacHeight : VetteScreen::kLoresHeight)) nextRow = 0;
-        const uint8_t* source = chunky + (uint32_t)y * (VetteScreen::kWidth / 2);
+        const uint8_t* source = chunky + (uint32_t)(uint16_t)y * chunkyRowBytes;
         const uint8_t* row = planar
             + (uint32_t)(y + VetteScreen::kMacTop) * VetteScreen::kRowStride;
         for (uint16_t x = hires ? 0 : cropLeft;
@@ -613,9 +613,11 @@ static bool rectanglesMergeLosslessly(const VetteScreen::DirtyRect& a,
 
 bool VetteScreen::presentMacFrame(const uint8_t* chunky, const uint8_t* colorTable,
                                   const DirtyRect* dirtyRects, uint16_t dirtyRectCount,
-                                  uint16_t cropLeft, uint16_t cropTop, bool mouseAllowed)
+                                  uint16_t cropLeft, uint16_t cropTop, bool mouseAllowed,
+                                  uint16_t chunkyRowBytes)
 {
-    if (!chunky || !colorTable || !m_back) return false;
+    if (!chunky || !colorTable || !m_back || chunkyRowBytes < kWidth / 2
+        || chunkyRowBytes > 0x7ffe || (chunkyRowBytes & 1)) return false;
     if (m_framePending) {
 #ifdef VETTE_PROBE
         VetteProfileScope profileWait(kProfileWait);
@@ -752,7 +754,7 @@ bool VetteScreen::presentMacFrame(const uint8_t* chunky, const uint8_t* colorTab
             uint16_t firstByte = (uint16_t)dirty.left / 8;
             uint16_t groups = (uint16_t)(dirty.right - dirty.left) / 8;
 #ifdef VETTE_C2P_ASM
-            const uint8_t* rectangleSource = chunky + (uint32_t)dirty.top * (kWidth / 2)
+            const uint8_t* rectangleSource = chunky + (uint32_t)(uint16_t)dirty.top * chunkyRowBytes
                                            + (uint16_t)dirty.left / 2;
             uint8_t* rectangleDestination = m_back
                                           + (uint32_t)(dirty.top + kMacTop) * kRowStride
@@ -767,12 +769,12 @@ bool VetteScreen::presentMacFrame(const uint8_t* chunky, const uint8_t* colorTab
             uint32_t start = vetteProfileBeamEpoch();
 #endif
             vetteC2PRectAsm(rectangleSource, rectangleDestination, s_quadToPlanes[0],
-                            groups, (uint16_t)(dirty.bottom - dirty.top));
+                            groups, (uint16_t)(dirty.bottom - dirty.top), chunkyRowBytes);
 #ifdef VETTE_C2P_SPLIT
             g_c2pSplitChipTicks += vetteProfileBeamEpoch() - splitStart;
             splitStart = vetteProfileBeamEpoch();
             vetteC2PRectAsm(rectangleSource, fastDestination, s_quadToPlanes[0],
-                            groups, (uint16_t)(dirty.bottom - dirty.top));
+                            groups, (uint16_t)(dirty.bottom - dirty.top), chunkyRowBytes);
             g_c2pSplitFastTicks += vetteProfileBeamEpoch() - splitStart;
             ++g_c2pSplitRects;
             // Keep the diagnostic out of libgcc's very costly 32-bit multiply;
@@ -786,7 +788,7 @@ bool VetteScreen::presentMacFrame(const uint8_t* chunky, const uint8_t* colorTab
 #endif
 #endif
             for (int16_t y = dirty.top; y < dirty.bottom; ++y) {
-                const uint8_t* source = chunky + (uint32_t)y * (kWidth / 2)
+                const uint8_t* source = chunky + (uint32_t)(uint16_t)y * chunkyRowBytes
                                       + (uint16_t)dirty.left / 2;
                 uint8_t* destination = m_back + (uint32_t)(y + kMacTop) * kRowStride
                                      + firstByte;
@@ -843,7 +845,7 @@ bool VetteScreen::presentMacFrame(const uint8_t* chunky, const uint8_t* colorTab
     // Rolling validation is intentionally diagnostic: it proves that dirty
     // synchronization plus the converted rectangle leave the back buffer an
     // exact planar encoding of the visible part of the 4-bit chunky surface.
-    validateConvertedFrame(chunky, m_back, m_hires, cropLeft, cropTop);
+    validateConvertedFrame(chunky, m_back, m_hires, cropLeft, cropTop, chunkyRowBytes);
 #endif
     m_nextCropLeft = cropLeft;
     m_nextCropTop = cropTop;

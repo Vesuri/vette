@@ -65,7 +65,7 @@ public:
     bool presentMacFrame(const uint8_t* chunky, const uint8_t* colorTable,
                          const DirtyRect* dirtyRects, uint16_t dirtyRectCount,
                          uint16_t cropLeft = kLoresLeft, uint16_t cropTop = 0,
-                         bool mouseAllowed = false);
+                         bool mouseAllowed = false, uint16_t chunkyRowBytes = kWidth / 2);
 
     bool matchesViewport(uint16_t left, uint16_t top) const {
         return m_hires || (m_cropLeft == left && m_cropTop == top);

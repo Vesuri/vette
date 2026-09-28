@@ -4,8 +4,13 @@ import sys
 from pathlib import Path
 
 folder = Path(sys.argv[1])
+def packed_screen(data):
+    assert len(data) in (81920, 83200), len(data)
+    stride = len(data) // 320
+    return b"".join(data[y * stride:y * stride + 256] for y in range(320))
+
 before, dialog, picture = [
-    (folder / f"recovery-{stage}.bin").read_bytes()
+    packed_screen((folder / f"recovery-{stage}.bin").read_bytes())
     for stage in ("before", "dialog", "picture")
 ]
 assert len(before) == len(dialog) == len(picture) == 512 * 320 // 2

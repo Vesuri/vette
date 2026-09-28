@@ -7,13 +7,14 @@ ROOT = Path(__file__).resolve().parents[1]
 chunky = (ROOT / "tmp/driving-planar-chunky.raw").read_bytes()
 planes = (ROOT / "tmp/driving-planar.planes").read_bytes()
 
-if len(chunky) != 81920 or len(planes) != 98304:
+if len(chunky) not in (81920, 83200) or len(planes) != 98304:
     raise SystemExit(f"bad capture sizes: chunky={len(chunky)}, planes={len(planes)}")
 
+stride = len(chunky) // 320
 bad = 0
 first = None
 for y in range(320):
-    source = y * 256
+    source = y * stride
     planar = (y + 32) * 256
     for x in range(512):
         packed = chunky[source + x // 2]

@@ -1,3 +1,4 @@
+# Build with DRIVING_COPY_LEGACY=1 VERIFY=1 PROBES=1.
 # Read the in-process 260-to-256 driving-copy differential after the host
 # interrupts a deterministic moving run.  No breakpoint enters the timed path.
 set pagination off

@@ -21,10 +21,10 @@
 	.endm
 
 | void vetteC2PRectAsm(const uint8_t* source, uint8_t* destination,
-|                      const uint32_t* table, uint16_t groups, uint16_t rows)
+|                      const uint32_t* table, uint16_t groups, uint16_t rows, uint16_t sourceRowBytes)
 |
-| Walk a complete dirty rectangle at the fixed 256-byte chunky and interleaved
-| planar row strides. Four groups are 16 packed Macintosh bytes (32 pixels)
+| Walk a dirty rectangle with the supplied packed source stride and fixed
+| 256-byte interleaved planar stride. Four groups are 16 packed Macintosh bytes (32 pixels)
 | and produce one long in each of the four Amiga planes. A final two-group/
 | 16-pixel tail uses word writes, so callers retain their natural alignment.
 | Each 256 KiB fast-RAM table maps four packed pixels to one nibble of four
@@ -99,7 +99,7 @@ vetteC2PRectAsm:
 	move.w	d2,64(a1)
 	move.w	d1,(a1)
 8:
-	lea	256(a3),a3
+	adda.w	70(sp),a3		| source stride (256 logical screen or 260 GWorld)
 	lea	256(a4),a4
 	subq.l	#1,a5
 	| Address-register arithmetic does not set the 68k condition codes.

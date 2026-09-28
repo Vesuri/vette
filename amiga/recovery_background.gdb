@@ -13,13 +13,21 @@ end
 break *(s_segments[1].begin+0x0fc8) if $armed
 commands
  silent
- dump binary memory .run/recovery-before.bin (char*)s_colorScreen (char*)s_colorScreen+81920
+ if s_drivingScreenSource
+  dump binary memory .run/recovery-before.bin s_drivingScreenSource s_drivingScreenSource+83200
+ else
+  dump binary memory .run/recovery-before.bin (char*)s_colorScreen (char*)s_colorScreen+81920
+ end
  continue
 end
 break *(s_segments[1].begin+0x0fce) if $armed
 commands
  silent
- dump binary memory .run/recovery-dialog.bin (char*)s_colorScreen (char*)s_colorScreen+81920
+ if s_drivingScreenSource
+  dump binary memory .run/recovery-dialog.bin s_drivingScreenSource s_drivingScreenSource+83200
+ else
+  dump binary memory .run/recovery-dialog.bin (char*)s_colorScreen (char*)s_colorScreen+81920
+ end
  continue
 end
 break drawPicture if $armed
@@ -32,7 +40,11 @@ end
 break *(s_segments[1].begin+0x0fe2) if $armed
 commands
  silent
- dump binary memory .run/recovery-picture.bin (char*)s_colorScreen (char*)s_colorScreen+81920
+ if s_drivingScreenSource
+  dump binary memory .run/recovery-picture.bin s_drivingScreenSource s_drivingScreenSource+83200
+ else
+  dump binary memory .run/recovery-picture.bin (char*)s_colorScreen (char*)s_colorScreen+81920
+ end
  printf "DIRTY count=%u\n",s_dirtyRectCount
  p s_dirtyRects[0]
  echo CAPTURE COMPLETE\n

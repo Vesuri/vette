@@ -196,6 +196,23 @@ static bool s_scoreTablesInitialized;
 static bool s_scoresDirty;
 static uint8_t s_quickDrawScreen[(512 / 8) * 320];
 static uint8_t s_colorScreen[(512 / 2) * 320];
+// The proven driving publication may retain the resident GWorld instead of
+// copying it. C2P consumes it synchronously at the completed-frame boundary;
+// VBI retains only planar buffers. Screen consumers materialize on demand.
+static const uint8_t* s_drivingScreenSource;
+static void materializeDrivingScreen()
+{
+    if (!s_drivingScreenSource) return;
+    const uint8_t* source = s_drivingScreenSource;
+    s_drivingScreenSource = 0;
+#ifdef VETTE_DRIVING_COPY_ASM
+    vetteDrivingCopyAsm(source, s_colorScreen);
+#else
+    for (uint16_t y = 0; y < 320; ++y)
+        for (uint16_t x = 0; x < 256; ++x)
+            s_colorScreen[(uint32_t)y * 256 + x] = source[(uint32_t)y * 260 + x];
+#endif
+}
 // The first driving frame expands its roadside panorama as 512x24 8-bit
 // strips.  Keep one strip's decode storage resident so all 38 calls share the
 // same small working set instead of entering Exec's allocator for every PICT.
@@ -611,6 +628,17 @@ static Segment s_segments[11] = {
     {0, 0, "SOUND"}, {0, 0, "%A5INIT"}
 };
 static uint8_t* s_residentSegmentStorage[11];
+#ifdef VETTE_CODE_PROFILE
+// FS-UAE's executable profiler only records PCs inside the first code hunk.
+// Keep diagnostic resident copies in that hunk (still writable Fast RAM).
+// The executable contains zeroes, never original game data.
+extern "C" uint8_t g_profileCodeStorage[131072];
+asm(".pushsection .text\n.balign 4\n.global g_profileCodeStorage\n"
+    "g_profileCodeStorage:\n.space 131072\n.popsection\n");
+#endif
+#ifdef VETTE_PARKED_PROFILE
+volatile uint32_t g_parkedProfileIteration = 0;
+#endif
 // Short aliases keep the byte-verified patch sites readable. They now point
 // into aligned resident copies of the application CODE resources loaded from
 // disk.
@@ -668,6 +696,9 @@ static void clearResidentSegments()
 static bool loadResidentSegments()
 {
     clearResidentSegments();
+#ifdef VETTE_CODE_PROFILE
+    uint32_t profileCodeUsed = 0;
+#endif
     for (uint16_t segment = 0; segment < 11; ++segment) {
         ResourceForks::Item item;
         if (!s_resourceForks.find(0, 0x434f4445UL, (int16_t)segment, item)
@@ -680,14 +711,25 @@ static bool loadResidentSegments()
         // Manager handles relocate them into aligned RAM.  Do the same here;
         // these private copies are also where the jump-table and compatibility
         // patches belong, leaving the original file image untouched.
+#ifdef VETTE_CODE_PROFILE
+        if (item.size > sizeof(g_profileCodeStorage) - profileCodeUsed) {
+            clearResidentSegments();
+            return false;
+        }
+        uint8_t* resident = g_profileCodeStorage + profileCodeUsed;
+        profileCodeUsed += (item.size + 3u) & ~3u;
+#else
         uint8_t* resident = new uint8_t[item.size];
+#endif
         if (!resident) {
             clearResidentSegments();
             return false;
         }
         for (uint32_t byte = 0; byte < item.size; ++byte)
             resident[byte] = item.data[byte];
+#ifndef VETTE_CODE_PROFILE
         s_residentSegmentStorage[segment] = resident;
+#endif
         s_segments[segment].begin = resident;
         s_segments[segment].end = resident + item.size;
     }
@@ -1174,6 +1216,12 @@ static bool installRemainingAudioProbe()
 
 static void blockMove(const uint8_t* source, uint8_t* destination, uint32_t count)
 {
+    if (s_drivingScreenSource && count
+        && (((uint32_t)source < (uint32_t)(s_colorScreen + sizeof(s_colorScreen))
+             && (uint32_t)source + count > (uint32_t)s_colorScreen)
+            || ((uint32_t)destination < (uint32_t)(s_colorScreen + sizeof(s_colorScreen))
+                && (uint32_t)destination + count > (uint32_t)s_colorScreen)))
+        materializeDrivingScreen();
     // The driving renderer uses _BlockMove as a direct packed-pixel primitive,
     // bypassing QuickDraw's rectangle calls.  Convert the touched byte span to
     // a conservative screen-space dirty rectangle before the pointers move.
@@ -2448,6 +2496,7 @@ static bool paintBehind(uint8_t* startWindow, uint8_t** clobberedRegion)
     // from the retiring full-screen window cannot remain above the next one.
     if (top == 20 && left == 0 && bottom == 320 && right == 512) top = 0;
 
+    materializeDrivingScreen();
     // Clear exposed space to reserved black.  Work in packed 4-bpp bytes and
     // preserve boundary nibbles for any future partial background exposure.
     for (int16_t y = top; y < bottom; ++y) {
@@ -2724,6 +2773,7 @@ static bool drawIndexedPictureBits(const uint8_t* picture, uint32_t size, uint32
     if (offset & 1) ++offset;
 
     uint8_t* destinationPixels = destinationMap ? (uint8_t*)read32(destinationMap) : 0;
+    if (destinationPixels == s_colorScreen) materializeDrivingScreen();
     uint16_t destinationRowBytes = destinationMap ? (uint16_t)(read16(destinationMap + 4) & 0x3fff) : 0;
     if (!valid || !destinationPixels || read16(destinationMap + 32) != 4) valid = false;
 
@@ -2979,6 +3029,7 @@ static bool drawPackedMonochromePictureBits(const uint8_t* picture, uint32_t siz
     uint8_t** destinationHandle = port ? (uint8_t**)read32(port + 2) : 0;
     uint8_t* destinationMap = destinationHandle ? *destinationHandle : 0;
     uint8_t* destinationPixels = destinationMap ? (uint8_t*)read32(destinationMap) : 0;
+    if (destinationPixels == s_colorScreen) materializeDrivingScreen();
     uint16_t destinationRowBytes = destinationMap
         ? (uint16_t)(read16(destinationMap + 4) & 0x3fff) : 0;
     if (!valid || !destinationPixels || read16(destinationMap + 32) != 4) valid = false;
@@ -3186,6 +3237,7 @@ static bool drawDirectPictureBits(const uint8_t* picture, uint32_t size, uint32_
     }
 
     uint8_t* destinationPixels = destinationMap ? (uint8_t*)read32(destinationMap) : 0;
+    if (destinationPixels == s_colorScreen) materializeDrivingScreen();
     uint16_t destinationRowBytes = destinationMap
         ? (uint16_t)(read16(destinationMap + 4) & 0x3fff) : 0;
     if (!valid || !destinationPixels || read16(destinationMap + 32) != 4) valid = false;
@@ -3327,6 +3379,7 @@ static bool drawVersionOnePicture(const uint8_t* picture, uint32_t size,
     uint8_t** mapHandle = port ? (uint8_t**)read32(port + 2) : 0;
     uint8_t* map = mapHandle ? *mapHandle : 0;
     uint8_t* pixels = map ? (uint8_t*)read32(map) : 0;
+    if (pixels == s_colorScreen) materializeDrivingScreen();
     uint16_t rowBytes = map ? (uint16_t)(read16(map + 4) & 0x3fff) : 0;
     int16_t mapTop = map ? (int16_t)read16(map + 6) : 0;
     int16_t mapLeft = map ? (int16_t)read16(map + 8) : 0;
@@ -3540,13 +3593,15 @@ static bool drawPictureContents(uint8_t** pictureHandle, const uint8_t* targetRe
 }
 
 static bool currentPortPixels(uint8_t*& pixels, uint16_t& rowBytes,
-                              int16_t& top, int16_t& left, int16_t& bottom, int16_t& right)
+                              int16_t& top, int16_t& left, int16_t& bottom, int16_t& right,
+                              bool accessPixels = true)
 {
     uint8_t* port = (uint8_t*)read32(s_qdThePort);
     uint8_t** mapHandle = port ? (uint8_t**)read32(port + 2) : 0;
     uint8_t* map = mapHandle ? *mapHandle : 0;
     if (!map || read16(map + 32) != 4) return false;
     pixels = (uint8_t*)read32(map);
+    if (accessPixels && pixels == s_colorScreen) materializeDrivingScreen();
     rowBytes = (uint16_t)(read16(map + 4) & 0x3fff);
     top = (int16_t)read16(map + 6); left = (int16_t)read16(map + 8);
     bottom = (int16_t)read16(map + 10); right = (int16_t)read16(map + 12);
@@ -3764,7 +3819,8 @@ static bool invertRect(const uint8_t* rectangle)
 }
 
 static bool bitmapPixels(const uint8_t* bitmap, uint8_t*& pixels, uint16_t& rowBytes,
-                         int16_t& top, int16_t& left, int16_t& bottom, int16_t& right)
+                         int16_t& top, int16_t& left, int16_t& bottom, int16_t& right,
+                         bool accessPixels = true)
 {
     if (!bitmap) return false;
     uint8_t* map = 0;
@@ -3776,6 +3832,7 @@ static bool bitmapPixels(const uint8_t* bitmap, uint8_t*& pixels, uint16_t& rowB
     if (bitmap == s_windowManagerPort + 2) map = s_windowManagerPixMap;
     if (!map || read16(map + 32) != 4) return false;
     pixels = (uint8_t*)read32(map);
+    if (accessPixels && pixels == s_colorScreen) materializeDrivingScreen();
     rowBytes = (uint16_t)(read16(map + 4) & 0x3fff);
     top = (int16_t)read16(map + 6); left = (int16_t)read16(map + 8);
     bottom = (int16_t)read16(map + 10); right = (int16_t)read16(map + 12);
@@ -3787,7 +3844,7 @@ static bool bitmapIsScreen(const uint8_t* bitmap)
     uint8_t* pixels;
     uint16_t rowBytes;
     int16_t top, left, bottom, right;
-    return bitmapPixels(bitmap, pixels, rowBytes, top, left, bottom, right)
+    return bitmapPixels(bitmap, pixels, rowBytes, top, left, bottom, right, false)
         && pixels == s_colorScreen;
 }
 
@@ -3808,7 +3865,7 @@ static bool currentPortIsScreen()
     uint8_t* pixels;
     uint16_t rowBytes;
     int16_t top, left, bottom, right;
-    return currentPortPixels(pixels, rowBytes, top, left, bottom, right)
+    return currentPortPixels(pixels, rowBytes, top, left, bottom, right, false)
         && pixels == s_colorScreen;
 }
 
@@ -4654,12 +4711,11 @@ extern "C" __attribute__((noinline)) void vetteMotionCaptureBoundary(
 }
 #endif
 
-#ifdef VETTE_DRIVING_COPY_ASM
-static bool copyDrivingPublishAsm(const uint8_t* sourceBitmap,
-                                  const uint8_t* destinationBitmap,
-                                  const uint8_t* sourceRect,
-                                  const uint8_t* destinationRect,
-                                  uint16_t mode, const uint8_t* maskRegion)
+static bool publishDrivingFrame(const uint8_t* sourceBitmap,
+                                const uint8_t* destinationBitmap,
+                                const uint8_t* sourceRect,
+                                const uint8_t* destinationRect,
+                                uint16_t mode, const uint8_t* maskRegion)
 {
     if (!sourceRect || !destinationRect || mode != 0 || maskRegion
         || (int16_t)read16(sourceRect) != 0 || (int16_t)read16(sourceRect + 2) != 0
@@ -4677,7 +4733,7 @@ static bool copyDrivingPublishAsm(const uint8_t* sourceBitmap,
     if (!bitmapPixels(sourceBitmap, sourcePixels, sourceRowBytes,
                       sourceTop, sourceLeft, sourceBottom, sourceRight)
         || !bitmapPixels(destinationBitmap, destinationPixels, destinationRowBytes,
-                         destinationTop, destinationLeft, destinationBottom, destinationRight)
+                         destinationTop, destinationLeft, destinationBottom, destinationRight, false)
         || destinationPixels != s_colorScreen
         || sourceRowBytes != 260 || destinationRowBytes != 256
         || sourceTop != 0 || sourceLeft != 0 || sourceBottom < 320 || sourceRight != 512
@@ -4689,6 +4745,18 @@ static bool copyDrivingPublishAsm(const uint8_t* sourceBitmap,
     if (!sourceColors || !destinationColors
         || read32(sourceColors) != read32(destinationColors)) return false;
 
+#ifndef VETTE_DRIVING_COPY_LEGACY
+#ifdef VETTE_DRIVING_COPY_SHADOW
+    // Diagnostic only: preserve the old publication for a boundary-time
+    // comparison, including any writes after the last CopyBits in a frame.
+    s_drivingScreenSource = 0;
+    if (!copyBits(sourceBitmap, destinationBitmap, sourceRect, destinationRect,
+                  mode, maskRegion)) return false;
+#endif
+    s_drivingScreenSource = sourcePixels;
+    return true;
+#else
+    materializeDrivingScreen();
 #ifdef VETTE_DRIVING_COPY_VERIFY
     uint32_t before = vetteProfileBeamEpoch();
     if (!copyBits(sourceBitmap, destinationBitmap, sourceRect, destinationRect,
@@ -4705,12 +4773,14 @@ static bool copyDrivingPublishAsm(const uint8_t* sourceBitmap,
             ++g_drivingCopyVerifyFailures;
             break;
         }
-#else
+#elif defined(VETTE_DRIVING_COPY_ASM)
     vetteDrivingCopyAsm(sourcePixels, destinationPixels);
+#else
+    return copyBits(sourceBitmap, destinationBitmap, sourceRect, destinationRect, mode, maskRegion);
 #endif
     return true;
-}
 #endif
+}
 
 static bool clipRect(const uint8_t* rectangle)
 {
@@ -4903,6 +4973,7 @@ static void initMenus()
         }
     }
 
+    materializeDrivingScreen();
     // The initialized menu list is empty, so the menu bar is its white background.
     for (uint32_t i = 0; i < (512 / 2) * 20; ++i) s_colorScreen[i] = 0;
 }
@@ -5567,9 +5638,11 @@ static void presentMacRuntime()
     }
     if (!s_screenDirty && s_loudStopScreen->matchesViewport(cropLeft, cropTop)
         && s_loudStopScreen->matchesMouseVisibility(mouseAllowed)) return;
+    if (!s_drivingFrameStarted) materializeDrivingScreen();
     bool presented = s_loudStopScreen->presentMacFrame(
-        s_colorScreen, s_windowManagerColors, s_dirtyRects, s_dirtyRectCount,
-        cropLeft, cropTop, mouseAllowed);
+        s_drivingScreenSource ? s_drivingScreenSource : s_colorScreen,
+        s_windowManagerColors, s_dirtyRects, s_dirtyRectCount,
+        cropLeft, cropTop, mouseAllowed, s_drivingScreenSource ? 260 : 256);
     if (presented) {
         s_screenDirty = false;
         s_pixelsDirty = false;
@@ -5854,7 +5927,7 @@ static void updateDrivingInputProbe()
 
 #if defined(VETTE_FREEWAY_START) || defined(VETTE_FINISH_CHECKPOINT) \
     || defined(VETTE_DAMAGE_REPAIR_CHECKPOINT) \
-    || defined(VETTE_POLICE_TICKET_CHECKPOINT)
+    || defined(VETTE_POLICE_TICKET_CHECKPOINT) || defined(VETTE_PARKED_PROFILE)
 static void relocateDiagnosticCar(uint8_t* car, uint32_t x, uint32_t z, uint16_t heading)
 {
     // Traffic keeps the rendered position, physics position, swept-collision
@@ -5930,6 +6003,26 @@ static void refreshDrivingKeyMap()
         keyMap[0x5b >> 3] |= 1u << (0x5b & 7); // keypad 8: accelerate
 #endif
     }
+#ifdef VETTE_PARKED_PROFILE
+    // Diagnostic scene only. Relocate once after the original countdown;
+    // thereafter let the original simulation and renderer run with no input.
+    static bool parkedProfilePlaced;
+    uint8_t* parkedCar = (uint8_t*)read32(s_currentA5 - 13944);
+    if (parkedCar && (int16_t)read16(s_currentA5 - 13296) >= 3) {
+        if (!parkedProfilePlaced) {
+            relocateDiagnosticCar(parkedCar,
+                                  (25UL << 11) + 128,
+                                  (32UL << 11) + 1024, 0x0000);
+            write16(parkedCar + 0x1a, 0);
+            write16(parkedCar + 0x1c, 0);
+            write16(parkedCar + 0x42, 0);
+            write16(parkedCar + 0x44, 0);
+            parkedProfilePlaced = true;
+            g_parkedProfileIteration = g_macDrivingIterations;
+        }
+        for (uint16_t i = 0; i < 16; ++i) keyMap[i] = 0;
+    }
+#endif
 #ifdef VETTE_FINISH_CHECKPOINT
     // The three source-defined endpoints form a cycle and are also the next
     // course's genuine start:
@@ -6882,6 +6975,7 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
             }
             write32(frame + 2, (uint32_t)(s_segments[1].begin + 0x1fd8));
         } else {
+            materializeDrivingScreen();
             s_drivingFrameStarted = false;
             s_drivingFrameSeeded = false;
             s_drivingDirtyRectCount = 0;
@@ -6889,6 +6983,7 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
             write32(frame + 2, (uint32_t)(s_segments[1].begin + 0x29d8));
         }
     } else if (trap == 0xa9b4 && pc == (uint32_t)(s_segments[1].begin + 0x29e6)) {
+        materializeDrivingScreen();
         s_drivingFrameStarted = s_drivingFrameSeeded = false;
         s_drivingDirtyRectCount = 0;
         g_drivingRasterBoundCount = 0;
@@ -7975,12 +8070,10 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
             uint32_t copyBitsStart = vetteProfileBeamEpoch();
 #endif
             copied = false;
-#ifdef VETTE_DRIVING_COPY_ASM
             if (fullDrivingPublish)
-                copied = copyDrivingPublishAsm(sourceBitmap, destinationBitmap,
+                copied = publishDrivingFrame(sourceBitmap, destinationBitmap,
                                                sourceRect, destinationRect,
                                                mode, maskRegion);
-#endif
             if (!copied)
                 copied = copyBits(sourceBitmap, destinationBitmap, sourceRect,
                                   destinationRect, mode, maskRegion);
@@ -8115,6 +8208,7 @@ bool MacLoader::prepareResourceForks(uint8_t* application, uint32_t applicationS
 
 static void releaseRuntimeAllocations()
 {
+    s_drivingScreenSource = 0; // GWorld allocations are about to be released.
 #ifdef VETTE_PROBE
     g_probeReleasedIntroSamples = 0;
     g_probeReleasedBogasSamples = 0;

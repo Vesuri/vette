@@ -5,7 +5,7 @@
 VETTE_APP_RSRC ?= tmp/rsrc_VETTE!_VETTE!_Folder_Folder_Color_VETTE!_Color_VETTE!.rsrc
 VETTE_DATA_RSRC ?= tmp/rsrc_VETTE!_VETTE!_Folder_Folder_Color_VETTE!_VETTE!.Data.rsrc
 
-.PHONY: all todo static-map-check coverage-check gameplay-regression-smoke gameplay-regression install-original-data release release-check fidelity-check course-text-regression driving-sequence-capture driving-sequence-compare driving-motion-reference driving-view-reference driving-view-capture driving-view-compare driving-view-regression driving-f1-reference driving-f1-capture driving-f1-compare driving-audio-reference driving-audio-capture driving-audio-compare driving-audio-countdown-regression driving-audio-regression driving-motion-capture driving-motion-compare driving-motion-viewport-compare driving-cadence-compare driving-control-audit driving-palette-compare driving-profile help
+.PHONY: all todo static-map-check coverage-check gameplay-regression-smoke gameplay-regression install-original-data release release-check fidelity-check course-text-regression driving-sequence-capture driving-sequence-compare driving-motion-reference driving-view-reference driving-view-capture driving-view-compare driving-view-regression driving-f1-reference driving-f1-capture driving-f1-compare driving-audio-reference driving-audio-capture driving-audio-compare driving-audio-countdown-regression driving-audio-regression driving-motion-capture driving-motion-compare driving-motion-viewport-compare driving-cadence-compare driving-control-audit driving-palette-compare driving-profile parked-game-profile help
 
 all: help
 
@@ -63,6 +63,10 @@ help:
 	@echo "  make driving-audio-countdown-regression  gate reliable ready-set-GO Paula restarts"
 	@echo "  make driving-motion-capture    capture distinct completed moving Amiga frames"
 	@echo "  make driving-profile  build and measure 300 PAL fields of target-A1200 driving"
+	@echo "  make parked-game-profile  profile original CODE in a stationary city scene"
+	@echo "  make direct-c2p-check     verify copy-free parked drawing and dirty rectangles"
+	@echo "  make direct-c2p-shadow-check  compare moving frames with original publication"
+	@echo "  make direct-c2p-fallback-check  verify screen restoration at race finish"
 	@echo
 	@echo "There is deliberately no host game build; the Amiga executable is the product."
 	@echo "The Amiga build:  cd amiga && . ./env.sh && make"
@@ -362,3 +366,43 @@ driving-profile:
 	  $(MAKE) -j4 PROBES=1 PROBEFIELDS=300 SKIP_INTRO=1 GARAGE_CLICK=1 && \
 	  EXTRA_ARGS="--warp_mode=1" GDBSCRIPT=driving_phase_profile.gdb \
 	  ./diag_run.sh 60
+
+# FS-UAE traces every instruction for 100 PAL fields, including original CODE.
+parked-game-profile:
+	@cd amiga && . ./env.sh && $(MAKE) clean && \
+	  $(MAKE) -j4 PROBES=1 SKIP_INTRO=1 GARAGE_CLICK=1 PARKED_PROFILE=1 CODE_PROFILE=1 && \
+	  GDBTAIL=60 EXTRA_ARGS="--warp_mode=1" GDBSCRIPT=parked_game_profile.gdb ./diag_run.sh 120
+	@cp amiga/.run/gdb-out.log tmp/parked-profile/capture.log
+	@cp amiga/out/Vette.elf tmp/parked-profile/Vette-profile.elf
+	@python3 tools/report_game_profile.py tmp/parked-profile/capture.bin \
+	  tmp/parked-profile/capture.log tmp/parked-profile/report
+	@. amiga/env.sh && python3 tools/report_port_profile.py \
+	  tmp/parked-profile/report/profile.json tmp/parked-profile/Vette-profile.elf \
+	  tmp/parked-profile/report
+
+# Validate direct source stride, partial-update synchronization, and deferred
+# logical-screen materialization. These observers require explicit PASS records.
+.PHONY: direct-c2p-check direct-c2p-shadow-check
+direct-c2p-check:
+	@mkdir -p tmp
+	@cd amiga && . ./env.sh && $(MAKE) clean && \
+	  $(MAKE) -j4 PROBES=1 VERIFY=1 FILLWATCH=1 SKIP_INTRO=1 GARAGE_CLICK=1 PARKED_PROFILE=1 && \
+	  GDBTAIL=60 EXTRA_ARGS="--warp_mode=1" GDBSCRIPT=direct_c2p_check.gdb ./diag_run.sh 180
+	@grep -q 'PASS direct C2P;' amiga/.run/gdb-out.log
+
+direct-c2p-shadow-check:
+	@mkdir -p tmp
+	@cd amiga && . ./env.sh && $(MAKE) clean && \
+	  $(MAKE) -j4 PROBES=1 VERIFY=1 FILLWATCH=1 SKIP_INTRO=1 GARAGE_CLICK=1 DRIVING_COPY_SHADOW=1 && \
+	  GDBTAIL=60 EXTRA_ARGS="--warp_mode=1" GDBSCRIPT=direct_c2p_shadow.gdb ./diag_run.sh 180
+	@grep -q 'PASS shadow conversion;' amiga/.run/gdb-out.log
+	@python3 tools/check_direct_c2p.py --shadow 45
+
+.PHONY: direct-c2p-fallback-check
+direct-c2p-fallback-check:
+	@mkdir -p tmp
+	@cd amiga && . ./env.sh && $(MAKE) clean && \
+	  $(MAKE) -j4 PROBES=1 FILLWATCH=1 SKIP_INTRO=1 GARAGE_CLICK=1 FINISH_CHECKPOINT=1 && \
+	  GDBTAIL=60 EXTRA_ARGS="--warp_mode=1" GDBSCRIPT=direct_c2p_fallback.gdb ./diag_run.sh 90
+	@grep -q 'PASS direct C2P fallback;' amiga/.run/gdb-out.log
+	@python3 tools/check_direct_c2p.py

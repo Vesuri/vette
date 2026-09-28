@@ -145,7 +145,20 @@ EXTRA_DEFINES += -DVETTE_C2P_VERIFY
 endif
 endif
 
-# Exact 260-byte GWorld to 256-byte logical-screen driving publication copy.
+# Driving normally converts the resident GWorld directly. Keep the old full
+# copy for controlled comparisons; its assembly also serves screen-access fallback.
+ifeq ($(DRIVING_COPY_LEGACY),1)
+EXTRA_DEFINES += -DVETTE_DRIVING_COPY_LEGACY
+endif
+# Diagnostic oracle: retain the old CopyBits publication in s_colorScreen
+# while C2P still reads the GWorld. Compare both at frame boundaries.
+ifeq ($(DRIVING_COPY_SHADOW),1)
+ifneq ($(PROBES),1)
+$(error DRIVING_COPY_SHADOW=1 requires PROBES=1)
+endif
+EXTRA_DEFINES += -DVETTE_DRIVING_COPY_SHADOW
+endif
+# Exact 260-byte GWorld to 256-byte logical-screen fallback copy.
 ifneq ($(DRIVING_COPY_C),1)
 EXTRA_DEFINES += -DVETTE_DRIVING_COPY_ASM
 ifdef VERIFY
@@ -351,6 +364,16 @@ endif
 
 ifdef VIEW_CAPTURE_RAW_KEY
 EXTRA_DEFINES += -DVETTE_VIEW_CAPTURE_RAW_KEY=$(VIEW_CAPTURE_RAW_KEY)
+endif
+
+# Diagnostic resident copies inside the executable profiler address range.
+ifeq ($(CODE_PROFILE),1)
+EXTRA_DEFINES += -DVETTE_CODE_PROFILE
+endif
+
+# Diagnostic stationary street scene for original-code profiling.
+ifeq ($(PARKED_PROFILE),1)
+EXTRA_DEFINES += -DVETTE_PARKED_PROFILE
 endif
 
 ifeq ($(FOLLOW_ROAD),1)
