@@ -381,6 +381,11 @@ static void appendDirtyBounds(VetteScreen::DirtyRect* rectangles, uint16_t& coun
         merged = false;
         for (uint16_t i = 0; i < count; ++i) {
             VetteScreen::DirtyRect& existing = rectangles[i];
+#ifndef VETTE_PORT_WORK_LEGACY
+            // An already-covered addition cannot enlarge the union. Avoid
+            // removing/reinserting its owner and restarting the entire scan.
+            if (dirtyRectContains(existing, rectangle)) return;
+#endif
             if (!dirtyRectsMergeLosslessly(rectangle, existing)) continue;
             if (existing.top < rectangle.top) rectangle.top = existing.top;
             if (existing.left < rectangle.left) rectangle.left = existing.left;
@@ -426,6 +431,11 @@ static void markDirtyBounds(int16_t top, int16_t left, int16_t bottom, int16_t r
 static void markDrivingDirtyBounds(int16_t top, int16_t left,
                                    int16_t bottom, int16_t right)
 {
+#ifndef VETTE_PORT_WORK_LEGACY
+    // Every completed driving frame already dirties the entire exterior.
+    // Only the portion below it adds information to the dashboard list.
+    if (top < 198) top = 198;
+#endif
     if (top >= bottom || left >= right) return;
     appendDirtyBounds(s_drivingDirtyRects, s_drivingDirtyRectCount,
                       top, left, bottom, right);

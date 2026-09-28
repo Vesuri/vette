@@ -132,6 +132,11 @@ EXTRA_DEFINES += -DVETTE_MAPPED_COPY_VERIFY
 endif
 endif
 
+# Paired-measurement fallback for port bookkeeping before optimization.
+ifeq ($(PORT_WORK_LEGACY),1)
+EXTRA_DEFINES += -DVETTE_PORT_WORK_LEGACY
+endif
+
 # Chunky-to-planar rectangle kernel. The C table implementation remains the oracle;
 # the default assembly twin consumes the game's packed nibbles directly and,
 # extending Kalms' OCS/ECS wide-write strategy, writes 32-pixel longword

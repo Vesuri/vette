@@ -494,6 +494,15 @@ void VetteScreen::updateMouseSprite(bool oddField)
 {
     uint16_t* sprite = m_mouseSprite[oddField ? 1 : 0];
     if (!sprite) return;
+#ifndef VETTE_PORT_WORK_LEGACY
+    if (!m_mouseAllowed || !m_cursorVisible) {
+        // Point at the existing empty sprite; hidden rows need no rebuilding.
+        uint32_t pointer = (uint32_t)m_emptySprite;
+        m_copper[VS_CL_SPRITES] = copperMove(spr1pth, (uint16_t)(pointer >> 16));
+        m_copper[VS_CL_SPRITES + 1] = copperMove(spr1ptl, (uint16_t)pointer);
+        return;
+    }
+#endif
 
     int16_t left = (int16_t)(m_cursorX - m_cursorHotX - (m_hires ? 0 : m_cropLeft));
     int16_t top = (int16_t)((m_hires ? (int16_t)kMacTop : -(int16_t)m_cropTop) + m_cursorY - m_cursorHotY);
@@ -585,12 +594,35 @@ static void validateConvertedFrame(const uint8_t* chunky, const uint8_t* planar,
 
 static uint8_t gammaToOcs(uint16_t component)
 {
+#ifdef VETTE_PORT_WORK_LEGACY
     static const uint8_t thresholds[15] = {
         2, 10, 20, 32, 46, 61, 77, 95, 113, 133, 153, 175, 197, 220, 243
     };
     uint8_t value = (uint8_t)(component >> 8), result = 0;
     while (result < 15 && value >= thresholds[result]) ++result;
     return result;
+#else
+    // Exact lookup for the original 15 thresholds; only the high byte matters.
+    static const uint8_t gamma[256] = {
+        0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2,
+        2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
+        4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 5, 5,
+        5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 6, 6, 6,
+        6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 7, 7, 7,
+        7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 8,
+        8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8,
+        8, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9,
+        9, 9, 9, 9, 9, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10,
+        10, 10, 10, 10, 10, 10, 10, 10, 10, 11, 11, 11, 11, 11, 11, 11,
+        11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 12,
+        12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12,
+        12, 12, 12, 12, 12, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13,
+        13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 14, 14, 14, 14,
+        14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14,
+        14, 14, 14, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
+    };
+    return gamma[component >> 8];
+#endif
 }
 
 static bool rectangleContains(const VetteScreen::DirtyRect& outer,
