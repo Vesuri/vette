@@ -208,3 +208,35 @@ switches, and reproduction commands. `make game-raster-check` compares the
 byte-guarded Traffic copy-row replacement against its original operations over
 866 memory/register/CCR cases. The replacement is specific to the supported
 68020 target and leaves the game's decisions and outer rendering routine intact.
+
+### Original geometry kernels
+
+`GAME_GEOMETRY=1` (the default) uses byte-guarded sparse-matrix paths for
+MAIN+$50FC's vertex pass, MAIN+$4BBE's point transform, and the transform inside
+MAIN+$4C30. Other matrices retain the original instructions. The full vertex
+pass is copied from the user's loaded CODE at runtime; projection, clipping,
+rounding and cached-coordinate behavior remain original. No game data is embedded.
+
+`make game-kernel-check` checks 2,240 generated cases and then replays live calls
+against the original instructions during driving. It compares output memory, all registers and the five
+CCR condition bits, and records paired field/beam timings on identical inputs.
+The paired timing includes the same register bridge and clock overhead in both
+arms; it is separate from whole-frame production performance.
+
+For the parked Pierce/Greenwich comparison, run:
+
+```sh
+bash amiga/geometry_benchmark.sh base
+bash amiga/geometry_benchmark.sh optimized
+python3 tools/report_geometry_benchmark.py
+```
+
+This uses `PARKED_PROFILE_SCENE=2`, seed 0x3BD90000, 100 settling iterations and
+120 complete measured frames, twice per stage. `GAME_GEOMETRY=0` retains original
+geometry for comparisons. The older four-stage `benchmark.sh` explicitly disables
+geometry changes so its historical comparison remains reproducible.
+
+In `CODE_PROFILE=1` builds, runtime copies occupy zero-filled code-hunk storage
+so FS-UAE records them. The resident-code report identifies `vetteGeometry*`,
+`vettePoint*` and `vetteVertex*` as game rendering; moving instructions to those
+addresses must not be interpreted as additional port overhead.

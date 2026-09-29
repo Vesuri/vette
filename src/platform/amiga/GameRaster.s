@@ -43,6 +43,8 @@ vetteGameCopyRowOriginal:
 | supplied in state[0..15], then capture every output, including untouched ones.
 	.section .text.vetteTestGameCopyRow,"ax"
 	.globl vetteTestGameCopyRow
+	.globl vetteTestGameKernel
+vetteTestGameKernel:
 vetteTestGameCopyRow:
 	movem.l d2-d7/a2-a6,-(sp)
 	move.l 48(sp),a0

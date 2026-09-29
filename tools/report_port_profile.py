@@ -78,7 +78,10 @@ def main():
     rows = [dict(name=name, cycles=cycles, total_pct=100 * cycles / data['total'],
                  port_pct=100 * cycles / port_total, pcs=sorted(pcs[name]))
             for name, cycles in costs.most_common()]
-    lines = ['# Port and resident-code self time', '',
+    game_total = sum(row['cycles'] for row in rows
+                     if row['name'].startswith(('vetteGameCopyRow', 'vetteGeometry', 'vettePoint', 'vetteVertex')))
+    lines = ['# Resident-code self time: port and game rendering', '',
+             f'Game renderer helpers and runtime copies account for **{100 * game_total / data["total"]:.3f}%** of the whole capture; these are not port-originated overhead.', '',
              'Resolved against the diagnostic ELF saved with this capture. ',
              'This partitions Amiga execution time; it does not measure slowdown versus Macintosh.', '',
              '| Function | Whole capture | Resident port category |', '| --- | ---: | ---: |']

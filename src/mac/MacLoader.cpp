@@ -1064,12 +1064,18 @@ static bool installDrivingBoundaryTrap()
     return true;
 }
 
+#if defined(VETTE_GAME_GEOMETRY) || defined(VETTE_GAME_KERNEL_VERIFY)
+extern "C" bool vetteInstallGameKernels(uint8_t* main);
+#endif
 extern "C" void vetteGameCopyRow();
 #ifdef VETTE_GAME_RASTER_VERIFY
 extern "C" bool vetteCheckGameRaster();
 #endif
 static bool installDrivingRasterTraps()
 {
+#if defined(VETTE_GAME_GEOMETRY) || defined(VETTE_GAME_KERNEL_VERIFY)
+    if (!vetteInstallGameKernels(s_segments[1].begin)) return false;
+#endif
     // Traffic+$67A4 and +$67FA are the game's two packed-byte rectangle
     // writers (copy and OR). Their entry registers are the destination X/Y,
     // width and height, so these are the authoritative dirty bounds for the
@@ -6039,9 +6045,15 @@ static void refreshDrivingKeyMap()
     uint8_t* parkedCar = (uint8_t*)read32(s_currentA5 - 13944);
     if (parkedCar && (int16_t)read16(s_currentA5 - 13296) >= 3) {
         if (!parkedProfilePlaced) {
+#if defined(VETTE_PARKED_PROFILE_SCENE) && VETTE_PARKED_PROFILE_SCENE == 2
+            // Pierce/Greenwich: look back down the street after traffic settles.
+            relocateDiagnosticCar(parkedCar, (22UL << 11) + 128,
+                                  (32UL << 11) + 1024, 0x2000);
+#else
             relocateDiagnosticCar(parkedCar,
                                   (25UL << 11) + 128,
                                   (32UL << 11) + 1024, 0x0000);
+#endif
             write16(parkedCar + 0x1a, 0);
             write16(parkedCar + 0x1c, 0);
             write16(parkedCar + 0x42, 0);

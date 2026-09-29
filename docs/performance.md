@@ -4,6 +4,7 @@ Measured 2026-09-29 in FS-UAE's PAL A1200 configuration: 68020, 2 MiB Chip RAM,
 8 MiB Fast RAM, normal lores crop. These are emulated machine timings, not host
 wall-clock timings or measurements on physical hardware.
 
+The initial port/copy-row comparison below predates the geometry changes.
 Each version ran twice, measuring 120 complete driving iterations and 120
 presented frames after twelve settling iterations in the parked street at cell
 (25,32). Position remained (51328,66563), speed and gear stayed zero, and each run
@@ -20,7 +21,7 @@ presentation boundaries; elapsed PAL fields and beam phase supplied the clock.
 | Plus port bookkeeping fixes | 155.233 | 6.442 | 6.68% | 155.233–155.233 |
 | Plus game copy-loop optimization | 147.648 | 6.773 | 11.24% | 147.648–147.648 |
 
-The final version uses **11.24% less time per frame**, corresponding to **12.66%
+The copy-row stage uses **11.24% less time per frame**, corresponding to **12.66%
 higher throughput** than the full-copy baseline. The port bookkeeping changes
 alone save 1.05% relative to direct C2P; the game copy loop then saves 4.89%.
 The largest within-version spread was 0.015 ms/frame, well below these effects.
@@ -78,3 +79,69 @@ switches are `DRIVING_COPY_LEGACY=1`, `PORT_WORK_LEGACY=1` and
 Correctness gates are `make game-raster-check`, `make direct-c2p-check`,
 `make direct-c2p-shadow-check` and `make direct-c2p-fallback-check`.
 Build cleanly without flags afterwards to restore the normal executable.
+
+
+## Geometry: Pierce/Greenwich
+
+The next profile's three largest game groups were vertex transformation and
+projection (15.56% of the whole capture), supporting coordinate/matrix work
+(9.75%), and polygon span/edge/row work (15.43%). Their combined 40.74% is time
+spent in those groups, not the amount that can be eliminated.
+
+The retained change skips four multiplications when the corresponding matrix
+coefficients are exactly zero. The vertex pass tests this once per model;
+other matrices and cached coordinates use the original instructions. Point
+transforms use the same exact sparse-matrix path. Projection, clipping, fixed-point
+rounding and overflow handling remain original. Complete replaced ranges have
+CRC-32 guards, and original code is copied from the user's loaded resources at
+runtime rather than embedded in the executable.
+
+Two polygon-row experiments were rejected: an eight-row unrolled loop increased
+whole-frame time by about 1.8%, and a compact loop with a uniform-pattern shortcut
+also ran slower. Polygon code therefore remains original. This optimization
+improves work in the two geometry groups; it does not accelerate all three groups.
+
+The final comparison uses the same PAL A1200 configuration as above, but a
+**different scene**: Pierce/Greenwich, cell (22,32), position (45184,66563), heading
+0x2000. The player stays stationary in neutral without input while simulation
+and traffic continue. Both builds use seed 0x3BD90000, 100 settling iterations,
+and 120 complete measured frames/iterations, repeated twice. Each run ends with
+15 active objects; that count does not imply 15 visible vehicles. Prior port and
+copy-row optimizations are enabled in both builds. No verification, probes or
+instruction tracing is active during these measurements.
+
+| Geometry | Mean ms/frame | FPS | Frame-time reduction | Repeat range (ms) |
+| --- | ---: | ---: | ---: | ---: |
+| Original (`GAME_GEOMETRY=0`) | 229.051 | 4.366 | 0.00% | 229.020–229.082 |
+| Optimized (default) | 223.414 | 4.476 | 2.46% | 223.414–223.414 |
+
+This saves **5.64 ms/frame (2.46%)**, or about **2.52% higher throughput**, in this
+scene. Do not compare these absolute times to the earlier cell (25,32) table.
+The result is scene-specific and measures emulated Amiga performance, not a
+speed difference from the Macintosh version.
+
+Differential verification passed 2,240 generated cases, including sparse and
+arbitrary matrices, signed and rounding boundaries, complete vertex passes,
+cached coordinates, clipping and projection overflow. It compares output memory,
+all registers and the five CCR condition bits. A moving driving run additionally
+passed 37,311 timed live comparisons against the original instructions with zero
+mismatches. Paired transform timings were 7.70% and 11.46% lower for the general
+and translated-point kernels respectively; both arms include register-bridge and
+clock-read overhead, so the whole-frame table is the performance result.
+Production, intro/audio and driving smoke regressions passed. The profiler-enabled
+code storage passed the generated cases and a short live replay; the restored
+normal build passed the software multiply/divide and probe-symbol link audits.
+
+Reproduce with:
+
+```sh
+bash amiga/geometry_benchmark.sh base
+bash amiga/geometry_benchmark.sh optimized
+python3 tools/report_geometry_benchmark.py
+make game-kernel-check
+```
+
+The benchmark retains both executables and logs under ignored
+`tmp/geometry-benchmark/` and rejects missing PASS records, incorrect frame counts,
+or mismatched position/object counts. The older four-stage benchmark explicitly
+sets `GAME_GEOMETRY=0`. Clean and rebuild without diagnostic flags afterwards.

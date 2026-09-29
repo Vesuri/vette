@@ -132,6 +132,14 @@ EXTRA_DEFINES += -DVETTE_MAPPED_COPY_VERIFY
 endif
 endif
 
+GAME_GEOMETRY ?= 1
+ifeq ($(GAME_GEOMETRY),1)
+EXTRA_DEFINES += -DVETTE_GAME_GEOMETRY
+endif
+ifeq ($(GAME_KERNEL_VERIFY),1)
+EXTRA_DEFINES += -DVETTE_GAME_KERNEL_VERIFY
+endif
+
 ifneq ($(GAME_RASTER_ORIGINAL),1)
 EXTRA_DEFINES += -DVETTE_GAME_RASTER
 endif
@@ -385,6 +393,9 @@ endif
 
 # Diagnostic stationary street scene for original-code profiling.
 ifeq ($(PARKED_PROFILE),1)
+ifdef PARKED_PROFILE_SCENE
+EXTRA_DEFINES += -DVETTE_PARKED_PROFILE_SCENE=$(PARKED_PROFILE_SCENE)
+endif
 EXTRA_DEFINES += -DVETTE_PARKED_PROFILE
 endif
 
@@ -522,6 +533,9 @@ ASFLAGS   = -mcpu=68000 -g --register-prefix-optional -I"$(SDKDIR)" -I"$(CURDIR)
 # The supported package target is an A1200. C2P uses scaled indexing;
 # GameRaster uses unaligned longwords and unprivileged CCR reads. All other
 # assembly and resident Macintosh code retain the broader 68000 setting.
+ifeq ($(GAME_KERNEL_VERIFY),1)
+obj/GameGeometry.o: ASFLAGS := $(filter-out -mcpu=68000,$(ASFLAGS)) -mcpu=68020 --defsym VETTE_GAME_KERNEL_VERIFY=1
+endif
 obj/GameRaster.o: ASFLAGS := $(filter-out -mcpu=68000,$(ASFLAGS)) -mcpu=68020
 obj/C2P.o: ASFLAGS := $(filter-out -mcpu=68000,$(ASFLAGS)) -mcpu=68020
 # vasm (Motorola syntax) for the framework *Assembler.s.  -m68010: the only >68000 instruction in
@@ -546,6 +560,11 @@ PROBE_SYMS = g_vbiCount g_planeChecksum g_screenReady g_laceFields g_longFields 
              g_stageBState g_trapWord g_trapSelector g_trapSegment g_trapOffset \
              g_trapPC g_trapRegisters g_trapUserStack g_resourceCount g_jumpEntryCount \
              g_blockMoveCount g_trapManager g_trapRoutine
+ifeq ($(GAME_KERNEL_VERIFY),1)
+PROBE_SYMS += g_gameKernelCases g_gameKernelFailures g_gameKernelFirstFailure \
+              g_gameKernelLiveCases g_gameKernelLiveFailures g_gameKernelLiveKind \
+              g_gameKernelFastTicks g_gameKernelOriginalTicks g_gameKernelTimedCases
+endif
 ifeq ($(GAME_RASTER_VERIFY),1)
 PROBE_SYMS += g_gameRasterVerifyCases g_gameRasterVerifyFailures
 endif

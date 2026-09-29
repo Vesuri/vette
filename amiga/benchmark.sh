@@ -14,7 +14,7 @@ esac
 mkdir -p ../tmp/optimization
 make clean
 make -j4 SKIP_INTRO=1 GARAGE_CLICK=1 PARKED_PROFILE=1 \
-  FIDELITY_RANDOM_SEED=0x3BD90000 "${flags[@]}" > "../tmp/optimization/$name-build.log" 2>&1
+  FIDELITY_RANDOM_SEED=0x3BD90000 GAME_GEOMETRY=0 "${flags[@]}" > "../tmp/optimization/$name-build.log" 2>&1
 cp out/Vette.elf "../tmp/optimization/$name.elf"
 cp out/Vette.exe "../tmp/optimization/$name.exe"
 for run in 1 2; do

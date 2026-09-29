@@ -414,3 +414,11 @@ game-raster-check:
 	  $(MAKE) -j4 GAME_RASTER_VERIFY=1 SKIP_INTRO=1 GARAGE_CLICK=1 && \
 	  GDBTAIL=30 EXTRA_ARGS="--warp_mode=1" GDBSCRIPT=game_raster_verify.gdb ./diag_run.sh 90
 	@grep -q 'PASS game raster differential' amiga/.run/gdb-out.log
+
+# Byte-guarded geometry kernels: generated cases and live moving-game replay.
+.PHONY: game-kernel-check
+game-kernel-check:
+	@cd amiga && . ./env.sh && $(MAKE) clean && \
+	  $(MAKE) -j4 GAME_GEOMETRY=1 GAME_KERNEL_VERIFY=1 SKIP_INTRO=1 GARAGE_CLICK=1 FOLLOW_ROAD=1 && \
+	  GDBTAIL=40 EXTRA_ARGS="--warp_mode=1" GDBSCRIPT=game_kernel_verify.gdb ./diag_run.sh 420 && \
+	  grep -q 'PASS game kernel differential' .run/gdb-out.log
