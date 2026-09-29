@@ -46,7 +46,7 @@ include aliases accommodate the SDK's short LVO names and the NDK's `_lib.i`
 filenames. The small slave is always reassembled, avoiding stale build options.
 
 `make dist` builds the production game, slave and native extraction helper, then
-creates `dist/Vette-0.90.lha`. Installer sets the game icon's default tool to
+creates `dist/Vette-0.92.lha`. Installer sets the game icon's default tool to
 WHDLoad, with `SLAVE=Vette!.slave` and `PRELOAD`.
 The archive follows the released Rescue on Fractalus conventions: `Vette! Install`
 drawer, `Vette!.inf` game-icon template, lowercase `.slave`, and `ReadMe` with its

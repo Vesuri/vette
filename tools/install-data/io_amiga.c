@@ -6,7 +6,7 @@
 #include <string.h>
 struct ExecBase *SysBase;
 struct DosLibrary *DOSBase;
-static const char version[] __attribute__((used,section(".text.ver"))) = "$VER: VetteInstallData 0.90 (23.09.2026)";
+static const char version[] __attribute__((used,section(".text.ver"))) = "$VER: VetteInstallData 0.92 (29.09.2026)";
 #ifdef INSTALL_STACK_TEST
 volatile uint32_t installer_stack_size,installer_stack_unused;
 volatile int installer_result;

@@ -77,7 +77,7 @@ Do not use the unidentified NDIF checksum as a validation gate.
 
 ## Release archive
 
-`make dist` produces `dist/Vette-0.91.lha`, with a `Vette! Install` drawer
+`make dist` produces `dist/Vette-0.92.lha`, with a `Vette! Install` drawer
 and sibling drawer icon. It contains the game executable, slave, `Vette!.inf`
 icon template, extraction helper, Install with its icon, ReadMe with its icon,
 and `LICENSE.LGPL.txt` without an icon. The LGPL text applies only to the helper

@@ -102,6 +102,12 @@
 
  History:
  --------
+ version 0.92 (29.09.2026):
+ - improved drawing performance by removing redundant frame copying and
+   optimizing object rendering and display updates
+ - restored original course selection layout in hires mode
+ - moved and reduced route detail panels to fit the cropped lores screen
+
  version 0.91 (25.09.2026):
  - added cropped lores display and optional interlaced hires mode
  - improved mouse pointer and course selection button layout
