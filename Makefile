@@ -89,7 +89,7 @@ todo:
 course-text-regression:
 	@mkdir -p tmp
 	@cd amiga && . ./env.sh && $(MAKE) clean && \
-	  $(MAKE) -j4 SKIP_INTRO=1 GARAGE_CLICK=1 && \
+	  $(MAKE) -j4 HIRES=1 SKIP_INTRO=1 GARAGE_CLICK=1 && \
 	  GDBTAIL=100 EXTRA_ARGS="--warp_mode=1" GDBSCRIPT=course_text_layout.gdb \
 	  ./diag_run.sh 90
 	@cp amiga/.run/gdb-out.log tmp/amiga-course-text-layout.log

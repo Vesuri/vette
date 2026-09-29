@@ -66,6 +66,18 @@ checks the image placement and preserved surroundings. Hires retains the origina
 artwork and hit/highlight positions X=38,132,226,320,413. The active startup mode
 (including the WHDLoad override) selects the layout, not a compile-time flag.
 
+The four course-detail PICTs (6398, 5383, 27402, 15714) also retain their authored
+positions in hires. In lores their panel is reflowed to (256,45)-(424,93), inside
+the course viewport (64,37)-(432,320). The 168x48 rounded panel covers about 58%
+less area than the original 193x100 panel. Text comes from the original resources
+and keeps the existing 5x7 glyph size; only its placement changes. The heading is
+centered and Start/Finish are left-aligned. Blank text records do not consume a
+line. Dirty tracking includes the relocated bounds, and original resources and
+course-selection logic are unchanged. `bash amiga/course_panels.sh` checks all
+four courses in both modes and captures their selected panels under ignored
+`tmp/course-bubbles/`. `make course-text-regression` checks the original hires
+relative-text placement. Clean and rebuild normally after diagnostic runs.
+
 Other windows use 80,0. A changed viewport forces a complete C2P of its newly
 visible area and drops the previous crop's synchronization rectangles. VBI
 publishes the new bitmap, origin and mouse visibility together. The pointer is

@@ -1,5 +1,5 @@
 # Check Course One's source-authored DHDVText placement after PICT 6398 has
-# returned. Requires SKIP_INTRO=1 GARAGE_CLICK=1.
+# returned. Requires HIRES=1 SKIP_INTRO=1 GARAGE_CLICK=1.
 set pagination off
 set confirm off
 

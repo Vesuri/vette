@@ -3391,8 +3391,10 @@ static bool pictureRoundPixel(int16_t y, int16_t x, int16_t top, int16_t left,
 }
 
 static bool drawVersionOnePicture(const uint8_t* picture, uint32_t size,
-                                  const uint8_t* frame, const uint8_t* targetRect)
+                                  const uint8_t* frame, const uint8_t* targetRect,
+                                  bool compactCourse = false)
 {
+    uint16_t courseTextLine = 0;
     uint32_t offset = 12;                    // version opcode $11, version byte $01
     bool drewPixels = false;
     uint8_t pattern[8] = { 0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff };
@@ -3424,7 +3426,12 @@ static bool drawVersionOnePicture(const uint8_t* picture, uint32_t size,
     if (!pixels || !rowBytes || read16(map + 32) != 4) return false;
     while (offset < size) {
         uint8_t opcode = picture[offset++];
-        if (opcode == 0xff) return drewPixels;
+        if (opcode == 0xff) {
+            if (!drewPixels || (compactCourse && courseTextLine != 3)) return false;
+            // The relocated panel extends left of the authored destination.
+            if (compactCourse && pixels == s_colorScreen) markDirtyBounds(45, 256, 93, 424);
+            return true;
+        }
         if (opcode == 0x00) continue;
         if (opcode == 0xa0) { if (offset + 2 > size) return false; offset += 2; continue; }
         if (opcode == 0xa1) {
@@ -3511,6 +3518,13 @@ static bool drawVersionOnePicture(const uint8_t* picture, uint32_t size,
                 lastBottom = (int16_t)(read16(picture + offset + 4) + translateV);
                 lastRight = (int16_t)(read16(picture + offset + 6) + translateH);
                 offset += 8;
+                if (compactCourse) {
+                    // Fit inside the course crop (64,37)-(432,320), leaving
+                    // the map and route markers visible below the panel.
+                    lastTop = 45; lastLeft = 256;
+                    lastBottom = 93; lastRight = 424;
+                    ovalHeight = ovalWidth = 12;
+                }
             }
             for (int16_t y = lastTop; y < lastBottom; ++y)
                 for (int16_t x = lastLeft; x < lastRight; ++x) {
@@ -3553,13 +3567,27 @@ static bool drawVersionOnePicture(const uint8_t* picture, uint32_t size,
             uint8_t length = picture[offset + prefix];
             if (offset + prefix + 1UL + length > size) return false;
             const uint8_t* text = picture + offset + prefix + 1;
+            int16_t drawH = textH, drawV = textV;
+            if (compactCourse) {
+                // Reflow the source strings without shrinking the 5x7 glyphs.
+                // Keep the PICT text origins intact for relative text opcodes.
+                // Course Three includes a separate blank text operation.
+                bool visibleText = false;
+                for (uint16_t i = 0; i < length; ++i)
+                    if (text[i] != ' ') visibleText = true;
+                if (!visibleText) { offset += prefix + 1UL + length; continue; }
+                if (courseTextLine >= 3 || length > 25) return false;
+                drawH = courseTextLine == 0 ? (int16_t)(340 - length * 3) : 264;
+                drawV = courseTextLine == 0 ? 58 : (courseTextLine == 1 ? 72 : 84);
+                ++courseTextLine;
+            }
             for (uint16_t i = 0; i < length; ++i) {
                 for (uint16_t row = 0; row < 7; ++row) {
                     uint8_t bits = pictureGlyphRow(text[i], row);
                     for (uint16_t column = 0; column < 5; ++column)
                         if (bits & (16u >> column)) {
-                            int16_t x = (int16_t)(textH + i * 6 + column);
-                            int16_t y = (int16_t)(textV - 7 + row);
+                            int16_t x = (int16_t)(drawH + i * 6 + column);
+                            int16_t y = (int16_t)(drawV - 7 + row);
                             if (y >= mapTop && y < mapBottom && x >= mapLeft && x < mapRight)
                                 setPackedPixel(pixels, rowBytes, mapTop, mapLeft, x, y, 15);
                         }
@@ -3589,8 +3617,19 @@ static bool drawPictureContents(uint8_t** pictureHandle, const uint8_t* targetRe
     if (!pictureHandle || !*pictureHandle || !targetRect || size < 12) return false;
     const uint8_t* picture = *pictureHandle;
     const uint8_t* frame = picture + 2;
-    if (picture[10] == 0x11 && picture[11] == 0x01)
-        return drawVersionOnePicture(picture, size, frame, targetRect);
+    if (picture[10] == 0x11 && picture[11] == 0x01) {
+        bool compactCourse = false;
+        if (!vette_hires_value) {
+            int32_t index = resourceHandleIndex(pictureHandle);
+            ResourceForks::Item item;
+            compactCourse = index >= 0 && s_resourceForks.item((uint32_t)index, item)
+                && item.type == 0x50494354UL
+                && (item.id == 6398 || item.id == 5383 || item.id == 27402 || item.id == 15714);
+            if (compactCourse && (read16(frame) != 34 || read16(frame + 2) != 315
+                || read16(frame + 4) != 134 || read16(frame + 6) != 508)) return false;
+        }
+        return drawVersionOnePicture(picture, size, frame, targetRect, compactCourse);
+    }
     uint32_t offset = 10;
     bool drewPixels = false;
     while (offset + 2 <= size) {
