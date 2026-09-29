@@ -18,6 +18,7 @@ void vette_line_a_handler();
 void vette_call_mac_code(void* entry, void* a5);
 void vette_user_exit_request();
 void vette_user_exit_trampoline();
+extern volatile uint16_t vette_hires_value;
 extern volatile uint16_t g_macFramesPresented;
 extern volatile uint16_t g_vbiCount;
 volatile uint32_t g_framePaceSteps[kPaceCount] = {};
@@ -3646,6 +3647,8 @@ static bool currentPortPixels(uint8_t*& pixels, uint16_t& rowBytes,
 static bool drawPicture(uint8_t** pictureHandle, const uint8_t* targetRect)
 {
     if (!drawPictureContents(pictureHandle, targetRect)) return false;
+    // Hires displays the full authored layout; only the lores crop needs moving.
+    if (vette_hires_value) return true;
     int32_t index = resourceHandleIndex(pictureHandle);
     ResourceForks::Item item;
     if (index >= 0 && s_resourceForks.item((uint32_t)index, item)
@@ -6454,6 +6457,9 @@ static bool nextEvent(uint16_t mask, uint8_t* event)
     // then the course screen's ACCEPT.
     // The visible 512x320 crop begins at Macintosh global (64,91), so keep the
     // live state local while emitting ordinary mouse events.
+    const uint16_t* courseLeft = vette_hires_value
+        ? CourseButtons::originalLeft : CourseButtons::left;
+    const int16_t courseAcceptX = (int16_t)(courseLeft[4] + 32);
 #ifdef VETTE_GARAGE_DIFFICULTY
     static const int16_t difficultyY[] = { 69, 112, 156 };
     const int16_t selectedDifficultyY = difficultyY[VETTE_GARAGE_DIFFICULTY - 1];
@@ -6476,7 +6482,7 @@ static bool nextEvent(uint16_t mask, uint8_t* event)
         466,
 #endif
         289, 293, 413, selectedOpponentX, 212,
-        (int16_t)(CourseButtons::left[VETTE_GARAGE_COURSE - 1] + 32), 402
+        (int16_t)(courseLeft[VETTE_GARAGE_COURSE - 1] + 32), courseAcceptX
     };
     const int16_t clickY[] = {
 #ifdef VETTE_GARAGE_DYNO
@@ -6491,7 +6497,7 @@ static bool nextEvent(uint16_t mask, uint8_t* event)
 #ifdef VETTE_GARAGE_DYNO
         466,
 #endif
-        289, 293, 413, selectedOpponentX, 212, 402
+        289, 293, 413, selectedOpponentX, 212, courseAcceptX
     };
     const int16_t clickY[] = {
 #ifdef VETTE_GARAGE_DYNO
@@ -6501,12 +6507,12 @@ static bool nextEvent(uint16_t mask, uint8_t* event)
         selectedOpponentY, 154, 308
     };
 #elif defined(VETTE_GARAGE_COURSE)
-    static const int16_t clickX[] = {
+    const int16_t clickX[] = {
 #ifdef VETTE_GARAGE_DYNO
         466,
 #endif
         293, 413, selectedOpponentX, 212,
-        (int16_t)(CourseButtons::left[VETTE_GARAGE_COURSE - 1] + 32), 402
+        (int16_t)(courseLeft[VETTE_GARAGE_COURSE - 1] + 32), courseAcceptX
     };
     const int16_t clickY[] = {
 #ifdef VETTE_GARAGE_DYNO
@@ -6519,7 +6525,7 @@ static bool nextEvent(uint16_t mask, uint8_t* event)
 #ifdef VETTE_GARAGE_DYNO
         466,
 #endif
-        293, 413, selectedOpponentX, 212, 402
+        293, 413, selectedOpponentX, 212, courseAcceptX
     };
     const int16_t clickY[] = {
 #ifdef VETTE_GARAGE_DYNO
