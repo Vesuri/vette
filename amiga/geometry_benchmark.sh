@@ -4,15 +4,17 @@ set -euo pipefail
 cd "$(dirname "$0")"
 . ./env.sh
 name="${1:-optimized}"
+flags=()
 case "$name" in
+  legacy) geometry=0; flags=(DRIVING_COPY_LEGACY=1 PORT_WORK_LEGACY=1 GAME_RASTER_ORIGINAL=1) ;;
   base) geometry=0 ;;
   optimized) geometry=1 ;;
-  *) echo 'Usage: bash amiga/geometry_benchmark.sh base|optimized' >&2; exit 2 ;;
+  *) echo 'Usage: bash amiga/geometry_benchmark.sh legacy|base|optimized' >&2; exit 2 ;;
 esac
 mkdir -p ../tmp/geometry-benchmark
 make clean
 make -j4 SKIP_INTRO=1 GARAGE_CLICK=1 PARKED_PROFILE=1 PARKED_PROFILE_SCENE=2 \
-  FIDELITY_RANDOM_SEED=0x3BD90000 GAME_GEOMETRY="$geometry" \
+  FIDELITY_RANDOM_SEED=0x3BD90000 GAME_GEOMETRY="$geometry" "${flags[@]}" \
   > "../tmp/geometry-benchmark/$name-build.log" 2>&1
 cp out/Vette.elf "../tmp/geometry-benchmark/$name.elf"
 cp out/Vette.exe "../tmp/geometry-benchmark/$name.exe"

@@ -145,3 +145,38 @@ The benchmark retains both executables and logs under ignored
 `tmp/geometry-benchmark/` and rejects missing PASS records, incorrect frame counts,
 or mismatched position/object counts. The older four-stage benchmark explicitly
 sets `GAME_GEOMETRY=0`. Clean and rebuild without diagnostic flags afterwards.
+
+
+## Combined port and game gain in the same scene
+
+The full-copy baseline was also measured at Pierce/Greenwich with the exact
+scene, seed, 100-iteration settling period and 120-frame window used above.
+Both repeats passed the stationary-position, frame-count and 15-active-object
+checks. The optimized and pre-geometry measurements are the saved runs above;
+only the missing full-copy baseline needed another clean build and two runs.
+
+| Cumulative stage | Mean ms/frame | FPS | Frame-time reduction | Repeat range (ms) |
+| --- | ---: | ---: | ---: | ---: |
+| Before these port/game optimizations | 245.202 | 4.078 | 0.00% | 244.967–245.437 |
+| Direct C2P, port bookkeeping and game copy row | 229.051 | 4.366 | 6.59% | 229.020–229.082 |
+| All of the above plus geometry | 223.414 | 4.476 | 8.89% | 223.414–223.414 |
+
+Together these changes save **21.79 ms/frame (8.89%)**, equivalent to **9.75%
+higher FPS**, in this scene. Frame-time saving is `1 - new/old`; FPS gain is
+`old/new - 1`. The baseline repeat spread is 0.47 ms, much smaller than the gain.
+The earlier 11.24% result used cell (25,32); adding it to the geometry percentage
+would mix different workloads. These are FS-UAE PAL A1200 measurements, not
+Macintosh comparisons or guarantees for every scene and CPU.
+
+To reproduce the cumulative comparison, run all three stages:
+
+```sh
+bash amiga/geometry_benchmark.sh legacy
+bash amiga/geometry_benchmark.sh base
+bash amiga/geometry_benchmark.sh optimized
+python3 tools/report_geometry_benchmark.py --combined
+```
+
+`legacy` enables `DRIVING_COPY_LEGACY=1`, `PORT_WORK_LEGACY=1`,
+`GAME_RASTER_ORIGINAL=1`, and `GAME_GEOMETRY=0`. The default report still compares
+only the two geometry stages. Restore a clean normal build after benchmarking.

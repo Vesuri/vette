@@ -235,6 +235,9 @@ This uses `PARKED_PROFILE_SCENE=2`, seed 0x3BD90000, 100 settling iterations and
 120 complete measured frames, twice per stage. `GAME_GEOMETRY=0` retains original
 geometry for comparisons. The older four-stage `benchmark.sh` explicitly disables
 geometry changes so its historical comparison remains reproducible.
+For the total port-plus-game gain in this same scene, also run
+`bash amiga/geometry_benchmark.sh legacy`, then
+`python3 tools/report_geometry_benchmark.py --combined`.
 
 In `CODE_PROFILE=1` builds, runtime copies occupy zero-filled code-hunk storage
 so FS-UAE records them. The resident-code report identifies `vetteGeometry*`,
