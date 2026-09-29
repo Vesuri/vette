@@ -238,6 +238,9 @@ geometry changes so its historical comparison remains reproducible.
 For the total port-plus-game gain in this same scene, also run
 `bash amiga/geometry_benchmark.sh legacy`, then
 `python3 tools/report_geometry_benchmark.py --combined`.
+Set `AMIGA_MODEL=A4000` on each benchmark command to repeat with that preset;
+its logs and executables go to `tmp/geometry-benchmark-A4000/`. Pass that
+directory to the report tool. Both presets keep 2 MiB Chip and 8 MiB Fast RAM.
 
 In `CODE_PROFILE=1` builds, runtime copies occupy zero-filled code-hunk storage
 so FS-UAE records them. The resident-code report identifies `vetteGeometry*`,

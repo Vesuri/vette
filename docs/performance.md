@@ -180,3 +180,40 @@ python3 tools/report_geometry_benchmark.py --combined
 `legacy` enables `DRIVING_COPY_LEGACY=1`, `PORT_WORK_LEGACY=1`,
 `GAME_RASTER_ORIGINAL=1`, and `GAME_GEOMETRY=0`. The default report still compares
 only the two geometry stages. Restore a clean normal build after benchmarking.
+
+
+## A4000 preset comparison
+
+Repeating all three stages with `AMIGA_MODEL=A4000` keeps the Pierce/Greenwich
+scene, seed, 100 settling iterations, 120 complete measured frames, two repeats,
+2 MiB Chip RAM and 8 MiB Fast RAM unchanged. All six runs passed the position,
+frame/iteration count and 15-active-object checks. Emulator logs confirm A4000
+and the requested memory sizes for every run.
+
+This local FS-UAE build resolves `A4000` to **68030 + 68882**, JIT disabled,
+`cpu_speed=max`, and `cpu_cycle_exact=false`. These are timings for that emulator
+preset, not a cycle-exact physical A4000/040 benchmark. No CPU override was added.
+
+| Cumulative stage | Mean ms/frame | FPS | Frame-time reduction | Repeat range (ms) |
+| --- | ---: | ---: | ---: | ---: |
+| Before these port/game optimizations | 80.215 | 12.466 | 0.00% | 80.214944–80.215174 |
+| Direct C2P, port bookkeeping and game copy row | 70.205 | 14.244 | 12.48% | 70.205007–70.205107 |
+| All of the above plus geometry | 70.020 | 14.282 | 12.71% | 70.020347–70.020347 |
+
+The combined saving is **10.195 ms/frame (12.71%)**, equivalent to **14.56%
+higher FPS**. Geometry alone saves **0.185 ms/frame (0.26%)** on this preset,
+versus 2.46% on the A1200 preset. Thus the total relative gain is larger on A4000,
+while the incremental geometry gain is smaller. Do not transfer an optimization's
+percentage between CPU presets.
+
+```sh
+AMIGA_MODEL=A4000 bash amiga/geometry_benchmark.sh legacy
+AMIGA_MODEL=A4000 bash amiga/geometry_benchmark.sh base
+AMIGA_MODEL=A4000 bash amiga/geometry_benchmark.sh optimized
+python3 tools/report_geometry_benchmark.py tmp/geometry-benchmark-A4000 --combined
+```
+
+A4000 artifacts are kept separately under ignored `tmp/geometry-benchmark-A4000/`;
+the script preserves each run's emulator output along with the measurement log.
+The default A1200 paths and settings are unchanged. The normal optimized build
+was restored after the measurements and passed both link audits.
