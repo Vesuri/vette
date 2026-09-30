@@ -2,15 +2,16 @@
 
 Vette! is a working single-player Amiga port of **Color VETTE! 1.02**.
 Read [README.md](README.md) and [docs/development.md](docs/development.md) for the
-current build and test workflow. [docs/open-work.md](docs/open-work.md) is a
-short queue, not a completed-stage log.
+current build and test workflow. Keep unresolved work in
+[docs/open-work.md](docs/open-work.md), technical facts in the relevant reference
+document, and completed investigations in Git history.
 
 ## Scope and correctness
 
 - Preserve original game decisions. Implement their documented services; do not
   replace decisions with screen-specific guesses. Measured renderer-kernel
   replacements require original-byte guards and memory/register/CCR differential
-  verification. See docs/performance.md for the approved copy-row optimization.
+  verification. See [performance.md](docs/performance.md) for copy-row and geometry kernels.
 - Attribute code addresses as **(segment, offset)** in the Color build; offsets
   include the four-byte segment header. B&W CODE is a different program.
 - Original Macintosh execution is the fidelity reference. State-pair captures;
@@ -25,7 +26,7 @@ short queue, not a completed-stage log.
 ## Build and hardware
 
 - Source `amiga/env.sh` in the same shell as builds/runs. Clean before changing
-  build flags or widely included headers; the makefile does not track those.
+  build flags or widely included headers; HIRES is tracked automatically.
 - Preserve the software mul/div and probe-symbol link audits. Use
   `src/m68k_math.h` for suitable 16-bit arithmetic.
 - `VetteScreen` owns display registers. Publish complete copper lists and
@@ -42,7 +43,8 @@ short queue, not a completed-stage log.
 
 - Never commit original game files, resource forks, generated disassembly,
   screenshots, audio captures, ROMs or emulator state. `tmp/` and `ref/` are
-  local-only. Build outputs and release archives are ignored.
+  local-only and can contain irreplaceable inputs; inspect before cleaning.
+  Build outputs and release archives are ignored.
 - Never kill all FS-UAE or GDB processes. Use the scripts' PID-scoped cleanup.
   The shared helper is selected by `FSUAE_COMMON`; projects share the host.
 - MAME must use the documented headless command, including

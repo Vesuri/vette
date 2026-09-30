@@ -49,7 +49,8 @@ export VETTE_DATA_RSRC='../tmp/runtime-data/VETTE!.Data'
 ```
 
 Check `stage_original_data.sh` for its local input paths before first use.
-The default model has 2 MB chip and 8 MB fast RAM. A clean production build
+The diagnostic launchers use 2 MB chip and 8 MB fast RAM. Check `run.sh` for
+its standalone model and memory settings. A clean production build
 shows the intro; `SKIP_INTRO=1` uses the original first-button skip branch.
 `GARAGE_CLICK=1` scripts real selector events into driving.
 `FOLLOW_ROAD=1` adds road-following input; without it the straight-to-water
@@ -58,7 +59,8 @@ fixture is intentional.
 ## Tests
 
 ```sh
-make frame-pacing-test coverage-check driving-control-audit
+make frame-pacing-test paula-sample-test course-buttons-test
+make coverage-check driving-control-audit
 make install-data-test
 make gameplay-regression-smoke
 make dist
@@ -246,3 +248,18 @@ In `CODE_PROFILE=1` builds, runtime copies occupy zero-filled code-hunk storage
 so FS-UAE records them. The resident-code report identifies `vetteGeometry*`,
 `vettePoint*` and `vetteVertex*` as game rendering; moving instructions to those
 addresses must not be interpreted as additional port overhead.
+
+## Repository maintenance
+
+Keep source, release inputs, reusable diagnostics and current documentation in
+Git. Put one-off experiments, captures and generated reports under ignored
+`tmp/`; keep Macintosh media and emulator setup under ignored `ref/`.
+Neither directory is a disposable build cache: they may contain the only local
+copy of original inputs or reference fixtures. Inspect their contents before
+removing generated output. `make fidelity-check` needs saved captures.
+
+Build products live in `build/`, `dist/`, `amiga/obj/` and `amiga/out/`.
+Emulator runners write `amiga/.run/`; remove its generated output only when no
+run is active. Keep historical investigations in Git history and update the
+relevant reference document when behavior changes. `CLAUDE.md` holds contributor
+guidance; `open-work.md` holds only unresolved work.

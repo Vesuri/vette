@@ -4,19 +4,16 @@
 [Inside Macintosh description](https://dev.os9.ca/techpubs/mac/Toolbox/Toolbox-429.html).
 The compatibility handler retains item-list validation and bookkeeping but
 must not clear the screen. Text/control item rendering remains incomplete;
-this change does not implement the optional Macintosh dialogs.
+the handler does not implement the optional Macintosh dialogs.
 
 DLOG 900 and 910 share DITL 900, containing only a null application-defined
 item. DLOG/DITL 600 (About/model preview) has the same empty-item structure.
 The original caller draws their content separately. No blanket no-op replaces
 the trap, and no original game instructions are changed.
 
-The water recovery previously cleared global bounds (50,23)-(462,319), while
-its picture drew at local (5,5)-(407,291) in the port's screen buffer. C2P
-rounded the latter's right edge to 416, exposing the cleared area at
-(407,23), size 9x268. Removing the unjustified clear preserves those pixels
-without changing picture placement or C2P alignment. General window-local
-QuickDraw coordinate translation is not implemented by this fix.
+Recovery pictures draw their own background. `DrawDialog` must preserve pixels
+outside the picture, including alignment padding exposed by C2P. General
+window-local QuickDraw coordinate translation remains unimplemented.
 
 ## Original caller audit
 
@@ -38,7 +35,7 @@ static; it does not claim runtime coverage of unsupported dialogs.
 
 None requires a whole-window erase from `DrawDialog`. Real text, controls,
 or installed user-item draw procedures need their own implementation rather
-than the former background-fill substitute.
+than a background-fill substitute.
 
 ## Regression
 

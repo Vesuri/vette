@@ -71,11 +71,8 @@ help:
 	@echo "There is deliberately no host game build; the Amiga executable is the product."
 	@echo "The Amiga build:  cd amiga && . ./env.sh && make"
 
-# ⭐⭐ WHAT IS OPEN.  The queue plus a live sweep for markers in the tracked, non-vendored tree.
-# Expected marker output is "none" — a printed marker is either a real work item that belongs in
-# docs/open-work.md or a stale marker to delete.  (CLAUDE.md §Working conventions.)
-# ⚠ The pattern is written with character classes (TOD[O] etc) so this Makefile does not match
-# ITSELF and report a permanent phantom hit.
+# Show the current queue and tracked markers, excluding vendored code and docs.
+# Character classes keep the marker pattern from matching itself.
 todo:
 	@cat docs/open-work.md
 	@echo

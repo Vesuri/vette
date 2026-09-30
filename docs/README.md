@@ -6,6 +6,8 @@ and [release ReadMe](../release/ReadMe).
 - [Playing guide](manual.md): controls, courses, damage and session behavior.
 - [Development](development.md): build tools, tests and debugging.
 - [Amiga architecture](amiga-arch.md): runtime, display, input, audio and cleanup.
+- [Dialog drawing](dialog-drawing.md): dialog semantics and recovery regression.
+- [Performance](performance.md): measured optimizations and reproduction commands.
 - [Frame pacing](frame-pacing.md): refresh-rate limits and their test hooks.
 - [WHDLoad](whdload.md): slave design, cross-build and isolated startup tests.
 - [Original-data installation](install-original-data.md): extraction, file layout,
@@ -17,6 +19,3 @@ and [release ReadMe](../release/ReadMe).
 - [Static map](static-map.md): code segments, entry points and low-memory patches.
 - [Data formats](data-formats.md): decoded structures and their consumers.
 - [Open work](open-work.md): current limitations and deferred work.
-
-Completed-stage journals and one-off experiments are kept in Git history, not
-as instructions for building or maintaining the current port.

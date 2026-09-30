@@ -24,7 +24,8 @@ without rewriting the physics engine.
 Color QuickDraw surfaces use packed 4-bit pixels: the high nibble is the left
 pixel, the low nibble is the next. Respect each PixMap's bounds, rowBytes,
 ColorTable and port origin. The game window's drawable surface is 512×320;
-the Amiga centers it in a 512×384 display.
+the Amiga crops it in lores or centers it in a 512×384 hires display.
+See [display geometry](amiga-arch.md#display).
 
 A pixel value is an index, not an RGB color. CopyBits may translate between
 different ColorTables. Palette Manager activation changes the destination
@@ -34,8 +35,9 @@ Dithered panels use two indices, not a single darkened shade.
 
 The Macintosh reference video card applies a gamma table after the QuickDraw
 CLUT. The measured reference gamma is about 1.435; raw CLUT components therefore
-do not directly represent the displayed screenshot colors. `fb_to_png.py` and
-the resource/palette comparison tools retain the explicit conversion.
+do not directly represent the displayed screenshot colors. `fb_to_png.py` renders
+the raw CLUT; account for the video card’s gamma when comparing that output with
+a displayed screenshot.
 The Amiga output is limited to 4-bit COLORxx components.
 
 The game's filled primitives choose among 32 packed-nibble raster patterns;

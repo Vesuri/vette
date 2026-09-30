@@ -49,8 +49,7 @@ The script supplies each observer's build flags and success conditions.
   captures. See [reference workflow](mac-reference-loop.md); local captures
   must be regenerated before claiming a new runtime result.
 - `make fidelity-check` checks the available local reference fixtures and
-  retained audits. Historical full-intro pixel comparisons are not a fresh
-  production pass; their old software-cursor verifier has been retired.
+  retained audits; it does not run a fresh production capture.
 
 `tools/check_gameplay_coverage.py` checks this document's observer names and
 build switches. It checks documentation consistency, not gameplay execution.
