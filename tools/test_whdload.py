@@ -18,6 +18,8 @@ def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--mode', choices=('smoke', 'boot', 'load', 'quit', 'timed'), default='quit')
     p.add_argument('--whdload', type=Path, default=Path.home()/'.local/share/amiga/WHDLoad/C/WHDLoad')
+    p.add_argument('--workbench', type=Path,
+                   default=Path.home()/'.local/share/amiga/Workbenchv2.04rev37.67Workbench.adf')
     p.add_argument('--rom', type=Path)
     p.add_argument('--rtb', type=Path)
     p.add_argument('--exe', type=Path, default=ROOT/'amiga/out/Vette.exe')
@@ -58,7 +60,7 @@ def main():
             '--jit_compiler=0', '--chip_memory=2048', '--fast_memory=8192',
             '--kickstart_file='+os.environ['KICKSTART'],
             '--hard_drive_0='+str(boot), '--hard_drive_0_priority=10', '--hard_drive_1='+str(game),
-            '--floppy_drive_0='+str(ROOT/'tmp/Workbenchv2.04rev37.67Workbench.adf'),
+            '--floppy_drive_0='+str(args.workbench),
             '--joystick_port_0=mouse', '--joystick_port_1=nothing', '--warp_mode=1', '--fullscreen=0',
             '--window_width=720', '--window_height=568', '--state_dir='+str(base/'state')], stdout=log, stderr=log)
         try:

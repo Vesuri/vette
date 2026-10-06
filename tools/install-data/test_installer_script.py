@@ -99,7 +99,8 @@ def main():
             emu=subprocess.Popen(["fs-uae","--amiga_model=A1200/020","--chip_memory=2048","--fast_memory=8192",
                 "--uae_cpu_model=68020","--uae_cpu_24bit_addressing=false","--uae_z3mem_size=16",
                 "--kickstart_file="+os.environ["KICKSTART"],"--hard_drive_0="+str(boot),
-                "--hard_drive_0_priority=10","--floppy_drive_0="+str(ROOT/"tmp/Workbenchv2.04rev37.67Workbench.adf"),
+                "--hard_drive_0_priority=10",
+                "--floppy_drive_0="+str(Path.home()/".local/share/amiga/Workbenchv2.04rev37.67Workbench.adf"),
                 "--hard_drive_1="+str(ROOT),"--hard_drive_2="+str(base),"--warp_mode=1",
                 "--fullscreen=0","--window_width=720","--window_height=568","--state_dir="+str(base/"state")],stdout=log,stderr=log)
             try:

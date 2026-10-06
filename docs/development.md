@@ -18,6 +18,12 @@ slave dependencies. FS-UAE launchers also use
 PID-scoped emulator/debug-port management. It is an external developer dependency,
 not included in the release. `KICKSTART` selects your local boot ROM.
 
+`~/.local/share/amiga` holds host assets usable by more than one Amiga project:
+the WHDLoad SDK, the LHa for UNIX build, the Workbench floppy the WHDLoad and
+installer tests boot, and the FS-UAE helper above. Put a new cross-project asset
+there rather than in `tmp/`, which is this project's scratch space and is
+periodically emptied.
+
 ```sh
 . amiga/env.sh
 make -C amiga clean

@@ -95,14 +95,14 @@ or set `LHA` to its absolute path. Example host build (C compiler, autoconf,
 automake required):
 
 ```sh
-git clone https://github.com/jca02266/lha.git tmp/lha-compressor
-cd tmp/lha-compressor
+git clone https://github.com/jca02266/lha.git ~/.local/share/amiga/lha-compressor
+cd ~/.local/share/amiga/lha-compressor
 git checkout 16619b066b189ef289bb8b07b37d1c38d550da99
 autoreconf -is
 ./configure
 make -j4
-cd ../..
-LHA="$PWD/tmp/lha-compressor/src/lha" make dist
+cd -
+LHA="$HOME/.local/share/amiga/lha-compressor/src/lha" make dist
 ```
 
 `tools/check_release.py` independently decodes members using `lha` (Lhasa),

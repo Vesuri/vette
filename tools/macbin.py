@@ -7,8 +7,8 @@ modern macOS produces MacBinary.  `unar` unpacks a .sit into real forked files
 (resource fork in the `com.apple.ResourceFork` xattr, type/creator in
 `com.apple.FinderInfo`), and this turns one of those back into MacBinary.
 
-    python3 tools/macbin.py "tmp/macsbug/MacsBug 6.2.2/MacsBug" tmp/macbin/
-    hcopy -m tmp/macbin/MacsBug ":MacsBug"
+    python3 tools/macbin.py "ref/mac-tools/macsbug/MacsBug 6.2.2/MacsBug" ref/mac-tools/macbin/
+    hcopy -m ref/mac-tools/macbin/MacsBug ":MacsBug"
 
 WARNING: a Mac application's code lives in the RESOURCE fork.  Copy one without
 its fork and you get a file that exists, has the right size on the data side, and
