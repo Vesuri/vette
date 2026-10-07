@@ -13,15 +13,17 @@ import tempfile
 import time
 
 ROOT = Path(__file__).resolve().parents[1]
+SHARE = Path.home()/'.local/share/amiga'
 
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--mode', choices=('smoke', 'boot', 'load', 'quit', 'timed'), default='quit')
-    p.add_argument('--whdload', type=Path, default=Path.home()/'.local/share/amiga/WHDLoad/C/WHDLoad')
+    p.add_argument('--whdload', type=Path,
+                   default=Path(os.environ.get('WHDLOAD', SHARE/'WHDLoad'))/'C/WHDLoad')
     p.add_argument('--workbench', type=Path,
-                   default=Path.home()/'.local/share/amiga/Workbenchv2.04rev37.67Workbench.adf')
-    p.add_argument('--rom', type=Path)
-    p.add_argument('--rtb', type=Path)
+                   default=Path(os.environ.get('WORKBENCH_ADF', SHARE/'Workbenchv2.04rev37.67Workbench.adf')))
+    p.add_argument('--rom', type=Path, default=SHARE/'Kickstarts/kick40063.A600')
+    p.add_argument('--rtb', type=Path, default=SHARE/'Kickstarts/kick40063.A600.RTB')
     p.add_argument('--exe', type=Path, default=ROOT/'amiga/out/Vette.exe')
     p.add_argument('--seconds', type=int, default=90, help='host safety ceiling')
     p.add_argument('--ticks', type=int, default=1500, help='WHDLoad timeout in PAL fields')
@@ -29,8 +31,6 @@ def main():
     p.add_argument('--hires', action='store_true', help='enable the slave Custom1 HIRES option')
     p.add_argument('--no-preload', action='store_true')
     args = p.parse_args()
-    if args.mode != 'smoke' and (not args.rom or not args.rtb):
-        p.error('--rom and --rtb are required except for smoke mode')
     slave = {'smoke':'Smoke.slave', 'boot':'BootTest.slave', 'load':'LoadTest.slave'}.get(args.mode, 'Vette!.slave')
     base = Path(tempfile.mkdtemp(prefix='whdload-test-', dir=ROOT/'tmp'))
     print('Fixture:', base, flush=True)
@@ -58,7 +58,7 @@ def main():
         emu = subprocess.Popen(['fs-uae', '--amiga_model=A1200', '--cpu='+args.cpu,
             '--uae_cpu_model='+args.cpu, '--uae_cpu_24bit_addressing=false',
             '--jit_compiler=0', '--chip_memory=2048', '--fast_memory=8192',
-            '--kickstart_file='+os.environ['KICKSTART'],
+            '--kickstart_file='+os.environ.get('KICKSTART', str(SHARE/'Kickstarts/kick40063.A600')),
             '--hard_drive_0='+str(boot), '--hard_drive_0_priority=10', '--hard_drive_1='+str(game),
             '--floppy_drive_0='+str(args.workbench),
             '--joystick_port_0=mouse', '--joystick_port_1=nothing', '--warp_mode=1', '--fullscreen=0',

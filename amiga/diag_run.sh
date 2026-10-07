@@ -7,7 +7,7 @@ cd "$(dirname "$0")"
 . ./stage_original_data.sh
 FSUAE="${FSUAE:-fs-uae}"
 GDB="${GDB:-m68k-amiga-elf-gdb}"
-ROM="${KICKSTART:-$HOME/Documents/RetroPie/BIOS/kick31.rom}"
+ROM="${KICKSTART:-$HOME/.local/share/amiga/Kickstarts/kick40063.A600}"
 DELAY="${1:-14}"
 # Production target: A1200, 2 MiB chip RAM and 8 MiB fast RAM.
 MODEL="${AMIGA_MODEL:-A1200}"

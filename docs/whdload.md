@@ -58,7 +58,7 @@ the package drawer artwork is the WHDLoad template's drawer.
 
 Source `amiga/env.sh`. `make -C whdload smoke boot-test load-test` creates isolated
 test slaves. `tools/test_whdload.py --mode smoke` runs without any ROM or game.
-For other modes supply `--rom /local/kick40063.A600 --rtb /local/kick40063.A600.RTB`.
+Other modes default to the shared `kick40063.A600` and `.RTB`; override with `--rom` and `--rtb`.
 Modes `boot` and `load` exit before executing Vette. `quit` expects a clean
 `QUIT_PROBE=1` game build. `timed` runs the production or gameplay regression build
 until WHDLoad's TIMEOUT, saving COREDUMP and FILELOG. `--hires` tests the Custom1 startup patch; `--no-preload` tests live disk

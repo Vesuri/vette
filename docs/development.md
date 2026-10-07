@@ -16,13 +16,26 @@ Adjust PATH for another installation; `WHDLOAD`, `NDK` and `VASM` override
 slave dependencies. FS-UAE launchers also use
 `${FSUAE_COMMON:-$HOME/.local/share/amiga/fsuae_common.sh}` for shared,
 PID-scoped emulator/debug-port management. It is an external developer dependency,
-not included in the release. `KICKSTART` selects your local boot ROM.
+not included in the release.
 
 `~/.local/share/amiga` holds host assets usable by more than one Amiga project:
-the WHDLoad SDK, the LHa for UNIX build, the Workbench floppy the WHDLoad and
-installer tests boot, and the FS-UAE helper above. Put a new cross-project asset
-there rather than in `tmp/`, which is this project's scratch space and is
-periodically emptied.
+Kickstarts, the WHDLoad SDK, Installer 43.3, the LHa for UNIX build, the
+Workbench floppy the WHDLoad and installer tests boot, and the FS-UAE helper
+above. Put a new cross-project asset there rather than in `tmp/`, which is this
+project's scratch space and is periodically emptied. Each common file has an
+environment override:
+
+| Variable | Default under `~/.local/share/amiga` | Used by |
+|---|---|---|
+| `KICKSTART` | `Kickstarts/kick40063.A600` (KS 3.1, A600) | emulator boot ROM for all launchers and tests |
+| `WORKBENCH_ADF` | `Workbenchv2.04rev37.67Workbench.adf` | WHDLoad and installer tests |
+| `INSTALLER43` | `Installer43/Installer` | installer test |
+| `WHDLOAD` | `WHDLoad` (SDK; tests copy `C/WHDLoad`) | slave build, WHDLoad and installer tests |
+| `FSUAE_COMMON` | `fsuae_common.sh` | FS-UAE launchers |
+
+WHDLoad guests receive `Kickstarts/kick40063.A600` and its `.RTB` from the same
+directory. `run.sh` writes FS-UAE screenshots (F12+S) to the ignored `tmp/screenshots`
+unless `FSEMU_SCREENSHOTS_DIR` is set.
 
 ```sh
 . amiga/env.sh
@@ -90,14 +103,14 @@ Native installation testing:
 
 ```sh
 . amiga/env.sh
-python3 tools/install-data/test_installer_script.py /path/to/Installer --t-temp
+python3 tools/install-data/test_installer_script.py --t-temp
 ```
 
 The default checks updating an existing installation while reusing its data.
 Use `--reinstall` to replace deliberately damaged data while keeping scores,
 `--remove` to remove the old drawer first, or `--fresh` for a new installation.
 The tests also check conditional prompts, release files and native icon tooltypes.
-They need the local Workbench floppy and ROM/RTB paths declared in that script. These are not redistributed. WHDLoad's isolated smoke/load/quit tests
+They use the shared Installer, Workbench floppy and ROM/RTB above, or an Installer path given as the first argument. These are not redistributed. WHDLoad's isolated smoke/load/quit tests
 are described in [whdload.md](whdload.md).
 
 ## Debugging and profiling

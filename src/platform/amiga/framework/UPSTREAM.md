@@ -1,7 +1,7 @@
 # Framework upstream
 
 Vendored from **dA JoRMaS / Template / C++**, by way of the *Revs* port
-(`~/Documents/Revs/src/platform/amiga/framework`, copied 2026-09-16) — which had itself taken it
+(Revs `src/platform/amiga/framework`, copied 2026-09-16) — which had itself taken it
 from the *Rescue on Fractalus!* port. Taking it from Revs rather than from the original template is
 deliberate: Revs's copy already carries the vasm-sanitised asm and the GCC marshalling bridges, and
 those were the expensive part.

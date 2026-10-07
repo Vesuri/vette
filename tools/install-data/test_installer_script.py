@@ -14,6 +14,11 @@ import tempfile
 import time
 
 ROOT=Path(__file__).resolve().parents[2]
+SHARE=Path.home()/".local/share/amiga"
+INSTALLER=Path(os.environ.get("INSTALLER43",SHARE/"Installer43/Installer"))
+WHDLOAD=Path(os.environ.get("WHDLOAD",SHARE/"WHDLoad"))/"C/WHDLoad"
+WORKBENCH=Path(os.environ.get("WORKBENCH_ADF",SHARE/"Workbenchv2.04rev37.67Workbench.adf"))
+KICKSTART=os.environ.get("KICKSTART",str(SHARE/"Kickstarts/kick40063.A600"))
 sys.path.insert(0,str(ROOT/"tools"))
 from installer_icon import installer_icon, drawer_icon, readme_icon
 
@@ -32,7 +37,8 @@ def replace_form(text,start,replacement):
     raise ValueError("Unbalanced Installer form")
 
 def main():
-    installer=Path(sys.argv[1]).resolve()
+    paths=[a for a in sys.argv[1:] if not a.startswith('--')]
+    installer=Path(paths[0] if paths else INSTALLER).resolve()
     temp_path = 'RAM:' if '--ram-temp' in sys.argv else 'T:' if '--t-temp' in sys.argv else 'DH2:scratch'
     temp_work = temp_path + ('' if temp_path.endswith(':') else '/') + '.vette-install-00'
     fresh = '--fresh' in sys.argv
@@ -66,13 +72,12 @@ def main():
         for source,name in ((installer,"Installer"),(build/"VetteInstallData.exe","VetteInstallData"),
                 (build/"test-icon.exe","IconTest"),(ROOT/"amiga/out/Vette.exe","Vette!"),
                 (ROOT/"build/whdload/Vette!.slave","Vette!.slave"),
-                (Path.home()/".local/share/amiga/WHDLoad/C/WHDLoad","WHDLoad"),
+                (WHDLOAD,"WHDLoad"),
                 (ROOT/"release/ReadMe","ReadMe"),
                 (ROOT/"tools/install-data/COPYING.LIB","LICENSE.LGPL.txt")):
             shutil.copyfile(source,boot/name)
         (boot/"devs/Kickstarts").mkdir(parents=True)
-        for source in (Path.home()/"Documents/RetroPie/BIOS/kick40063.A600",
-                Path.home()/"Documents/amiberry/whdboot/save-data/Kickstarts/kick40063.A600.RTB"):
+        for source in (SHARE/"Kickstarts/kick40063.A600",SHARE/"Kickstarts/kick40063.A600.RTB"):
             shutil.copyfile(source,boot/"devs/Kickstarts"/source.name)
         script=(ROOT/"release/Install").read_text()
         # Installer detects welcome syntactically. Omitting it would cause an
@@ -98,9 +103,9 @@ def main():
         with (ROOT/"tmp/installer-script-emulator.log").open("w") as log:
             emu=subprocess.Popen(["fs-uae","--amiga_model=A1200/020","--chip_memory=2048","--fast_memory=8192",
                 "--uae_cpu_model=68020","--uae_cpu_24bit_addressing=false","--uae_z3mem_size=16",
-                "--kickstart_file="+os.environ["KICKSTART"],"--hard_drive_0="+str(boot),
+                "--kickstart_file="+KICKSTART,"--hard_drive_0="+str(boot),
                 "--hard_drive_0_priority=10",
-                "--floppy_drive_0="+str(Path.home()/".local/share/amiga/Workbenchv2.04rev37.67Workbench.adf"),
+                "--floppy_drive_0="+str(WORKBENCH),
                 "--hard_drive_1="+str(ROOT),"--hard_drive_2="+str(base),"--warp_mode=1",
                 "--fullscreen=0","--window_width=720","--window_height=568","--state_dir="+str(base/"state")],stdout=log,stderr=log)
             try:

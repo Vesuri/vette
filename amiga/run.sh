@@ -16,7 +16,7 @@ cd "$(dirname "$0")"
 . ./stage_original_data.sh
 
 FSUAE="${FSUAE:-fs-uae}"
-ROM="${1:-${KICKSTART:-$HOME/Documents/RetroPie/BIOS/kick31.rom}}"
+ROM="${1:-${KICKSTART:-$HOME/.local/share/amiga/Kickstarts/kick40063.A600}}"
 [ -f "$ROM" ] || { echo "Kickstart ROM not found: $ROM  (pass as \$1 or set \$KICKSTART)"; exit 1; }
 EXE="${VETTE_EXE:-out/Vette.exe}"
 # Production target: A1200, 2 MiB chip RAM and 8 MiB fast RAM.  AMIGA_MODEL
@@ -40,7 +40,7 @@ rm -f "$RUN"/state/*.uss
 # Screenshots: this fsemu-core FS-UAE takes them with HOST-KEY + S = hold F12, press S.
 # The screenshot code reads the FSEMU_SCREENSHOTS_DIR env var (the --screenshots_output_dir
 # config key is parsed but ignored by the fsemu core), so set it here.  Dir must exist.
-SHOTS="${FSEMU_SCREENSHOTS_DIR:-$HOME/Pictures/Screenshots}"
+SHOTS="${FSEMU_SCREENSHOTS_DIR:-$(cd .. && pwd)/tmp/screenshots}"
 mkdir -p "$SHOTS"
 export FSEMU_SCREENSHOTS_DIR="$SHOTS"
 

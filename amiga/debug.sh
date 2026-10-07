@@ -11,7 +11,7 @@ cd "$(dirname "$0")"
 FSUAE="${FSUAE:-fs-uae}"
 GDB="${GDB:-m68k-amiga-elf-gdb}"
 MODEL="${AMIGA_MODEL:-A1200}"
-ROM="${1:-${KICKSTART:-$HOME/Documents/RetroPie/BIOS/kick31.rom}}"
+ROM="${1:-${KICKSTART:-$HOME/.local/share/amiga/Kickstarts/kick40063.A600}}"
 [ -f "$ROM" ] || { echo "Kickstart ROM not found: $ROM  (pass as \$1 or set \$KICKSTART)"; exit 1; }
 [ -f out/Vette.elf ] || { echo "build first: make"; exit 1; }
 

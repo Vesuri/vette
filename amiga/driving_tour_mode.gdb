@@ -43,7 +43,7 @@ commands
   continue
 end
 
-break /Users/vesa.halttunen/Documents/Vette/src/mac/MacLoader.cpp:5816
+break MacLoader.cpp:6475
 commands
   silent
   printf "tour-mode complete enabled=%d entered=%d moved=%d index=%u iterations=%u\n", *(signed short*)(s_currentA5-0x5318), $entered, $moved, *(unsigned short*)(s_currentA5-0x4ddc), g_macDrivingIterations
