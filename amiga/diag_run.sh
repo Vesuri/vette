@@ -3,16 +3,16 @@
 # breaks in and prints the standby-build timing probes.
 set -uo pipefail
 cd "$(dirname "$0")"
-. "${FSUAE_COMMON:-$HOME/.local/share/amiga/fsuae_common.sh}"
+. ./env.sh
+. "$FSUAE_COMMON"
 . ./stage_original_data.sh
-FSUAE="${FSUAE:-fs-uae}"
 GDB="${GDB:-m68k-amiga-elf-gdb}"
-ROM="${KICKSTART:-$HOME/.local/share/amiga/Kickstarts/kick40063.A600}"
+ROM="$KICKSTART"
 DELAY="${1:-14}"
 # Production target: A1200, 2 MiB chip RAM and 8 MiB fast RAM.
 MODEL="${AMIGA_MODEL:-A1200}"
-# Optional extra fs-uae args, e.g. EXTRA_ARGS="--cpu=68040 --jit_compiler=1".
-EXTRA_ARGS="${EXTRA_ARGS:-}"
+# Optional extra fs-uae args, e.g. EXTRA_ARGS="--cpu=68040 --jit_compiler=1" (they win over
+# everything below; --warp_mode=1 there also counts as a debug run).
 
 RUN=.run; DH0="$RUN/dh0"; DH1="$RUN/dh1"; GDBHOME="$RUN/gdbhome"
 mkdir -p "$DH0/s" "$DH1" "$RUN/state" "$GDBHOME"
@@ -21,21 +21,18 @@ cp -f out/Vette.exe "$DH1/Vette"
 stage_vette_original_data "$DH1"
 
 fsuae_claim_port
-"$FSUAE" \
-  --amiga_model="$MODEL" --chip_memory="${CHIP_MEMORY:-2048}" --fast_memory="${FAST_MEMORY:-8192}" \
-  --kickstart_file="$ROM" \
+# A debug run: silent, window behind the others (fsuae_options; SOUND=1 or WINDOW=front change it).
+DEBUG=1 AMIGA_MODEL="$MODEL" KICKSTART="$ROM" CHIP_KB="${CHIP_MEMORY:-2048}" FAST_KB="${FAST_MEMORY:-8192}"
+JOY0=mouse JOY1=nothing FSUAE_LOG="$RUN/fsuae-dbg.log"
+fsuae_options
+fsuae_launch \
   --hard_drive_0="$DH0" --hard_drive_1="$DH1" \
-  --joystick_port_0=mouse --joystick_port_1=nothing \
   --full_keyboard=1 \
   --keyboard_key_up=action_key_cursor_up --keyboard_key_down=action_key_cursor_down \
   --keyboard_key_left=action_key_cursor_left --keyboard_key_right=action_key_cursor_right \
-  --automatic_input_grab=0 --fullscreen=0 --window_width=720 --window_height=568 \
-  $EXTRA_ARGS \
-  --remote_debugger=20 --remote_debugger_port="$DEBUG_PORT" --remote_debugger_trigger=Vette \
-  --ntsc_mode=0 --state_dir="$RUN/state" > "$RUN/fsuae-dbg.log" 2>&1 &
-FSUAE_PID=$!
-fsuae_track "$FSUAE_PID"
-echo "FS-UAE pid=$FSUAE_PID; waiting for stub..."
+  --window_width=720 --window_height=568 \
+  --remote_debugger_trigger=Vette --state_dir="$RUN/state"
+echo "waiting for stub..."
 for i in $(seq 1 60); do
   kill -0 "$FSUAE_PID" 2>/dev/null || { echo "FS-UAE exited early; see $RUN/fsuae-dbg.log"; exit 1; }
   lsof -nP -iTCP:"$DEBUG_PORT" -sTCP:LISTEN >/dev/null 2>&1 && break

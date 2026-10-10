@@ -27,7 +27,8 @@ def crc16(data):
 def member(name, data):
     # Use the established UNIX LHa encoder, but own the generic header so host
     # timestamps, permissions and paths cannot affect release reproducibility.
-    encoder = os.environ.get("LHA", shutil.which("lha-compress") or "lha")
+    encoder = os.environ.get("LHA", shutil.which("lha-compress") or
+                             str(Path.home()/".local/share/amiga/lha-compressor/src/lha"))
     with tempfile.TemporaryDirectory(prefix="vette-lh5-") as directory:
         work = Path(directory)
         (work / "payload").write_bytes(data)

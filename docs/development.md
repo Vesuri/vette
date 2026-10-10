@@ -11,14 +11,16 @@ The production game is the Amiga executable; there is no host game renderer.
   verification. Set `LHA` to the encoder's absolute path or install it as
   `lha-compress` on PATH. Build instructions: [installation](install-original-data.md).
 
-`amiga/env.sh` adds the development toolchain under `~/.local` to PATH.
-Adjust PATH for another installation; `WHDLOAD`, `NDK` and `VASM` override
-slave dependencies. FS-UAE launchers also use
-`${FSUAE_COMMON:-$HOME/.local/share/amiga/fsuae_common.sh}` for shared,
-PID-scoped emulator/debug-port management. It is an external developer dependency,
-not included in the release.
+`amiga/env.sh` sources the shared environment that AmigaXDev installs
+(`~/.local/share/amiga/env.sh`): the development toolchain under `~/.local` on
+PATH and the common files below. `WHDLOAD`, `NDK` and `VASM` override slave
+dependencies. The FS-UAE launchers source `env.sh` themselves and take their
+options and PID-scoped emulator/debug-port management from the shared
+`$FSUAE_COMMON` (debug runs are silent with the window behind the others; `SOUND`
+and `WINDOW` override that). It is an external developer dependency, not included
+in the release.
 
-`~/.local/share/amiga` holds host assets usable by more than one Amiga project:
+`~/.local/share/amiga` (installed by AmigaXDev `make setup`) holds host assets usable by more than one Amiga project:
 Kickstarts, the WHDLoad SDK, Installer 43.3, the LHa for UNIX build, the
 Workbench floppy the WHDLoad and installer tests boot, and the FS-UAE helper
 above. Put a new cross-project asset there rather than in `tmp/`, which is this
@@ -30,7 +32,7 @@ environment override:
 | `KICKSTART` | `Kickstarts/kick40063.A600` (KS 3.1, A600) | emulator boot ROM for all launchers and tests |
 | `WORKBENCH_ADF` | `Workbenchv2.04rev37.67Workbench.adf` | WHDLoad and installer tests |
 | `INSTALLER43` | `Installer43/Installer` | installer test |
-| `WHDLOAD` | `WHDLoad` (SDK; tests copy `C/WHDLoad`) | slave build, WHDLoad and installer tests |
+| `WHDLOAD` | `WHDLoad` (19.2 SDK, set by `amiga/env.sh`; tests copy `C/WHDLoad`) | slave build, WHDLoad and installer tests |
 | `FSUAE_COMMON` | `fsuae_common.sh` | FS-UAE launchers |
 
 WHDLoad guests receive `Kickstarts/kick40063.A600` and its `.RTB` from the same

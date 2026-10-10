@@ -5,18 +5,19 @@
 # ⚠ CTRL-qualified on purpose: whatever this port binds the bare mouse button to (the Mac
 # original is a one-button machine, so it binds it to something), the quit chord must not
 # collide with it.
-# Override ROM via $1 or $KICKSTART.
+# Override ROM via $1 or $KICKSTART.  Sound, window, warp and the rest: fsuae_options in the
+# shared fsuae_common.sh.
 #
 # Run a DIFFERENT binary than out/Vette.exe with $VETTE_EXE — handy for A/B-ing two builds by
 # eye or ear without rebuilding between each look, e.g.
 #   VETTE_EXE=Vette-a.exe ./run.sh      vs      VETTE_EXE=Vette-b.exe ./run.sh
 set -euo pipefail
 cd "$(dirname "$0")"
-. "${FSUAE_COMMON:-$HOME/.local/share/amiga/fsuae_common.sh}"
+. ./env.sh
+. "$FSUAE_COMMON"
 . ./stage_original_data.sh
 
-FSUAE="${FSUAE:-fs-uae}"
-ROM="${1:-${KICKSTART:-$HOME/.local/share/amiga/Kickstarts/kick40063.A600}}"
+ROM="${1:-$KICKSTART}"
 [ -f "$ROM" ] || { echo "Kickstart ROM not found: $ROM  (pass as \$1 or set \$KICKSTART)"; exit 1; }
 EXE="${VETTE_EXE:-out/Vette.exe}"
 # The production target remains A1200, 2 MiB chip and 8 MiB fast RAM (see the
@@ -44,21 +45,16 @@ SHOTS="${FSEMU_SCREENSHOTS_DIR:-$(cd .. && pwd)/tmp/screenshots}"
 mkdir -p "$SHOTS"
 export FSEMU_SCREENSHOTS_DIR="$SHOTS"
 
-fsuae_stop_previous
-# After the exec this shell IS fs-uae, so record $$ as the emulator pid.
-fsuae_track_self
 # Port 0 remains the real Amiga mouse.  Port 1 must be "nothing" (FS-UAE's
 # documented spelling), otherwise its keyboard-joystick fallback consumes the
 # host cursor keys before they can become Amiga keyboard events.
-exec "$FSUAE" \
-  --amiga_model="$MODEL" \
-  --chip_memory=1024 --fast_memory=4096 \
-  --kickstart_file="$ROM" \
+AMIGA_MODEL="$MODEL" KICKSTART="$ROM" CHIP_KB=1024 FAST_KB=4096 JOY0=mouse JOY1=nothing
+fsuae_options
+fsuae_stop_previous
+fsuae_exec \
   --hard_drive_0="$DH0" --hard_drive_1="$DH1" \
-  --joystick_port_0=mouse --joystick_port_1=nothing \
   --full_keyboard=1 \
   --keyboard_key_up=action_key_cursor_up --keyboard_key_down=action_key_cursor_down \
   --keyboard_key_left=action_key_cursor_left --keyboard_key_right=action_key_cursor_right \
-  --automatic_input_grab=1 --fullscreen=0 --window_width=720 --window_height=568 \
-  --ntsc_mode=0 --state_dir="$RUN/state" \
-  --screenshots_output_dir="$SHOTS"
+  --automatic_input_grab=1 --window_width=720 --window_height=568 \
+  --state_dir="$RUN/state" --screenshots_output_dir="$SHOTS"
