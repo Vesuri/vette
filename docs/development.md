@@ -282,5 +282,5 @@ removing generated output. `make fidelity-check` needs saved captures.
 Build products live in `build/`, `dist/`, `amiga/obj/` and `amiga/out/`.
 Emulator runners write `amiga/.run/`; remove its generated output only when no
 run is active. Keep historical investigations in Git history and update the
-relevant reference document when behavior changes. `CLAUDE.md` holds contributor
+relevant reference document when behavior changes. `AGENTS.md` holds contributor
 guidance; `open-work.md` holds only unresolved work.

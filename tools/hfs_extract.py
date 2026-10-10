@@ -2,7 +2,7 @@
 """Read an HFS (not HFS+) volume image: list it, extract forks, list resources.
 
 Why this exists: macOS dropped HFS-standard support in 10.15, so a classic Mac
-volume cannot be mounted on the dev host at all.  And per CLAUDE.md, Ghidra 12.1
+volume cannot be mounted on the dev host at all.  And per AGENTS.md, Ghidra 12.1
 has no resource-fork loader either, so the `CODE` segments have to come out of
 the resource map by hand whatever else happens.  This is that tool.
 
@@ -13,7 +13,7 @@ the resource map by hand whatever else happens.  This is that tool.
 
 `segments` is the one the port cares about: it writes one file per `CODE`
 resource, named `CODE_<id>_<segname>.bin`, ready to import into Ghidra as a raw
-68000:BE:32 binary.  ** Remember what CLAUDE.md says about addresses: each file
+68000:BE:32 binary.  ** Remember what AGENTS.md says about addresses: each file
 is ONE SEGMENT, so an address is (segment, offset) and every symbol must record
 which segment it belongs to. **  `CODE 0` is not code - it is the jump table.
 """

@@ -200,7 +200,7 @@ extern "C" __attribute__((noinline)) void vetteScoreSaveComplete()
 // ⚠⚠ EVERY GLOBAL A COMMITTED .gdb SCRIPT READS MUST BE IN amiga/Makefile's PROBE_SYMS.
 // -Wl,--gc-sections drops an unreferenced counter, and gdb then resolves the name into
 // .text and prints INSTRUCTION BYTES as a value -- a fake measurement, not an obvious
-// zero.  `make probe-audit` enforces it on every link.  (CLAUDE.md)
+// zero.  `make probe-audit` enforces it on every link.  (AGENTS.md)
 //
 // These five are Stage A's whole acceptance test: they say the display came up, in the
 // mode that was asked for, showing the bytes that were meant to be there.

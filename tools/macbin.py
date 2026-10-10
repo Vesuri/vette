@@ -12,7 +12,7 @@ modern macOS produces MacBinary.  `unar` unpacks a .sit into real forked files
 
 WARNING: a Mac application's code lives in the RESOURCE fork.  Copy one without
 its fork and you get a file that exists, has the right size on the data side, and
-cannot be launched -- the same silent-loss failure `CLAUDE.md` warns about for the
+cannot be launched -- the same silent-loss failure `AGENTS.md` warns about for the
 source archive.  This script fails loudly if the fork is missing rather than
 writing a MacBinary with a zero-length resource fork.
 """

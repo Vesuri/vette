@@ -56,7 +56,7 @@ public:
     // ⭐ Called FIRST in the VERTB handler, before any other work: an interlaced
     // display needs the bitplane pointers re-pointed at the other field's rows
     // every field, and a torn pointer garbages the whole viewport for a frame
-    // (CLAUDE.md). Builds the inactive list and restarts the Copper in blanking.
+    // (AGENTS.md). Builds the inactive list and restarts the Copper in blanking.
     void vbiUpdate(bool install = true);
 
     // Convert a Macintosh 4-bpp chunky surface and ColorTable into the Amiga's
