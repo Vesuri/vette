@@ -20,7 +20,7 @@ WHDLOAD=Path(os.environ.get("WHDLOAD",SHARE/"WHDLoad"))/"C/WHDLoad"
 WORKBENCH=Path(os.environ.get("WORKBENCH_ADF",SHARE/"Workbenchv2.04rev37.67Workbench.adf"))
 KICKSTART=os.environ.get("KICKSTART",str(SHARE/"Kickstarts/kick40063.A600"))
 sys.path.insert(0,str(ROOT/"tools"))
-from installer_icon import installer_icon, drawer_icon, readme_icon
+from package_release import installer_icon, drawer_icon, readme_icon
 
 def replace_form(text,start,replacement):
     a=text.index(start); depth=0; quoted=False; i=a

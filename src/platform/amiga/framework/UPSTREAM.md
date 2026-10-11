@@ -76,3 +76,10 @@ written, not inherited, because on ECS/AGA it overrides DIWSTOP's H8/V8 rules an
 ⚠ The **AGA** DDF branch is untouched and `[ASSUMED]`: FMODE 3 fetches four words per access and the
 documented OCS formulas do not apply to it. `docs/amiga-arch.md` §`setPlayfield()` has the full
 derivation and the measured evidence.
+
+## Canonical framework
+
+The canonical framework is AmigaXDev's `share/framework` (installed as `$AMIGA_FRAMEWORK`); this
+copy was last compared with it at AmigaXDev commit 2e02af5. `python3 -m amigaxdev.framework diff
+Vette` (with `amiga/env.sh` sourced) shows which files are identical, local fixes or fixes still
+to take.

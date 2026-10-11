@@ -75,6 +75,11 @@ specific to this game in `docs/`.
 - Source/resource names and decoded fields live in `disasm/symbols.csv`,
   `ghidra_scripts/entrypoints.csv` and the format documentation. Mark inference
   explicitly rather than treating a plausible name as a measured fact.
+- The Mac helpers (`python3 -m amigaxdev.mac.*`: `hfs_extract`, `resource_fork`, `macbin`,
+  `gen_trap_names`, `m68k_sweep`), the release archive code (`amigaxdev.release`), the smoke
+  slave and the Ghidra scripts (`MacMarkEntries`, `MacApplyNames`, `MacDumpTraps`,
+  `DumpCallGraph`, `ExportListing`) are AmigaXDev's. Run Ghidra headless from the project root
+  with `-scriptPath "$AMIGA_GHIDRA_SCRIPTS"`; `ghidra_scripts/` keeps only `entrypoints.csv`.
 
 ## Changes
 

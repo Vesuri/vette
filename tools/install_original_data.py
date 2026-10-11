@@ -14,9 +14,10 @@ import hashlib
 import struct
 from pathlib import Path
 
-from hfs_extract import HFS
+import _amigaxdev  # noqa: F401,E402
+from amigaxdev.mac.hfs_extract import HFS
 from ndif2raw import decode_ndif, named_resource_fork
-from resource_fork import parse_resource_fork
+from amigaxdev.mac.resource_fork import parse_resource_fork
 
 
 FILES = (

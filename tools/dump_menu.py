@@ -4,7 +4,8 @@
 import argparse
 from pathlib import Path
 
-from hfs_extract import resources
+import _amigaxdev  # noqa: F401,E402
+from amigaxdev.mac.hfs_extract import resources
 
 
 def decode_menu(body: bytes):

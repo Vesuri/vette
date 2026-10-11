@@ -53,8 +53,8 @@ across four hardware channels, with used source volumes 0..300 mapped to 0..64.
 
 ## Inspection
 
-`resource_fork.py` reads extracted forks; `hfs_extract.py` lists HFS contents,
-resources and CODE segments. The `dump_perf/objs/maps/quad/coll/driving_data.py`
+AmigaXDev's `amigaxdev.mac.resource_fork` reads extracted forks and
+`python3 -m amigaxdev.mac.hfs_extract` lists HFS contents, resources and CODE segments. The `dump_perf/objs/maps/quad/coll/driving_data.py`
 tools validate the decoded formats. `dump_inst_levels.py` audits sound levels.
 All original bytes and generated listings remain local. The distributable
 symbol and export maps are in `disasm/` and `ghidra_scripts/`.

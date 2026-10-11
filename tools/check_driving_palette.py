@@ -5,7 +5,8 @@ import argparse
 import struct
 from pathlib import Path
 
-from resource_fork import find_resource, read_resource_fork
+import _amigaxdev  # noqa: F401,E402
+from amigaxdev.mac.resource_fork import find_resource, read_resource_fork
 
 
 ALLOCATIONS = {

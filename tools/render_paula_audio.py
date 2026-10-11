@@ -9,7 +9,8 @@ import wave
 from dataclasses import dataclass
 from pathlib import Path
 
-from resource_fork import read_resource_fork
+import _amigaxdev  # noqa: F401,E402
+from amigaxdev.mac.resource_fork import read_resource_fork
 
 
 PAULA_CLOCK = 3_546_895

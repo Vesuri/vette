@@ -70,8 +70,9 @@ make install-data-helper
 build/install-data/VetteInstallData VETTE__1.02_and_extras.sit destination scratch
 ```
 
-The older `ndif2raw.py`, `hfs_extract.py`, `resource_fork.py` and `macbin.py`
-remain independent inspection/reference tools, not installation dependencies.
+The older `tools/ndif2raw.py` and AmigaXDev's `amigaxdev.mac.hfs_extract`,
+`resource_fork` and `macbin` remain independent inspection/reference tools, not
+installation dependencies.
 NDIF needs its resource fork for the block map; a data-fork-only image is insufficient.
 Do not use the unidentified NDIF checksum as a validation gate.
 

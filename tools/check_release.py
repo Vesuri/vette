@@ -5,8 +5,7 @@ import hashlib
 import struct
 import subprocess
 from pathlib import Path
-from package_release import ORIGINAL_HASHES, PREFIX, crc16
-from installer_icon import installer_icon, readme_icon
+from package_release import ORIGINAL_HASHES, PREFIX, crc16, installer_icon, readme_icon
 
 REQUIRED = {"Vette!", "Vette!.slave", "Vette!.inf", "VetteInstallData", "Install", "Install.info", "ReadMe", "ReadMe.info", "LICENSE.LGPL.txt"}
 

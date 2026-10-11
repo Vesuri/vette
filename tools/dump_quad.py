@@ -10,7 +10,8 @@ from collections import Counter
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from hfs_extract import resources  # noqa: E402
+import _amigaxdev  # noqa: F401,E402
+from amigaxdev.mac.hfs_extract import resources  # noqa: E402
 
 
 def quad_resource(path: Path):

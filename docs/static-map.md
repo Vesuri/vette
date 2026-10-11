@@ -126,7 +126,7 @@ Reproduce the gate with:
 
 ```sh
 make static-map-check
-python3 tools/m68k_sweep.py --selftest
-python3 tools/m68k_sweep.py tmp/seg_color
+python3 -m amigaxdev.mac.m68k_sweep --selftest
+python3 -m amigaxdev.mac.m68k_sweep tmp/seg_color
 python3 tools/check_trap_map.py ref/mame/traps.txt --static-dir tmp
 ```

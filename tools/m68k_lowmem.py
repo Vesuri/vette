@@ -17,7 +17,8 @@ from capstone import Cs, CS_ARCH_M68K, CS_MODE_M68K_000, CsError
 from capstone.m68k import (M68K_AM_ABSOLUTE_DATA_LONG, M68K_AM_ABSOLUTE_DATA_SHORT,
                            M68K_OP_MEM)
 
-from m68k_sweep import BRANCH, STOP, jump_table, target_of
+import _amigaxdev  # noqa: F401,E402
+from amigaxdev.mac.m68k_sweep import BRANCH, STOP, jump_table, target_of
 
 md = Cs(CS_ARCH_M68K, CS_MODE_M68K_000)
 md.detail = True

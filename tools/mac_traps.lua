@@ -215,12 +215,12 @@ end)
 -- in a way that reads as fact: $A8B5 was labelled a QuickDraw call and is
 -- ScriptUtil, $A893 is MoveTo, $A885 is DrawText.  A wrong name here becomes a
 -- wrong entry in the port's work list, so the table is GENERATED from cxmon's
--- full 1 178-trap list by tools/gen_trap_names.py into tmp/ (local only).
+-- full 1 178-trap list by `python3 -m amigaxdev.mac.gen_trap_names` into tmp/ (local only).
 local NAMES, BYNUM = {}, {}
 do
 	local f = loadfile("tmp/trap_names.lua")
 	if f then NAMES = f() else
-		print("VP ⚠⚠ tmp/trap_names.lua MISSING -- run tools/gen_trap_names.py. Names will be raw hex.")
+		print("VP ⚠⚠ tmp/trap_names.lua MISSING -- run python3 -m amigaxdev.mac.gen_trap_names. Names will be raw hex.")
 	end
 	-- ⚠ The table is keyed the way Apple's own Traps.h is keyed: by the word a
 	-- compiler EMITS, flag bits included -- _NewPtr is listed as $A11E, not
