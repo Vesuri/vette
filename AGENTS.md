@@ -6,6 +6,25 @@ current build and test workflow. Keep unresolved work in
 [docs/open-work.md](docs/open-work.md), technical facts in the relevant reference
 document, and completed investigations in Git history.
 
+## Shared environment and knowledge
+
+The toolchain, emulators, Kickstarts, WHDLoad and the Python environment come from AmigaXDev
+(`make setup` there); `amiga/env.sh` sources `~/.local/share/amiga/env.sh`. Lessons that hold
+for any port live in AmigaXDev's docs: add or correct them there, and keep only what is
+specific to this game in `docs/`.
+
+| AmigaXDev doc | For |
+| --- | --- |
+| `docs/environment.md` | the shared variables and installed files |
+| `docs/playbooks/new-port-playbook.md` | the phases of a port and their gates |
+| `docs/reference/amiga-hardware.md` | Chip bus, takeover, interrupts, copper, blitter, Paula, AGA, the dA JoRMaS framework |
+| `docs/reference/m68k-optimisation.md` | 68000/68020 cost model and code generation |
+| `docs/reference/measurement-method.md` | profiling instruments, A/B discipline, pricing a change |
+| `docs/reference/validation-harness.md` | faithfulness to the original: references, differentials, sabotage |
+| `docs/reference/headless-fsuae.md` | the shared launcher, FS-UAE builds, gdb stub, diag runs |
+| `docs/reference/port-toolchain.md` | flags, linking, link audits, WHDLoad slaves, release archives |
+| `docs/native-port-validation.md` | crash dumps as regressions, installer updates, release archive checks |
+
 ## Scope and correctness
 
 - Preserve original game decisions. Implement their documented services; do not
@@ -37,7 +56,8 @@ document, and completed investigations in Git history.
 - Every debugger-read global must be in `PROBE_SYMS`; garbage-collected symbols
   can otherwise resolve into instruction bytes.
 - Check timing in emulated fields/ticks, not host wall time or screenshots.
-  Warp is useful for bounded regression runs, not a real-time speed measurement.
+  Warp is useful for bounded regression runs, not a real-time speed measurement
+  (AmigaXDev `docs/reference/measurement-method.md`).
 
 ## Local inputs and tools
 
@@ -46,7 +66,8 @@ document, and completed investigations in Git history.
   local-only and can contain irreplaceable inputs; inspect before cleaning.
   Build outputs and release archives are ignored.
 - Never kill all FS-UAE or GDB processes. Use the scripts' PID-scoped cleanup.
-  The shared helper is selected by `FSUAE_COMMON`; projects share the host.
+  The shared helper is selected by `FSUAE_COMMON`; projects share the host
+  (AmigaXDev `docs/reference/headless-fsuae.md`).
 - MAME must use the documented headless command, including
   `SDL_VIDEODRIVER=dummy`, `-window`, `-cfg_directory` and `-nvram_directory`.
 - Keep maintained regression scripts, reusable format tools and concise current
