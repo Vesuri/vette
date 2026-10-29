@@ -142,14 +142,14 @@ def check_machine(base, report, mode, machine):
     cacr = int(re.findall(r'CACR=([0-9A-F]+)', report)[-1], 16)
     tc = int(re.findall(r'\bTC=([0-9A-F]+)', report)[-1], 16) if mmu != '0' else 0
     print(f'Machine: {cpu} MMU={mmu} CACR={cacr:X} TC={tc:X}')
-    # The slave enables both caches on a 68030 and keeps 68040/68060 copyback off.
+    # The slave enables both caches on a 68030/68040/68060 (the 68020 has no data cache).
     model = re.sub(r'\D', '', cpu)
     if model == '68020':
         assert cacr & 0x1, f'68020 instruction cache off: CACR={cacr:X}'
     elif model == '68030':
         assert cacr & 0x0101 == 0x0101, f'68030 instruction/data caches not both on: CACR={cacr:X}'
     else:
-        assert cacr & 0x80008000 == 0x8000, f'{cpu} expected instruction cache only: CACR={cacr:X}'
+        assert cacr & 0x80008000 == 0x80008000, f'{cpu} expected both caches: CACR={cacr:X}'
 
 if __name__ == '__main__':
     main()

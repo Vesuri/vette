@@ -6,9 +6,6 @@ This file tracks remaining limitations and optional work, not completed stages.
 - Test on real Amiga hardware, especially 68030/68040 and differing memory
   configurations. The reported FS-UAE 68040-NOMMU + SetPatch startup failure is
   unresolved; cache flushing did not fix it.
-- The slave still keeps the 68040/68060 data cache off. The failure that
-  required it was the self-modifying picture batch, now redirected (see
-  [static map](static-map.md#a5-world-and-naming-pass)).
 - Further C2P optimization is deferred. Preserve explicit dirty rectangles and
   source-derived bounds, not shadow-buffer or tile comparisons.
 - A native options interface is not implemented. The Macintosh menu bar/desktop

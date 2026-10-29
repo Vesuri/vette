@@ -10,7 +10,7 @@ NUMDRIVES = 0
 WPDRIVES = 0
 BLACKSCREEN
 BOOTDOS
-CACHECHIP                       ; boot setup; _bootdos widens it on a 68020/68030
+CACHECHIP                       ; boot setup; _bootdos adds the data cache
 HDINIT
 SEGTRACKER
 NO68020                         ; portable kickemu patches; game still needs 020
@@ -46,20 +46,21 @@ _bootdos
         move.l (_resload,pc),a2
         lea (_config_tags,pc),a0
         jsr (resload_Control,a2)
-; Enable the data cache too on a 68020/68030, with chip memory write-through
-; (the CACHECHIPDATA values). The 68030 data cache is write-through, and the
-; hardware keeps chip data uncached. Not CACHE: without WHDLoad's MMU, which a
-; 68030 uses only with the MMU option, its non-cacheable chip memory switches
-; both caches off. 68040/68060 copyback stays off until docs/open-work.md's
-; data-cache failure is resolved. KickEmu's boot fetched _attnflags
+; Enable the data cache too once DOS is up. A 68020/68030 gets chip memory
+; write-through (the CACHECHIPDATA values): the 68030 data cache is
+; write-through, and the hardware keeps chip data uncached. Not CACHE there:
+; without WHDLoad's MMU, which a 68030 uses only with the MMU option, its
+; non-cacheable chip memory switches both caches off. A 68040/68060, where
+; WHDLoad uses the MMU, gets the CACHE values: chip memory stays uncached so
+; blitter and other DMA writes are seen. KickEmu's boot fetched _attnflags
 ; (WHDLTAG_ATTNFLAGS_GET); bit 7 is AFB_68060, absent from this NDK.
-        move.l (_attnflags,pc),d0
-        and.w #AFF_68040|$80,d0
-        bne.b .cpuset
         move.l #WCPUF_Base_WT|WCPUF_Exp_CB|WCPUF_Slave_CB|WCPUF_IC|WCPUF_DC|WCPUF_BC|WCPUF_SS|WCPUF_SB,d0
-        move.l #WCPUF_All,d1
+        move.l (_attnflags,pc),d1
+        and.w #AFF_68040|$80,d1
+        beq.b .cpuset
+        move.l #WCPUF_Base_NC|WCPUF_Exp_CB|WCPUF_Slave_CB|WCPUF_IC|WCPUF_DC|WCPUF_BC|WCPUF_SS|WCPUF_SB,d0
+.cpuset move.l #WCPUF_All,d1
         jsr (resload_SetCPU,a2)
-.cpuset
         IFD BOOTONLY
         pea TDREASON_OK
         jmp (resload_Abort,a2)

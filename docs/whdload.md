@@ -25,13 +25,13 @@ chip and 8 MiB fast RAM. A 68020 is required by the port's current C2P routine;
 Macintosh trap vector at $28 despite WHDLoad's relocated VBR.
 
 Caches are chosen per CPU. KickEmu boots with `CACHECHIP` (instruction cache
-only). Once DOS is up, `_bootdos` gives a 68020/68030 both caches with chip
-memory write-through (the `CACHECHIPDATA` values); a 68040/68060 keeps the
-instruction cache only (see [open work](open-work.md)). The slave does not use
-`CACHE`: it marks chip memory non-cacheable, and without the MMU, which WHDLoad
-uses on a 68030 only with its `MMU` option and never on a 68020, that disables
-both caches. Measured in the driving loop on FS-UAE (cycle-exact 68020/68030),
-iterations gained over 600 fields (the game's own pacing caps this at 240):
+only). Once DOS is up, `_bootdos` adds the data cache. A 68020/68030 gets chip
+memory write-through (the `CACHECHIPDATA` values). A 68040/68060, where WHDLoad
+uses the MMU, gets the `CACHE` values: copyback with chip memory uncached, so
+DMA writes stay visible. A 68020/68030 does not use `CACHE`: it marks chip
+memory non-cacheable, and without the MMU, which WHDLoad uses on a 68030 only
+with its `MMU` option and never on a 68020, that disables both caches.
+Measured in the driving loop on FS-UAE (cycle-exact 68020/68030), iterations gained over 600 fields (the game's own pacing caps this at 240):
 
 | Machine | `CACHECHIP` | `CACHE` | `CACHE` + WHDLoad `MMU` | per-CPU |
 |---|---:|---:|---:|---:|
