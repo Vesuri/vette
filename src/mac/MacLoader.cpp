@@ -144,7 +144,9 @@ static const uint16_t kJumpCount = 509;
 // Private shadows immediately below the shipped A5 world.  The original game
 // directly touches classic-Mac Page-0 mouse globals, which are exception-vector
 // and operating-system memory on the Amiga.
-static const uint32_t kPortLowMemoryBytes = 20;
+static const uint32_t kPortLowMemoryBytes = 24;
+static const int16_t kPictureBatchLimit = -31296;
+static const int16_t kPictureBatchBase = -31294;
 static const int16_t kShadowCurrentA5 = -31292;
 static const int16_t kShadowMBState = -31288;
 static const int16_t kShadowMTempV = -31284;
@@ -1048,6 +1050,48 @@ static bool disableCopyProtection()
         if (read16(vette_code_1 + 0x05fe + i * 2) != original[i]) return false;
     for (uint16_t i = 0; i < 6; ++i)
         write16(vette_code_1 + 0x05fe + i * 2, replacement[i]);
+    return true;
+}
+
+static bool removePictureBatchSelfModification(uint8_t* a5)
+{
+    // Main+$2572 selects a PICT series from the car record's +$1E word by
+    // storing the loop limit and base ID into the immediates of CMPI.W #6,D7
+    // (Main+$25CE) and MOVE.W #$7E,D0 (Main+$25E8), then executing them. A
+    // copyback data cache keeps those stores from instruction fetch, so a
+    // 68040/68060 ran the shipped #$7E and requested the missing PICT 127.
+    // Keep the two values in private words below A5 instead: each
+    // LEA d16(PC),A0 / ADDQ.L #2,A0 / MOVE.W D0,(A0) store becomes
+    // MOVE.W D0,d16(A5) and two NOPs (A0 is reloaded before any use), and the
+    // two consumers read the word through same-width d16(A5) forms. CMP.W and
+    // MOVE.W set the same condition codes as the immediate forms.
+    struct Store { uint32_t offset; uint16_t displacement; int16_t shadow; };
+    static const Store stores[] = {
+        {0x2582, 0x004a, kPictureBatchLimit}, {0x258e, 0x0058, kPictureBatchBase},
+        {0x259e, 0x002e, kPictureBatchLimit}, {0x25aa, 0x003c, kPictureBatchBase},
+        {0x25b4, 0x0018, kPictureBatchLimit}, {0x25c0, 0x0026, kPictureBatchBase},
+    };
+    for (uint16_t i = 0; i < sizeof(stores) / sizeof(stores[0]); ++i) {
+        const uint8_t* store = vette_code_1 + stores[i].offset;
+        if (read16(store) != 0x41fa || read16(store + 2) != stores[i].displacement
+            || read16(store + 4) != 0x5488 || read16(store + 6) != 0x3080) return false;
+    }
+    if (read16(vette_code_1 + 0x25ce) != 0x0c47 || read16(vette_code_1 + 0x25d0) != 0x0006
+        || read16(vette_code_1 + 0x25e8) != 0x303c || read16(vette_code_1 + 0x25ea) != 0x007e)
+        return false;
+    for (uint16_t i = 0; i < sizeof(stores) / sizeof(stores[0]); ++i) {
+        uint8_t* store = vette_code_1 + stores[i].offset;
+        write16(store, 0x3b40);             // MOVE.W D0,shadow(A5)
+        write16(store + 2, (uint16_t)stores[i].shadow);
+        write16(store + 4, 0x4e71);         // NOP
+        write16(store + 6, 0x4e71);         // NOP
+    }
+    write16(vette_code_1 + 0x25ce, 0xbe6d); // CMP.W pictureBatchLimit(A5),D7
+    write16(vette_code_1 + 0x25d0, (uint16_t)kPictureBatchLimit);
+    write16(vette_code_1 + 0x25e8, 0x302d); // MOVE.W pictureBatchBase(A5),D0
+    write16(vette_code_1 + 0x25ea, (uint16_t)kPictureBatchBase);
+    write16(a5 + kPictureBatchLimit, 0x0006); // the shipped immediates
+    write16(a5 + kPictureBatchBase, 0x007e);
     return true;
 }
 
@@ -8414,6 +8458,7 @@ bool MacLoader::run(VetteScreen* screen)
     s_currentA5 = a5;
     Enable();
     if (!redirectLowMemoryGlobals(a5) || !disableCopyProtection()
+        || !removePictureBatchSelfModification(a5)
         || !installDrivingBoundaryTrap() || !installDrivingRasterTraps()
         || !installStaticCollisionProbe() || !installAdverseDamageCheckpoint()
         || !installPoliceTicketCheckpoint()

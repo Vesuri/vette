@@ -95,10 +95,21 @@ it, so a different executable fails before takeover.
 ## A5 world and naming pass
 
 `%A5Init` runs unchanged and constructs the shipped 31,272 bytes of application
-globals. The port reserves a separate 20-byte prefix for the mouse and
-CurrentA5 shadows; it is not presented as part of the original world. The
+globals. The port reserves a separate 24-byte prefix for the mouse and
+CurrentA5 shadows and the picture-batch words below; it is not presented as
+part of the original world. The
 positive parameter area A5+0..31 holds Ticks, RndSeed, WMgrPort, GrayRgn and the
 16-byte KeyMap before the jump table at A5+32.
+
+Main+$2572, in the fixed picture batch before driving, is the only
+self-modifying code: it stores a loop limit and base PICT ID (10000, 10006 or
+10013, chosen by the car record's +$1E word) into the immediates of
+`CMPI.W #6,D7` at Main+$25CE and `MOVE.W #$7E,D0` at Main+$25E8. A copyback data
+cache hides those stores from instruction fetch, and a 68040/68060 then
+requested the missing PICT 127 and raised the game's fatal alert. The port
+redirects the six stores and both consumers, at the same width, to the two
+private words. A scan of all ten CODE resources finds no other PC-relative
+store.
 
 `disasm/symbols.csv` is the source of truth for the concentrated naming pass.
 It separates `code`, `a5`, and `lowmem` spaces, carries an evidence class on
