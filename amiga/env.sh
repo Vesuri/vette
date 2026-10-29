@@ -5,6 +5,9 @@
 #   . amiga/env.sh
 # or from the amiga/ directory:
 #   . env.sh
-# WHDLoad 19.2: the version the slave builds against (whdload/) and the tests run.
-export WHDLOAD="${WHDLOAD:-$HOME/.local/share/amiga/WHDLoad}"
 . "${AMIGA_ENV:-$HOME/.local/share/amiga/env.sh}"
+# Project choices from the shared tools: the native FS-UAE build, which carries AmigaXDev's
+# emulator corrections (the x86_64 fs-uae on PATH does not), and the elf2hunk that zero-fills
+# section padding.
+export FSUAE="${FSUAE:-$FSUAE_ARM}"
+export ELF2HUNK="${ELF2HUNK:-$AMIGA_SHARE/elf2hunk-fixed}"

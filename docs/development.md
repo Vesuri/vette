@@ -7,21 +7,23 @@ The production game is the Amiga executable; there is no host game renderer.
 - GNU make, a shell and Python 3.
 - `m68k-amiga-elf-gcc/g++`, `elf2hunk`, vasm and Amiga NDK headers.
 - WHDLoad SDK includes for the slave. See [whdload.md](whdload.md).
-- LHa for UNIX for LH5 encoding, plus Lhasa's `lha` for independent archive
-  verification. Set `LHA` to the encoder's absolute path or install it as
-  `lha-compress` on PATH. Build instructions: [installation](install-original-data.md).
+- LHa for UNIX for LH5 encoding (AmigaXDev's shared build, `LHA`), plus Lhasa's
+  `lha` for independent archive verification. See [installation](install-original-data.md).
 
 `amiga/env.sh` sources the shared environment that AmigaXDev installs
 (`~/.local/share/amiga/env.sh`): the development toolchain under `~/.local` on
 PATH and the common files below. `WHDLOAD`, `NDK` and `VASM` override slave
-dependencies. The FS-UAE launchers source `env.sh` themselves and take their
+dependencies. `amiga/env.sh` selects AmigaXDev's native FS-UAE (`FSUAE`, default
+`$FSUAE_ARM`), which carries its emulator corrections, and its `elf2hunk-fixed`
+(`ELF2HUNK`), which zero-fills section padding; set either to override. The launchers
+and the Python test harnesses all run `FSUAE`. The FS-UAE launchers source `env.sh` themselves and take their
 options and PID-scoped emulator/debug-port management from the shared
 `$FSUAE_COMMON` (debug runs are silent with the window behind the others; `SOUND`
 and `WINDOW` override that). It is an external developer dependency, not included
 in the release.
 
 `~/.local/share/amiga` (installed by AmigaXDev `make setup`) holds host assets usable by more than one Amiga project:
-Kickstarts, the WHDLoad SDK, Installer 43.3, the LHa for UNIX build, the
+Kickstarts, the WHDLoad 20.1 package, Installer 43.3, the LHa for UNIX build, the
 Workbench floppy the WHDLoad and installer tests boot, and the FS-UAE helper
 above. Put a new cross-project asset there rather than in `tmp/`, which is this
 project's scratch space and is periodically emptied. Each common file has an
@@ -32,7 +34,10 @@ environment override:
 | `KICKSTART` | `Kickstarts/kick40063.A600` (KS 3.1, A600) | emulator boot ROM for all launchers and tests |
 | `WORKBENCH_ADF` | `Workbenchv2.04rev37.67Workbench.adf` | WHDLoad and installer tests |
 | `INSTALLER43` | `Installer43/Installer` | installer test |
-| `WHDLOAD` | `WHDLoad` (19.2 SDK, set by `amiga/env.sh`; tests copy `C/WHDLoad`) | slave build, WHDLoad and installer tests |
+| `WHDLOAD` | `WHDLoad` (20.1 package: SDK includes, KickEmu sources) | slave build |
+| `WHDLOAD_BINARY` | `$WHDLOAD/C/WHDLoad` | WHDLoad and installer tests |
+| `FSUAE` | `$FSUAE_ARM` (`fs-uae-arm/fs-uae`, set by `amiga/env.sh`) | every launcher and test harness |
+| `ELF2HUNK` | `elf2hunk-fixed` | game and helper executables |
 | `FSUAE_COMMON` | `fsuae_common.sh` | FS-UAE launchers |
 
 WHDLoad guests receive `Kickstarts/kick40063.A600` and its `.RTB` from the same

@@ -11,6 +11,9 @@ import tempfile
 import time
 
 ROOT=Path(__file__).resolve().parents[2]
+SHARE=Path.home()/".local/share/amiga"
+# amiga/env.sh selects AmigaXDev's native FS-UAE; its corrections are absent from the x86_64 one.
+FSUAE=os.environ.get("FSUAE") or os.environ.get("FSUAE_ARM") or str(SHARE/"fs-uae-arm/fs-uae")
 sys.path.insert(0,str(Path(__file__).resolve().parent))
 from test_install import EXPECTED, SOURCE
 
@@ -40,8 +43,8 @@ quit
 ''')
         env=os.environ.copy(); env.update(HOME=str(base/"home"),XDG_CACHE_HOME=str(base/"home"))
         with (base/"fsuae.log").open("w") as log:
-            emu=subprocess.Popen(["fs-uae","--amiga_model=A1200","--chip_memory=2048","--fast_memory=8192",
-                "--kickstart_file="+os.environ["KICKSTART"],"--hard_drive_0="+str(boot),
+            emu=subprocess.Popen([FSUAE,"--amiga_model=A1200","--chip_memory=2048","--fast_memory=8192",
+                "--kickstart_file="+os.environ.get("KICKSTART",str(SHARE/"Kickstarts/kick40063.A600")),"--hard_drive_0="+str(boot),
                 "--hard_drive_1="+str(ROOT),"--hard_drive_2="+str(base),"--warp_mode=1",
                 "--fullscreen=0","--window_width=720","--window_height=568",
                 "--remote_debugger=20",f"--remote_debugger_port={port}",

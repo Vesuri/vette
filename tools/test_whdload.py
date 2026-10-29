@@ -7,6 +7,7 @@ The quit mode requires a QUIT_PROBE=1 executable; timed mode runs production.
 import argparse
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import tempfile
@@ -18,8 +19,8 @@ SHARE = Path.home()/'.local/share/amiga'
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--mode', choices=('smoke', 'boot', 'load', 'quit', 'timed'), default='quit')
-    p.add_argument('--whdload', type=Path,
-                   default=Path(os.environ.get('WHDLOAD', SHARE/'WHDLoad'))/'C/WHDLoad')
+    p.add_argument('--whdload', type=Path, default=Path(os.environ.get('WHDLOAD_BINARY',
+                   Path(os.environ.get('WHDLOAD', SHARE/'WHDLoad'))/'C/WHDLoad')))
     p.add_argument('--workbench', type=Path,
                    default=Path(os.environ.get('WORKBENCH_ADF', SHARE/'Workbenchv2.04rev37.67Workbench.adf')))
     p.add_argument('--rom', type=Path, default=SHARE/'Kickstarts/kick40063.A600')
@@ -28,9 +29,15 @@ def main():
     p.add_argument('--seconds', type=int, default=90, help='host safety ceiling')
     p.add_argument('--ticks', type=int, default=1500, help='WHDLoad timeout in PAL fields')
     p.add_argument('--cpu', default='68020')
+    p.add_argument('--setup', help='AmigaXDev AMIGA_SETUP machine, e.g. a1200-030 or a1200-040; replaces --cpu')
+    p.add_argument('--no-mmu', action='store_true', help='with --setup, remove the preset CPU MMU')
+    p.add_argument('--whdload-option', action='append', default=[], help='extra WHDLoad option, e.g. MMU')
     p.add_argument('--hires', action='store_true', help='enable the slave Custom1 HIRES option')
     p.add_argument('--no-preload', action='store_true')
     args = p.parse_args()
+    if args.no_mmu and not args.setup:
+        p.error('--no-mmu requires --setup')
+    machine = setup_args(args.setup, args.no_mmu) if args.setup else None
     slave = {'smoke':'Smoke.slave', 'boot':'BootTest.slave', 'load':'LoadTest.slave'}.get(args.mode, 'Vette!.slave')
     base = Path(tempfile.mkdtemp(prefix='whdload-test-', dir=ROOT/'tmp'))
     print('Fixture:', base, flush=True)
@@ -48,17 +55,22 @@ def main():
         subprocess.run(['bash', '-c', '. ./stage_original_data.sh; stage_vette_original_data "$1"',
                         'stage', str(game/'data')], cwd=ROOT/'amiga', check=True)
     (boot/'s/WHDLoad.prefs').write_text('Expert\nReadDelay=0\n')
-    preload = '' if args.no_preload else 'PRELOAD '
+    options = ('' if args.no_preload else 'PRELOAD ') + ''.join(o + ' ' for o in args.whdload_option)
     (boot/'s/startup-sequence').write_text(
         'DF0:C/Assign C: DF0:C\nDF0:C/Assign LIBS: DF0:Libs\n'
         'DF0:C/Assign DEVS: DH0:devs\nStack 16384\nFailAt 999\n'
-        f'CD DH1:\nWHDLoad Vette!.slave {preload}CUSTOM1={int(args.hires)} SPLASHDELAY=0 NOREQ COREDUMP FILELOG TIMEOUT={args.ticks} >DH0:result\n'
+        f'CD DH1:\nWHDLoad Vette!.slave {options}CUSTOM1={int(args.hires)} SPLASHDELAY=0 NOREQ COREDUMP FILELOG TIMEOUT={args.ticks} >DH0:result\n'
         'If WARN\nEcho failed >DH0:failed\nElse\nEcho passed >DH0:passed\nEndIf\n')
-    with (base/'emulator.log').open('w') as log:
-        emu = subprocess.Popen(['fs-uae', '--amiga_model=A1200', '--cpu='+args.cpu,
+    # amiga/env.sh selects AmigaXDev's native FS-UAE; its corrections, including the 040/060
+    # MMU write attributes that copyback testing needs, are absent from the x86_64 one.
+    emulator = os.environ.get('FSUAE') or os.environ.get('FSUAE_ARM') or str(SHARE/'fs-uae-arm/fs-uae')
+    if machine is None:
+        machine = ['--amiga_model=A1200', '--cpu='+args.cpu,
             '--uae_cpu_model='+args.cpu, '--uae_cpu_24bit_addressing=false',
             '--jit_compiler=0', '--chip_memory=2048', '--fast_memory=8192',
-            '--kickstart_file='+os.environ.get('KICKSTART', str(SHARE/'Kickstarts/kick40063.A600')),
+            '--kickstart_file='+os.environ.get('KICKSTART', str(SHARE/'Kickstarts/kick40063.A600'))]
+    with (base/'emulator.log').open('w') as log:
+        emu = subprocess.Popen([emulator, *machine, '--base_dir='+str(base/'fsuae'),
             '--hard_drive_0='+str(boot), '--hard_drive_0_priority=10', '--hard_drive_1='+str(game),
             '--floppy_drive_0='+str(args.workbench),
             '--joystick_port_0=mouse', '--joystick_port_1=nothing', '--warp_mode=1', '--fullscreen=0',
@@ -72,6 +84,8 @@ def main():
             output = (boot/'result').read_text(errors='replace') if (boot/'result').exists() else ''
             report = (game/'.whdl_register').read_text(encoding='latin1') if (game/'.whdl_register').exists() else ''
             assert report, f'No WHDLoad core dump: {base}\n{output}'
+            if args.setup:
+                check_machine(base, report, args.mode, machine)
             if args.mode == 'timed':
                 assert 'DEBUG caused.' in report, report + output
                 files = (game/'.whdl_log').read_text(encoding='latin1')
@@ -92,6 +106,36 @@ def main():
             emu.terminate()
             try: emu.wait(timeout=5)
             except subprocess.TimeoutExpired: emu.kill(); emu.wait()
+
+def setup_args(name, no_mmu):
+    """Return the shared launcher's preset arguments, so machines match AmigaXDev exactly."""
+    common = os.environ.get('FSUAE_COMMON', str(SHARE/'fsuae_common.sh'))
+    out = subprocess.run(['/bin/bash', '-c', '. "$1" && AMIGA_SETUP="$2" && fsuae_setup && '
+                          'printf "%s\\0" "${FSUAE_SETUP_ARGS[@]}"', 'setup', common, name],
+                         check=True, capture_output=True, text=True).stdout
+    machine = out.split('\0')[:-1]
+    if no_mmu:
+        machine = ['--uae_mmu_model=0' if a.startswith('--uae_mmu_model=') else a for a in machine]
+    return machine
+
+def check_machine(base, report, mode, machine):
+    """Require the emulated CPU and MMU to be what the run claims; report the cache state."""
+    option = dict(a[2:].split('=', 1) for a in machine)
+    log = (base/'fsuae/Cache/Logs/fs-uae.log.txt').read_text(errors='replace')
+    # As AmigaXDev scripts/test_fsuae_config.py: a UAE fixup logs "[UAE] [000] TEXT", then TEXT.
+    lines = log.splitlines()
+    fixups = [l for prev, l in zip([''] + lines, lines) if l.strip() and (prev == '[UAE] [000] ' + l
+              or re.fullmatch(r'Unknown CPU specified|.* must be paired with .*', l))]
+    assert not fixups, f'FS-UAE changed the configuration: {fixups}'
+    cpu, mmu = option['cpu'], option['uae_mmu_model']
+    runtime = re.findall(r'CPU=(\d+), FPU=\d+.*?MMU=(\d+), JIT=0', log)
+    assert runtime and runtime[-1] == (re.sub(r'\D', '', cpu), mmu), f'Runtime CPU/MMU {runtime} != {cpu}/{mmu}'
+    if mode == 'smoke':
+        return
+    # The last appended report is this run's.
+    cacr = int(re.findall(r'CACR=([0-9A-F]+)', report)[-1], 16)
+    tc = int(re.findall(r'\bTC=([0-9A-F]+)', report)[-1], 16) if mmu != '0' else 0
+    print(f'Machine: {cpu} MMU={mmu} CACR={cacr:X} TC={tc:X}')
 
 if __name__ == '__main__':
     main()

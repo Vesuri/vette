@@ -62,8 +62,15 @@ Other modes default to the shared `kick40063.A600` and `.RTB`; override with `--
 Modes `boot` and `load` exit before executing Vette. `quit` expects a clean
 `QUIT_PROBE=1` game build. `timed` runs the production or gameplay regression build
 until WHDLoad's TIMEOUT, saving COREDUMP and FILELOG. `--hires` tests the Custom1 startup patch; `--no-preload` tests live disk
-reads. Each invocation retains an isolated fixture under `tmp/whdload-test-*`
+reads. `--setup a1200-030` (or another AmigaXDev `AMIGA_SETUP` name) takes the whole
+machine from the shared presets and checks FS-UAE's runtime CPU/MMU report; `--no-mmu`
+removes the preset MMU and `--whdload-option` adds a WHDLoad option such as `MMU`.
+Each invocation retains an isolated fixture under `tmp/whdload-test-*`
 and terminates only its own emulator. No test configuration enters the release.
+
+The shared WHDLoad 20.1 (build 7190) on AmigaXDev's native FS-UAE passes the smoke,
+boot, load, quit, timed (lores and HIRES) and native Installer tests, and the load test
+on the `a1200-030`, `a1200-040` and `a1200-060` presets.
 
 Confirmed with WHDLoad 19.2.6941 and the local A600 40.063 ROM:
 

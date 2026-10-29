@@ -91,20 +91,9 @@ Rescue on Fractalus conventions; provenance is in
 
 Every archive member uses LH5 with deterministic generic level-zero headers.
 Packaging requires [LHa for UNIX](https://github.com/jca02266/lha), not the
-extraction-only Homebrew Lhasa. Install the encoder as `lha-compress` on PATH
-or set `LHA` to its absolute path. Example host build (C compiler, autoconf,
-automake required):
-
-```sh
-git clone https://github.com/jca02266/lha.git ~/.local/share/amiga/lha-compressor
-cd ~/.local/share/amiga/lha-compressor
-git checkout 16619b066b189ef289bb8b07b37d1c38d550da99
-autoreconf -is
-./configure
-make -j4
-cd -
-LHA="$HOME/.local/share/amiga/lha-compressor/src/lha" make dist
-```
+extraction-only Homebrew Lhasa. AmigaXDev's `make setup` builds the pinned encoder
+(commit `16619b0`) and `amiga/env.sh` sets `LHA` to it; `LHA` or an `lha-compress`
+on PATH overrides it.
 
 `tools/check_release.py` independently decodes members using `lha` (Lhasa),
 checks CRCs, exact membership, reference icons, helper license and installer

@@ -16,7 +16,10 @@ import time
 ROOT=Path(__file__).resolve().parents[2]
 SHARE=Path.home()/".local/share/amiga"
 INSTALLER=Path(os.environ.get("INSTALLER43",SHARE/"Installer43/Installer"))
-WHDLOAD=Path(os.environ.get("WHDLOAD",SHARE/"WHDLoad"))/"C/WHDLoad"
+WHDLOAD=Path(os.environ.get("WHDLOAD_BINARY",Path(os.environ.get("WHDLOAD",SHARE/"WHDLoad"))/"C/WHDLoad"))
+ELF2HUNK=os.environ.get("ELF2HUNK",str(SHARE/"elf2hunk-fixed"))
+# amiga/env.sh selects AmigaXDev's native FS-UAE; its corrections are absent from the x86_64 one.
+FSUAE=os.environ.get("FSUAE") or os.environ.get("FSUAE_ARM") or str(SHARE/"fs-uae-arm/fs-uae")
 WORKBENCH=Path(os.environ.get("WORKBENCH_ADF",SHARE/"Workbenchv2.04rev37.67Workbench.adf"))
 KICKSTART=os.environ.get("KICKSTART",str(SHARE/"Kickstarts/kick40063.A600"))
 sys.path.insert(0,str(ROOT/"tools"))
@@ -50,7 +53,7 @@ def main():
     subprocess.run(["m68k-amiga-elf-gcc","-O2","-m68000","-nostdlib","-Wno-volatile-register-var",
         "-Wl,--emit-relocs,-Ttext=0,-e,_start",str(ROOT/"tools/install-data/start.s"),
         str(ROOT/"tools/install-data/test_icon.c"),"-o",str(build/"test-icon.elf")],check=True)
-    subprocess.run(["elf2hunk",str(build/"test-icon.elf"),str(build/"test-icon.exe"),"-s"],check=True)
+    subprocess.run([ELF2HUNK,str(build/"test-icon.elf"),str(build/"test-icon.exe"),"-s"],check=True)
     with tempfile.TemporaryDirectory(prefix="vette-installer-script-",dir=ROOT/"tmp") as temp:
         base=Path(temp); boot=base/"boot"; (boot/"s").mkdir(parents=True)
         (base/"state").mkdir(); dest=base/"out/Vette!"; (base/"out").mkdir()
@@ -101,7 +104,7 @@ def main():
         (boot/"s/startup-sequence").write_text('CD DH0:\nStack 16384\nIconTest\nDF0:C/Assign C: DF0:C\nDF0:C/Assign LIBS: DF0:Libs\nDF0:C/Assign DEVS: DH0:devs\nPath DH0: ADD\nC:LoadWB\nInstaller SCRIPT DH0:Install APPNAME Vette! MINUSER NOVICE DEFUSER NOVICE LOGFILE DH2:installer.log NOPRETEND >DH2:installer-console.log\n'
             + f'IconTest\nIf EXISTS "{temp_work}"\nEcho leftover >DH2:leftover\nEndIf\nEcho done >DH2:finished\n')
         with (ROOT/"tmp/installer-script-emulator.log").open("w") as log:
-            emu=subprocess.Popen(["fs-uae","--amiga_model=A1200/020","--chip_memory=2048","--fast_memory=8192",
+            emu=subprocess.Popen([FSUAE,"--amiga_model=A1200/020","--chip_memory=2048","--fast_memory=8192",
                 "--uae_cpu_model=68020","--uae_cpu_24bit_addressing=false","--uae_z3mem_size=16",
                 "--kickstart_file="+KICKSTART,"--hard_drive_0="+str(boot),
                 "--hard_drive_0_priority=10",

@@ -48,6 +48,8 @@ CC       = m68k-amiga-elf-gcc
 AS       = m68k-amiga-elf-as
 VASM     = vasmm68k_mot
 OBJDUMP  = m68k-amiga-elf-objdump
+AMIGA_SHARE ?= $(HOME)/.local/share/amiga
+ELF2HUNK ?= $(AMIGA_SHARE)/elf2hunk-fixed
 SDKDIR   = $(abspath $(dir $(shell which $(CC)))../m68k-amiga-elf/sys-include)
 SUPPORT  = $(abspath $(dir $(shell which $(CC)))../../support)
 
@@ -671,7 +673,7 @@ obj/StartupConfig.o: $(AMIGA_SRC)/StartupConfig.s
 
 $(OUT).exe: $(OUT).elf
 	$(info Elf2Hunk $@)
-	@elf2hunk $(OUT).elf $(OUT).exe -s
+	@$(ELF2HUNK) $(OUT).elf $(OUT).exe -s
 	@grep -qa '$$VER: Vette! 0.92 (29.09.2026)' $(OUT).exe || { \
 	  echo "error: the AmigaOS \$$VER: string is missing from $@."; \
 	  echo "       See src/platform/amiga/version.s (SHF_GNU_RETAIN)."; \
