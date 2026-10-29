@@ -32,12 +32,14 @@ def main():
     p.add_argument('--setup', help='AmigaXDev AMIGA_SETUP machine, e.g. a1200-030 or a1200-040; replaces --cpu')
     p.add_argument('--no-mmu', action='store_true', help='with --setup, remove the preset CPU MMU')
     p.add_argument('--whdload-option', action='append', default=[], help='extra WHDLoad option, e.g. MMU')
+    p.add_argument('--fsuae-option', action='append', default=[], metavar='KEY=VALUE',
+                   help='with --setup, replace or add one FS-UAE option, e.g. uae_cpu_frequency=25000000')
     p.add_argument('--hires', action='store_true', help='enable the slave Custom1 HIRES option')
     p.add_argument('--no-preload', action='store_true')
     args = p.parse_args()
-    if args.no_mmu and not args.setup:
-        p.error('--no-mmu requires --setup')
-    machine = setup_args(args.setup, args.no_mmu) if args.setup else None
+    if (args.no_mmu or args.fsuae_option) and not args.setup:
+        p.error('--no-mmu and --fsuae-option require --setup')
+    machine = setup_args(args.setup, args.no_mmu, args.fsuae_option) if args.setup else None
     slave = {'smoke':'Smoke.slave', 'boot':'BootTest.slave', 'load':'LoadTest.slave'}.get(args.mode, 'Vette!.slave')
     base = Path(tempfile.mkdtemp(prefix='whdload-test-', dir=ROOT/'tmp'))
     print('Fixture:', base, flush=True)
@@ -107,7 +109,7 @@ def main():
             try: emu.wait(timeout=5)
             except subprocess.TimeoutExpired: emu.kill(); emu.wait()
 
-def setup_args(name, no_mmu):
+def setup_args(name, no_mmu, overrides):
     """Return the shared launcher's preset arguments, so machines match AmigaXDev exactly."""
     common = os.environ.get('FSUAE_COMMON', str(SHARE/'fsuae_common.sh'))
     out = subprocess.run(['/bin/bash', '-c', '. "$1" && AMIGA_SETUP="$2" && fsuae_setup && '
@@ -115,11 +117,15 @@ def setup_args(name, no_mmu):
                          check=True, capture_output=True, text=True).stdout
     machine = out.split('\0')[:-1]
     if no_mmu:
-        machine = ['--uae_mmu_model=0' if a.startswith('--uae_mmu_model=') else a for a in machine]
+        overrides = ['uae_mmu_model=0', *overrides]
+    # Replace in place: FS-UAE can reapply a duplicated raw UAE option.
+    for override in overrides:
+        key = '--' + override.split('=', 1)[0] + '='
+        machine = [a for a in machine if not a.startswith(key)] + ['--' + override]
     return machine
 
 def check_machine(base, report, mode, machine):
-    """Require the emulated CPU and MMU to be what the run claims; report the cache state."""
+    """Require the emulated CPU and MMU to be what the run claims, and the slave's caches."""
     option = dict(a[2:].split('=', 1) for a in machine)
     log = (base/'fsuae/Cache/Logs/fs-uae.log.txt').read_text(errors='replace')
     # As AmigaXDev scripts/test_fsuae_config.py: a UAE fixup logs "[UAE] [000] TEXT", then TEXT.
@@ -136,6 +142,14 @@ def check_machine(base, report, mode, machine):
     cacr = int(re.findall(r'CACR=([0-9A-F]+)', report)[-1], 16)
     tc = int(re.findall(r'\bTC=([0-9A-F]+)', report)[-1], 16) if mmu != '0' else 0
     print(f'Machine: {cpu} MMU={mmu} CACR={cacr:X} TC={tc:X}')
+    # The slave enables both caches on a 68030 and keeps 68040/68060 copyback off.
+    model = re.sub(r'\D', '', cpu)
+    if model == '68020':
+        assert cacr & 0x1, f'68020 instruction cache off: CACR={cacr:X}'
+    elif model == '68030':
+        assert cacr & 0x0101 == 0x0101, f'68030 instruction/data caches not both on: CACR={cacr:X}'
+    else:
+        assert cacr & 0x80008000 == 0x8000, f'{cpu} expected instruction cache only: CACR={cacr:X}'
 
 if __name__ == '__main__':
     main()
