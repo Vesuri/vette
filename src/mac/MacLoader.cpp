@@ -8429,8 +8429,11 @@ bool MacLoader::run(VetteScreen* screen)
     // These segments were loaded as data, then patched together with the A5
     // JMP table. Publish dirty data and discard stale instruction-cache lines
     // before executing any of them (Exec V37+, our OS 2.04 baseline).
-    // Do not disable caches: let Exec use the installed CPU support routines.
-    CacheClearU();
+    // CacheControl(0, 0) changes no setting and clears all caches as its
+    // documented side effect. Use it rather than CacheClearU: WHDLoad's KickEmu
+    // routes CacheControl to resload_FlushCache, while the emulated ROM's
+    // CacheClearU leaves 68040/68060 copyback lines unpushed.
+    CacheControl(0, 0);
     // Main+1EDA is the application entry stub.  Its first JSR is through the final
     // jump-table entry to %A5Init; invoking %A5Init here as well would initialise twice.
     vette_call_mac_code((void*)read32(firstJump + 4), a5);

@@ -71,7 +71,7 @@ extern "C" bool vetteInstallGameKernels(uint8_t* main)
     absoluteJump((uint8_t*)vetteVertexPassFast + 6, vetteVertexPlanar, true);
     vetteVertexPassFast[6] = 0x6000;
     vetteVertexPassFast[7] = 0x5168 - 0x510a;
-    CacheClearU();
+    CacheControl(0, 0);                 // flush; see MacLoader.cpp stage B
 #ifdef VETTE_GAME_KERNEL_VERIFY
     if (!vetteCheckGameKernels((void (*)())vertexOriginal, (void (*)())vetteGeometryOriginal,
                               (void (*)())vettePointOriginal)) return false;
@@ -83,7 +83,7 @@ extern "C" bool vetteInstallGameKernels(uint8_t* main)
     *(uint16_t*)(main + 0x4caa) = 0x4d06 - 0x4caa;
     absoluteJump(main + 0x4bbe, vettePointTransform, false);
 #endif
-    CacheClearU();
+    CacheControl(0, 0);                 // flush; see MacLoader.cpp stage B
     return true;
 }
 #endif
