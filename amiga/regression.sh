@@ -136,6 +136,8 @@ run_controls()
     PROBES=1 SKIP_INTRO=1 GARAGE_CLICK=1 CONTROLLER_PROBE=1
   run_case controller-cd32 240 controller_input.gdb 'PASS controller input mode=2' \
     PROBES=1 SKIP_INTRO=1 GARAGE_CLICK=1 CONTROLLER_PROBE=2
+  run_case horn 120 driving_horn.gdb 'horn PASS' \
+    PROBES=1 SKIP_INTRO=1 GARAGE_CLICK=1 HORN_PROBE=1
 }
 
 case "$group" in

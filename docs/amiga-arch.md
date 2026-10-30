@@ -141,6 +141,11 @@ Bogas is bridged to Paula rather than software-mixed. Three logical contexts
 share four hardware voices. Source volume range 0..300 maps to Paula 0..64;
 relative volume matters, not RMS normalization. Preserve voice ownership,
 finite sample completion, looping semantics and clean channel retirement.
+BGAS outputs 11.127 kHz (Paula period 319). Context 0 advances by its 16.16
+Load/Play step; contexts 1 and 2 advance by whole bytes per output sample
+(BGAS+$1F4A), so their Load step is an integer rate multiplier (the horn uses
+2). The INST header byte at +4 is a sequencer base note, not a rate. Command
+$1A (CODE 9+$BA) silences one context: Z release, sound off, cue reloads.
 
 Intro and gameplay share header-aware INST preparation and the Paula restart
 sequence. The initial segment ends at the defined loop end; aligned loops reuse

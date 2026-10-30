@@ -181,7 +181,7 @@ static const uint16_t kPoliceTicketTrap = 0xafef;
 // to know that Paula owns the implementation.
 static const uint16_t kBogasDisposeTrap = 0xaff0;
 static const uint16_t kBogasCloseTrap = 0xaff1;
-static const uint16_t kBogasOpenTrap = 0xaff2;
+static const uint16_t kBogasQuietTrap = 0xaff2;
 static const uint16_t kBogasKillTrap = 0xaff3;
 static const uint16_t kBogasLoadTrap = 0xaff4;
 static const uint16_t kBogasPlayTrap = 0xaff5;
@@ -512,7 +512,6 @@ struct BogasInstrument {
     uint8_t** resource;
     uint8_t* chipData;
     uint32_t size;
-    uint16_t basePeriod;
     uint16_t loopStart;
     uint16_t loopEnd;
     PaulaSample::Layout dma;
@@ -521,7 +520,6 @@ static BogasInstrument s_bogasInstruments[16];
 static uint16_t s_bogasInstrumentCount;
 
 struct BogasContext {
-    bool open;
     bool playing;
     uint16_t instrument;
     uint16_t channel;
@@ -1169,7 +1167,7 @@ static bool installBogasTraps()
         0x1b0, 0x1e6, 0x21c, 0x24c, 0x27c, 0x2ac
     };
     static const uint16_t traps[] = {
-        kBogasDisposeTrap, kBogasCloseTrap, kBogasOpenTrap, kBogasKillTrap,
+        kBogasDisposeTrap, kBogasCloseTrap, kBogasQuietTrap, kBogasKillTrap,
         kBogasLoadTrap, kBogasPlayTrap, kBogasPitchTrap, kBogasPurgeTrap,
         kBogasSetTrap, kBogasStartTrap, kBogasStopTrap, kBogasDeactivateTrap
     };
@@ -1892,8 +1890,6 @@ static BogasInstrument* bogasInstrument(uint16_t ordinal)
     instrument.size = instrument.dma.size;
     instrument.loopStart = (uint16_t)instrument.dma.loopStart;
     instrument.loopEnd = (uint16_t)instrument.dma.loopEnd;
-    uint16_t sampleRate = instrument.dma.rate;
-    instrument.basePeriod = sampleRate ? vette_divu16(3546895UL, sampleRate) : 319;
     PaulaSample::convert(instrument.dma, instrument.chipData);
     return &instrument;
 }
@@ -1938,8 +1934,8 @@ static void startBogasVoice(uint16_t ordinal, uint16_t channel,
 
 static uint16_t bogasPeriod(uint16_t basePeriod, uint32_t pitch)
 {
-    // The live engine values behave as a 16.16 playback-rate multiplier;
-    // 0x10000 therefore preserves the source rate carried by the INST header.
+    // The live engine values behave as a 16.16 playback-rate multiplier of
+    // the 11.127 kHz BGAS output rate.
     if (!pitch) pitch = 0x10000UL;
     if (pitch < basePeriod) return 65535;
     uint32_t numerator = (uint32_t)basePeriod << 16;
@@ -1949,6 +1945,16 @@ static uint16_t bogasPeriod(uint16_t basePeriod, uint32_t pitch)
     }
     uint16_t period = vette_divu16(numerator + (pitch >> 1), (uint16_t)pitch);
     return period < 124 ? 124 : period;
+}
+
+// BGAS+$1F4A advances contexts 1 and 2 by whole source bytes per 11.127 kHz
+// output sample (ADDA.L of the Load step), not by the INST header byte, which
+// is a base note for the sequencer. The horn's step 2 doubles its rate.
+static uint16_t bogasEffectPeriod(uint32_t step)
+{
+    if (step <= 1) return 319;
+    if (step > 2) return 124;              // Paula's minimum period
+    return 160;                            // 319 / 2, rounded
 }
 
 static uint32_t s_bogasVoiceEndTick[4];
@@ -2001,10 +2007,8 @@ static void resumeBogasAudio()
             startBogasVoice(context.instrument, 0, period, volume);
             startBogasVoice(context.instrument, 1, period, volume);
         } else {
-            BogasInstrument* sample = bogasInstrument(context.instrument);
             startBogasVoice(context.instrument, context.channel,
-                            sample ? sample->basePeriod : 319,
-                            bogasPaulaVolume());
+                            bogasEffectPeriod(context.pitch), bogasPaulaVolume());
         }
     }
     s_bogasSuspended = false;
@@ -2043,7 +2047,7 @@ static void bogasLoad(uint16_t contextIndex, uint32_t duration,
     BogasContext& context = s_bogasContexts[contextIndex];
     context.instrument = instrument;
     context.duration = duration;
-    context.pitch = contextIndex == 0 ? options : 0x10000UL;
+    context.pitch = options;
 
     // The source's indefinitely loaded context 0 is the gameplay engine.
     // Intro cues continue through the already-proven one-shot bridge until
@@ -2057,8 +2061,7 @@ static void bogasLoad(uint16_t contextIndex, uint32_t duration,
         context.channel = 0;
         context.playing = true;
         // BGAS mixes context 0 into its fixed 11.127 kHz output and advances
-        // the source by the Load/Play 16.16 step. The INST header rate belongs
-        // to the direct effect contexts, not to this software-mixer clock.
+        // the source by the Load/Play 16.16 step.
         uint16_t period = bogasPeriod(319, options);
         uint16_t volume = bogasPaulaVolume();
         startBogasVoice(instrument, 0, period, volume);
@@ -2080,10 +2083,25 @@ static void bogasLoad(uint16_t contextIndex, uint32_t duration,
     uint16_t channel = contextIndex == 1 ? 3 : 2;
     context.channel = channel;
     context.playing = true;
-    BogasInstrument* sample = bogasInstrument(instrument);
-    uint16_t period = sample ? sample->basePeriod : 319;
-    startBogasVoice(instrument, channel, period, bogasPaulaVolume());
+    startBogasVoice(instrument, channel, bogasEffectPeriod(options), bogasPaulaVolume());
     s_bogasVoiceEndTick[channel] = duration == 0x7fffffffUL ? 0 : g_macTicks + duration;
+}
+
+static void bogasQuiet(uint16_t contextIndex)
+{
+    if (contextIndex >= 3) return;
+    BogasContext& context = s_bogasContexts[contextIndex];
+    context.playing = false;
+    if (contextIndex == 0) {
+        stopBogasVoice(0);
+        stopBogasVoice(1);
+        s_bogasVoiceEndTick[0] = 0;
+        s_bogasVoiceEndTick[1] = 0;
+        return;
+    }
+    uint16_t channel = contextIndex == 1 ? 3 : 2;
+    stopBogasVoice(channel);
+    s_bogasVoiceEndTick[channel] = 0;
 }
 
 static void bogasPlay(uint32_t pitch, uint16_t contextIndex)
@@ -2092,12 +2110,12 @@ static void bogasPlay(uint32_t pitch, uint16_t contextIndex)
     BogasContext& context = s_bogasContexts[contextIndex];
     context.pitch = pitch;
     if (!context.playing || s_bogasSuspended) return;
-    uint16_t period = bogasPeriod(319, pitch);
     if (contextIndex == 0) {
+        uint16_t period = bogasPeriod(319, pitch);
         setPaulaPeriod(0, period);
         setPaulaPeriod(1, period);
     } else {
-        setPaulaPeriod(context.channel, period);
+        setPaulaPeriod(context.channel, bogasEffectPeriod(pitch));
     }
 }
 
@@ -6093,7 +6111,8 @@ static void updateDrivingInputProbe()
     // A real keyboard edge after the countdown has reached race state 3 and
     // the car has had time to accelerate. Keep Z down through one complete
     // original iteration, then release it through the same CIA state/edge
-    // path. The horn latch is not driven by a transient GetKeys bitmap alone.
+    // path (HORN_PROBE=1), or keep it held (HORN_PROBE=2). The horn latch is
+    // not driven by a transient GetKeys bitmap alone.
     static uint8_t hornProbePhase;
     static uint32_t hornProbeIteration;
     bool raceUnderway = s_currentA5
@@ -6103,7 +6122,8 @@ static void updateDrivingInputProbe()
         hornProbeIteration = g_macDrivingIterations;
         vetteInputInjectProbeKey(0x31, true);  // physical Z
         hornProbePhase = 1;
-    } else if (hornProbePhase == 1 && g_macDrivingIterations > hornProbeIteration) {
+    } else if (VETTE_HORN_PROBE == 1 && hornProbePhase == 1
+               && g_macDrivingIterations > hornProbeIteration) {
         vetteInputInjectProbeKey(0x31, false);
         hornProbePhase = 2;
     }
@@ -6935,12 +6955,10 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
         if (s_bogasStarted) stopBogasAudio();
         return returnFromBogasTrap(frame, userStack, 0);
     }
-    if (trap == kBogasOpenTrap && pc == (uint32_t)(sound + 0x0ba)) {
-        uint16_t context = read16(userStack + 4);
-        if (context < 3) {
-            s_bogasContexts[context].open = true;
-            s_bogasContexts[context].channel = context == 0 ? 0 : (context == 1 ? 3 : 2);
-        }
+    if (trap == kBogasQuietTrap && pc == (uint32_t)(sound + 0x0ba)) {
+        // Command $1A (BGAS $60C) silences one context: the horn on Z
+        // release, the engine on sound off and the context-2 cue reloads.
+        bogasQuiet(read16(userStack + 4));
         return returnFromBogasTrap(frame, userStack, 2);
     }
     if (trap == kBogasKillTrap && pc == (uint32_t)(sound + 0x0ee)) {
@@ -8483,7 +8501,6 @@ static void releaseRuntimeAllocations()
         instrument.resource = 0;
         instrument.chipData = 0;
         instrument.size = 0;
-        instrument.basePeriod = 0;
         instrument.loopStart = 0;
         instrument.loopEnd = 0;
     }

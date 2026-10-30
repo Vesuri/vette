@@ -121,6 +121,8 @@
  - faster on 68030, 68040 and 68060 processors by enabling the data cache
  - added joystick and CD32 pad support
  - fixed the mouse pointer appearing too narrow in hires mode on AGA
+ - fixed the horn sounding too low and not stopping when released, and
+   other sound effects playing slightly too low
 
  version 0.92 (29.09.2026):
  - improved drawing performance by removing redundant frame copying and

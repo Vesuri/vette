@@ -1,8 +1,8 @@
 # Assert authentic three-context overlap and one subsequent context-2
-# replacement on Course Two. The diagnostic physical Z-key edge supplies an
+# replacement on Course Two. The diagnostic held Z key supplies an
 # indefinite horn on context 1 while original traffic supplies crash on
 # context 2. Requires PROBES=1 SKIP_INTRO=1 GARAGE_CLICK=1 GARAGE_COURSE=2
-# FREEWAY_ROUTE=1 HORN_PROBE=1 FIDELITY_RANDOM_SEED=0x3BD90000.
+# FREEWAY_ROUTE=1 HORN_PROBE=2 FIDELITY_RANDOM_SEED=0x3BD90000.
 set pagination off
 set confirm off
 set $seenContext1 = 0

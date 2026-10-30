@@ -295,11 +295,14 @@ endif
 EXTRA_DEFINES += -DVETTE_CONTROLLER_PROBE=$(CONTROLLER_PROBE)
 endif
 
-# Diagnostic only: pulse the documented Z horn control for one driving KeyMap
-# scan after the countdown and initial acceleration, then release it through
-# the next ordinary scan.
+# Diagnostic only: press the documented Z horn control after the countdown and
+# initial acceleration. HORN_PROBE=1 releases it through the next ordinary
+# scan; HORN_PROBE=2 keeps it held.
 ifdef HORN_PROBE
-EXTRA_DEFINES += -DVETTE_HORN_PROBE
+ifneq ($(filter $(HORN_PROBE),1 2),$(HORN_PROBE))
+$(error HORN_PROBE must be 1 (press and release) or 2 (hold))
+endif
+EXTRA_DEFINES += -DVETTE_HORN_PROBE=$(HORN_PROBE)
 endif
 
 # `make FPSCOUNT=1` — the honest framerate build: one increment per painted frame and the
