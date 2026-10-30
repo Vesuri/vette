@@ -23,6 +23,8 @@ Host OS/WHDLoad/PRELOAD require additional memory. The tested machine has 2 MiB
 chip and 8 MiB fast RAM. A 68020 is required by the port's current C2P routine;
 68030 or better and AGA are recommended. `WHDLF_EmulLineA` forwards the game's
 Macintosh trap vector at $28 despite WHDLoad's relocated VBR.
+`INITAGA` makes KickEmu call `SetChipRev(SETCHIPREV_BEST)` as SetPatch does, so
+graphics.library reports AGA and the HIRES pointer uses AGA hires sprites.
 
 Caches are chosen per CPU. KickEmu boots with `CACHECHIP` (instruction cache
 only). Once DOS is up, `_bootdos` adds the data cache. A 68020/68030 gets chip

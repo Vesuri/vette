@@ -12,6 +12,7 @@ BLACKSCREEN
 BOOTDOS
 CACHECHIP                       ; boot setup; _bootdos adds the data cache
 HDINIT
+INITAGA                         ; SetChipRev, as SetPatch: AGA sprite resolution
 SEGTRACKER
 NO68020                         ; portable kickemu patches; game still needs 020
 ; Do not use kick31.s STACKSIZE: its A600 patch at $2305c overwrites

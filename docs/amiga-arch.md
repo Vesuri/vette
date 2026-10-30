@@ -94,7 +94,9 @@ field independently of game rendering. AGA uses matching HIRES/LORES SPRRES
 settings. OCS/ECS hires cursors sample every second source column into eight
 lores sprite pixels to preserve their proportions; ECS cannot force hires
 sprites in a hires playfield. The logical hotspot is unchanged. The chipset is
-identified through graphics.library before takeover. Unused sprite channels
+identified through graphics.library before takeover; Kickstart 3.1 reports AGA
+only after SetPatch, or KickEmu's `INITAGA` in the slave, so an A1200 without
+either takes the ECS cursor and shows it half width. Unused sprite channels
 point to empty sprites, and sprite priority keeps the pointer in front of the
 playfield.
 
