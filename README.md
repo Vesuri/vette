@@ -38,6 +38,7 @@ installation instructions.
 | A | Automatic shifting |
 | Z | Horn |
 | P | Pause/options |
+| Amiga+R | Resume after pause |
 | Control + left mouse button | Quit normally and save scores |
 | F10 | Immediate WHDLoad quit; pending scores are not saved |
 
@@ -49,7 +50,7 @@ detected during the first seconds after startup.
 | Up / Down | Accelerate / brake | Left / Right | Steer |
 | Left / Right | Steer | Forward (R) / Reverse (L) | Accelerate / brake |
 | Fire + Up / Down | Shift up / down | Red / Green | Shift up / down |
-| | | Blue / Yellow / Play | Reverse / horn / pause |
+| | | Blue / Yellow / Play | Reverse / horn / pause or resume |
 
 Select a gear before accelerating. In FS-UAE, disable keyboard joystick
 emulation if it consumes the cursor keys. More controls and game rules are in

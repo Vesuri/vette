@@ -123,7 +123,10 @@ inside the driving iteration) with no key down (A5-$39BE), so a new
 controller shift releases the controller's keys for one whole iteration.
 Joystick fire adds the shift to forward/back rather than replacing it:
 Traffic+$3766 undoes a manual shift whose engine speed leaves the new gear's
-band, which an upshift with the accelerator released does at moderate speed. `CONTROLLER_PROBE=1|2` scripts port 1 for
+band, which an upshift with the accelerator released does at moderate speed.
+The pad has no Command key: while the session is suspended (driving flag
+A5-21316 clear, Return to Game enabled), a controller P edge becomes
+Command-R in the event layer. `CONTROLLER_PROBE=1|2` scripts port 1 for
 `controller_input.gdb`.
 
 Presentation does not itself stall original code: a pending buffer causes the

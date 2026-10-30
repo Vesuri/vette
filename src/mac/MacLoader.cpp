@@ -6006,9 +6006,22 @@ static void updateControllerProbe()
         CONTROLLER_STEP((uint16_t)(up | right), 0, right, forward);
         break;
     case 2:   // shift up into second
+        // Steer only briefly: a sustained right turn can reach the lake
+        // (water recovery, PICT 140) before the stop.
+#if VETTE_CONTROLLER_PROBE == 1
+        if (elapsed >= 10 && g_controllerProbeJoy != up) {
+            r[4] = heading;
+            g_controllerProbeJoy = up;
+        }
+#else
+        if (elapsed >= 10 && g_controllerProbeJoy) {
+            r[4] = heading;
+            g_controllerProbeJoy = 0;
+            g_controllerProbePad = (uint16_t)(forward | 0x0003);
+        }
+#endif
         if (elapsed < 60) return;
         r[3] = speed;
-        r[4] = heading;
         CONTROLLER_STEP(up, 1, 0, (uint16_t)(red | forward));
         break;
     case 3:   // shift down into first
@@ -6026,7 +6039,7 @@ static void updateControllerProbe()
         r[7] = speed;
 #if VETTE_CONTROLLER_PROBE == 1
         next(0, 0, 0);
-        g_controllerProbePhase = 10;
+        g_controllerProbePhase = 14;
         vetteControllerProbeComplete();
 #else
         next(0, 0, 0x0200);                    // blue: reverse gear
@@ -6045,6 +6058,16 @@ static void updateControllerProbe()
     case 8:   // play: pause clears the driving flag (vetteLineADispatch)
         if (elapsed < 2) return;
         next(0, 0, 0x0008);
+        break;
+    case 12:  // play again resumed the race (phases 10-11 run while paused)
+        r[11] = 1;
+        since = g_macDrivingIterations;
+        g_controllerProbePhase = 13;
+        break;
+    case 13:  // still driving after Play was held across the resume
+        if (elapsed < 60) return;
+        g_controllerProbePhase = 14;
+        vetteControllerProbeComplete();
         break;
 #endif
     }
@@ -6774,6 +6797,7 @@ static bool nextEvent(uint16_t mask, uint8_t* event)
     uint8_t rawKey;
     bool keyDown;
     uint16_t keyModifiers;
+    bool keyFromController;
     if (!transition && s_escapeGaragePending && !read16(s_currentA5 - 21316)
         && (mask & (1u << 3)) && (menuKey('G') & 0xffff) == 7) {
         what = 3;
@@ -6782,7 +6806,7 @@ static bool nextEvent(uint16_t mask, uint8_t* event)
         transition = true;
         s_escapeGaragePending = false;
     }
-    while (!transition && vetteInputPopKey(rawKey, keyDown, keyModifiers)) {
+    while (!transition && vetteInputPopKey(rawKey, keyDown, keyModifiers, keyFromController)) {
         KeyTranslation key;
         uint16_t keyWhat = keyDown ? 3 : 4;
         if (!translateAmigaKey(rawKey, key)) continue;
@@ -6798,6 +6822,15 @@ static bool nextEvent(uint16_t mask, uint8_t* event)
         if (rawKey == 0x45 && keyDown && (menuKey('G') & 0xffff) == 7) {
             key.virtualKey = 0x05; // Macintosh G
             character = 'g';
+            modifiers |= 0x0100; // cmdKey
+        }
+        // The pad has no Command key: its Play (P) resumes a suspended
+        // session through the enabled Return to Game command (Command-R).
+        if (rawKey == 0x19 && keyDown && keyFromController && s_currentA5
+            && !read16(s_currentA5 - 21316)
+            && (menuKey('R') & 0xffff) == 6) {
+            key.virtualKey = 0x0f; // Macintosh R
+            character = 'r';
             modifiers |= 0x0100; // cmdKey
         }
         message = ((uint32_t)key.virtualKey << 8) | character;
@@ -6859,11 +6892,22 @@ static bool validatePermanentHandle(uint8_t** handle)
 extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* userStack)
 {
 #if defined(VETTE_CONTROLLER_PROBE) && VETTE_CONTROLLER_PROBE == 2
+    // While paused no driving iteration runs: release Play, then hold it
+    // again for 30 ticks so the resumed race scans it, then release.
+    static uint32_t controllerPauseTick;
     if (g_controllerProbePhase == 9 && s_currentA5
         && read16(s_currentA5 - 21316) == 0) {
         g_controllerProbePhase = 10;
+        g_controllerProbeResult[10] = 1;
         g_controllerProbePad = 0x0003;
-        vetteControllerProbeComplete();
+        controllerPauseTick = g_macTicks;
+    } else if (g_controllerProbePhase == 10 && g_macTicks - controllerPauseTick >= 10) {
+        g_controllerProbePhase = 11;
+        g_controllerProbePad = 0x000b;
+        controllerPauseTick = g_macTicks;
+    } else if (g_controllerProbePhase == 11 && g_macTicks - controllerPauseTick >= 30) {
+        g_controllerProbePhase = 12;
+        g_controllerProbePad = 0x0003;
     }
 #endif
 #ifdef VETTE_SESSION_CONTROL_ITEM

@@ -19,7 +19,7 @@ rejects loud stops, and cannot pass merely because its time limit expired.
 | recovery | Lake collision/tow, damage/repair, terminal damage and police penalties |
 | routes | city → freeway activation, freeway movement and far freeway → city return |
 | session | Pause/resume, garage/restart, quit and persistent scores |
-| controls | `CONTROLLER_PROBE=1..2`: joystick and CD32 shifting, acceleration, steering, braking, reverse, horn and pause; `HORN_PROBE=1`: horn step and release |
+| controls | `CONTROLLER_PROBE=1..2`: joystick and CD32 shifting, acceleration, steering, braking, reverse, horn, Play pause and resume; `HORN_PROBE=1`: horn step and release |
 
 Selection fixtures use ordinary mouse events. Route fixtures use normal KeyMap
 input; far-end starts shorten already-decoded routes. Finish, damage, repair

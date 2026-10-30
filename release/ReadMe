@@ -94,6 +94,7 @@
  A               automatic shift
  Z               horn
  P               pause/options
+ Amiga+R         resume after pause
  Escape          quit race to garage
  Q               menu
 
@@ -109,7 +110,7 @@
  Red / Green     shift up / down
  Blue            reverse
  Yellow          horn
- Play            pause
+ Play            pause / resume
 
  If using an emulator, set port 0 to Mouse and port 1 to a real controller
  or Nothing. Keyboard joystick emulation would consume the cursor keys.

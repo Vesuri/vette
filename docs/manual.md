@@ -18,6 +18,7 @@ automatic transmission, and accelerate. There is no separate ignition command.
 | Shift up / down | + / - |
 | Automatic / cruise control | A / C |
 | Horn / pause | Z / P |
+| Resume after pause | Amiga+R (original Command-R) |
 | Quit race to garage | Esc |
 | Sound / engine sound | S / E |
 | Buildings / damage / navigation | B / D / H |
@@ -69,7 +70,8 @@ Zoo, and all three legs in sequence. Routes are not prescribed. Cross the
 finish **between the poles**, beneath the checkerboard.
 
 Esc quits the current race and returns to the garage through the original
-Quit to Garage command. P suspends the session. Original Command-R resumes it; Restart Race is enabled
+Quit to Garage command. P suspends the session. Amiga+R (original Command-R) resumes it, as does a
+CD32 pad's Play; Restart Race is enabled
 after Quit to Garage, not in the paused race. Tour Mode relocates the retained
 player rather than starting another race.
 

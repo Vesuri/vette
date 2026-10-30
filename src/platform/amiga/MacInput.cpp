@@ -14,6 +14,7 @@ static struct Interrupt s_keyboardInterrupt;
 static struct Interrupt* s_savedVector;
 struct KeyEvent {
     uint8_t rawAndUp;
+    uint8_t source;
     uint16_t modifiers;
 };
 static volatile KeyEvent s_events[32];
@@ -43,6 +44,7 @@ static void recordKey(uint8_t raw, bool down, uint8_t source)
     uint8_t next = (uint8_t)((s_head + 1) & 31);
     if (next != s_tail) {
         s_events[s_head].rawAndUp = (uint8_t)(raw | (down ? 0 : 0x80));
+        s_events[s_head].source = source;
         s_events[s_head].modifiers = currentModifiers();
         s_head = next;
     }
@@ -246,11 +248,12 @@ void vetteInputShutdown()
     s_ciaaBase = 0;
 }
 
-bool vetteInputPopKey(uint8_t& rawKey, bool& down, uint16_t& modifiers)
+bool vetteInputPopKey(uint8_t& rawKey, bool& down, uint16_t& modifiers, bool& controller)
 {
     if (s_tail == s_head) return false;
     uint8_t event = s_events[s_tail].rawAndUp;
     modifiers = s_events[s_tail].modifiers;
+    controller = s_events[s_tail].source == kController;
     s_tail = (uint8_t)((s_tail + 1) & 31);
     rawKey = (uint8_t)(event & 0x7f);
     down = (event & 0x80) == 0;
