@@ -42,6 +42,13 @@ Original keyboard equivalents remain available. F10 is reserved by WHDLoad,
 overriding the original viewing-angle-down command unless QuitKey changes.
 Network play and optional High Screen/Preferences dialogs are unsupported.
 
+A joystick or CD32 pad in the second port drives the same keys; see the root
+README for the mapping. As on the keyboard, the original shifts only after
+every key has been released, so a controller shift briefly releases the
+controller's other keys first. Keyboard keys held at the same time still
+block the shift. The original also refuses an upshift at low engine speed,
+so keep accelerating: Fire+Up shifts up without lifting the accelerator.
+
 If FS-UAE consumes cursor keys as joystick input, disable that assignment or
 use this repository's launcher mappings.
 

@@ -283,6 +283,18 @@ ifeq ($(FINITE_AUDIO_PROBE),1)
 EXTRA_DEFINES += -DVETTE_FINITE_CONTEXT0_AUDIO_PROBE
 endif
 
+# Regression-only: script port 1 in place of the hardware through each mapped
+# control in a race: CONTROLLER_PROBE=1 joystick, 2 CD32 pad.
+ifdef CONTROLLER_PROBE
+ifndef GARAGE_CLICK
+$(error CONTROLLER_PROBE requires GARAGE_CLICK=1)
+endif
+ifneq ($(filter $(CONTROLLER_PROBE),1 2),$(CONTROLLER_PROBE))
+$(error CONTROLLER_PROBE must be 1 (joystick) or 2 (CD32))
+endif
+EXTRA_DEFINES += -DVETTE_CONTROLLER_PROBE=$(CONTROLLER_PROBE)
+endif
+
 # Diagnostic only: pulse the documented Z horn control for one driving KeyMap
 # scan after the countdown and initial acceleration, then release it through
 # the next ordinary scan.
@@ -640,6 +652,9 @@ PROBE_SYMS += g_scorePersistenceChanged g_scorePersistenceWrites \
 endif
 ifdef SESSION_CONTROL_ITEM
 PROBE_SYMS += g_sessionControlProbeItem g_sessionControlProbePhase
+endif
+ifdef CONTROLLER_PROBE
+PROBE_SYMS += g_controllerProbeMode g_controllerProbePhase g_controllerProbeResult
 endif
 ifdef FPSCOUNT
 PROBE_SYMS +=

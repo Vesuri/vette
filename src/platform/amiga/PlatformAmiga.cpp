@@ -286,6 +286,8 @@ static uint32_t vbiHandler()
     // inside the displayed picture, and a torn pointer garbages the whole field.
     // (docs/amiga-arch.md)
     if (s_screen) s_screen->vbiUpdate();
+    // A field's sample rate keeps short controller presses.
+    vetteInputPollController();
 
     // ⭐ Sample the RAW VPOSR for the first 8 fields.  The long/total ratio alone cannot
     // distinguish "LACE is not working" from "the LOF read is wrong" -- both pin it to 1.0.

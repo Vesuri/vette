@@ -82,6 +82,18 @@ volatile uint16_t g_optionsSteeringProbeComplete = 0;
 volatile uint16_t g_scorePersistenceChanged = 0;
 volatile uint16_t g_scorePersistenceWrites = 0;
 #endif
+#ifdef VETTE_CONTROLLER_PROBE
+// Phase and the car state each controller step produced (gdb reads these).
+volatile uint16_t g_controllerProbeMode = VETTE_CONTROLLER_PROBE;
+volatile uint16_t g_controllerProbePhase = 0;
+volatile uint16_t g_controllerProbeResult[12];
+extern volatile uint16_t g_controllerProbeJoy, g_controllerProbePad;
+extern volatile uint8_t g_controllerProbeFire;
+extern "C" __attribute__((noinline)) void vetteControllerProbeComplete()
+{
+    __asm__ volatile ("" ::: "memory");
+}
+#endif
 #ifdef VETTE_SESSION_CONTROL_ITEM
 volatile uint16_t g_sessionControlProbeItem = VETTE_SESSION_CONTROL_ITEM;
 volatile uint16_t g_sessionControlProbePhase = 0;
@@ -5935,8 +5947,98 @@ extern "C" void vetteMacRawKeyChanged(uint8_t rawKey, bool down)
     setCursorDrivingAliases(rawKey, down);
 }
 
+#ifdef VETTE_CONTROLLER_PROBE
+// Drive port 1 through each documented control once the race is underway.
+// JOY1DAT words: up $0100, down $0001, right $0003. CD32 words carry the
+// $0003 marker bits. Each step waits for the car to respond, so a missed
+// control stops the sequence before phase 10 and the gdb check fails.
+static void updateControllerProbe()
+{
+    static uint32_t since;
+    uint8_t* car = s_currentA5 ? (uint8_t*)read32(s_currentA5 - 13944) : 0;
+    if (!car || !s_drivingFrameStarted) return;
+    uint16_t gear = read16(car + 28), speed = read16(car + 26);
+    uint16_t heading = read16(car + 0x66);
+    uint32_t elapsed = g_macDrivingIterations - since;
+    volatile uint16_t* r = g_controllerProbeResult;
+    auto next = [&](uint16_t joy, uint8_t fire, uint16_t pad) {
+        g_controllerProbeJoy = joy;
+        g_controllerProbeFire = fire;
+        g_controllerProbePad = (uint16_t)(pad | (VETTE_CONTROLLER_PROBE == 2 ? 0x0003 : 0));
+        since = g_macDrivingIterations;
+        ++g_controllerProbePhase;
+    };
+    const uint16_t up = 0x0100, down = 0x0001, right = 0x0003;
+    const uint16_t red = 0x0100, green = 0x0040, forward = 0x0020, reverse = 0x0010;
+#if VETTE_CONTROLLER_PROBE == 1
+#define CONTROLLER_STEP(joystick, fire, joy, pad) next(joystick, fire, 0)
+#else
+#define CONTROLLER_STEP(joystick, fire, joy, pad) next(joy, 0, pad)
+#endif
+    switch (g_controllerProbePhase) {
+    case 0:   // countdown over: shift up into first
+        if ((int16_t)read16(s_currentA5 - 13296) < 3 || g_macDrivingIterations < 30) return;
+        r[0] = gear;
+        CONTROLLER_STEP(up, 1, 0, red);
+        break;
+    case 1:   // accelerate while steering right
+        if (gear == r[0]) return;
+        r[1] = gear;
+        r[2] = heading;
+        CONTROLLER_STEP((uint16_t)(up | right), 0, right, forward);
+        break;
+    case 2:   // shift up into second
+        if (elapsed < 60) return;
+        r[3] = speed;
+        r[4] = heading;
+        CONTROLLER_STEP(up, 1, 0, (uint16_t)(red | forward));
+        break;
+    case 3:   // shift down into first
+        if (gear == r[1]) return;
+        r[5] = gear;
+        CONTROLLER_STEP(down, 1, 0, (uint16_t)(green | forward));
+        break;
+    case 4:   // brake to a stop
+        if (gear == r[5]) return;
+        r[6] = gear;
+        CONTROLLER_STEP(down, 0, 0, reverse);
+        break;
+    case 5:
+        if (speed != 0) return;
+        r[7] = speed;
+#if VETTE_CONTROLLER_PROBE == 1
+        next(0, 0, 0);
+        g_controllerProbePhase = 10;
+        vetteControllerProbeComplete();
+#else
+        next(0, 0, 0x0200);                    // blue: reverse gear
+#endif
+        break;
+#if VETTE_CONTROLLER_PROBE == 2
+    case 6:
+        if (gear == r[6]) return;
+        r[8] = gear;
+        next(0, 0, 0x0080);                    // yellow: horn
+        break;
+    case 7:
+        r[9] = vetteInputKeyDown(0x31);
+        next(0, 0, 0);
+        break;
+    case 8:   // play: pause clears the driving flag (vetteLineADispatch)
+        if (elapsed < 2) return;
+        next(0, 0, 0x0008);
+        break;
+#endif
+    }
+#undef CONTROLLER_STEP
+}
+#endif
+
 static void updateDrivingInputProbe()
 {
+#ifdef VETTE_CONTROLLER_PROBE
+    updateControllerProbe();
+#endif
 #ifdef VETTE_SESSION_CONTROL_ITEM
     // Reach suspension through the physical P or Escape path.
     // Main's event loop dispatches the requested menu command.
@@ -6074,6 +6176,7 @@ static void relocateDiagnosticCar(uint8_t* car, uint32_t x, uint32_t z, uint16_t
 static void refreshDrivingKeyMap()
 {
     if (!s_currentA5) return;
+    vetteInputDrivingScan();
     uint8_t* keyMap = s_currentA5 + 16;
     for (uint16_t i = 0; i < 16; ++i) keyMap[i] = 0;
     for (uint16_t raw = 0; raw < 128; ++raw) {
@@ -6090,6 +6193,7 @@ static void refreshDrivingKeyMap()
     // subsequent GetKeys after that scanner has changed the car's gear.  VBL
     // callbacks are not a safe pulse boundary: several can run without the
     // main-loop keyboard scanner running between them.
+#ifndef VETTE_CONTROLLER_PROBE   // the controller supplies gear and accelerator
     if (s_garageClickPhase >= kGarageDrivingPhase && s_garageGearPhase < 2) {
         uint8_t* car = (uint8_t*)read32(s_currentA5 - 13944);
         if (s_garageGearPhase && car && read16(car + 28)) {
@@ -6124,6 +6228,7 @@ static void refreshDrivingKeyMap()
         keyMap[0x5b >> 3] |= 1u << (0x5b & 7); // keypad 8: accelerate
 #endif
     }
+#endif
 #ifdef VETTE_PARKED_PROFILE
     // Diagnostic scene only. Relocate once after the original countdown;
     // thereafter let the original simulation and renderer run with no input.
@@ -6733,6 +6838,14 @@ static bool validatePermanentHandle(uint8_t** handle)
 // a six-byte frame on the supervisor stack.  This differs from the supervisor-mode Mac II.
 extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* userStack)
 {
+#if defined(VETTE_CONTROLLER_PROBE) && VETTE_CONTROLLER_PROBE == 2
+    if (g_controllerProbePhase == 9 && s_currentA5
+        && read16(s_currentA5 - 21316) == 0) {
+        g_controllerProbePhase = 10;
+        g_controllerProbePad = 0x0003;
+        vetteControllerProbeComplete();
+    }
+#endif
 #ifdef VETTE_SESSION_CONTROL_ITEM
     // The driving-boundary trap stops when the pause key clears the driving
     // flag. Release it at the next Mac trap; Escape needs no extra command

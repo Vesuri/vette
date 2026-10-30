@@ -130,6 +130,14 @@ run_session()
     PROBES=1 SKIP_INTRO=1 SCORE_PERSISTENCE_PROBE=1
 }
 
+run_controls()
+{
+  run_case controller-joystick 240 controller_input.gdb 'PASS controller input mode=1' \
+    PROBES=1 SKIP_INTRO=1 GARAGE_CLICK=1 CONTROLLER_PROBE=1
+  run_case controller-cd32 240 controller_input.gdb 'PASS controller input mode=2' \
+    PROBES=1 SKIP_INTRO=1 GARAGE_CLICK=1 CONTROLLER_PROBE=2
+}
+
 case "$group" in
   smoke) run_smoke ;;
   courses) run_courses ;;
@@ -138,6 +146,7 @@ case "$group" in
   recovery) run_recovery ;;
   routes) run_routes ;;
   session) run_session ;;
+  controls) run_controls ;;
   all)
     run_smoke
     run_courses
@@ -146,9 +155,10 @@ case "$group" in
     run_recovery
     run_routes
     run_session
+    run_controls
     ;;
   *)
-    echo "usage: $0 {smoke|courses|vehicles|difficulties|recovery|routes|session|all}" >&2
+    echo "usage: $0 {smoke|courses|vehicles|difficulties|recovery|routes|session|controls|all}" >&2
     exit 2
     ;;
 esac

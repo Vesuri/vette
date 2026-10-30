@@ -77,6 +77,7 @@
  - animated introduction with music and sound effects
  - native Amiga display, hardware mouse pointer and Paula sound
  - cursor-key aliases for steering, acceleration and braking
+ - joystick and CD32 pad support in port 2
  - scores saved on normal exit
 
  Network play is not supported.
@@ -96,14 +97,29 @@
  Escape          quit race to garage
  Q               menu
 
- If using an emulator, set port 0 to Mouse and port 1 to Nothing. Keyboard
- joystick emulation may otherwise consume the cursor keys.
+ Joystick (port 2):
+ Up / Down       accelerator / brake
+ Left / Right    steering
+ Fire + Up/Down  shift up / down
+
+ CD32 pad (port 2, detected at startup):
+ Left / Right    steering
+ Forward (R)     accelerator
+ Reverse (L)     brake
+ Red / Green     shift up / down
+ Blue            reverse
+ Yellow          horn
+ Play            pause
+
+ If using an emulator, set port 0 to Mouse and port 1 to a real controller
+ or Nothing. Keyboard joystick emulation would consume the cursor keys.
 
 
  History:
  --------
  version 0.93 (30.10.2026):
  - faster on 68030, 68040 and 68060 processors by enabling the data cache
+ - added joystick and CD32 pad support
  - fixed the mouse pointer appearing too narrow in hires mode on AGA
 
  version 0.92 (29.09.2026):

@@ -111,6 +111,21 @@ The VBI advances `g_vbiCount` once per PAL field and Macintosh ticks at 60 Hz
 state. Original VBL callbacks run at safe user-mode trap-return boundaries,
 never directly from the hardware ISR.
 
+The VBI also samples port 1 and presses the Amiga raw keys a player would:
+cursor keys, top-row `=`/`-` for shifting, R, P and Z. Keyboard and controller
+hold separate bits per key, so neither releases a key the other holds. A CD32
+pad is detected once, in the first 128 fields: three valid, agreeing reads
+eight fields apart, after Commodore's note that early reads can miss buttons.
+Without a pad its read never runs again; with one, the 10-bit serial read
+(`Cd32Pad.s`, from Rescue on Fractalus) replaces the fire button. The original
+shift handlers (Main+$328E/$32AC) act only after a KeyMap scan (Main+$2D26,
+inside the driving iteration) with no key down (A5-$39BE), so a new
+controller shift releases the controller's keys for one whole iteration.
+Joystick fire adds the shift to forward/back rather than replacing it:
+Traffic+$3766 undoes a manual shift whose engine speed leaves the new gear's
+band, which an upshift with the accelerator released does at moderate speed. `CONTROLLER_PROBE=1|2` scripts port 1 for
+`controller_input.gdb`.
+
 Presentation does not itself stall original code: a pending buffer causes the
 present call to return. Selected animation loops and the driving loop therefore
 have explicit maximum-rate pacing. See [frame-pacing.md](frame-pacing.md);

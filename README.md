@@ -41,6 +41,16 @@ installation instructions.
 | Control + left mouse button | Quit normally and save scores |
 | F10 | Immediate WHDLoad quit; pending scores are not saved |
 
+A joystick or CD32 pad in the second port (port 1) also works; the pad is
+detected during the first seconds after startup.
+
+| Joystick | Action | CD32 pad | Action |
+| --- | --- | --- | --- |
+| Up / Down | Accelerate / brake | Left / Right | Steer |
+| Left / Right | Steer | Forward (R) / Reverse (L) | Accelerate / brake |
+| Fire + Up / Down | Shift up / down | Red / Green | Shift up / down |
+| | | Blue / Yellow / Play | Reverse / horn / pause |
+
 Select a gear before accelerating. In FS-UAE, disable keyboard joystick
 emulation if it consumes the cursor keys. More controls and game rules are in
 [the playing guide](docs/manual.md).
