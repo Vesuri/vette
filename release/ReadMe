@@ -102,6 +102,10 @@
 
  History:
  --------
+ version 0.93 (30.10.2026):
+ - faster on 68030, 68040 and 68060 processors by enabling the data cache
+ - fixed the mouse pointer appearing too narrow in hires mode on AGA
+
  version 0.92 (29.09.2026):
  - improved drawing performance by removing redundant frame copying and
    optimizing object rendering and display updates
