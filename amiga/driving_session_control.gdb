@@ -3,6 +3,9 @@
 set pagination off
 set confirm off
 set $handler = 0
+set $pausedFrames = 0
+set $pauseShown = 0
+set $seed = 0
 
 break menuKey if g_sessionControlProbePhase == 3
 commands
@@ -47,10 +50,29 @@ commands
   continue
 end
 
+# While suspended, before the menu command, the screen must stay the driving
+# picture (WIND 131 is selected but not drawn): driving crop, no pointer. The
+# device seed must not change, or CopyBits rematches the driving pixels.
+break VetteScreen::presentMacFrame if g_sessionControlProbePhase >= 1 && $handler == 0
+commands
+  silent
+  if $seed == 0
+    set $seed = *(unsigned int*)s_windowManagerColors
+  end
+  if *(unsigned short*)(s_currentA5-21316) == 0
+    set $pausedFrames = $pausedFrames + 1
+    if mouseAllowed || cropLeft != 96 || cropTop != 32
+      set $pauseShown = 1
+    end
+  end
+  continue
+end
+
 break *(s_segments[1].begin+0x1fd2) if $handler == g_sessionControlProbeItem
 commands
   silent
-  printf "session-control resumed tick=%u item=%u handler=%u phase=%u iterations=%u race-state=%d driving-global=%u bridge=%u\n", g_macTicks, g_sessionControlProbeItem, $handler, g_sessionControlProbePhase, g_macDrivingIterations, *(signed short*)(s_currentA5-13296), *(unsigned short*)(s_currentA5-21316), s_drivingFrameStarted
+  set $pauseOk = !$pauseShown && *(unsigned int*)s_windowManagerColors == $seed && s_loudStopScreen->m_nextCropLeft == 96 && !s_loudStopScreen->m_nextMouseAllowed
+  printf "session-control resumed tick=%u item=%u handler=%u phase=%u iterations=%u race-state=%d driving-global=%u bridge=%u paused-frames=%u pause-ok=%u\n", g_macTicks, g_sessionControlProbeItem, $handler, g_sessionControlProbePhase, g_macDrivingIterations, *(signed short*)(s_currentA5-13296), *(unsigned short*)(s_currentA5-21316), s_drivingFrameStarted, $pausedFrames, $pauseOk
   if !s_bogasContexts[0].playing || s_bogasSuspended || (*(unsigned short*)0xdff002 & 3) != 3 || s_bogasVoiceVolume[0] == 0 || s_bogasVoiceVolume[1] == 0
     echo FAIL resumed race engine audio\n
   else

@@ -4945,9 +4945,15 @@ static bool clipRect(const uint8_t* rectangle)
     return true;
 }
 
-static void paletteToColorTable(uint8_t** paletteHandle, uint8_t* colorTable)
+static void paletteToColorTable(uint8_t** paletteHandle, uint8_t* deviceTable)
 {
-    if (!paletteHandle || !*paletteHandle || !colorTable) return;
+    if (!paletteHandle || !*paletteHandle || !deviceTable) return;
+    // Build the realized table aside: activating a palette whose colors the
+    // device already holds changes nothing, so its seed must stay. Pause
+    // selects the options window, which shares the driving palette; a new
+    // seed there made CopyBits rematch offscreen pixels through a stale table.
+    uint8_t colorTable[sizeof(s_windowManagerColors)];
+    blockMove(deviceTable, colorTable, sizeof(colorTable));
     const uint8_t* palette = *paletteHandle;
     uint16_t count = read16(palette);
     if (count > 16) count = 16;
@@ -5010,7 +5016,12 @@ static void paletteToColorTable(uint8_t** paletteHandle, uint8_t* colorTable)
         }
     }
     write16(colorTable + 4, 0x8000);       // device table: array index is pixel value
+    bool changed = false;
+    for (uint16_t i = 4; i < sizeof(colorTable); ++i)
+        if (colorTable[i] != deviceTable[i]) changed = true;
+    if (!changed) return;
     write32(colorTable, s_colorSeed++);
+    blockMove(colorTable, deviceTable, sizeof(colorTable));
 }
 
 static GWorldSlot* gWorldForPort(uint8_t* port)
@@ -5777,6 +5788,12 @@ static void presentMacRuntime()
         case 140: // garage
             cropLeft = 128; cropTop = 26; mouseAllowed = true; break;
         case 131: // opponent/difficulty
+            // A suspended race (P) selects this window without drawing it,
+            // leaving the driving picture; Return to Game is enabled only then.
+            if ((menuKey('R') & 0xffff) == 6) {
+                cropLeft = 96; cropTop = 32;
+                break;
+            }
             cropLeft = 144; cropTop = 8; mouseAllowed = true; break;
         case 129: // driving
             cropLeft = 96; cropTop = 32;

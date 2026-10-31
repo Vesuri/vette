@@ -82,7 +82,9 @@ Other windows use 80,0. A changed viewport forces a complete C2P of its newly
 visible area and drops the previous crop's synchronization rectangles. VBI
 publishes the new bitmap, origin and mouse visibility together. The pointer is
 allowed only in garage, opponent/difficulty and course windows; original cursor
-hide/show calls still apply within those screens. It stays hidden in the intro,
+hide/show calls still apply within those screens. A suspended race (P) selects
+the opponent/difficulty window without drawing it and enables Return to Game;
+while that item is enabled the driving crop stays and the pointer stays hidden. It stays hidden in the intro,
 driving and other windows in both display modes, while mouse input remains active.
 Bytes outside the current crop retain their previous contents.
 

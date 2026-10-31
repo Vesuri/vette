@@ -30,6 +30,9 @@ See [display geometry](amiga-arch.md#display).
 A pixel value is an index, not an RGB color. CopyBits may translate between
 different ColorTables. Palette Manager activation changes the destination
 relationship; direct 3D pattern writers also need the correct index mapping.
+Activating a palette whose colors the device already holds leaves its seed:
+pause selects the options window, which shares the driving palette, and a new
+seed made CopyBits rematch the driving pixels through a stale offscreen table.
 Do not infer index permutations from a particular car or palette screenshot.
 Dithered panels use two indices, not a single darkened shade.
 

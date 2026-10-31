@@ -116,7 +116,7 @@ run_routes()
 run_session()
 {
   run_case return-to-game 45 driving_session_control.gdb \
-    'session-control resumed.*item=6.*handler=6' PROBES=1 SKIP_INTRO=1 GARAGE_CLICK=1 SESSION_CONTROL_ITEM=6
+    'session-control resumed.*item=6.*handler=6.*pause-ok=1' PROBES=1 SKIP_INTRO=1 GARAGE_CLICK=1 SESSION_CONTROL_ITEM=6
   run_case restart-race 50 driving_session_control.gdb \
     'session-control resumed.*item=5.*handler=5' PROBES=1 SKIP_INTRO=1 GARAGE_CLICK=1 SESSION_CONTROL_ITEM=5
   run_case menu-quit 50 driving_menu_quit.gdb \
