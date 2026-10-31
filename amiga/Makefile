@@ -692,7 +692,7 @@ obj/StartupConfig.o: $(AMIGA_SRC)/StartupConfig.s
 $(OUT).exe: $(OUT).elf
 	$(info Elf2Hunk $@)
 	@$(ELF2HUNK) $(OUT).elf $(OUT).exe -s
-	@grep -qa '$$VER: Vette! 0.93 (30.10.2026)' $(OUT).exe || { \
+	@grep -qa '$$VER: Vette! 0.93 (31.10.2026)' $(OUT).exe || { \
 	  echo "error: the AmigaOS \$$VER: string is missing from $@."; \
 	  echo "       See src/platform/amiga/version.s (SHF_GNU_RETAIN)."; \
 	  $(RM) $@; exit 1; }

@@ -118,12 +118,14 @@
 
  History:
  --------
- version 0.93 (30.10.2026):
+ version 0.93 (31.10.2026):
  - faster on 68030, 68040 and 68060 processors by enabling the data cache
  - added joystick and CD32 pad support
  - fixed the mouse pointer appearing too narrow in hires mode on AGA
  - fixed the horn sounding too low and not stopping when released, and
    other sound effects playing slightly too low
+ - fixed the mouse pointer appearing while paused and the colours breaking
+   after resuming with Amiga+R
 
  version 0.92 (29.09.2026):
  - improved drawing performance by removing redundant frame copying and
