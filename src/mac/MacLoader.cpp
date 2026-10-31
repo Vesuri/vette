@@ -6076,12 +6076,18 @@ static void updateControllerProbe()
         if (elapsed < 2) return;
         next(0, 0, 0x0008);
         break;
-    case 12:  // play again resumed the race (phases 10-11 run while paused)
+    case 11:  // Play, pressed while paused (phase 10), resumed the race
         r[11] = 1;
+        since = g_macDrivingIterations;
+        g_controllerProbePhase = 12;
+        break;
+    case 12:  // keep Play held into the resumed race, then release it
+        if (elapsed < 20) return;
+        g_controllerProbePad = 0x0003;
         since = g_macDrivingIterations;
         g_controllerProbePhase = 13;
         break;
-    case 13:  // still driving after Play was held across the resume
+    case 13:  // still driving: the held Play did not pause again
         if (elapsed < 60) return;
         g_controllerProbePhase = 14;
         vetteControllerProbeComplete();
@@ -6849,6 +6855,7 @@ static bool nextEvent(uint16_t mask, uint8_t* event)
             key.virtualKey = 0x0f; // Macintosh R
             character = 'r';
             modifiers |= 0x0100; // cmdKey
+            vetteInputControllerResumed();
         }
         message = ((uint32_t)key.virtualKey << 8) | character;
         transition = true;
@@ -6909,8 +6916,8 @@ static bool validatePermanentHandle(uint8_t** handle)
 extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* userStack)
 {
 #if defined(VETTE_CONTROLLER_PROBE) && VETTE_CONTROLLER_PROBE == 2
-    // While paused no driving iteration runs: release Play, then hold it
-    // again for 30 ticks so the resumed race scans it, then release.
+    // While paused no driving iteration runs: release Play, then press it
+    // again; updateControllerProbe holds it into the resumed race.
     static uint32_t controllerPauseTick;
     if (g_controllerProbePhase == 9 && s_currentA5
         && read16(s_currentA5 - 21316) == 0) {
@@ -6921,10 +6928,6 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
     } else if (g_controllerProbePhase == 10 && g_macTicks - controllerPauseTick >= 10) {
         g_controllerProbePhase = 11;
         g_controllerProbePad = 0x000b;
-        controllerPauseTick = g_macTicks;
-    } else if (g_controllerProbePhase == 11 && g_macTicks - controllerPauseTick >= 30) {
-        g_controllerProbePhase = 12;
-        g_controllerProbePad = 0x0003;
     }
 #endif
 #ifdef VETTE_SESSION_CONTROL_ITEM

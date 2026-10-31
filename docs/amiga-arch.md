@@ -128,7 +128,8 @@ Traffic+$3766 undoes a manual shift whose engine speed leaves the new gear's
 band, which an upshift with the accelerator released does at moderate speed.
 The pad has no Command key: while the session is suspended (driving flag
 A5-21316 clear, Return to Game enabled), a controller P edge becomes
-Command-R in the event layer. `CONTROLLER_PROBE=1|2` scripts port 1 for
+Command-R in the event layer. The controller's P then stays up until Play is
+released, or the resumed race's KeyMap scan would pause it again. `CONTROLLER_PROBE=1|2` scripts port 1 for
 `controller_input.gdb`.
 
 Presentation does not itself stall original code: a pending buffer causes the

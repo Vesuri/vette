@@ -89,6 +89,9 @@ static volatile bool s_controllerReady;
 static volatile uint16_t s_drivingScans;
 static uint16_t s_shiftReleaseScan;
 static bool s_shiftPending;
+// Set when Play resumed a suspended race: the resumed driving scan would
+// otherwise read the still-held P and pause again. Cleared on release.
+static volatile bool s_resumePlayHeld;
 
 extern "C" uint16_t vette_cd32_read();
 #ifdef VETTE_CONTROLLER_PROBE
@@ -188,6 +191,11 @@ void vetteInputPollController()
         if (down) keys |= kKeyDown | (fire ? kKeyShiftDown : 0);
     }
 
+    if (s_resumePlayHeld) {
+        if (keys & kKeyPause) keys &= (uint16_t)~kKeyPause;
+        else s_resumePlayHeld = false;
+    }
+
     const uint16_t shifts = kKeyShiftUp | kKeyShiftDown;
     if (keys & shifts & ~s_controllerKeys) {
         if (!s_shiftPending) {
@@ -212,12 +220,24 @@ void vetteInputDrivingScan()
     ++s_drivingScans;
 }
 
+void vetteInputControllerResumed()
+{
+    Disable();
+    s_resumePlayHeld = true;
+    if (s_controllerKeys & kKeyPause) {
+        s_controllerKeys &= (uint16_t)~kKeyPause;
+        recordKey(kRawPause, false, kController);
+    }
+    Enable();
+}
+
 bool vetteInputInitialize()
 {
     for (uint16_t i = 0; i < 128; ++i) s_keyDown[i] = 0;
     s_head = s_tail = 0;
     s_controllerKeys = 0;
     s_shiftPending = false;
+    s_resumePlayHeld = false;
     s_cd32Present = false;
     s_cd32Streak = 0;
     (void)readCd32();   // warm-up read, discarded
