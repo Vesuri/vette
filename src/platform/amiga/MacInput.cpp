@@ -280,6 +280,26 @@ bool vetteInputPopKey(uint8_t& rawKey, bool& down, uint16_t& modifiers, bool& co
     return true;
 }
 
+void vetteInputFlushKeys(uint16_t whichMask, uint16_t stopMask)
+{
+    // Key events only: keyDown (3) and keyUp (4) bits of the Mac event masks.
+    Disable();
+    uint8_t kept = s_tail;
+    uint8_t i = s_tail;
+    bool stopped = false;
+    for (; i != s_head; i = (uint8_t)((i + 1) & 31)) {
+        uint16_t bit = (uint16_t)((s_events[i].rawAndUp & 0x80) ? 1u << 4 : 1u << 3);
+        if (stopMask & bit) stopped = true;
+        if (!stopped && (whichMask & bit)) continue;
+        s_events[kept].rawAndUp = s_events[i].rawAndUp;
+        s_events[kept].source = s_events[i].source;
+        s_events[kept].modifiers = s_events[i].modifiers;
+        kept = (uint8_t)((kept + 1) & 31);
+    }
+    s_head = kept;
+    Enable();
+}
+
 bool vetteInputKeyDown(uint8_t rawKey)
 {
     if (rawKey >= 128) return false;

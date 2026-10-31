@@ -6925,6 +6925,8 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
         g_controllerProbeResult[10] = 1;
         g_controllerProbePad = 0x0003;
         controllerPauseTick = g_macTicks;
+    } else if (g_controllerProbePhase == 10 && read16(s_currentA5 - 21316)) {
+        g_controllerProbeResult[10] = 0;     // resumed before Play was pressed again
     } else if (g_controllerProbePhase == 10 && g_macTicks - controllerPauseTick >= 10) {
         g_controllerProbePhase = 11;
         g_controllerProbePad = 0x000b;
@@ -6933,9 +6935,14 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
 #ifdef VETTE_SESSION_CONTROL_ITEM
     // The driving-boundary trap stops when the pause key clears the driving
     // flag. Release it at the next Mac trap; Escape needs no extra command
-    // injection, while the other fixtures supply their Command-key edges.
+    // injection, while the other fixtures supply their Command-key edges
+    // once EnterPauseOptions has flushed the queued keys (phase 2).
+#if VETTE_SESSION_CONTROL_ITEM == 7
     if (g_sessionControlProbePhase == 1 && s_currentA5
         && read16(s_currentA5 - 21316) == 0) {
+#else
+    if (g_sessionControlProbePhase == 2) {
+#endif
         // Restart is disabled while the session is suspended. Its real path
         // first selects Quit to Garage (Command-G); that transition enables
         // Restart Race. Return (Command-R) and Quit (Command-Q) are immediately
@@ -7384,9 +7391,14 @@ extern "C" uint32_t vetteLineADispatch(uint32_t* regs, uint8_t* frame, uint8_t* 
         return 5;                             // handled + four parameter bytes consumed
     }
     if (trap == 0xa032) {                    // FlushEvents(whichMask, stopMask) in D0
-        // No Macintosh events have been enqueued before the main loop.  The
-        // combined masks in D0 are still accepted exactly as a register trap;
-        // live mouse/key state is not an event-queue entry and is untouched.
+        // Remove queued key events of the low-word types, stopping at the
+        // first of the high-word types. EnterPauseOptions flushes the Play
+        // press that suspended the race; the live key state is untouched.
+        vetteInputFlushKeys((uint16_t)regs[0], (uint16_t)(regs[0] >> 16));
+#ifdef VETTE_SESSION_CONTROL_ITEM
+        if (g_sessionControlProbePhase == 1 && read16(s_currentA5 - 21316) == 0)
+            g_sessionControlProbePhase = 2;
+#endif
         if (g_stageCDepth < 79) g_stageCDepth = 79;
         return 1;
     }

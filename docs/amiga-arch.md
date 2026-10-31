@@ -129,7 +129,10 @@ band, which an upshift with the accelerator released does at moderate speed.
 The pad has no Command key: while the session is suspended (driving flag
 A5-21316 clear, Return to Game enabled), a controller P edge becomes
 Command-R in the event layer. The controller's P then stays up until Play is
-released, or the resumed race's KeyMap scan would pause it again. `CONTROLLER_PROBE=1|2` scripts port 1 for
+released, or the resumed race's KeyMap scan would pause it again. The race
+reads keys from the KeyMap, so the Play press that pauses it is still queued:
+`FlushEvents` removes queued key events (EnterPauseOptions flushes them) so
+the options loop cannot take that press as Return to Game. `CONTROLLER_PROBE=1|2` scripts port 1 for
 `controller_input.gdb`.
 
 Presentation does not itself stall original code: a pending buffer causes the
